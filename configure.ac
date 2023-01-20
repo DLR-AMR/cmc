@@ -187,6 +187,7 @@ AC_MSG_CHECKING([for compilation and linkage of MPI C program])
 AC_LANG_PUSH([C])
 AC_LINK_IFELSE([AC_LANG_PROGRAM(
     [[
+     	#include <stddef.h>
         #include "mpi.h"
     ]],
     [[
