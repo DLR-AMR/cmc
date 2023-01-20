@@ -1,0 +1,6 @@
+bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression \
+example/lossy_amr_nc_compression/cmc_fortran_lossy_amr_compression
+
+example_lossy_amr_nc_compression_cmc_lossy_amr_nc_compression_SOURCES = example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression.cxx
+
+example_lossy_amr_nc_compression_cmc_fortran_lossy_amr_compression_SOURCES = example/lossy_amr_nc_compression/cmc_fortran_lossy_amr_compression.f90
