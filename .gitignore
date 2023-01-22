@@ -33,4 +33,5 @@ src/config.h.in
 *.nc
 *.vtu
 *.pvtu
+*.mod
 *~

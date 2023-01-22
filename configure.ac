@@ -15,7 +15,7 @@ AM_PROG_AR
 #   --enable-debug          for a DEBUG-mode configuration
 #   --enable-mpi            for compilation with MPI support
 #   --enable-fortran        for enabling Fortran code dependent files
-#   --enable-messy-only     for maximum performance if only used with MESSy
+#   --with-moddir           the directory path for Fortran module files
 #   --with-t8code           for linkage against t8code
 #   --with-netcdf           for linkage against netCDF
 # ==========================================================
@@ -55,18 +55,20 @@ if test "x$enableval" != xno ; then
 fi
 AM_CONDITIONAL([ENABLE_FORTRAN], [test "x$enableval" != xno])
 CMC_ENABLE_FORTRAN="$enableval"
+AC_SUBST([CMC_ENABLE_FORTRAN])
 
 # ==========================================================
-# Check if the option for a MESSy-only usage is given ======
-AC_ARG_ENABLE([messy-only],
-    [AS_HELP_STRING([--enable-messy-only], [Enabling this option reduces the overhead introduced by a general compression approach and is designed for usage with MESSy-Simulation data only])],,
-    [enableval=no])
+# Check if a path for the Fortran modules is explicitly 
+# specified ====================================================
+AC_ARG_WITH([moddir],
+    [AS_HELP_STRING([--with-moddir], [Specify the path for Fortran module files])],,
+    [withval=no])
 
-if test "x$enableval" != xno ; then
-    AC_DEFINE([ENABLE_MESSY_ONLY], 1, [Define if a MESSy only usage is wished.])
+if test "x$withval" != xno ; then
+    AC_DEFINE([WITH_MODDIR], 1, [Specify the Fortran module files output directory.])
 fi
-AM_CONDITIONAL([ENABLE_MESSY_ONLY], [test "x$enableval" != xno])
-CMC_ENABLE_MESSY_ONLY="$enableval"
+AM_CONDITIONAL([WITH_MODDIR], [test "x$withval" != xno])
+CMC_WITH_MODDIR="$withval"
 
 # ==========================================================
 # Check if option with-t8code is given =====================
@@ -151,11 +153,12 @@ if test "x$CMC_ENABLE_FORTRAN" != xno; then
     AC_FC_MODULE_EXTENSION
     AC_FC_MODULE_FLAG
     AC_FC_MODULE_OUTPUT_FLAG
-    #if test "x$ac_cv_fc_module_output_flag" != x; then
-        #FCFLAGS+=" ${ac_cv_fc_module_output_flag}${prefix}/include"
-        #FFLAGS+=" ${ac_cv_fc_module_output_flag}${prefix}/include"
-    #fi
-    AC_MSG_NOTICE([Das DIng hat den Wert: $ac_cv_fc_module_output_flag])
+    if test -n "$ac_cv_fc_module_output_flag"; then
+        if test "x$CMC_WITH_MODDIR" != xno; then
+            FCFLAGS+=" ${ac_cv_fc_module_output_flag}${CMC_WITH_MODDIR}"
+            FFLAGS+=" ${ac_cv_fc_module_output_flag}${CMC_WITH_MODDIR}"
+        fi
+    fi
 fi
 
 # ==========================================================
