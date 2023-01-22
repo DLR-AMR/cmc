@@ -7,7 +7,6 @@
 #include "t8code/cmc_t8code_data.hxx"
 #include "t8code/cmc_t8code_geo_mesh.h"
 #include "t8code/cmc_t8code_geo_data.h"
-#include "t8_forest/t8_forest_vtk.h"
 #include "component_interfaces/cmc_t8_nc.h"
 #include "lossy/cmc_amr_compressor.h"
 

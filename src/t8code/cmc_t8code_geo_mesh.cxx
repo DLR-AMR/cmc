@@ -6,31 +6,15 @@
 
 /** Begin STATIC Functions **/
 /** Calculate the maximum refinement level needed per direction/dimension in order to build an enclosing t8code mesh */
-#if 0
-static int
-cmc_t8_calc_geo_refinement_level(var_vector_t* coords)
-{
-    #ifdef CMC_WITH_T8CODE
-    cmc_assert(coords->size() >= CMC_NUM_COORD_IDS);
-    /* Calculate the maximum number of elements per direction */
-    const size_t max_elem_per_direction{std::max(std::initializer_list<size_t> {coords->operator[](CMC_COORD_IDS::CMC_LAT).size(), coords->operator[](CMC_COORD_IDS::CMC_LON).size(), coords->operator[](CMC_COORD_IDS::CMC_LEV).size()})};
-    /* Calculate the induced initial refinement level needed in order to build an enclosing mesh */
-    return static_cast<int>(std::ceil(std::log2(max_elem_per_direction) + std::numeric_limits<double>::epsilon()));
+#ifdef CMC_WITH_T8CODE
 
-    #else
-    return CMC_ERR;
-    #endif
-}
-#endif
 static int
 cmc_t8_calc_geo_refinement_level(const cmc_t8_data& t8_data, const int var_id)
 {
-    #ifdef CMC_WITH_T8CODE
     cmc_assert(var_id >= 0 && var_id < static_cast<int>(t8_data.vars.size()));
     const size_t max_elem_per_direction{*std::max_element(t8_data.vars[var_id]->var->dim_lengths.begin(), t8_data.vars[var_id]->var->dim_lengths.end())};
     /* Calculate the induced initial refinement level needed in order to build an enclosing mesh */
     return static_cast<int>(std::ceil(std::log2(max_elem_per_direction) + std::numeric_limits<double>::epsilon()));
-    #endif
 }
 
 static std::string
@@ -83,7 +67,6 @@ data_layout_to_string(const DATA_LAYOUT layout)
 static t8_forest_t
 cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const int initial_refinement_lvl, const int var_id = -1)
 {
-    #ifdef CMC_WITH_T8CODE
     t8_forest_t forest{initial_forest};
     t8_forest_t forest_adapt;
 
@@ -125,9 +108,8 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
 
     /* Return the coarsened forest */
     return forest;
-    #endif
 }
-
+#endif
 /** END STATIC Functions **/
 
 bool
@@ -407,6 +389,8 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
             t8_forest_unref(&initial_forest);
         }
     }
+    #else
+    cmc_err_msg("CMC is not compiled with t8code, please reconfigure with t8code linkage in order to use this function.");
     #endif
 }
 

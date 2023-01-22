@@ -2,6 +2,8 @@
 #include "t8code/cmc_t8code_data.hxx"
 #include "cmc_t8code_geo_mesh.h"
 
+#ifdef CMC_WITH_T8CODE
+
 t8_locidx_t
 cmc_t8_adapt_coarsen_geo_mesh_callback (t8_forest_t forest,
                                         t8_forest_t forest_from,
@@ -295,3 +297,5 @@ cmc_t8_adapt_callback_coarsen_error_threshold (t8_forest_t forest,
     return CMC_ERR;
     #endif
 }
+
+#endif

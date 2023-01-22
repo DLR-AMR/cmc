@@ -1,4 +1,3 @@
-
 #include "cmcc_wrapper.h"
 
 int

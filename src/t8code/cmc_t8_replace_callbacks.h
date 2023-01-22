@@ -1,6 +1,8 @@
 #ifndef CMC_T8_REPLACE_CALLBACKS_H
 #define CMC_T8_REPLACE_CALLBACKS_H
 
+#ifdef CMC_WITH_T8CODE
+
 #include "cmc_t8code.h"
 
 void
@@ -18,5 +20,6 @@ void
 cmc_t8_geo_data_interpolate_error_threshold_adaption(t8_forest_t forest_old, t8_forest_t forest_new, t8_locidx_t which_tree,
                                                      t8_eclass_scheme_c* ts, int refine, int num_outgoing, t8_locidx_t first_outgoing,
                                                      int num_incoming, t8_locidx_t first_incoming);
-                                                     
+
+#endif                                                   
 #endif /* CMC_T8_REPLACE_CALLBACKS_H */

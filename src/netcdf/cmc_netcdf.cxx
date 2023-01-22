@@ -51,21 +51,17 @@ public:
 cmc_nc_data_t
 cmc_nc_create(const int _ncid)
 {
-    #if CMC_WITH_NETCDF
     return new cmc_nc_data{_ncid};
-    #endif
 }
 
 /* Destroy/deallocate a cmc_nc_data struct */
 void
 cmc_nc_destroy(const cmc_nc_data_t nc_data)
 {
-    #if CMC_WITH_NETCDF
     if (nc_data != nullptr)
     {
         delete nc_data;
     }
-    #endif
 }
 
 int
@@ -76,6 +72,7 @@ cmc_nc_data::get_ncid() const
 
 /************************************/
 /****** BEGIN STATIC FUNCTIONS ******/
+#ifdef CMC_WITH_NETCDF
 /** Inquire the dimension lenghts and ids of the (geo-spatial) coordinate dimensions as well as their variables ids */ 
 static void
 cmc_nc_inquire_coordinate_dims(cmc_nc_data& nc_data)
@@ -362,7 +359,7 @@ cmc_nc_inquire_var_meta_data(cmc_nc_data_t nc_data)
     cmc_nc_check_for_attributes(*nc_data, attributes);
     #endif 
 }
-
+#endif
 /******* END STATIC FUNCTIONS *******/
 /************************************/
 
@@ -461,7 +458,8 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
 void
 cmcc_nc_inquire_vars(cmc_nc_data_t nc_data, const size_t* start_ptr, const size_t* count_ptr, const int var_count, ...)
 {
-    #if CMC_WITH_NETCDF
+    #ifdef CMC_WITH_NETCDF
+
     va_list args;
     const char* current_var_name;
 
@@ -526,8 +524,10 @@ cmc_nc_open(const char* path_to_file, MPI_Comm comm)
 void
 cmc_nc_close(int ncid)
 {
+    #ifdef CMC_WITH_NETCDF
     int err{nc_close(ncid)};
     cmc_nc_check_err(err);
+    #endif
 }
 
 void
@@ -756,8 +756,6 @@ _Noreturn
 void
 cmc_netcdf_exit(const int _err_code, const char* _location)
 {
-    #ifdef CMC_WITH_NETCDF
     std::cout << "CMC_NETCDF_EXIT is invoked..." << std::endl << "A netCDF-Error occured, Code: " << _err_code << std::endl << nc_strerror(_err_code) << std::endl << "In: " << _location << std::endl;
     std::exit(EXIT_FAILURE);
-    #endif
 }

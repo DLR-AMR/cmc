@@ -29,7 +29,7 @@ struct cmc_amr_data
 };
 
 /** Begin Static Functions **/
-
+#ifdef CMC_WITH_T8CODE
 static
 int
 get_dimensionality_of_compression_mode(const CMC_AMR_COMPRESSION_MODE mode)
@@ -54,13 +54,14 @@ get_dimensionality_of_compression_mode(const CMC_AMR_COMPRESSION_MODE mode)
             return CMC_ERR;
     }
 }
+#endif
 
 /* In order to write a netCDF-file of the decompressed data, the data has to be defined on the same geo domain */
+#ifdef CMC_WITH_NETCDF
 static void
 cmc_amr_write_nc_file_decompressed_data(cmc_amr_data_t amr_data, const char* path, const std::vector<int>& var_ids)
 {
     #ifdef CMC_WITH_T8CODE
-    #ifdef CMC_WITH_NETCDF
     cmc_assert(amr_data->compression_applied == false);
     cmc_assert(var_ids.size() > 0);
 
@@ -321,20 +322,17 @@ cmc_amr_write_nc_file_decompressed_data(cmc_amr_data_t amr_data, const char* pat
     cmc_nc_check_err(err);
 
     #endif
-    #endif
 }
-
+#endif
 /** End Static Functions **/
 
 cmc_amr_data_t
 cmc_create_amr_compression_data(cmc_nc_data_t nc_data, const MPI_Comm comm)
 {
-    #ifdef CMC_WITH_T8CODE
     cmc_amr_data_t amr_data{new cmc_amr_data()};
     amr_data->t8_data = new cmc_t8_data(comm);
     cmc_t8_nc_setup_compression(nc_data, amr_data->t8_data);
     return amr_data;
-    #endif
 }
 
 #if 0
@@ -624,20 +622,17 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
 void
 cmc_amr_destroy(cmc_amr_data_t amr_data)
 {
-    #ifdef CMC_WITH_T8CODE
     if (amr_data != nullptr)
     {
         delete amr_data->t8_data;
         delete amr_data;
     }
-    #endif
 }
 
 
 void
 cmc_amr_write_netcdf_file(cmc_amr_data_t amr_data, const char* path, const int var_id)
 {
-    #ifdef CMC_WITH_T8CODE
     #ifdef CMC_WITH_NETCDF
     std::vector<int> output_variable_ids;
     if (var_id == CMC_AMR_WRITE_ALL_VARS_TO_NETCDF)
@@ -671,7 +666,6 @@ cmc_amr_write_netcdf_file(cmc_amr_data_t amr_data, const char* path, const int v
         /* If the data is not compressed */
         cmc_amr_write_nc_file_decompressed_data(amr_data, path, output_variable_ids);
     }
-    #endif
     #endif
 }
 

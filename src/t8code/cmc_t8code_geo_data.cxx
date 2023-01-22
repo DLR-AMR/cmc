@@ -8,7 +8,7 @@
 
 /** Begin STATIC Functions **/
 /****************************/
-
+#ifdef CMC_WITH_T8CODE
 /** \note: These functions are considered to be used when linear ordered data is transformed to z-curve compliant data.
   * \note: It is assumed that longitude coordinates are ordered like: lon=0.0, 2.5, 5.0, ..., 357.5
   *        It is assumed that latitude coordinates are ordered like:  lat=90.0, 87.5, 85, ..., -90.0
@@ -1512,7 +1512,7 @@ cmc_t8_adapt_interpolate_data_func(cmc_t8_data_t t8_data, t8_forest_adapt_t adap
     }
     #endif
 }
-
+#endif
 /** End STATIC Functions **/
 /**************************/
 

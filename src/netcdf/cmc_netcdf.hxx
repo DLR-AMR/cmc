@@ -38,7 +38,7 @@ cmc_nc_inquire_vars(cmc_nc_data_t nc_data, const size_t* start_ptr, const size_t
 
     /* Inquire the data of these variables */
     cmc_nc_inquire_var_data(nc_data, start_ptr, count_ptr);
-    
+
     #else
     cmc_err_msg("CMC is not compiled with netCDF, please reconfigure with netCDF linkage in order to use this function.");
     #endif
