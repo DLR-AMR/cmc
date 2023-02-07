@@ -55,6 +55,10 @@ public:
     /* The name of the variable */
     std::string name{};
 
+    /* In a parallel setting, we are saving the start and count data pointer (for a blocked parallel distribution of the variable's data */
+    std::vector<uint32_t> start_ptr;
+    std::vector<uint32_t> count_ptr;
+
     void switch_data();
     void get_data_layout_from_axis_ordering();
     void assign_an_arbitrary_missing_value();

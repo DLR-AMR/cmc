@@ -42,6 +42,9 @@ cmc_nc_data_t
 cmc_nc_create(const int _ncid);
 
 void
+cmc_nc_set_mpi_communicator(cmc_nc_data_t nc_data, MPI_Comm comm);
+
+void
 cmc_nc_destroy(const cmc_nc_data_t _nc_data);
 
 #ifdef __cplusplus

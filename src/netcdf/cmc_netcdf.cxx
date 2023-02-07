@@ -1,5 +1,4 @@
 #include "cmc_netcdf.h"
-//#include "utilities/cmc_array.h"
 #include "utilities/cmc_container.hxx"
 #include "utilities/cmc_geo_util.h"
 #include "utilities/cmc_log_functions.h"
@@ -14,9 +13,7 @@ public:
     
     cmc_nc_data(const int _ncid)
     : ncid{_ncid}{};
-    ~cmc_nc_data(){
-        //TODO deallocate vars if not nullptr or so
-    };
+    ~cmc_nc_data(){};
     /* These variables only save cooridnate relative values for (latitude, longitude, leverage, time) */
     std::array<int, CMC_NUM_COORD_IDS> coord_dim_ids{CMC_COORDINATE_NOT_CONSIDERED, CMC_COORDINATE_NOT_CONSIDERED, CMC_COORDINATE_NOT_CONSIDERED, CMC_COORDINATE_NOT_CONSIDERED};
     std::array<int, CMC_NUM_COORD_IDS> coord_var_ids{CMC_COORDINATE_NOT_CONSIDERED, CMC_COORDINATE_NOT_CONSIDERED, CMC_COORDINATE_NOT_CONSIDERED, CMC_COORDINATE_NOT_CONSIDERED};
@@ -40,11 +37,9 @@ public:
     /* A status flag of the current mode the struct is in */
     CMC_NC_STATUS status{STATUS_UNDEFINED};
 
-    int get_ncid() const;
+    MPI_Comm comm{MPI_COMM_WORLD}; //!< The communicator to use in a parallel environment
 
-    //TODO for later
-    /* Save start and count data pointer because if only a hyperslab is read in the inquired coordinate variables (i.e. their data) has to be cropped and adapted */
-    //std::vector<size_t> start_ptr, count_ptr (reserve size num_dimensions) 
+    int get_ncid() const;
 };
 
 /* Create a cmc_nc_data struct */
@@ -52,6 +47,13 @@ cmc_nc_data_t
 cmc_nc_create(const int _ncid)
 {
     return new cmc_nc_data{_ncid};
+}
+
+/* Set a communicator to use in a parallel environment */
+void
+cmc_nc_set_mpi_communicator(cmc_nc_data_t nc_data, MPI_Comm comm)
+{
+    nc_data->comm = comm;
 }
 
 /* Destroy/deallocate a cmc_nc_data struct */
@@ -78,9 +80,10 @@ static void
 cmc_nc_inquire_coordinate_dims(cmc_nc_data& nc_data)
 {
     #ifdef CMC_WITH_NETCDF
-    char nc_name[NC_MAX_NAME+1];
+    std::basic_string<char> nc_name;
+    nc_name.reserve(NC_MAX_NAME +1);
     size_t dim_length;
-    
+
     /* Inquire the most general information about the supplied netCDF file (like number of diemnsion, number of global attributes, number of variables, etc.)*/
     int err{nc_inq(nc_data.get_ncid(), &(nc_data.num_dimensions), NULL, &(nc_data.num_global_atts), &(nc_data.id_unlimited_dim))};
     cmc_nc_check_err(err);
@@ -88,12 +91,17 @@ cmc_nc_inquire_coordinate_dims(cmc_nc_data& nc_data)
     /* Reserve memory for all 'dimension_lenghts' and 'dimension_names' */
     nc_data.dimension_sizes.reserve(nc_data.num_dimensions);
     nc_data.dimension_names.reserve(nc_data.num_dimensions);
+    /* Assign a default string as dimension name for each dimension */
+    for (int dim_index{0}; dim_index < nc_data.num_dimensions; ++dim_index)
+    {
+        nc_data.dimension_names.push_back(std::string());
+    }
 
     /* Loop over all dimension within the netCDF file */
     for (int dim_index{0}; dim_index < nc_data.num_dimensions; ++dim_index) 
     {
         /* Get the name and the length of the dimension which corresponds to the current id */
-        err = nc_inq_dim(nc_data.get_ncid(), dim_index, nc_name, &dim_length);
+        err = nc_inq_dim(nc_data.get_ncid(), dim_index, &nc_name[0], &dim_length);
         cmc_nc_check_err(err);
 
         /* Check for coordinate dimension if a hint to the id was given */
@@ -117,29 +125,29 @@ cmc_nc_inquire_coordinate_dims(cmc_nc_data& nc_data)
         /* In case no hints concerning the coordinate dimensions were given */
         /* Check if the name is equal to any of the considered (geo-spatial) coordinate variables */
         else if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_LON] == CMC_COORDINATE_NOT_CONSIDERED && 
-                   (strcmp(nc_name, "lon") == 0 || strcmp(nc_name, "longitude") == 0))
+                   (strcmp(nc_name.c_str(), "lon") == 0 || strcmp(nc_name.c_str(), "longitude") == 0))
         {
             nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_LON] = dim_index;
             nc_data.coord_lengths[CMC_COORD_IDS::CMC_LON] = dim_length;
         } else if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_TIME] == CMC_COORDINATE_NOT_CONSIDERED &&
-                   (strcmp(nc_name, "lat") == 0 || strcmp(nc_name, "latitude") == 0))
+                   (strcmp(nc_name.c_str(), "lat") == 0 || strcmp(nc_name.c_str(), "latitude") == 0))
         {
             nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_LAT] = dim_index;
             nc_data.coord_lengths[CMC_COORD_IDS::CMC_LAT] = dim_length;
         }
         else if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_TIME] == CMC_COORDINATE_NOT_CONSIDERED &&
-                 (strcmp(nc_name, "lev") == 0 || strcmp(nc_name, "leverage") == 0 || strcmp(nc_name, "height") == 0))
+                 (strcmp(nc_name.c_str(), "lev") == 0 || strcmp(nc_name.c_str(), "leverage") == 0 || strcmp(nc_name.c_str(), "height") == 0))
         {
             nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_LEV] = dim_index;
             nc_data.coord_lengths[CMC_COORD_IDS::CMC_LEV] = dim_length;
-        } else if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_TIME] == CMC_COORDINATE_NOT_CONSIDERED && strcmp(nc_name, "time") == 0)
+        } else if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_TIME] == CMC_COORDINATE_NOT_CONSIDERED && strcmp(nc_name.c_str(), "time") == 0)
         {
             nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_TIME] = dim_index;
             nc_data.coord_lengths[CMC_COORD_IDS::CMC_TIME] = dim_length;
         }
 
         /* Save the name and the length of each dimension within the netCDF file */
-        nc_data.dimension_names[dim_index].assign(nc_name);
+        nc_data.dimension_names[dim_index].assign(nc_name.data());
         nc_data.dimension_sizes[dim_index] = dim_length;
     }
     cmc_debug_msg("The following coordinate dimensions were retrieved:");
@@ -359,6 +367,63 @@ cmc_nc_inquire_var_meta_data(cmc_nc_data_t nc_data)
     cmc_nc_check_for_attributes(*nc_data, attributes);
     #endif 
 }
+
+//TODO: Make the distribution more general. Currently, a somehow evenly hyperslab is assigned to each rank
+static
+void
+cmc_nc_calc_offsets_for_parallel_reading(cmc_nc_data_t nc_data, const size_t current_var_id)
+{
+    #ifdef CMC_WITH_NETCDF_PAR
+    //TODO: Currently, the data is divided into similar blocks (maybe this is an average approach between the amount of communications needed (in order to reorder the data) and the cache misses during the reading of the file) ?
+    int err, size, rank;
+    /* Get the size of the MPI communicator */
+    err = MPI_Comm_size(nc_data->comm, &size);
+    cmc_mpi_check_err(err);
+    /* Get the rank id */
+    err = MPI_Comm_rank(nc_data->comm, &rank);
+    cmc_mpi_check_err(err);
+    uint32_t leftover_dim_points{0}, evenly_split_dim_points{0};
+    uint32_t global_offset{0};
+    for (int dims{0}; dims < nc_data->vars[current_var_id]->num_dimensions; ++dims)
+    {
+        /* If a dimension is not considered in the data hyperslab, just skip it */
+        if (nc_data->vars[current_var_id]->count_ptr[dims] <= 1)
+        {
+            continue;
+        } else
+        {
+            cmc_assert(nc_data->vars[current_var_id]->count_ptr[dims] >= static_cast<size_t>(size));
+            /* If the dimension is considered, calculate an offset for this dimension */
+            //The assertion above indicates that at least one dimension point is assigned to each rank
+            /* The leftover dimension points will be distributed */
+            evenly_split_dim_points = static_cast<uint32_t>(nc_data->vars[current_var_id]->count_ptr[dims] / size);
+            /* Calculate the offset for the start vector */
+            global_offset = rank * evenly_split_dim_points;
+            /* Calculate the points which cannot be evenly split between all processses */
+            leftover_dim_points = nc_data->vars[current_var_id]->count_ptr[dims] % size;
+            /* Adjust the offset for the leftover points */
+            /* Rank 0 starts at position zero nevertheless, therefore, the offset cannot change */
+            if (rank != 0)
+            {
+                if (rank < static_cast<int>(leftover_dim_points))
+                {
+                    /* The ranks (starting from the lowest to the highest id) obtain another additional dimension point when the diemnsion cannot be split evenly */
+                    ++(evenly_split_dim_points);
+                    /* Adjust the global offset */
+                    global_offset += leftover_dim_points - rank;
+                } else
+                {
+                    /* Adjust the global offset */
+                    global_offset += leftover_dim_points;
+                }
+            }
+            /* Save the start and count values for this dimension */
+            nc_data->vars[current_var_id]->start_ptr[dims] += global_offset;
+            nc_data->vars[current_var_id]->count_ptr[dims] = evenly_split_dim_points;
+        }
+    }
+    #endif
+}
 #endif
 /******* END STATIC FUNCTIONS *******/
 /************************************/
@@ -398,6 +463,14 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
     int err;
     size_t num_data_points{1};
 
+    /* Vectors storing the start and count values for reading the data */
+    std::vector<size_t> start_values;
+    std::vector<size_t> count_values;
+
+    #ifdef CMC_WITH_NETCDF_PAR
+    int comm_size;
+    #endif
+
     /* Read the meta data of the variable (for example 'data_type', 'missing_value', 'offset', 'scale_factor', ...) */
     cmc_nc_inquire_var_meta_data(nc_data);
 
@@ -411,30 +484,80 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
 
         /* Reserve space for storing the lengths of the data of each data dimension */
         nc_data->vars[i]->dim_lengths.reserve(nc_data->vars[i]->num_dimensions);
-
-        /* Calculate the amount of memory needed in order to store the variable's data */
+        /* Allocate memeory for the start and the count ptr */
+        nc_data->vars[i]->start_ptr.reserve(nc_data->vars[i]->num_dimensions);
+        nc_data->vars[i]->count_ptr.reserve(nc_data->vars[i]->num_dimensions);
+        /* Save the start and count pointers associated with the hyperslab */
         if (start_ptr != nullptr && count_ptr != nullptr)
         {
+            /* If only a hyperslab will be read */
             /* Store the data concerning the defined hyperslab */
             for (int dims{0}; dims < nc_data->vars[i]->num_dimensions; ++dims)
             {
-                num_data_points *= count_ptr[dims];
-                (nc_data->vars[i]->dim_lengths).push_back(count_ptr[dims]);
+                nc_data->vars[i]->start_ptr.push_back(static_cast<uint32_t>(start_ptr[dims]));
+                nc_data->vars[i]->count_ptr.push_back(static_cast<uint32_t>(count_ptr[dims]));
             }
-        } else 
+        } else
         {
-            /* Store the whole variable's data */
+            /* If the data of the whole varibale will be read */
             for (int dims{0}; dims < nc_data->vars[i]->num_dimensions; ++dims)
             {
-                num_data_points *= nc_data->dimension_sizes[nc_data->vars[i]->dimension_ids[dims]];
-                (nc_data->vars[i]->dim_lengths).push_back(nc_data->dimension_sizes[nc_data->vars[i]->dimension_ids[dims]]);
+                nc_data->vars[i]->start_ptr.push_back(0);
+                nc_data->vars[i]->count_ptr.push_back(static_cast<uint32_t>(nc_data->dimension_sizes[nc_data->vars[i]->dimension_ids[dims]]));
             }
         }
 
-        /** Create for each variable's meta class a corresponding data class holding the (hyperslab) of the netCDF variables.
-         * Allocate memory for the actual data */
+        /* Adjust the start and count vectors in a parallel environment */
+        #ifdef CMC_WITH_NETCDF_PAR
+        /* Get the size of the communicator in order to check whether the data can be read in parallel or not */
+        err = MPI_Comm_size(nc_data->comm, &comm_size);
+        cmc_mpi_check_err(err);
+        /* If there is more than one process active */
+        if (comm_size > 1)
+        {
+            /* If the data may be read in distributed, calculate the offsets */
+            /* Before this call the full dimension lengths of the variable are stored in the start_ptr and count_ptr vectors */
+            cmc_nc_calc_offsets_for_parallel_reading(nc_data, i);
+        }
+        #endif
+
+        /* Calculate the number of data points (neeeded for the array allocation) */
+        for (int dims{0}; dims < nc_data->vars[i]->num_dimensions; ++dims)
+        {
+            (nc_data->vars[i]->dim_lengths).push_back(count_ptr[dims]);
+            num_data_points *= nc_data->vars[i]->count_ptr[dims];
+        }
+
+        /* Allocate memory for an array able to hold the data of the variable */
         nc_data->vars[i]->data = new var_array_t{num_data_points, static_cast<cmc_type>(nc_data->vars[i]->var_type)};
 
+        /* Allocate space for the vectors defining the data inquisition */
+        start_values.reserve(nc_data->vars[i]->num_dimensions);
+        count_values.reserve(nc_data->vars[i]->num_dimensions);
+
+        /* Set the vectors for reading the data */
+        for (int dim_id{0}; dim_id < nc_data->vars[i]->num_dimensions; ++dim_id)
+        {
+            start_values[dim_id] = static_cast<size_t>(nc_data->vars[i]->start_ptr[dim_id]);
+            count_values[dim_id] = static_cast<size_t>(nc_data->vars[i]->count_ptr[dim_id]);
+        }
+
+        /* Decide whther the data will be read in parallel or serial */
+        #ifdef CMC_WITH_NETCDF_PAR
+        /* Get the size of the communicator in order to check whether the data can be read in parallel or not */
+        err = MPI_Comm_size(nc_data->comm, &comm_size);
+        cmc_mpi_check_err(err);
+        /* If there is more than one process active */
+        if (comm_size > 1)
+        {
+            /* If the data may be read in distributed, calculate the offsets */
+            /* Before this call the full dimension lengths of the variable are stored in the start_ptr and count_ptr vectors */
+            err = nc_get_vara(nc_data->get_ncid(), nc_data->vars[i]->var_id, &(start_values[0]), &(count_values[0]), nc_data->vars[i]->data->get_initial_data_ptr());
+            cmc_nc_check_err(err);
+        }
+        else
+        #endif
+        {
         /* Inquire and store the variable's data */
         if (start_ptr == nullptr && count_ptr == nullptr)
         {
@@ -442,9 +565,10 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
             err = nc_get_var(nc_data->get_ncid(), nc_data->vars[i]->var_id, nc_data->vars[i]->data->get_initial_data_ptr());
             cmc_nc_check_err(err);
         } else {
-            /* Store only the data of the specified hyperslab*/
-            err = nc_get_vara(nc_data->get_ncid(), nc_data->vars[i]->var_id, start_ptr, count_ptr, nc_data->vars[i]->data->get_initial_data_ptr());
+            /* Store only the data of the specified hyperslab */
+            err = nc_get_vara(nc_data->get_ncid(), nc_data->vars[i]->var_id, &(start_values[0]), &(count_values[0]), nc_data->vars[i]->data->get_initial_data_ptr());
             cmc_nc_check_err(err);
+        }
         }
         /* Save the data scheme */
         nc_data->vars[i]->data_scheme = CMC_DATA_ORDERING_SCHEME::CMC_GEO_DATA_LINEAR;
@@ -503,10 +627,9 @@ cmc_nc_open(const char* path_to_file, MPI_Comm comm)
     int err{0};
     int ncid{0};
 
-    //#ifdef CMC_WITH_NETCDF_PAR
-    #if 0
+    #ifdef CMC_WITH_NETCDF_PAR
     MPI_Info info = MPI_INFO_NULL;
-    err = nc_open_par(path_to_file_c, NC_NOWRITE, comm, info, &ncid);
+    err = nc_open_par(path_to_file, NC_NOWRITE, comm, info, &ncid);
     cmc_nc_check_err(err);
     #else
     err = nc__open(path_to_file, NC_NOWRITE, NULL, &ncid);
@@ -565,7 +688,6 @@ cmc_nc_set_hint_time_dim(cmc_nc_data_t nc_data, const int time_dim_id)
     nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_TIME] = time_dim_id;
     #endif
 }
-
 
 void
 cmc_nc_add_variable(cmc_nc_data_t nc_data, const char* var_name)
@@ -669,12 +791,15 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         /* Nullify the new dim_lengths vector */
         std::fill(cmc_t8_dim_lengths.begin(), cmc_t8_dim_lengths.end(), 1);
 
+        /* Reserve space for the data axis ordering */
+        t8_data->vars[var_id]->var->axis_ordering.reserve(t8_data->vars[var_id]->var->num_dimensions);
+
         /* Retrieve the axis ordering of the variable */
         for(int i{0}; i < t8_data->vars[var_id]->var->num_dimensions; ++i)
         {
             if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LON])
             {
-                if (!(t8_data->vars[var_id]->var->dim_lengths[i] == 1 || t8_data->vars[var_id]->var->dim_lengths[i] == 0))
+                if (t8_data->vars[var_id]->var->dim_lengths[i] > 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LON);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LON] = t8_data->vars[var_id]->var->dim_lengths[i];
@@ -684,7 +809,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 }
             } else if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LAT])
             {
-                if (!(t8_data->vars[var_id]->var->dim_lengths[i] == 1 || t8_data->vars[var_id]->var->dim_lengths[i] == 0))
+                if (t8_data->vars[var_id]->var->dim_lengths[i] > 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LAT);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LAT] = t8_data->vars[var_id]->var->dim_lengths[i];
@@ -694,7 +819,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 }
             } else if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LEV])
             {
-                if (!(t8_data->vars[var_id]->var->dim_lengths[i] == 1 || t8_data->vars[var_id]->var->dim_lengths[i] == 0))
+                if (t8_data->vars[var_id]->var->dim_lengths[i] > 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LEV);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LEV] = t8_data->vars[var_id]->var->dim_lengths[i];
@@ -706,18 +831,16 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
             {
                 //Time series are currently not supported, therefore the time coordinates are skipped
                 #if 0
-                if (!(nc_data->coord_lengths[CMC_COORD_IDS::CMC_TIME] == 1 || nc_data->coord_lengths[CMC_COORD_IDS::CMC_TIME] == 0))
+                if (nc_data->coord_lengths[CMC_COORD_IDS::CMC_TIME] > 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_TIME);
                 }
                 #else
-                //Set time coordinate length to zero
-                //cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_TIME] = 0; //This is ensured automatically via the vector constructor
                 ++update_num_dims;
                 #endif
             } else
             {
-                if (!(t8_data->vars[var_id]->var->dim_lengths[i] == 1 || t8_data->vars[var_id]->var->dim_lengths[i] == 0))
+                if (t8_data->vars[var_id]->var->dim_lengths[i] > 1)
                 {
                     cmc_err_msg("The data (hyperslab) of variable (name: ", nc_data->vars[var_id]->name, ") is dependent on non-geo-spatial dimensions.");
                 }
