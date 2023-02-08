@@ -628,13 +628,20 @@ cmc_nc_open(const char* path_to_file, MPI_Comm comm)
     int ncid{0};
 
     #ifdef CMC_WITH_NETCDF_PAR
-    MPI_Info info = MPI_INFO_NULL;
-    err = nc_open_par(path_to_file, NC_NOWRITE, comm, info, &ncid);
-    cmc_nc_check_err(err);
-    #else
-    err = nc__open(path_to_file, NC_NOWRITE, NULL, &ncid);
-    cmc_nc_check_err(err);
+    int comm_size{0};
+    err = MPI_Comm_size(comm, &comm_size);
+    cmc_mpi_check_err(err);
+    if (comm_size > 1)
+    {
+        MPI_Info info = MPI_INFO_NULL;
+        err = nc_open_par(path_to_file, NC_NOWRITE, comm, info, &ncid);
+        cmc_nc_check_err(err);
+    } else
     #endif
+    {
+        err = nc__open(path_to_file, NC_NOWRITE, NULL, &ncid);
+        cmc_nc_check_err(err);
+    }
 
     return ncid;
     #else
