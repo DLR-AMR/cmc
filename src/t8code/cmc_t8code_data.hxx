@@ -116,6 +116,11 @@ public:
     */
     size_t get_data_size() const;
 
+    /** \fn int get_dimensionality() const
+     * @return The number of dimension this variable is defined on
+    */
+    int get_dimensionality() const;
+
     /** \fn void* get_initial_data_ptr() const
      * @return A void pointer to the start of a dynamic array holding the actual data of the varibale
     */
