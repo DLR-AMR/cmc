@@ -384,6 +384,8 @@ cmc_nc_calc_offsets_for_parallel_reading(cmc_nc_data_t nc_data, const size_t cur
     cmc_mpi_check_err(err);
     uint32_t leftover_dim_points{0}, evenly_split_dim_points{0};
     uint32_t global_offset{0};
+    /* Flag indicating that one diemnsion was already not split (in oder to cover the whole domain) */
+    bool non_splitted_dim_applied{false};
     for (int dims{0}; dims < nc_data->vars[current_var_id]->num_dimensions; ++dims)
     {
         /* If a dimension is not considered in the data hyperslab, just skip it */
@@ -393,33 +395,41 @@ cmc_nc_calc_offsets_for_parallel_reading(cmc_nc_data_t nc_data, const size_t cur
         } else
         {
             cmc_assert(nc_data->vars[current_var_id]->count_ptr[dims] >= static_cast<size_t>(size));
-            /* If the dimension is considered, calculate an offset for this dimension */
-            //The assertion above indicates that at least one dimension point is assigned to each rank
-            /* The leftover dimension points will be distributed */
-            evenly_split_dim_points = static_cast<uint32_t>(nc_data->vars[current_var_id]->count_ptr[dims] / size);
-            /* Calculate the offset for the start vector */
-            global_offset = rank * evenly_split_dim_points;
-            /* Calculate the points which cannot be evenly split between all processses */
-            leftover_dim_points = nc_data->vars[current_var_id]->count_ptr[dims] % size;
-            /* Adjust the offset for the leftover points */
-            /* Rank 0 starts at position zero nevertheless, therefore, the offset cannot change */
-            if (rank != 0)
+            if (non_splitted_dim_applied)
             {
-                if (rank < static_cast<int>(leftover_dim_points))
+                /* If the dimension is considered, calculate an offset for this dimension */
+                //The assertion above indicates that at least one dimension point is assigned to each rank
+                /* The leftover dimension points will be distributed */
+                evenly_split_dim_points = static_cast<uint32_t>(nc_data->vars[current_var_id]->count_ptr[dims] / size);
+                /* Calculate the offset for the start vector */
+                global_offset = rank * evenly_split_dim_points;
+                /* Calculate the points which cannot be evenly split between all processses */
+                leftover_dim_points = nc_data->vars[current_var_id]->count_ptr[dims] % size;
+                /* Adjust the offset for the leftover points */
+                /* Rank 0 starts at position zero nevertheless, therefore, the offset cannot change */
+                if (rank != 0)
                 {
-                    /* The ranks (starting from the lowest to the highest id) obtain another additional dimension point when the diemnsion cannot be split evenly */
-                    ++(evenly_split_dim_points);
-                    /* Adjust the global offset */
-                    global_offset += leftover_dim_points - rank;
-                } else
-                {
-                    /* Adjust the global offset */
-                    global_offset += leftover_dim_points;
+                    if (rank < static_cast<int>(leftover_dim_points))
+                    {
+                        /* The ranks (starting from the lowest to the highest id) obtain another additional dimension point when the diemnsion cannot be split evenly */
+                        ++(evenly_split_dim_points);
+                        /* Adjust the global offset */
+                        global_offset += leftover_dim_points - rank;
+                    } else
+                    {
+                        /* Adjust the global offset */
+                        global_offset += leftover_dim_points;
+                    }
                 }
+                /* Save the start and count values for this dimension */
+                nc_data->vars[current_var_id]->start_ptr[dims] += global_offset;
+                nc_data->vars[current_var_id]->count_ptr[dims] = evenly_split_dim_points;
             }
-            /* Save the start and count values for this dimension */
-            nc_data->vars[current_var_id]->start_ptr[dims] += global_offset;
-            nc_data->vars[current_var_id]->count_ptr[dims] = evenly_split_dim_points;
+            else
+            {
+                /* The whole dimensions are already saved by default in start and count pointers */
+                non_splitted_dim_applied = true;
+            }
         }
     }
     #endif
@@ -862,6 +872,16 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         if (t8_data->vars[var_id]->var->num_dimensions > max_dim)
         {
             max_dim = t8_data->vars[var_id]->var->num_dimensions;
+        }
+
+        /* Update the start and count ptrs */
+        for (size_t j{0}; j < t8_data->vars[var_id]->var->count_ptr.size(); ++j)
+        {
+            if (t8_data->vars[var_id]->var->count_ptr[j] <= 1)
+            {
+                t8_data->vars[var_id]->var->count_ptr.erase(t8_data->vars[var_id]->var->count_ptr.begin() + j);
+                t8_data->vars[var_id]->var->start_ptr.erase(t8_data->vars[var_id]->var->start_ptr.begin() + j);
+            }
         }
 
         /* Set the new dimension lenghts */
