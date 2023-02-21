@@ -20,9 +20,10 @@ main(int argc, char* argv[])
   {
     /* Open a netCDF file with geo-spatial data */
     //For opening out of the 'cmc_v03' directory
-    //int ncid = cmc_nc_open("../data/ECMWF_ERA-40_subset.nc");
+    //int ncid = cmc_nc_open("../../data/ECMWF_ERA-40_subset.nc");
+    //int ncid = cmc_nc_open("../../data/test_nc4_file.nc");
     /* Open a MESSy simulation file */
-    int ncid = cmc_nc_open("../data/MESSy_DATA/MESSy2/raw/tracer/RC1-base-07_0028_restart_0001_tracer_gp.nc");
+    int ncid = cmc_nc_open("../../data/MESSy_DATA/MESSy2/raw/tracer/RC1-base-07_0028_restart_0001_tracer_gp.nc");
 
     /* Create a class holding the data from the netCDF-File */
     //CMC_NC_DATA_T nc_data{ncid};
@@ -36,12 +37,16 @@ main(int argc, char* argv[])
     //const size_t count_ptr[4] = {1,19,32,64}; // Example MESSy netCDF File
     
     const size_t start_ptr[3] = {0,0,0};  //MESSy Tracer Initialization File
-    const size_t count_ptr[3] = {5,64,128}; //MESSy Tracer Initialization File
-
+    const size_t count_ptr[3] = {90,64,128}; //MESSy Tracer Initialization File
+    //cmc_nc_set_mpi_communicator(nc_data, MPI_COMM_WORLD);
     /* Inquire given data/variables which are defined on a geo-spatial domain (latitude, longitude, height, (time)) */
-    //cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "tco3", "p2t");
-    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "O3", "CH4");
-
+    //cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t");
+    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "CO");
+    int err = MPI_Barrier(MPI_COMM_WORLD);
+    cmc_mpi_check_err(err);
+    /* Close the netCDF file */
+    cmc_nc_close(ncid);
+#if 1
     /* Define data classes holding the variable data and forests as well as additional information during the compression process */
     cmc_amr_data_t amr_data;
 
@@ -53,12 +58,15 @@ main(int argc, char* argv[])
 
     /* Set a compression criterium - e.g. error threshold woth a predefined tolerance */
     cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.02);
-    
+
     /* Write out a netCDF File containing the uncompressed data */
-    //cmc_amr_write_netcdf_file(amr_data, "example_initial.nc");
+    cmc_amr_write_netcdf_file(amr_data, "example_initial.nc", CMC_AMR_WRITE_ALL_VARS_TO_NETCDF);
     
     /* Setup the compression for a given 'compression mode' */
     cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D);
+
+    /* Write a vtk file of the decompressed data */
+    //cmc_amr_write_vtk_file(amr_data, "cmc_initial_data");
 
     /* Write out a netCDF File containing the uncompressed data */
     //cmc_amr_write_netcdf_file(amr_data, "example_uncompressed.nc");
@@ -73,20 +81,19 @@ main(int argc, char* argv[])
 
   
   	/* Write a vtk file of the decompressed data */
-    cmc_amr_write_vtk_file(amr_data, "cmc_decompressed_data");
+    //cmc_amr_write_vtk_file(amr_data, "cmc_decompressed_data");
 
     /* Write a netCDF file */
     /* Write out a netCDF File containing the uncompressed data */
     cmc_amr_write_netcdf_file(amr_data, "example_decompressed.nc", CMC_AMR_WRITE_ALL_VARS_TO_NETCDF);
-
-    /* Close the netCDF file */
-    cmc_nc_close(ncid);
 
     /* Deallocate the netCDF data */
     cmc_nc_destroy(nc_data);
 
     /* Deallocate the Lossy AMR Compression data */
     cmc_amr_destroy(amr_data);
+
+  #endif
   }
 
   /* Finalize cmc */

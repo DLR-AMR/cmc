@@ -425,6 +425,9 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
     /* Build an enclosing mesh */
     cmc_t8_create_enclosing_geo_mesh(*(amr_data->t8_data));
 
+    // Test: distribute the data in parallel
+    //cmc_t8_distribute_data((amr_data->t8_data));
+
     /* Apply the z-curve ordering to all variables */
     cmc_t8_apply_zcurve_ordering(*(amr_data->t8_data), CMC_APPLY_ZCURVE_TO_ALL_VARS);
 

@@ -63,6 +63,25 @@ private:
     void _intern_add_const(void*);
 };
 
+class
+var_dynamic_array_t
+{
+public:
+    var_dynamic_array_t(const size_t num_elements, const cmc_type _type){
+        _init_array(num_elements, _type);
+    };
+    ~var_dynamic_array_t(){
+        _destroy_array();
+    };
+    size_t size() const;
+    void push_back(const cmc_universal_type_t& value);
+
+    struct var_dynamic_array* data{nullptr};
+private:
+    void _init_array(const size_t, const cmc_type);
+    void _destroy_array();
+};
+
 class var_vector_t
 {
 public:

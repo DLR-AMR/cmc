@@ -77,6 +77,8 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
     /* Assign the current var id (the underlying geo-spatial data of the variable corresponding to the given id will be regarded during the coarsening) */
     /* If no id is explicitly given, it will be assumed that each variable is defined on the same geo-spatial domain. Therfore, the first variable id is (arbitrarily) assigned */
     adapt_data->current_var_id = (var_id <= -1 ? 0 : var_id);
+    /* Set the partition for coarsening flag for the 'partition'-routine */
+    const int partition_for_coarsening = 0;
     /* Adapt the forest as much as possible by coarsen the 'dummy' elements which do not resemble a geo-spatial data point */
     while (refinement_step < initial_refinement_lvl && num_elems_former_forest != t8_forest_get_global_num_elements(forest))
     {
@@ -88,9 +90,8 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
         t8_forest_set_user_data(forest_adapt, static_cast<void*>(adapt_data));
         /* Adapt the forest accordingly to the callback function */
         t8_forest_set_adapt(forest_adapt, forest, cmc_t8_adapt_coarsen_geo_mesh_callback, 0);
-
-        //eventually repartition here in a parallel case
-
+        /* Partition the forest */
+        t8_forest_set_partition(forest_adapt, forest, partition_for_coarsening);
         /* Commit the adapted forest (perform the adaption step) */
         t8_forest_commit(forest_adapt);
         /* Save the coarsened forest */

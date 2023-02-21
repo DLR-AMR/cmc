@@ -3778,6 +3778,67 @@ cmc_eval(void* data_dest, void* data_src, const cmc_type d_type)
     memcpy(data_dest, data_src, cmc_type_to_bytes[d_type]);
 }
 
+
+/*********************************************/
+/*****    VAR_DYNAMIC_ARRAY_T STUFF       ****/
+
+struct var_dynamic_array
+{
+public:
+    var_dynamic_array(const cmc_type _type)
+    {
+        /* If no size is specified, we just allocate for 8 values */
+        array = new var_array_t(8, _type);
+
+    };
+    var_dynamic_array(const size_t _num_elems, const cmc_type _type)
+    : capacity{_num_elems}{
+        array = new var_array_t(_num_elems, _type);
+    };
+    ~var_dynamic_array(){
+        if (array != nullptr)
+        {
+            delete array;
+            array = nullptr;
+        }
+    };
+
+    size_t capacity{8}; //!< The capacity of the dynamic array, if no capacity is specified, by default the array is able of holding 8 elements
+    size_t size{0}; //!< The current size of the dynamic array
+    var_array_t* array{nullptr};
+};
+
+void
+var_dynamic_array_t::_init_array(const size_t num_elements, const cmc_type _type)
+{
+    data = new var_dynamic_array(num_elements, _type);
+}
+
+void
+var_dynamic_array_t::_destroy_array()
+{
+    if (data != nullptr)
+    {
+        delete data;
+        data = nullptr;
+    }
+}
+
+size_t
+var_dynamic_array_t::size() const
+{
+    return data->size;
+}
+
+void 
+var_dynamic_array_t::push_back(const cmc_universal_type_t& value)
+{
+    cmc_assert(data->size < data->capacity);
+    //TODO: if the assertion is not true, values need to be copied to a larger mem location 
+    data->array->assign_value(data->size, value);
+    ++(data->size);
+}
+
 /*********************************************/
 /*****      VAR_VECTOR_T STUFF            ****/
 
