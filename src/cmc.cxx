@@ -4,6 +4,7 @@
 #include "mpi/cmc_mpi.h"
 #include "t8code/cmc_t8code.h"
 
+/** Initialize cmc and it's sub-modules */
 void
 cmc_initialize()
 {
@@ -13,6 +14,7 @@ cmc_initialize()
   cmc_t8code_initialize();
 }
 
+/** Finalize cmc and it's submodules */
 void
 cmc_finalize()
 {
@@ -22,6 +24,7 @@ cmc_finalize()
   cmc_mpi_finalize();
 }
 
+/** Finalize cmc and it's submodules except MPI */
 void
 cmc_finalize_without_mpi()
 {
