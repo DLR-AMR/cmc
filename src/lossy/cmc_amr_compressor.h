@@ -93,7 +93,8 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
  * 
  * @note It is possible to pass nullptr's to the adapt- and interpolation-functions. This results in a default case using error threshold adaptation and chooses the arithmetic mean as interpolation function.
  * @note In a C++ environment this is the default case. However, to have a C-compliant interface, thsi function is defined below without default values.
- *
+
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
  * @param adapt_function A function pointer describing the adaptation/compression which will be used (@see @file cmc_t8_adapt_callbacks.h for all opportunities)
  * @param interpolation_function A function pointer describing which interpolation will be used in order to map the fine data on a coarser domain (@see @file cmc_t8_replace_callbacks.h for all opportunities)
  */
@@ -105,6 +106,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
  * 
  * @note It is possible to pass nullptr's to the adapt- and interpolation-functions. This results in a default case using error threshold adaptation and chooses the arithmetic mean as interpolation function.
  *
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
  * @param adapt_function A function pointer describing the adaptation/compression which will be used (@see @file cmc_t8_adapt_callbacks.h for all opportunities)
  * @param interpolation_function A function pointer describing which interpolation will be used in order to map the fine data on a coarser domain (@see @file cmc_t8_replace_callbacks.h for all opportunities)
  */
@@ -112,15 +114,35 @@ void
 cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function, const t8_forest_replace_t interpolation_function);
 #endif
 
+/**
+ * @brief This function decompresses the (previously) lossy AMR compressed data
+ * 
+ * @note Currently, it is only possible to decompress data after the initial data has been compressed (because it is currently not possible to store the compressed data)
+ *
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
+ * @param adapt_function A function pointer describing the adaptation/compression which will be used (@see @file cmc_t8_adapt_callbacks.h for all opportunities)
+ * @param interpolation_function A function pointer describing which interpolation will be used in order to map the fine data on a coarser domain (@see @file cmc_t8_replace_callbacks.h for all opportunities)
+ */
 void
 cmc_amr_decompress(cmc_amr_data_t amr_data);
 
 void
 cmc_amr_write_netcdf_file(cmc_amr_data_t amr_data, const char* path, const int var_id);
 
+/**
+ * @brief This function writes a vtk-file with the variables (initial data, compressed data or decompressed data) as well as the underlying meshes to one or severeal vtk-files
+ * 
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
+ * @param file_prefix The prefix the vtk-files will be given
+ */
 void
 cmc_amr_write_vtk_file(cmc_amr_data_t amr_data, const char* file_prefix);
 
+/**
+ * @brief This function destroys a @struct cmc_amr_data and deallocates it's members
+ * 
+ * @param amr_data A pointer to a @struct cmc_amr_data which will be destroyed/deallocated
+ */
 void
 cmc_amr_destroy(cmc_amr_data_t amr_data);
 

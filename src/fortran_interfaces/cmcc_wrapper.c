@@ -32,6 +32,25 @@ cmcc_create_amr_compression_data(cmc_nc_data_t nc_data, const MPI_Fint comm_f)
     #endif
 }
 
+void
+cmcc_amr_write_vtk_file(cmc_amr_data_t amr_data, const char* file_prefix, const int file_prefix_length)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Allocate memory fot the file-prefix */
+    char* fprefix = (char*) malloc(sizeof(char) * (file_prefix_length + 1));
+    /* Copy the 'Fortran'-name */
+    memcpy(fprefix, file_prefix, sizeof(char) * file_prefix_length);
+    /* Add a trailing null-terminating character */
+    fprefix[file_prefix_length] = '\0';
+
+    /* Now we can call the C function with the C-compliant 'file_prefix' */
+    cmc_amr_write_vtk_file(amr_data, fprefix);
+
+    /* Deallocate the fpreix */
+    free(fprefix);
+    #endif
+}
+
 //TODO: update messy functions
 #if 0
 cmc_amr_data_t
