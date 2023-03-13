@@ -1,6 +1,9 @@
-bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression
+bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression \
+example/lossless/cmc_lzss
 
 example_lossy_amr_nc_compression_cmc_lossy_amr_nc_compression_SOURCES = example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression.cxx
+
+example_lossless_cmc_lzss_SOURCES = example/lossless/cmc_lzss.cxx
 
 if ENABLE_FORTRAN
 bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_fortran_lossy_amr_compression

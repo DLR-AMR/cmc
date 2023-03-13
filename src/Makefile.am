@@ -24,7 +24,8 @@ src/t8code/cmc_t8_replace_callbacks.h \
 src/component_interfaces/cmc_t8_nc.h \
 src/component_interfaces/cmc_t8_messy.h \
 src/lossy/cmc_amr_compressor.h \
-src/messy/cmc_messy.h 
+src/messy/cmc_messy.h \
+src/lossless/cmc_lzss.h
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -52,7 +53,8 @@ src/t8code/cmc_t8_replace_callbacks.cxx \
 src/component_interfaces/cmc_t8_nc.cxx \
 src/component_interfaces/cmc_t8_messy.cxx \
 src/lossy/cmc_amr_compressor.cxx \
-src/messy/cmc_messy.cxx 
+src/messy/cmc_messy.cxx \
+src/lossless/cmc_lzss.cxx
 
 if ENABLE_FORTRAN
 src_libcmc_la_SOURCES += src/fortran_interfaces/cmcc.c \
