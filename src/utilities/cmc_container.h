@@ -7,9 +7,6 @@
 /* Array holding the data_size (in bytes) of each variable data type */ 
 inline constexpr std::array<size_t, cmc_type::CMC_NUM_TYPES> cmc_type_to_bytes{sizeof(std::byte), sizeof(int8_t), sizeof(char), sizeof(int16_t), sizeof(int32_t), sizeof(float), sizeof(double), sizeof(uint8_t), sizeof(uint16_t), sizeof(uint32_t), sizeof(int64_t), sizeof(uint64_t)};
 
-/* Define a typedef of variant able to hold severeal data types */
-typedef std::variant<std::byte, int8_t, char, int16_t, int32_t, float, double, uint8_t, uint16_t, uint32_t, int64_t, uint64_t> cmc_universal_type_t;
-
 /* Define a standard type for the data, in case of conflicts, data will be casted to this type */
 typedef double cmc_standard_type;
 

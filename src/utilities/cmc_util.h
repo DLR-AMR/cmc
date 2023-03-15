@@ -18,6 +18,9 @@
 
 #include "cmc_constants_definitions.h"
 
+/* Define a typedef of variant able to hold severeal data types */
+typedef std::variant<std::byte, int8_t, char, int16_t, int32_t, float, double, uint8_t, uint16_t, uint32_t, int64_t, uint64_t> cmc_universal_type_t;
+
 [[noreturn]] void cmc_exit(const char* _err_msg, const char* _location);
 
 [[noreturn]] void cmc_abort(const char* _err_msg, const char* _location);
@@ -49,6 +52,15 @@ cmc_approx_cmp(T num1, T num2, T epsilon = 2*std::numeric_limits<T>::epsilon())
     {
         return false;
     }
+}
+
+template<typename T>
+auto cmc_get_universal_data(const cmc_universal_type_t& _universal_data)
+    -> std::enable_if_t<std::is_arithmetic_v<T>,T>
+{
+    return std::visit([](auto&& value) -> T {
+        return static_cast<T>(value);
+    }, _universal_data);
 }
 
 #if 0
