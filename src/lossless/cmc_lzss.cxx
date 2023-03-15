@@ -70,17 +70,6 @@
 /* The maximum amount of bytes an encoding for eight values may use */
 #define MAXIMUM_BYTES_EIGHT_BLOCK_SEQUENCE  (ENCODED_VALUE_SIZE * ENCODED_VALUES_PER_BLOCK * PLAIN_VALUE_BYTE_SIZE + 1)
 
-
-#if __cplusplus >= 202002L
-/* If C++20 is compiled, use the likely/unlikely attributes for tests since we have many conditionals in this implementation */
-#define CMC_LIKELY [[likely]]
-#define CMC_UNLIKELY [[unlikely]]
-#else
-/* Empty macros in case it is not compiled with C++20 standard */
-#define CMC_LIKELY 
-#define CMC_UNLIKELY
-#endif
-
 #if 0
 /* The following two functions are currently unused, but will be used in the future. */
 /* Overloading for putting out a byte as a sequence of 0's and 1's */
@@ -697,7 +686,7 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
             offset_until_current_byte_position = SLIDING_WINDOW_SIZE + current_byte;
         } 
         /* If we no longer need the previous sliding window, we switch to the initial pointer of the current sliding window (pointed to by the iterator initially when the function was called) */
-        else if (previous_sliding_window != nullptr && (current_byte - current_match_length < SLIDING_WINDOW_SIZE && current_byte >= SLIDING_WINDOW_SIZE)) CMC_UNLIKELY
+        else if (previous_sliding_window != nullptr && (current_byte - current_match_length < SLIDING_WINDOW_SIZE && current_byte >= SLIDING_WINDOW_SIZE)) 
         {
             /* Reset the initial_ptr to the original initial ptr to the start of the current buffer (initially pointed to by iterator when the function was called) */
             initial_ptr = initial_ptr_backup;
@@ -757,18 +746,18 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
                 {
                     /* Switch to the current memory segment when our match leaves the previous sliding window */
                     search_buffer_ptr = initial_ptr_backup;
-                } else CMC_LIKELY
+                } else 
                 {
                     /* Just increment the search_buffer pointer to the byte after the match */
                     ++search_buffer_ptr;
                 }
 
                 /* If a look ahead buffer is supplied, check if the match overlappes the current memory block into the look ahead buffer */
-                if (look_ahead_buffer != nullptr && current_byte >= num_bytes) CMC_UNLIKELY
+                if (look_ahead_buffer != nullptr && current_byte >= num_bytes) 
                 {
                     /* If we are exceeding the current memory block, we have to update the pointer to the supplied look ahead buffer (if there is a look ahead buffer succeding this memory block) */
                     look_ahead_buffer_ptr = look_ahead_buffer;
-                } else CMC_LIKELY
+                } else 
                 {
                     /* Just increment the look ahead buffer if it is still in a contiguous memory segment */
                     look_ahead_buffer_ptr = iterator + 1;
@@ -789,7 +778,7 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
                             /* Switch to the current memory segment when our match leaves the previous sliding window */
                             search_buffer_ptr = initial_ptr_backup;
 
-                        } else CMC_LIKELY
+                        } else 
                         {
                             /* Just increment the search buffer pointer when we are in a contiguous memory segment */
                             ++search_buffer_ptr;
@@ -803,7 +792,7 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
 
                             /* Increment the overlapping offset count, if the match still continues */
                             ++overlapping_offset_into_look_ahead_buffer;
-                        } else CMC_LIKELY
+                        } else 
                         {
                             /* If the look ahead buffer pointer is in a contiguous memory segment, just increment it */
                             ++look_ahead_buffer_ptr;
@@ -903,7 +892,7 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
     }
 
     /* Check if all values have been written to the encoded sequene */
-    if (look_ahead_buffer != nullptr && block_count < 8) CMC_LIKELY
+    if (look_ahead_buffer != nullptr && block_count < 8) 
     {
         /* Define the current offset in the look ahead buffer */
         size_t current_look_ahead_byte{static_cast<size_t>(overlapping_offset_into_look_ahead_buffer)};
@@ -956,11 +945,11 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
                     current_match_length = 1;
 
                     /* Save the next pointer positions (after the first match) */
-                    if (iter == num_bytes) CMC_UNLIKELY
+                    if (iter == num_bytes) 
                     {
                         /* Switch to the current memory segment when our match leaves the previous sliding window */
                         search_buffer_ptr = look_ahead_buffer;
-                    } else CMC_LIKELY
+                    } else 
                     {
                         /* Just increment the search_buffer pointer to the byte after the match */
                         search_buffer_ptr = initial_ptr + iter + 1;
@@ -983,7 +972,7 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
                             {
                                 /* Switch from the current memory segment to the look ahead buffer */
                                 search_buffer_ptr = look_ahead_buffer;
-                            } else CMC_LIKELY
+                            } else 
                             {
                                 /* Just increment the search buffer pointer when we are in a contiguous memory segment */
                                 ++search_buffer_ptr;
@@ -1078,7 +1067,7 @@ cmc_lzss_compress(unsigned char* iterator, const size_t num_bytes, unsigned char
         }
 
         /* Check if the block is now full */
-        if (block_count == 8) CMC_LIKELY
+        if (block_count == 8) 
         {
             /* If the block is now complete, copy it to the encoded sequence */
             memcpy((encoded_sequence + encoded_bytes_count), &block_sequence[0], block_occupied_bytes);
@@ -1215,7 +1204,7 @@ cmc_lzss_decompress(unsigned char* iterator, const size_t num_bytes, unsigned ch
 
                 /* Copy all values to the decoded_sequence */
                 /* Check if this match overlaps the current position. In this case we have to be careful with copying */
-                if (decoded_properties.first < static_cast<uint16_t>(decoded_properties.second)) CMC_UNLIKELY
+                if (decoded_properties.first < static_cast<uint16_t>(decoded_properties.second)) 
                 {
                     /* Overlapping boundaries occur */
                     /* Copy the non-overlapping bytes over */
@@ -1225,7 +1214,7 @@ cmc_lzss_decompress(unsigned char* iterator, const size_t num_bytes, unsigned ch
                     {
                         memcpy(static_cast<void*>(&(decoded_sequence[decoded_bytes_count + decoded_properties.first + i])), static_cast<void*>(&(decoded_sequence[decoded_bytes_count + i])), 1);
                     }
-                } else CMC_LIKELY
+                } else 
                 {
                     /* No overlapping boundaries */
                     memcpy(static_cast<void*>(&(decoded_sequence[decoded_bytes_count])), static_cast<void*>(&(decoded_sequence[decoded_bytes_count]) - decoded_properties.first), decoded_properties.second);
