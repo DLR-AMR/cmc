@@ -26,38 +26,36 @@ public:
 
     size_t size() const;
     cmc_type get_data_type() const;
+    void print_data() const;
+    void* get_initial_data_ptr() const;
+    
     cmc_universal_type_t sum_over_range(const size_t start_index, const size_t end_index) const;
     cmc_universal_type_t mean_value(const size_t start_index, const size_t end_index) const;
-    double mean_value_wo_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const;
     cmc_universal_type_t mean_value_same_type_wo_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const;
+    double mean_value_wo_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const;
+    
     bool check_range_fullfills_deviation_threshold_from_value(const size_t start_index, const size_t end_index, const double deviation, const cmc_universal_type_t& value, const cmc_universal_type_t& missing_value) const;
-    template<typename T> void assign(const size_t index, T value);
+    
     void assign(const size_t index, const cmc_universal_type_t& value);
     /* This function performs a type check of the data inside 'value' */
     void assign_value(const size_t index, const cmc_universal_type_t& value);
-    template<typename T> auto axpy(T scale_factor, var_array_t& summand) -> std::enable_if_t<std::is_arithmetic_v<T>, void>;
-    template<typename T> auto axpy_scalar(T scale_factor, T constant_summand) -> std::enable_if_t<std::is_arithmetic_v<T>, void>;
-    template<typename T> auto scale(T scale_factor) -> std::enable_if_t<std::is_arithmetic_v<T>, void>;
-    void scale_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& missing_value);
-    template<typename T> auto add_const(T constant_summand) -> std::enable_if_t<std::is_arithmetic_v<T>, void>;
-    void add_const_with_missing_vals(const cmc_universal_type_t& offset, const cmc_universal_type_t& missing_value);
-    void axpy_scalar_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset, const cmc_universal_type_t& missing_value);
-    void add(var_array_t& summand);
     
-    void print_data() const;
-    void* get_initial_data_ptr() const;
+    void scale(const cmc_universal_type_t& scale_factor);
+    void scale_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& missing_value);
+    
+    void add(var_array_t& summand);
+    void add_const(const cmc_universal_type_t& constant_summand);
+    void add_const_with_missing_vals(const cmc_universal_type_t& offset, const cmc_universal_type_t& missing_value);
 
+    void axpy_scalar(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset);    
+    void axpy_scalar_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset, const cmc_universal_type_t& missing_value);
+    
     // Opaque pointer to the internal data structure
     struct var_array* data{nullptr};
 private:
     /* Private functions are only considered for internal usage and management of the array */
     void _init_array(const size_t, const cmc_type);
     void _destroy_array();
-    void _intern_axpy(void*, var_array_t&);
-    void _intern_axpy_scalar(void*, void*);
-    void _intern_scale(void*);
-    void _intern_assign(const size_t, void*);
-    void _intern_add_const(void*);
 };
 
 class var_vector_t
@@ -91,6 +89,65 @@ private:
     void _init_vector();
     void _destroy_vector();
 };
+
+
+template<typename T>
+cmc_type
+type_to_cmc_type(T val)
+{
+    if constexpr (std::is_same_v<std::remove_cv_t<T>, std::byte>)
+    { 
+        return CMC_BYTE;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, int8_t>)
+    {
+        return CMC_INT8_T;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, char>)
+    {
+        return CMC_CHAR;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, int16_t>)
+    {
+        return CMC_INT16_T;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, int32_t>)
+    {
+        return CMC_INT32_T;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, float>)
+    {
+        return CMC_FLOAT;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, double>)
+    {
+        return CMC_DOUBLE;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, uint8_t>)
+    {
+        return CMC_UINT8_T;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, uint16_t>)
+    {
+        return CMC_UINT16_T;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, uint32_t>)
+    {
+        return CMC_UINT32_T;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, int64_t>)
+    {
+        return CMC_INT64_T;
+    }
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, uint64_t>)
+    {
+        return CMC_UINT64_T;
+    }
+    else
+    {
+        return CMC_UNDEFINED;
+    }
+}
 
 
 #endif /* CMC_CONTAINER_H */

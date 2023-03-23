@@ -4,12 +4,6 @@
 #include "cmc.h"
 #include "cmc_t8code_data.h"
 
-#if 0
-#define CMC_APPLY_ZCURVE_TO_ALL_VARS -1
-#define CMC_APPLY_OFFSET_AND_SCALING_TO_ALL_VARS -1
-#define CMC_APPLY_TRANSFORMATION_3D_TO_2D_TO_ALL_VARS -1
-#endif
-
 void
 cmc_t8_apply_zcurve_ordering(cmc_t8_data& t8_data, const int var_id);
 

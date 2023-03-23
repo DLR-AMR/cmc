@@ -4,7 +4,7 @@
 #include "cmc_t8_adapt_callbacks.h"
 #include "cmc_t8_replace_callbacks.h"
 #include "utilities/cmc_log_functions.h"
-#include "utilities/cmc_container.hxx"
+#include "utilities/cmc_container.h"
 
 /** Begin STATIC Functions **/
 /****************************/
@@ -1972,6 +1972,7 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
             return;
         }
     }
+
     /* Define standard offset and scaling variables */
     double add_offset{0.0};
     double scale_factor{1.0};
@@ -1979,17 +1980,20 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
     /* Iterate over all variables which should be scaled */
     for (size_t var_id{0}; var_id < ids_apply_scaling.size(); ++var_id)
     {
+        /* Get the scale_factor and the offset of the for the data of the variable with the id 'ids_apply_scaling[var_id]' */
         scale_factor = cmc_get_universal_data<double>(t8_data->vars[ids_apply_scaling[var_id]]->var->scale_factor);
         add_offset = cmc_get_universal_data<double>(t8_data->vars[ids_apply_scaling[var_id]]->var->add_offset);
+
         /* Check if the meta data of the variable holds offset and scaling attributes and if so, if they already have been applied */
-        if (!(t8_data->vars[ids_apply_scaling[var_id]]->var->applied_offset_scaling || (cmc_approx_cmp(add_offset, 0.0) && cmc_approx_cmp(scale_factor, 1.0))))
+        if (!(cmc_approx_cmp(add_offset, 0.0) && cmc_approx_cmp(scale_factor, 1.0)))
         {
             cmc_debug_msg("Scaling and offset are applied to variable ", t8_data->vars[ids_apply_scaling[var_id]]->var->name);
 
             /* Check if missing values are present */
             if (t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value_present)
             {
-                /* If missing values are present within the data */
+                /** If missing values are present within the data **/
+                /* Check if only scaling needs to be applied */
                 if ((cmc_approx_cmp(add_offset, 0.0) && (!cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only scaling */
@@ -2001,7 +2005,9 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
 
-                } else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
+                }
+                /* Check if only an offset needs to be applied */
+                else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only offset */
                     t8_data->vars[ids_apply_scaling[var_id]]->var->data->add_const_with_missing_vals(add_offset, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
@@ -2011,7 +2017,9 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
                         cmc_debug_msg("The misssing value will be casted, since the scaling changed the data type.");
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
-                } else
+                }
+                /* Otherwise a scaling as well as an offset needs to be applied */
+                else
                 {
                     /* Apply offset and scaling */
                     t8_data->vars[ids_apply_scaling[var_id]]->var->data->axpy_scalar_with_missing_vals(scale_factor, add_offset, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
@@ -2023,32 +2031,37 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
                     }
                 } 
             }
+            /* In case NO missing values are present within the data */
             else {
-                /* If NO missing values are present within the data */
+                /* Check if only scaling needs to be applied */
                 if ((cmc_approx_cmp(add_offset, 0.0) && (!cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only scaling */
-                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->scale(scale_factor);
+                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->scale(t8_data->vars[ids_apply_scaling[var_id]]->var->scale_factor);
                     /* Check if data type has changed */
                     if (t8_data->vars[ids_apply_scaling[var_id]]->get_type() != static_cast<cmc_type>(t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value.index()))
                     {
                         cmc_debug_msg("The misssing value will be casted, since the scaling changed the data type.");
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
-                } else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
+                }
+                /* Check of only an offset needs to be applied */
+                else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only offset */
-                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->add_const(add_offset);
+                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->add_const(t8_data->vars[ids_apply_scaling[var_id]]->var->add_offset);
                     /* Check if data type has changed */
                     if (t8_data->vars[ids_apply_scaling[var_id]]->get_type() != static_cast<cmc_type>(t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value.index()))
                     {
                         cmc_debug_msg("The misssing value will be casted, since the scaling changed the data type.");
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
-                } else
+                }
+                /* In case sclaing as well as an offset needs to be applied */
+                else
                 {
                     /* Apply offset and scaling */
-                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->axpy_scalar(scale_factor, add_offset);
+                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->axpy_scalar(t8_data->vars[ids_apply_scaling[var_id]]->var->scale_factor, t8_data->vars[ids_apply_scaling[var_id]]->var->add_offset);
                     /* Check if data type has changed */
                     if (t8_data->vars[ids_apply_scaling[var_id]]->get_type() != static_cast<cmc_type>(t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value.index()))
                     {

@@ -10,7 +10,6 @@ src/utilities/cmc_log_functions.h \
 src/utilities/cmc_geo_util.h \
 src/utilities/cmc_fallbacks.h \
 src/utilities/cmc_container.h \
-src/utilities/cmc_container.hxx \
 src/mpi/cmc_mpi.h \
 src/netcdf/cmc_netcdf.h \
 src/netcdf/cmc_netcdf.hxx \
@@ -35,8 +34,6 @@ cmc_messy_interface.mod \
 cmc_netcdf_interface.mod \
 cmc_amr_compression_interface.mod
 endif
-
-noinst_HEADERS += src/utilities/cmc_container.hxx
 
 src_libcmc_la_SOURCES = src/cmc.cxx \
 src/utilities/cmc_util.cxx \

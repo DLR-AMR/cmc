@@ -1,5 +1,5 @@
 #include "cmc_netcdf.h"
-#include "utilities/cmc_container.hxx"
+#include "utilities/cmc_container.h"
 #include "utilities/cmc_geo_util.h"
 #include "utilities/cmc_log_functions.h"
 
