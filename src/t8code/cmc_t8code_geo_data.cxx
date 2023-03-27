@@ -128,7 +128,7 @@ cmc_t8_calc_lin_order_offset_for_zcurve_lev_lat_lon(const std::vector<size_t>& d
 {
     #ifdef CMC_WITH_T8CODE
     /* In this case the data layout equals 'CMC_3D_LEV_LAT_LON' */
-    return x_coord + dim_lengths[CMC_COORD_IDS::CMC_LON] * (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 -y_coord + z_coord * dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    return x_coord + dim_lengths[CMC_COORD_IDS::CMC_LON] * (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 -y_coord + z_coord * dim_lengths[CMC_COORD_IDS::CMC_LAT]);
     #else
     return CMC_ERR;
     #endif
