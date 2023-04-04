@@ -368,6 +368,15 @@ cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_d
     #endif
 }
 
+void
+cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data, const CMC_COORD_IDS coord_id, const cmc_universal_type_t& start_value, const cmc_universal_type_t& end_value)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Set the exclusion area, in which not coarsening will be applied */
+    cmc_t8_geo_data_set_exclude_area(amr_data->t8_data, coord_id, start_value, end_value);
+    #endif
+}
+
 /** Create an initial mesh which will be able to contain the (simulation) data */          
 void
 cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE compression_mode)
@@ -464,6 +473,28 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
         /* Perform the adaptation/compression with the supplied adapt and replace functions */
         cmc_t8_coarsen_data(amr_data->t8_data, adapt_function, interpolation_function);
     } else {
+        switch (amr_data->t8_data->settings.compression_criterium)
+        {
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
+                cmc_err_msg("No compression criterion has bee specified. Please call one of the 'cmc_amr_pre_setup_set_...()' functions earlier.");
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
+                /* In case a relative error criterion has been chosen */
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                /* In case an exclude area crierion has been chosen */
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_exclude_area, cmc_t8_geo_data_interpolate_std_mean);
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* In case several compression criteria has been chosen */
+                cmc_err_msg("not yet implemented");
+            break;
+            default :
+                cmc_err_msg("An unknown compression criterion has bee supplied.");
+        } 
+
+        #if 0
         /* Perform the adaptation/compression with predefined adapt and replace functions */
         switch (amr_data->t8_data->compression_mode)
         {
@@ -484,6 +515,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
             default:
                 cmc_err_msg("An unknown compression_mode was supplied.");
         }
+        #endif
     }
     cmc_debug_msg("The Lossy AMR compressor has been successfully applied.");
     

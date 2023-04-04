@@ -110,33 +110,37 @@ cmc_t8_adapt_callback_coarsen_exclude_area(t8_forest_t forest,
     {
         /* The element stays the same, it will not be refined and it cannot be coarsened */
         return 0;
-    } else
+    }
+
+    /* Get the adapt data from the forest */
+    cmc_t8_adapt_data_t adapt_data = static_cast<cmc_t8_adapt_data_t>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != NULL);
+
+    /* Set the current_var_id based on the compression mode (in a 'One for All'-compression, current var_id is smaller thn zero, otherwise in a 'One for One'-compression it resembles the current intern id of the variable) */
+    const int var_id = (adapt_data->current_var_id < 0 ? 0 : adapt_data->current_var_id);
+
+    /* Check if at least one element of the family lies within the excluded geo-spatial domain */
+    for (int elem_id{0}; elem_id < num_elements; ++elem_id)
     {
-        /* Get the adapt data from the forest */
-        cmc_t8_adapt_data_t adapt_data = static_cast<cmc_t8_adapt_data_t>(t8_forest_get_user_data(forest));
-
-        cmc_assert(adapt_data != NULL);
-
-        /* Only perform two coarsening steps */
-        if (adapt_data->adapt_step >= 1)
+        /* Check if the element is inside the geo mesh */
+        if (cmc_t8_elem_inside_geo_mesh(elements[elem_id], ts, *(adapt_data->t8_data), 0) == 1)
         {
-            return 0;
-        }
-
-        /* Check if at least one element of the family lies within the defined geo-spatial domain */
-        for (int elem_id{0}; elem_id < num_elements; ++elem_id)
-        {
-            /* Example check for the domain of South-America */
-            if (cmc_t8_elem_inside_geo_domain(elements[elem_id], ts, *(adapt_data->t8_data), adapt_data->current_var_id, 13, 45, 112, 132, 0, 0) == 1)
+            /* Check if the element is inside the given domain (which will be excluded by the compression) */
+            if (cmc_t8_elem_inside_geo_domain(elements[elem_id], ts, *(adapt_data->t8_data), var_id, adapt_data->t8_data->settings.exclude_area_start_indices[CMC_COORD_IDS::CMC_LAT], adapt_data->t8_data->settings.exclude_area_end_indices[CMC_COORD_IDS::CMC_LAT],
+                                              adapt_data->t8_data->settings.exclude_area_start_indices[CMC_COORD_IDS::CMC_LON], adapt_data->t8_data->settings.exclude_area_end_indices[CMC_COORD_IDS::CMC_LON],
+                                              adapt_data->t8_data->settings.exclude_area_start_indices[CMC_COORD_IDS::CMC_LEV], adapt_data->t8_data->settings.exclude_area_end_indices[CMC_COORD_IDS::CMC_LEV]) == 1)
             {
                 /* Do not coarsen elements which lay inside the given domain */
                 return 0;
             }
+        } else 
+        {
+            return 0;
         }
-
-        /* If all checks have passed, coarsen the elements' family */
-        return -1;
     }
+
+    /* If all checks have passed, coarsen the elements' family */
+    return -1;
     #else
     return CMC_ERR;
     #endif

@@ -69,6 +69,19 @@ void
 cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_data, const double maximum_error_tolerance);
 
 /**
+ * @brief This function sets an error threshold compression criterium for the lossy AMR compressor. The data of all variables will be compressed compliant to the this threshold.
+ * Precisly, the introduced data loss during the compression will not excced @var maximum_error_tolerance.
+ * 
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
+ * @param coord_id The corrdinate which should be restriceted (e.g. longitude: CMC_COORD_IDS::CMC_LON)
+ * @param start_value An actual coordinate value specifiying a start (in the given coordinate dimension @var coord_id) of an area which will be excluded during the compression 
+ * @param end_value An actual coordinate value specifiying a end (in the given coordinate dimension @var coord_id) of an area which will be excluded during the compression 
+ */
+void
+cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data, const CMC_COORD_IDS coord_id, const cmc_universal_type_t& start_value, const cmc_universal_type_t& end_value);
+
+
+/**
  * @brief This function sets the variables' data up fpr the lossy AMR compression based on the given @var compression_mode.
  * The @var compression_mode could be 'One for One' or 'One for All' in 2D or 3D (@see @enum CMC_AMR_COMPRESSION_MODE).
  * The main difference between the two approaches is, that in case of a 'One for One' compression, each variable is compressed independetly with the supplied compression criterium.

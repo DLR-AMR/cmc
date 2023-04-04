@@ -1068,8 +1068,9 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
         {
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
+            cmc_warn_msg("No compression criterion has been specified.");
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
                 #if 0
                 adapt_data._counter.push_back(0);
@@ -1080,6 +1081,9 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Create a var_vector holding data which may be used by the interpolation */
                 adapt_data.adapted_data = new var_vector_t();
                 adapt_data.adapted_data->reserve(t8_data->vars.size());
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                // In this case nothing has to be set up
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1093,7 +1097,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
             #if 0
                 /* Allocate space for all unordered maps (for each varibale) */
                 adapt_data.initial_ref_lvl_ids.reserve(t8_data->vars.size());
@@ -1111,6 +1115,13 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Save the initial data */
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
                 //t8_data->initial_data.push_back(t8_data->vars[var_id]->var->data);
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                /* Reset the adapt_data class */
+                adapt_data.adapt_step = 0;
+                /* Save the current variable ID */
+                adapt_data.current_var_id = var_id;
+                interpolation_data.current_var_id = var_id;
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1133,7 +1144,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Reset the counters */
                 #if 0
                 adapt_data._counter[0] = 0;
@@ -1152,6 +1163,9 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 /* Save a pointer to the 'adapted_data' in the interpolation struct */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
             break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
+            break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
         }
@@ -1164,7 +1178,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Reset the adapt counters */
                 #if 0
                 adapt_data._counter[var_id] = 0;
@@ -1177,6 +1191,9 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 /* Save a pointer to the 'adapted_data' for the interpolation */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
                 interpolation_data.coarsening_counter = 0;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1213,10 +1230,13 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1230,11 +1250,14 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
 
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1259,9 +1282,12 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Delete the allocation of the var_vector */
                 delete adapt_data.adapted_data;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1275,9 +1301,12 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Delete the allocation of the var_vector */
                 delete adapt_data.adapted_data;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -2225,11 +2254,269 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 }
 
 void
-cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximim_error_tolerance)
+cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance)
 {
     #ifdef CMC_WITH_T8CODE
     /* Save the error tolerance */
-    t8_data->settings.max_err = maximim_error_tolerance;
-    t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED;
+    t8_data->settings.max_err = maximum_error_tolerance;
+
+    /* Set a flag that the exclude criterion will be applied */
+    if (t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED)
+    {
+        /* If no criterion has been specified, set the relative error criterion */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD;
+    } else if (t8_data->settings.compression_criterium != CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD)
+    {
+        /* If another criterion already has been specified, set the combined flag */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION;
+    }
+    #endif
+}
+
+template<typename T>
+static std::pair<int,int>
+cmc_t8_geo_data_get_area_threshold(const var_array_t& coordinate, T start_val, T end_val)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Obtain the smaller and the bigger value of the threshold */
+    const T smaller_val = start_val <= end_val ? start_val : end_val;
+    const T bigger_val = start_val > end_val ? start_val : end_val;
+
+    /* Check if there is a 'real' threshold supplied */
+    if(bigger_val - smaller_val <= 0)
+    {
+        /* In this case there will be no threshold applied for the given coordinate dimension */
+        cmc_warn_msg("The supplied exclude-area threshold will have no effect (please check the given min/max values for the desired area to be excluded from the compression).");
+        return std::make_pair<int, int>(-1, INT_MAX);
+    }
+
+    bool flag_descending_order{false};
+
+    /* Get the pointer to the coordinate data */
+    T* coord_ptr = static_cast<T*>(coordinate.get_initial_data_ptr());
+
+    /* Declare a return value */
+    std::pair<int, int> ret_val{-1, INT_MAX};
+
+    /* Check the ordering of the coordinate data */
+    size_t iter{0};
+    while (iter + 1 < coordinate.size())
+    {
+        if (*(coord_ptr + iter) == *(coord_ptr + iter + 1))
+        {
+            continue;
+        } else if (*(coord_ptr + iter) > *(coord_ptr + iter + 1))
+        {
+            /* If the order is descending */
+            flag_descending_order = true;
+            break;
+        } else
+        {
+            /* If anascending order is found, we just break since the flag's default is false */
+            break;
+        }
+        
+        /* Increment the iterator variable */
+        ++iter;
+    }
+
+    /* Find the integer values resembling the actual domain of the threshold */
+    if (flag_descending_order)
+    {
+        /* In case of a descending order */
+        size_t i{0};
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) <= bigger_val)
+            {
+                /* We have found the start index */
+                ret_val.second = static_cast<int>(coordinate.size() - i);
+                break;
+            }
+        }
+        /* Check for the end index */
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) <= smaller_val)
+            {
+                /* We have found the end index */
+                ret_val.first = static_cast<int>(coordinate.size() - i);
+                break;
+            }
+        }
+    }
+    /* In case of an ascending order */
+    else
+    {
+        size_t i{0};
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) >= smaller_val)
+            {
+                /* We have found the start index */
+                ret_val.first = static_cast<int>(i);
+                break;
+            }
+        }
+        /* Check for the end index */
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) >= bigger_val)
+            {
+                /* We have found the end index */
+                ret_val.second = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+
+    return ret_val;
+    #endif
+}
+
+// Currently, we assume that coordinates are ordered incrementally, e.g. longitude: -90, -85, ...,-5, 0, 5, ..., 85, 90 
+void
+cmc_t8_geo_data_set_exclude_area(cmc_t8_data_t t8_data, const CMC_COORD_IDS coord_id, const cmc_universal_type_t& starting_value, const cmc_universal_type_t& end_value)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Currently, only possible for longitude, latitiude and elevation */
+    cmc_assert(coord_id == CMC_COORD_IDS::CMC_LON || coord_id == CMC_COORD_IDS::CMC_LAT || coord_id == CMC_COORD_IDS::CMC_LEV);
+    
+    /* Get the coordinate array */
+    var_array_t& coordinate = t8_data->geo_data->coords->operator[](coord_id);
+
+    /* Check the data type */
+    switch (coordinate.get_data_type())
+    {
+        case CMC_INT32_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int32_t>(starting_value), std::get<int32_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<float>(starting_value), std::get<float>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<double>(starting_value), std::get<double>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int16_t>(starting_value), std::get<int16_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int64_t>(starting_value), std::get<int64_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint64_t>(starting_value), std::get<uint64_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint32_t>(starting_value), std::get<uint32_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int8_t>(starting_value), std::get<int8_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint8_t>(starting_value), std::get<uint8_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint16_t>(starting_value), std::get<uint16_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Coordinate values of type byte are not supported.");
+        break;
+        case CMC_CHAR:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<char>(starting_value), std::get<char>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+    
+    /* Set a flag that the exclude criterion will be applied */
+    if (t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED)
+    {
+        /* If no criterion has been specified, set the excldue area */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA;
+    } else if (t8_data->settings.compression_criterium != CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA)
+    {
+        /* If another criterion already has been specified, set the combined flag */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION;
+    }
+
+    std::cout << "Settings for start is now: " << t8_data->settings.exclude_area_start_indices[0] << ", " << t8_data->settings.exclude_area_start_indices[1] << ", " << t8_data->settings.exclude_area_start_indices[2] << ", " << t8_data->settings.exclude_area_start_indices[3] << ", " << std::endl;
+    std::cout << "Settings for  end  is now: " << t8_data->settings.exclude_area_end_indices[0] << ", " << t8_data->settings.exclude_area_end_indices[1] << ", " << t8_data->settings.exclude_area_end_indices[2] << ", " << t8_data->settings.exclude_area_end_indices[3] << ", " << std::endl;
     #endif
 }

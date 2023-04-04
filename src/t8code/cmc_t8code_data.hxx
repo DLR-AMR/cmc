@@ -141,7 +141,9 @@ struct cmc_amr_compression_settings
 {
 public:
     CMC_T8_COMPRESSION_CRITERIUM compression_criterium{CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED};
-    double max_err{0.01};
+    double max_err{0.0};
+    std::array<int, CMC_NUM_COORD_IDS> exclude_area_start_indices{-1,-1,-1,-1};
+    std::array<int, CMC_NUM_COORD_IDS> exclude_area_end_indices{INT_MAX, INT_MAX, INT_MAX, INT_MAX};
 };
 
 /**
