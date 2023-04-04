@@ -380,7 +380,7 @@ cmc_t8_adapt_callback_refine_to_initial_lvl (t8_forest_t forest,
         /* If we have already reached the initial refinement level, the element stays the same */
         return 0;
     }
-    
+
     #endif
 }
 
@@ -456,6 +456,7 @@ cmc_t8_adapt_callback_coarsen_error_threshold (t8_forest_t forest,
          * Therefore, when this criterion is used, we need to update the counters in the 'adapt_data' every time we prematurely return without coarsening
          */
         cmc_t8_update_counters_for_rel_error_threshold(adapt_data);
+
         /* The element stays the same, it will not be refined and it cannot be coarsened */
         return 0;
     }
@@ -467,6 +468,70 @@ cmc_t8_adapt_callback_coarsen_error_threshold (t8_forest_t forest,
      */
     if (!cmc_t8_elements_coarsened_from_the_beginning_onwards(adapt_data, ts, elements[0]) ||
         !cmc_t8_elements_all_inside_geo_mesh(adapt_data, ts, num_elements, elements))
+    {
+        /* Update the counters within the adapt data */
+        cmc_t8_update_counters_for_rel_error_threshold(adapt_data);
+
+        /* The element stays the same, it will not be refined and it cannot be coarsened */
+        return 0;
+    }
+
+    /* Families of elements that have passed the previous checks are now conducted if they fulfill the given relative error threshold */
+    if (cmc_t8_elements_fulfill_rel_error_threshold(adapt_data, lelement_id, ts, num_elements, elements))
+    {
+        /* If the elements family fulfills the relative error threshold, we are able to coarsen the elements */
+        return -1;
+    } else
+    {
+        /* If the family of elements do not fulfill the relative error threshold, the element stays the same */
+        return 0;
+    }
+
+    #else
+    return CMC_ERR;
+    #endif
+}
+
+
+t8_locidx_t
+cmc_t8_adapt_callback_coarsen_combined_criteria (t8_forest_t forest,
+                                               t8_forest_t forest_from,
+                                               int which_tree,
+                                               int lelement_id,
+                                               t8_eclass_scheme_c * ts,
+                                               const int is_family,
+                                               const int num_elements,
+                                               t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+
+    /* Get the adapt data from the forest */
+    cmc_t8_adapt_data_t adapt_data = static_cast<cmc_t8_adapt_data_t>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    /** Only a family of elements can be coarsened.
+     * If only a single element is passed to the callback, the callback function can be returned immediately. 
+    */
+    if (is_family == 0)
+    {
+        /* Due to the nature of the relative error criterion, we need to keep track which elements are coarsened.
+         * Therefore, when this criterion is used, we need to update the counters in the 'adapt_data' every time we prematurely return without coarsening
+         */
+        cmc_t8_update_counters_for_rel_error_threshold(adapt_data);
+        
+        /* The element stays the same, it will not be refined and it cannot be coarsened */
+        return 0;
+    }
+
+    /** Furthermore, if the elements are not inside the geo mesh, we cannot coarsen them. 
+     * And elements (resp. family of elements) that have not been coarsened before (resp. from the start of coarsening onwards) cannot be coarsened
+     * since this would discard artefacts/high variability of the data in a small scale (which were initially present). So once we have decided to no coarsen the elements, the decision is absolute
+     * (This keeps 'details' in the data).
+     * Moreover the exclude-area criterion is checked.
+     */
+    if (!cmc_t8_elements_coarsened_from_the_beginning_onwards(adapt_data, ts, elements[0]) ||
+        !cmc_t8_elements_all_inside_geo_mesh(adapt_data, ts, num_elements, elements) ||
+        !cmc_t8_elements_all_outside_geo_domain(adapt_data, ts, num_elements, elements))
     {
         /* Update the counters within the adapt data */
         cmc_t8_update_counters_for_rel_error_threshold(adapt_data);

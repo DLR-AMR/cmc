@@ -1072,10 +1072,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
             [[fallthrough]];
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
-                #if 0
-                adapt_data._counter.push_back(0);
-                adapt_data._counter_nxt_lvl.push_back(0);
-                #endif
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->assets->forest) / pow(t8_data->geo_data->dim, 2)));
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
                 /* Create a var_vector holding data which may be used by the interpolation */
@@ -1084,6 +1081,15 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 // In this case nothing has to be set up
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->assets->forest) / pow(t8_data->geo_data->dim, 2)));
+                adapt_data._counter = 0;
+                adapt_data._counter_nxt_lvl = 0;
+                /* Create a var_vector holding data which may be used by the interpolation */
+                adapt_data.adapted_data = new var_vector_t();
+                adapt_data.adapted_data->reserve(t8_data->vars.size());
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1098,15 +1104,6 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
-            #if 0
-                /* Allocate space for all unordered maps (for each varibale) */
-                adapt_data.initial_ref_lvl_ids.reserve(t8_data->vars.size());
-                adapt_data._counter.reserve(t8_data->vars.size());
-                adapt_data._counter_nxt_lvl.reserve(t8_data->vars.size());
-                /* Create a var_vector holding data which may be used by the interpolation */
-                adapt_data.adapted_data = new var_vector_t();
-                adapt_data.adapted_data->reserve(1);
-            #endif
                 /* Reset the adapt_data class */
                 adapt_data.adapt_step = 0;
                 /* Save the current variable ID */
@@ -1114,7 +1111,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 interpolation_data.current_var_id = var_id;
                 /* Save the initial data */
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
-                //t8_data->initial_data.push_back(t8_data->vars[var_id]->var->data);
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[var_id]->assets->forest) / pow(t8_data->vars[var_id]->var->num_dimensions, 2)));
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 /* Reset the adapt_data class */
@@ -1122,6 +1119,16 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Save the current variable ID */
                 adapt_data.current_var_id = var_id;
                 interpolation_data.current_var_id = var_id;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Reset the adapt_data class */
+                adapt_data.adapt_step = 0;
+                /* Save the current variable ID */
+                adapt_data.current_var_id = var_id;
+                interpolation_data.current_var_id = var_id;
+                /* Save the initial data */
+                adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[var_id]->assets->forest) / pow(t8_data->vars[var_id]->var->num_dimensions, 2)));
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1146,13 +1153,8 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             [[fallthrough]];
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Reset the counters */
-                #if 0
-                adapt_data._counter[0] = 0;
-                adapt_data._counter_nxt_lvl[0] = 0;
-                #endif
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
-
                 adapt_data.coarsening_counter = 0;
                 interpolation_data.coarsening_counter = 0;
                 /* Allocate space for each variable in order to save data which may be used by the interpolation */
@@ -1165,6 +1167,20 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Reset the counters */
+                adapt_data._counter = 0;
+                adapt_data._counter_nxt_lvl = 0;
+                adapt_data.coarsening_counter = 0;
+                interpolation_data.coarsening_counter = 0;
+                /* Allocate space for each variable in order to save data which may be used by the interpolation */
+                for (size_t id{0}; id < adapt_data.t8_data->vars.size(); ++id)
+                {
+                    adapt_data.adapted_data->push_back(new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapt_data.t8_data->assets->forest) / (2 * adapt_data.t8_data->vars[id]->var->num_dimensions) +1), adapt_data.t8_data->vars[id]->get_type()));
+                }
+                /* Save a pointer to the 'adapted_data' in the interpolation struct */
+                interpolation_data.adapted_data = adapt_data.adapted_data;    
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1180,10 +1196,6 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             [[fallthrough]];
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Reset the adapt counters */
-                #if 0
-                adapt_data._counter[var_id] = 0;
-                adapt_data._counter_nxt_lvl[var_id] = 0;
-                #endif
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
                 adapt_data.coarsening_counter = 0;
@@ -1194,6 +1206,16 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Reset the adapt counters */
+                adapt_data._counter = 0;
+                adapt_data._counter_nxt_lvl = 0;
+                adapt_data.coarsening_counter = 0;
+                adapt_data.adapted_data->push_back(new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapt_data.t8_data->vars[var_id]->assets->forest) / (2 * adapt_data.t8_data->vars[var_id]->var->num_dimensions) +1), adapt_data.t8_data->vars[var_id]->get_type()));
+                /* Save a pointer to the 'adapted_data' for the interpolation */
+                interpolation_data.adapted_data = adapt_data.adapted_data;
+                interpolation_data.coarsening_counter = 0;
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1238,6 +1260,11 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
             break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Free the data which has been saved during the adaptation */
+                adapt_data.adapted_data->clear();
+                interpolation_data.adapted_data = nullptr;
+            break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
         }
@@ -1258,6 +1285,11 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Free the data which has been saved during the adaptation */
+                adapt_data.adapted_data->clear();
+                interpolation_data.adapted_data = nullptr;
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1289,6 +1321,10 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
             break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Delete the allocation of the var_vector */
+                delete adapt_data.adapted_data;
+            break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
         }
@@ -1307,6 +1343,10 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Delete the allocation of the var_vector */
+                delete adapt_data.adapted_data;
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");

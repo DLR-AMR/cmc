@@ -488,7 +488,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
                 /* In case several compression criteria has been chosen */
-                cmc_err_msg("not yet implemented");
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_combined_criteria, cmc_t8_geo_data_interpolate_error_threshold_adaption);
             break;
             default :
                 cmc_err_msg("An unknown compression criterion has bee supplied.");
