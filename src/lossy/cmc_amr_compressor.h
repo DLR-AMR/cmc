@@ -13,7 +13,7 @@
 #include "t8code/cmc_t8_replace_callbacks.h"
 
 
-/** Opaue pointer declaration of @struct cmc_amr_data */
+/** Opaque pointer declaration of @struct cmc_amr_data */
 typedef struct cmc_amr_data* cmc_amr_data_t;
 
 /** Typedef for @enum CMC_LOSSY_COMPRESSION_MODE describing the compression mode (definition in @file cmc_constants_definitions.h) */
@@ -77,9 +77,14 @@ cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_d
  * @param start_value An actual coordinate value specifiying a start (in the given coordinate dimension @var coord_id) of an area which will be excluded during the compression 
  * @param end_value An actual coordinate value specifiying a end (in the given coordinate dimension @var coord_id) of an area which will be excluded during the compression 
  */
+#ifdef __cplusplus
 void
-cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data, const CMC_COORD_IDS coord_id, const cmc_universal_type_t& start_value, const cmc_universal_type_t& end_value);
-
+cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data, const enum CMC_COORD_IDS coord_id, const cmc_universal_type_t& start_value, const cmc_universal_type_t& end_value);
+#else
+/* In order to keep a C-compliant interface, the start and end value needs to default to double values */
+void
+cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data, const enum CMC_COORD_IDS coord_id, const double start_value, const double end_value);
+#endif
 
 /**
  * @brief This function sets the variables' data up fpr the lossy AMR compression based on the given @var compression_mode.

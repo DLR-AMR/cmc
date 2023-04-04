@@ -3,6 +3,7 @@
 
 #include "cmc.h"
 #include "utilities/cmc_util.h"
+#include "utilities/cmc_log_functions.h"
 
 /* Array holding the data_size (in bytes) of each variable data type */ 
 inline constexpr std::array<size_t, cmc_type::CMC_NUM_TYPES> cmc_type_to_bytes{sizeof(std::byte), sizeof(int8_t), sizeof(char), sizeof(int16_t), sizeof(int32_t), sizeof(float), sizeof(double), sizeof(uint8_t), sizeof(uint16_t), sizeof(uint32_t), sizeof(int64_t), sizeof(uint64_t)};
@@ -149,5 +150,72 @@ type_to_cmc_type(T val)
     }
 }
 
-
+template<typename T>
+auto convert_to_universal_type(const cmc_type dest_type, const T value)
+ -> std::enable_if_t<std::is_arithmetic_v<T>, cmc_universal_type_t>
+{
+    switch (dest_type)
+    {
+        case CMC_INT32_T:
+        {
+            return cmc_universal_type_t(static_cast<int32_t>(value));
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            return cmc_universal_type_t(static_cast<float>(value));
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            return cmc_universal_type_t(static_cast<double>(value));
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            return cmc_universal_type_t(static_cast<int16_t>(value));
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            return cmc_universal_type_t(static_cast<int64_t>(value));
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            return cmc_universal_type_t(static_cast<uint64_t>(value));
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            return cmc_universal_type_t(static_cast<uint32_t>(value));
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            return cmc_universal_type_t(static_cast<int8_t>(value));
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            return cmc_universal_type_t(static_cast<uint8_t>(value));
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            return cmc_universal_type_t(static_cast<uint16_t>(value));
+        }
+        break;
+        case CMC_BYTE:
+        cmc_err_msg("Cannot convert value to type byte.");
+        break;
+        case CMC_CHAR:
+        {
+            return cmc_universal_type_t(static_cast<char>(value));
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+} 
 #endif /* CMC_CONTAINER_H */

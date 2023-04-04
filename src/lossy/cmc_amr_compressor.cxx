@@ -368,6 +368,7 @@ cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_d
     #endif
 }
 
+#if __cplusplus
 void
 cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data, const CMC_COORD_IDS coord_id, const cmc_universal_type_t& start_value, const cmc_universal_type_t& end_value)
 {
@@ -376,6 +377,19 @@ cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data
     cmc_t8_geo_data_set_exclude_area(amr_data->t8_data, coord_id, start_value, end_value);
     #endif
 }
+#else
+void
+cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data, const enum CMC_COORD_IDS coord_id, const double start_value, const double end_value)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Transform the start and end values to their corresponding universal_type */
+    cmc_universal_type_t start_val = convert_to_universal_type(amr_data->t8_data->geo_data->coords->operator[](static_cast<size_t>(coord_id)).get_data_type(), start_value);
+    cmc_universal_type_t end_val = convert_to_universal_type(amr_data->t8_data->geo_data->coords->operator[](static_cast<size_t>(coord_id)).get_data_type(), end_value);
+    /* Set the exclusion area, in which not coarsening will be applied */
+    cmc_t8_geo_data_set_exclude_area(amr_data->t8_data, coord_id, start_value, end_value);
+    #endif
+}
+#endif
 
 /** Create an initial mesh which will be able to contain the (simulation) data */          
 void

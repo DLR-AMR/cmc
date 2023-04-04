@@ -1,5 +1,4 @@
 #include "utilities/cmc_container.h"
-#include "utilities/cmc_log_functions.h"
 
 struct var_array
 {
