@@ -28,11 +28,7 @@ src/lossless/cmc_lzss.h
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
-src/fortran_interfaces/cmcc_wrapper.h \
-cmc_fortran.mod \
-cmc_messy_interface.mod \
-cmc_netcdf_interface.mod \
-cmc_amr_compression_interface.mod
+src/fortran_interfaces/cmcc_wrapper.h 
 endif
 
 src_libcmc_la_SOURCES = src/cmc.cxx \
@@ -54,12 +50,13 @@ src/messy/cmc_messy.cxx \
 src/lossless/cmc_lzss.cxx
 
 if ENABLE_FORTRAN
-src_libcmc_la_SOURCES += src/fortran_interfaces/cmcc.c \
-src/fortran_interfaces/cmcc_wrapper.c \
-src/fortran_interfaces/cmc_fortran.f90 \
+MODSOURCES += src/fortran_interfaces/cmc_fortran.f90 \
 src/fortran_interfaces/cmc_messy_interface.f90 \
 src/fortran_interfaces/cmc_netcdf_interface.f90 \
 src/fortran_interfaces/cmc_amr_compression_interface.f90
+
+src_libcmc_la_SOURCES += src/fortran_interfaces/cmcc.c \
+src/fortran_interfaces/cmcc_wrapper.c $(MODSOURCES)
 endif
 
 
@@ -69,7 +66,7 @@ src_libcmc_la_LIBFLAGS = $(NETCDF_LIBFLAGS) $(T8CODE_LIBFLAGS)
 src_libcmc_la_CXXFLAGS = $(AM_CXXFLAGS)
 src_libcmc_la_CFLAGS = $(CMC_CFLAGS)
 if ENABLE_FORTRAN
-src_libcmc_la_FCFLAGS = $(CMC_FCFLAGS)
+src_libcmc_la_FCFLAGS = $(AM_FCFLAGS)
 src_libcmc_la_FFLAGS = $(CMC_FFLAGS)
 endif
 
