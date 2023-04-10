@@ -50,13 +50,15 @@ src/messy/cmc_messy.cxx \
 src/lossless/cmc_lzss.cxx
 
 if ENABLE_FORTRAN
-MODSOURCES += src/fortran_interfaces/cmc_fortran.f90 \
+cmc_module_sources = src/fortran_interfaces/cmc_fortran.f90 \
 src/fortran_interfaces/cmc_messy_interface.f90 \
 src/fortran_interfaces/cmc_netcdf_interface.f90 \
 src/fortran_interfaces/cmc_amr_compression_interface.f90
 
 src_libcmc_la_SOURCES += src/fortran_interfaces/cmcc.c \
-src/fortran_interfaces/cmcc_wrapper.c $(MODSOURCES)
+src/fortran_interfaces/cmcc_wrapper.c $(cmc_module_sources)
+
+MODSOURCES += $(cmc_module_sources)
 endif
 
 
