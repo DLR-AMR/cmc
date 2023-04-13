@@ -1,5 +1,7 @@
 #include "cmcc_wrapper.h"
+#include "cmc.h"
 
+/** This functions opens a netCDF-File */
 int
 cmcc_nc_open(const char* path_to_file_f, const int length, MPI_Fint comm_f)
 {
@@ -11,6 +13,7 @@ cmcc_nc_open(const char* path_to_file_f, const int length, MPI_Fint comm_f)
     #endif
 }
 
+/** This functions adds a variable to the list of variables which will be read from the netCDF-File */
 void
 cmcc_nc_add_variable(cmc_nc_data_t nc_data, const char* var_name_f, const int length)
 {
@@ -22,12 +25,15 @@ cmcc_nc_add_variable(cmc_nc_data_t nc_data, const char* var_name_f, const int le
     #endif
 }
 
+/** This functions creates a @struct cmc_amr_data based on the netCDF input data supplied via @var nc_data and returns a pointer of the struct */
 cmc_amr_data_t
 cmcc_create_amr_compression_data(cmc_nc_data_t nc_data, const MPI_Fint comm_f)
 {
     #ifdef CMC_WITH_T8CODE
     #ifdef CMC_WITH_NETCDF
+    #ifdef CMC_ENABLE_MPI
     cmc_create_amr_compression_data(nc_data, MPI_Comm_f2c(comm_f));
+    #endif
     #endif
     #endif
 }
@@ -50,6 +56,17 @@ cmcc_amr_write_vtk_file(cmc_amr_data_t amr_data, const char* file_prefix, const 
     free(fprefix);
     #endif
 }
+
+/** Initialize cmc and it's submodules given a specific MPI Communicator */
+void
+cmcc_initialize_mpi_comm(const MPI_Fint comm_f)
+{
+    #ifdef CMC_ENABLE_MPI
+    /* Call the initialization with the corresponding 'C-MPI' Communicator */
+    cmc_initialize_mpi_comm(MPI_Comm_f2c(comm_f));
+    #endif
+}
+
 
 //TODO: update messy functions
 #if 0
