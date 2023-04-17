@@ -1,15 +1,26 @@
 #include "cmc.h"
 #include "cmc_mpi.h"
 
+/** Initialize MPI (if has not been initialized beforehand) */
 void
 cmc_mpi_initialize()
 {
     #ifdef CMC_ENABLE_MPI
-    int err{MPI_Init(NULL, NULL)};
+    int init_flag{0};
+
+    /* Check if MPI already has been initialized */
+    int err{MPI_Initialized(&init_flag)};
     cmc_mpi_check_err(err);
+
+    if (init_flag == 0)
+    {
+        err = MPI_Init(NULL, NULL);
+        cmc_mpi_check_err(err);
+    }
     #endif
 }
 
+/** Finalize MPI */
 void
 cmc_mpi_finalize()
 {
@@ -19,6 +30,7 @@ cmc_mpi_finalize()
     #endif
 }
 
+/** Abort MPI */
 void
 cmc_mpi_abort(const int _err_code, const char* _location)
 {

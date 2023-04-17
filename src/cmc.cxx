@@ -43,10 +43,10 @@ cmc_initialize_mpi_comm(MPI_Comm comm)
   /* Only print out the initilization info on rank zero */
   if (rank == 0)
   {
-    std::cout << "[cmc] cmc has been finalized." << std::endl;
+    std::cout << "[cmc] cmc has been initialized." << std::endl;
   }
   #else
-  std::cout << "[cmc] cmc has been finalized." << std::endl;
+  std::cout << "[cmc] cmc has been initialized." << std::endl;
   #endif
 }
 
