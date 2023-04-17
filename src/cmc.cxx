@@ -12,7 +12,19 @@ cmc_initialize()
   cmc_mpi_initialize();
   /* Initialize t8code */
   cmc_t8code_initialize(MPI_COMM_WORLD);
-  std::cout << "[CMC] cmc has been initialized." << std::endl; 
+  #ifdef cmc_ENABLE_MPI
+  int err, rank;
+  /* Get the rank of the process */
+  err = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  cmc_mpi_check_err(err);
+  /* Only print out the initilization info on rank zero */
+  if (rank == 0)
+  {
+    std::cout << "[cmc] cmc has been initialized." << std::endl; 
+  }
+  #else
+  std::cout << "[cmc] cmc has been initialized." << std::endl; 
+  #endif
 }
 
 /** Initialize cmc and it's sub-modules with a specific MPI Communicator */
@@ -23,7 +35,19 @@ cmc_initialize_mpi_comm(MPI_Comm comm)
   cmc_mpi_initialize();
   /* Initialize t8code */
   cmc_t8code_initialize(comm);
-  std::cout << "[CMC] cmc has been initialized." << std::endl; 
+  #ifdef cmc_ENABLE_MPI
+  int err, rank;
+  /* Get the rank of the process */
+  err = MPI_Comm_rank(comm, &rank);
+  cmc_mpi_check_err(err);
+  /* Only print out the initilization info on rank zero */
+  if (rank == 0)
+  {
+    std::cout << "[cmc] cmc has been finalized." << std::endl;
+  }
+  #else
+  std::cout << "[cmc] cmc has been finalized." << std::endl;
+  #endif
 }
 
 /** Finalize cmc and it's submodules */
@@ -34,7 +58,8 @@ cmc_finalize()
   cmc_t8code_finalize(0);
   /* Finalize MPI */
   cmc_mpi_finalize();
-  std::cout << "[CMC] cmc has been finalized." << std::endl;
+  /* Print out the finalizing info */
+  std::cout << "[cmc] cmc has been finalized." << std::endl;
 }
 
 /** Finalize cmc and it's submodules except MPI */
@@ -43,5 +68,16 @@ cmc_finalize_without_mpi()
 {
   /* Finalize t8code */
   cmc_t8code_finalize(0);
-  std::cout << "[CMC] cmc has been finalized." << std::endl;
+  #ifdef cmc_ENABLE_MPI
+  int err, rank; 
+  err = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  cmc_mpi_check_err(err);
+  /* Only print out the finalizing info on rank zero of the MPI_WORLD_COMM */
+  if (rank == 0)
+  {
+    std::cout << "[cmc] cmc has been finalized." << std::endl;
+  }
+  #else
+  std::cout << "[cmc] cmc has been finalized." << std::endl;
+  #endif
 }
