@@ -1,6 +1,80 @@
-#include "cmc.h"
-#include "utilities/cmc_log_functions.h"
 #include "cmc_messy.h"
+#include "utilities/cmc_constants_definitions.h"
+//#include "cmc.h"
+#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_util.h"
+#include "utilities/cmc_geo_util.h"
+
+
+struct cmc_messy_data {
+    cmc_messy_data(){};
+    cmc_messy_data(int _num_variables)
+    : num_variables{_num_variables}{
+        std::cout << "Created messy data struct with num vars = " << _num_variables << std::endl;
+        vars.reserve(_num_variables);
+    };
+    cmc_messy_data(MPI_Comm _comm)
+    : comm{_comm}{};
+
+    /* Number of tracers (excluding the reference variable) */
+    int num_variables{0};
+
+    /* Dimension of the tracer data (2D, 3D) */
+    int data_dimension{0};
+
+    /* A flag whether a refernce variable is given */
+    bool reference_values_present{false};
+
+    /* Length of latitiude, longitude, elevation coordinate */
+    std::vector<int> dimension_sizes;
+
+    /* A vector containing all variables (excluding a reference variable) */
+    std::vector<cmc_var_t> vars;
+
+    /* A potential reference variable */
+    cmc_var_t reference_variable;
+
+    /* Axis ordering of the data in C row-major layout */
+    int* axis_ordering;
+
+    /* Axis representation of the Fortran data */
+    std::array<char, 4> axis_representation_f;
+
+    /* The C-communicator to use */
+    MPI_Comm comm;
+};
+
+
+cmc_messy_data_t
+cmc_setup_messy_data(const MPI_Fint comm)
+{
+    #ifdef CMC_ENABLE_FORTRAN
+    std::cout << "Hallo" << std::endl;
+    MPI_Comm c_comm = 0;
+    #ifdef CMC_ENABLE_MPI
+    /** Convert the Fortran MPI Communicator to a 'C-MPI Communicator' */
+    c_comm = MPI_Comm_f2c(comm);
+    #endif
+    cmc_debug_msg("The cmc_messy_data struct will be initialized and passed back to MESSy");
+    return new cmc_messy_data(c_comm);
+    #endif
+}
+
+
+void
+cmc_destroy_messy_data(cmc_messy_data_t messy_data)
+{
+    #ifdef CMC_ENABLE_FORTRAN
+    if (messy_data != nullptr)
+    {
+        delete messy_data;
+    }
+    cmc_debug_msg("The messy data struct has been deallocated.");
+    #endif
+}
+
+
+
 
 #if 0
 //TODO: update

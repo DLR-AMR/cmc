@@ -1,8 +1,8 @@
 #ifndef CMC_MESSY_H
 #define CMC_MESSY_H
 
-//#include "cmc_messy_data.h"
 //#include "fortran_interfaces/cmcc.h"
+#include "cmc.h"
 #include "utilities/cmc_constants_definitions.h"
 
 #ifdef CMC_ENABLE_MPI
@@ -17,6 +17,18 @@
 extern "C" {
 #endif
 #endif
+
+
+/* Opaque pointer to data structure */
+typedef struct cmc_messy_data* cmc_messy_data_t;
+
+cmc_messy_data_t
+cmc_setup_messy_data(MPI_Fint comm);
+
+void
+cmc_destroy_messy_data(cmc_messy_data_t messy_data);
+
+
 
 #if 0
 //TODO: update
