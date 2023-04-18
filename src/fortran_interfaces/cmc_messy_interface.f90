@@ -6,6 +6,26 @@ MODULE cmc_messy_interface
     
     INTERFACE
     ! Allocate a MESSy_data struct and assign some initial values
+    TYPE(C_PTR) FUNCTION cmcf_setup_messy_data(num_variables) &
+    BIND(C, NAME='cmc_setup_messy_data')
+    USE, INTRINSIC :: ISO_C_BINDING, only: C_PTR, C_INT
+    IMPLICIT NONE
+    INTEGER(C_INT), VALUE, INTENT(IN)    :: num_variables
+    !INTEGER(C_INT), VALUE, INTENT(IN)    :: comm_f
+    END FUNCTION cmcf_setup_messy_data
+    END INTERFACE
+
+    INTERFACE
+    ! Free the allocated messy_data struct
+    SUBROUTINE cmcf_destroy_messy_data(messy_data) BIND(C, NAME='cmc_destroy_messy_data')
+    USE, INTRINSIC :: ISO_C_BINDING, only: C_PTR
+    IMPLICIT NONE
+    TYPE(C_PTR), VALUE, INTENT(IN) :: messy_data
+    END SUBROUTINE cmcf_destroy_messy_data
+    END INTERFACE
+
+    INTERFACE
+    ! Allocate a MESSy_data struct and assign some initial values
     TYPE(C_PTR) FUNCTION cmcf_setup_messy(dimension_sizes, axis_representation, num_variables, &
     missing_value, comm_f) BIND(C, NAME='cmc_setup_messy')
     USE, INTRINSIC :: ISO_C_BINDING, only: C_PTR, C_INT, C_CHAR, C_DOUBLE

@@ -5,11 +5,20 @@ MODULE cmc_fortran
     IMPLICIT NONE
 
     INTERFACE
-    ! Initialize cmc, MPI and t8code 
+    ! Initialize cmc, MPI and t8code using MPI_COMM_WORLD as a default communicator (if MPI is enabled)
     SUBROUTINE cmcf_initialize() BIND(C, NAME='cmc_initialize')
     USE, INTRINSIC :: ISO_C_BINDING
     IMPLICIT NONE
     END SUBROUTINE cmcf_initialize
+    END INTERFACE
+
+    INTERFACE
+    ! Initialize cmc, MPI and t8code given a specific MPI communicator
+    SUBROUTINE cmcf_initialize_mpi_comm(comm_f) BIND(C, NAME='cmcc_initialize_mpi_comm')
+    USE, INTRINSIC :: ISO_C_BINDING, only: C_INT
+    IMPLICIT NONE
+    INTEGER(C_INT), VALUE, INTENT(IN) :: comm_f
+    END SUBROUTINE cmcf_initialize_mpi_comm
     END INTERFACE
 
     INTERFACE

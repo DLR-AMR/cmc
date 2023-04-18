@@ -68,4 +68,25 @@ MODULE cmc_amr_compression_interface
     END SUBROUTINE cmcf_amr_destroy
     END INTERFACE
 
+    INTERFACE
+    ! Decompress the lossy AMR compressed data
+    SUBROUTINE cmcf_amr_decompress(amr_data) BIND(C, NAME='cmc_amr_decompress')
+    USE, INTRINSIC :: ISO_C_BINDING, only: C_PTR
+    IMPLICIT NONE
+    TYPE(C_PTR), VALUE, INTENT(IN) :: amr_data
+    END SUBROUTINE cmcf_amr_decompress
+    END INTERFACE
+
+    INTERFACE
+    ! Destroy the allocated data
+    SUBROUTINE cmcf_amr_write_vtk_file(amr_data, file_prefix, file_prefix_length) &
+    BIND(C, NAME='cmcc_amr_write_vtk_file')
+    USE, INTRINSIC :: ISO_C_BINDING, only: C_PTR, C_CHAR, C_INT
+    IMPLICIT NONE
+    TYPE(C_PTR), VALUE, INTENT(IN)       :: amr_data
+    CHARACTER(C_CHAR), VALUE, INTENT(IN) :: file_prefix
+    INTEGER(C_INT), VALUE, INTENT(IN)    :: file_prefix_length
+    END SUBROUTINE cmcf_amr_write_vtk_file
+    END INTERFACE
+
 END MODULE cmc_amr_compression_interface

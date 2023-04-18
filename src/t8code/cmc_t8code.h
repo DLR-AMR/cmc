@@ -19,9 +19,21 @@ extern "C" {
 #endif
 #endif
 
+/**
+ * @brief Initialize t8code and it's submodules 
+ * 
+ * @param comm The MPI Communicator to be used 
+ */
 void
-cmc_t8code_initialize();
+cmc_t8code_initialize(MPI_Comm comm);
 
+/**
+ * @brief Finalize t8code and it's submodules 
+ * 
+ * @param flag_finalize_mpi Flag indicating whether or not MPI will be finalized as well or if only t8code will be finalized
+ *
+ * @note @var flag_finalize_mpi = 0 indicates that MPI will not be finalized; @var flag_finalize_mpi != 0 will result in finalizing MPI as well 
+ */
 void
 cmc_t8code_finalize(const int flag_finalize_mpi);
 

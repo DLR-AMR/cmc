@@ -7,9 +7,9 @@
 #include "utilities/cmc_log_functions.h"
 
 
-/* Initialize t8code */
+/* Initialize t8code and it's submodules */
 void
-cmc_t8code_initialize()
+cmc_t8code_initialize(MPI_Comm comm)
 {
     #ifdef CMC_WITH_T8CODE
     int mpi_already_initialized{0};
@@ -21,11 +21,12 @@ cmc_t8code_initialize()
     #endif
     if(mpi_already_initialized == 0)
     {
+        std::cout << "t8code initializes mpi" << std::endl;
         mpiret = sc_MPI_Init(NULL, NULL);
         SC_CHECK_MPI(mpiret);
     }
 
-    sc_init(MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
+    sc_init(comm, 1, 1, NULL, SC_LP_ESSENTIAL);
 
     t8_init(SC_LP_PRODUCTION);
 
@@ -34,7 +35,7 @@ cmc_t8code_initialize()
     #endif
 }
 
-/* Finalize t8code */
+/* Finalize t8code and it's submodules */
 void
 cmc_t8code_finalize(const int flag_finalize_mpi)
 {
@@ -42,6 +43,7 @@ cmc_t8code_finalize(const int flag_finalize_mpi)
     sc_finalize();
     if (flag_finalize_mpi)
     {
+        std::cout << "t8code finalizes mpi"<<std::endl;
         int mpiret{sc_MPI_Finalize()};
         SC_CHECK_MPI(mpiret);
     }

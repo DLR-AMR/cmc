@@ -65,15 +65,6 @@ public:
     bool is_equal_to_missing_value(const size_t value) const;
 };
 
-template<typename T>
-auto cmc_get_universal_data(const cmc_universal_type_t& _universal_data)
-    -> std::enable_if_t<std::is_arithmetic_v<T>,T>
-{
-    return std::visit([](auto&& value) -> T {
-        return static_cast<T>(value);
-    }, _universal_data);
-}
-
 std::string
 get_coord_name(const CMC_COORD_IDS coord_id);
 

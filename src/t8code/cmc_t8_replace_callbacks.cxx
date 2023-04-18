@@ -46,7 +46,7 @@ cmc_t8_geo_data_interpolate_std_mean(t8_forest_t forest_old, t8_forest_t forest_
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)
             {
-                /* If no coarsening has happened, jsut copy the previous element's value */
+                /* If no coarsening has happened, just copy the previous element's value */
                 memcpy(static_cast<std::byte*>(interpolation_data->t8_data->vars[var_id]->get_initial_data_new_ptr()) + first_incoming * interpolation_data->t8_data->vars[var_id]->get_data_size(),
                        static_cast<std::byte*>(interpolation_data->t8_data->vars[var_id]->get_initial_data_ptr()) + first_outgoing * interpolation_data->t8_data->vars[var_id]->get_data_size(),
                        interpolation_data->t8_data->vars[var_id]->get_data_size());
@@ -56,7 +56,7 @@ cmc_t8_geo_data_interpolate_std_mean(t8_forest_t forest_old, t8_forest_t forest_
         else
         {
             /* In case a 'One for One' compression is chosen */
-            /* If no coarsening has happened, jsut copy the previous element's value */
+            /* If no coarsening has happened, just copy the previous element's value */
             memcpy(static_cast<std::byte*>(interpolation_data->t8_data->vars[interpolation_data->current_var_id]->get_initial_data_new_ptr()) + first_incoming * interpolation_data->t8_data->vars[interpolation_data->current_var_id]->get_data_size(),
                    static_cast<std::byte*>(interpolation_data->t8_data->vars[interpolation_data->current_var_id]->get_initial_data_ptr()) + first_outgoing * interpolation_data->t8_data->vars[interpolation_data->current_var_id]->get_data_size(),
                    interpolation_data->t8_data->vars[interpolation_data->current_var_id]->get_data_size());
@@ -160,7 +160,7 @@ cmc_t8_geo_data_interpolate_error_threshold_adaption(t8_forest_t forest_old, t8_
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)
             {
-                /* If no coarsening has happened, jsut copy the previous element's value */
+                /* If no coarsening has happened, just copy the previous element's value */
                 memcpy(static_cast<std::byte*>(interpolation_data->t8_data->vars[var_id]->get_initial_data_new_ptr()) + first_incoming * interpolation_data->t8_data->vars[var_id]->get_data_size(),
                        static_cast<std::byte*>(interpolation_data->t8_data->vars[var_id]->get_initial_data_ptr()) + first_outgoing * interpolation_data->t8_data->vars[var_id]->get_data_size(),
                        interpolation_data->t8_data->vars[var_id]->get_data_size());

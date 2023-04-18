@@ -4,7 +4,7 @@
 #include "cmc_t8_adapt_callbacks.h"
 #include "cmc_t8_replace_callbacks.h"
 #include "utilities/cmc_log_functions.h"
-#include "utilities/cmc_container.hxx"
+#include "utilities/cmc_container.h"
 
 /** Begin STATIC Functions **/
 /****************************/
@@ -732,7 +732,7 @@ cmc_t8_calc_lin_order_offset_for_zcurve_lev_lat_lon(const std::vector<size_t>& d
 {
     #ifdef CMC_WITH_T8CODE
     /* In this case the data layout equals 'CMC_3D_LEV_LAT_LON' */
-    return x_coord + dim_lengths[CMC_COORD_IDS::CMC_LON] * (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 -y_coord + z_coord * dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    return x_coord + dim_lengths[CMC_COORD_IDS::CMC_LON] * (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 -y_coord + z_coord * dim_lengths[CMC_COORD_IDS::CMC_LAT]);
     #else
     return CMC_ERR;
     #endif
@@ -1672,13 +1672,23 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
         {
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
+            cmc_warn_msg("No compression criterion has been specified.");
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
-                #if 0
-                adapt_data._counter.push_back(0);
-                adapt_data._counter_nxt_lvl.push_back(0);
-                #endif
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->assets->forest) / pow(t8_data->geo_data->dim, 2)));
+                adapt_data._counter = 0;
+                adapt_data._counter_nxt_lvl = 0;
+                /* Create a var_vector holding data which may be used by the interpolation */
+                adapt_data.adapted_data = new var_vector_t();
+                adapt_data.adapted_data->reserve(t8_data->vars.size());
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                // In this case nothing has to be set up
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->assets->forest) / pow(t8_data->geo_data->dim, 2)));
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
                 /* Create a var_vector holding data which may be used by the interpolation */
@@ -1697,16 +1707,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
-            #if 0
-                /* Allocate space for all unordered maps (for each varibale) */
-                adapt_data.initial_ref_lvl_ids.reserve(t8_data->vars.size());
-                adapt_data._counter.reserve(t8_data->vars.size());
-                adapt_data._counter_nxt_lvl.reserve(t8_data->vars.size());
-                /* Create a var_vector holding data which may be used by the interpolation */
-                adapt_data.adapted_data = new var_vector_t();
-                adapt_data.adapted_data->reserve(1);
-            #endif
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Reset the adapt_data class */
                 adapt_data.adapt_step = 0;
                 /* Save the current variable ID */
@@ -1714,7 +1715,24 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 interpolation_data.current_var_id = var_id;
                 /* Save the initial data */
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
-                //t8_data->initial_data.push_back(t8_data->vars[var_id]->var->data);
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[var_id]->assets->forest) / pow(t8_data->vars[var_id]->var->num_dimensions, 2)));
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                /* Reset the adapt_data class */
+                adapt_data.adapt_step = 0;
+                /* Save the current variable ID */
+                adapt_data.current_var_id = var_id;
+                interpolation_data.current_var_id = var_id;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Reset the adapt_data class */
+                adapt_data.adapt_step = 0;
+                /* Save the current variable ID */
+                adapt_data.current_var_id = var_id;
+                interpolation_data.current_var_id = var_id;
+                /* Save the initial data */
+                adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
+                adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[var_id]->assets->forest) / pow(t8_data->vars[var_id]->var->num_dimensions, 2)));
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1737,15 +1755,10 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Reset the counters */
-                #if 0
-                adapt_data._counter[0] = 0;
-                adapt_data._counter_nxt_lvl[0] = 0;
-                #endif
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
-
                 adapt_data.coarsening_counter = 0;
                 interpolation_data.coarsening_counter = 0;
                 /* Allocate space for each variable in order to save data which may be used by the interpolation */
@@ -1755,6 +1768,23 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 }
                 /* Save a pointer to the 'adapted_data' in the interpolation struct */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Reset the counters */
+                adapt_data._counter = 0;
+                adapt_data._counter_nxt_lvl = 0;
+                adapt_data.coarsening_counter = 0;
+                interpolation_data.coarsening_counter = 0;
+                /* Allocate space for each variable in order to save data which may be used by the interpolation */
+                for (size_t id{0}; id < adapt_data.t8_data->vars.size(); ++id)
+                {
+                    adapt_data.adapted_data->push_back(new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapt_data.t8_data->assets->forest) / (2 * adapt_data.t8_data->vars[id]->var->num_dimensions) +1), adapt_data.t8_data->vars[id]->get_type()));
+                }
+                /* Save a pointer to the 'adapted_data' in the interpolation struct */
+                interpolation_data.adapted_data = adapt_data.adapted_data;    
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1768,12 +1798,21 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Reset the adapt counters */
-                #if 0
-                adapt_data._counter[var_id] = 0;
-                adapt_data._counter_nxt_lvl[var_id] = 0;
-                #endif
+                adapt_data._counter = 0;
+                adapt_data._counter_nxt_lvl = 0;
+                adapt_data.coarsening_counter = 0;
+                adapt_data.adapted_data->push_back(new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapt_data.t8_data->vars[var_id]->assets->forest) / (2 * adapt_data.t8_data->vars[var_id]->var->num_dimensions) +1), adapt_data.t8_data->vars[var_id]->get_type()));
+                /* Save a pointer to the 'adapted_data' for the interpolation */
+                interpolation_data.adapted_data = adapt_data.adapted_data;
+                interpolation_data.coarsening_counter = 0;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Reset the adapt counters */
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
                 adapt_data.coarsening_counter = 0;
@@ -1817,7 +1856,15 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
+                /* Free the data which has been saved during the adaptation */
+                adapt_data.adapted_data->clear();
+                interpolation_data.adapted_data = nullptr;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
@@ -1834,11 +1881,19 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
 
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
+                /* Free the data which has been saved during the adaptation */
+                adapt_data.adapted_data->clear();
+                interpolation_data.adapted_data = nullptr;
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1863,7 +1918,14 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the criterium is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
+                /* Delete the allocation of the var_vector */
+                delete adapt_data.adapted_data;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
                 /* Delete the allocation of the var_vector */
                 delete adapt_data.adapted_data;
             break;
@@ -1879,7 +1941,14 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED:
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
-            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ERROR_THRESHOLD:
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
+                /* Delete the allocation of the var_vector */
+                delete adapt_data.adapted_data;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
+                //Here has nothing to be done
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION:
                 /* Delete the allocation of the var_vector */
                 delete adapt_data.adapted_data;
             break;
@@ -2576,6 +2645,7 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
             return;
         }
     }
+
     /* Define standard offset and scaling variables */
     double add_offset{0.0};
     double scale_factor{1.0};
@@ -2583,17 +2653,20 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
     /* Iterate over all variables which should be scaled */
     for (size_t var_id{0}; var_id < ids_apply_scaling.size(); ++var_id)
     {
+        /* Get the scale_factor and the offset of the for the data of the variable with the id 'ids_apply_scaling[var_id]' */
         scale_factor = cmc_get_universal_data<double>(t8_data->vars[ids_apply_scaling[var_id]]->var->scale_factor);
         add_offset = cmc_get_universal_data<double>(t8_data->vars[ids_apply_scaling[var_id]]->var->add_offset);
+
         /* Check if the meta data of the variable holds offset and scaling attributes and if so, if they already have been applied */
-        if (!(t8_data->vars[ids_apply_scaling[var_id]]->var->applied_offset_scaling || (cmc_approx_cmp(add_offset, 0.0) && cmc_approx_cmp(scale_factor, 1.0))))
+        if (!(cmc_approx_cmp(add_offset, 0.0) && cmc_approx_cmp(scale_factor, 1.0)))
         {
             cmc_debug_msg("Scaling and offset are applied to variable ", t8_data->vars[ids_apply_scaling[var_id]]->var->name);
 
             /* Check if missing values are present */
             if (t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value_present)
             {
-                /* If missing values are present within the data */
+                /** If missing values are present within the data **/
+                /* Check if only scaling needs to be applied */
                 if ((cmc_approx_cmp(add_offset, 0.0) && (!cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only scaling */
@@ -2605,7 +2678,9 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
 
-                } else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
+                }
+                /* Check if only an offset needs to be applied */
+                else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only offset */
                     t8_data->vars[ids_apply_scaling[var_id]]->var->data->add_const_with_missing_vals(add_offset, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
@@ -2615,7 +2690,9 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
                         cmc_debug_msg("The misssing value will be casted, since the scaling changed the data type.");
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
-                } else
+                }
+                /* Otherwise a scaling as well as an offset needs to be applied */
+                else
                 {
                     /* Apply offset and scaling */
                     t8_data->vars[ids_apply_scaling[var_id]]->var->data->axpy_scalar_with_missing_vals(scale_factor, add_offset, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
@@ -2627,32 +2704,37 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
                     }
                 } 
             }
+            /* In case NO missing values are present within the data */
             else {
-                /* If NO missing values are present within the data */
+                /* Check if only scaling needs to be applied */
                 if ((cmc_approx_cmp(add_offset, 0.0) && (!cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only scaling */
-                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->scale(scale_factor);
+                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->scale(t8_data->vars[ids_apply_scaling[var_id]]->var->scale_factor);
                     /* Check if data type has changed */
                     if (t8_data->vars[ids_apply_scaling[var_id]]->get_type() != static_cast<cmc_type>(t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value.index()))
                     {
                         cmc_debug_msg("The misssing value will be casted, since the scaling changed the data type.");
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
-                } else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
+                }
+                /* Check of only an offset needs to be applied */
+                else if ((!cmc_approx_cmp(add_offset, 0.0) && (cmc_approx_cmp(scale_factor, 1.0))))
                 {
                     /* Apply only offset */
-                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->add_const(add_offset);
+                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->add_const(t8_data->vars[ids_apply_scaling[var_id]]->var->add_offset);
                     /* Check if data type has changed */
                     if (t8_data->vars[ids_apply_scaling[var_id]]->get_type() != static_cast<cmc_type>(t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value.index()))
                     {
                         cmc_debug_msg("The misssing value will be casted, since the scaling changed the data type.");
                         t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value = std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value);
                     }
-                } else
+                }
+                /* In case sclaing as well as an offset needs to be applied */
+                else
                 {
                     /* Apply offset and scaling */
-                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->axpy_scalar(scale_factor, add_offset);
+                    t8_data->vars[ids_apply_scaling[var_id]]->var->data->axpy_scalar(t8_data->vars[ids_apply_scaling[var_id]]->var->scale_factor, t8_data->vars[ids_apply_scaling[var_id]]->var->add_offset);
                     /* Check if data type has changed */
                     if (t8_data->vars[ids_apply_scaling[var_id]]->get_type() != static_cast<cmc_type>(t8_data->vars[ids_apply_scaling[var_id]]->var->missing_value.index()))
                     {
@@ -2816,11 +2898,269 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 }
 
 void
-cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximim_error_tolerance)
+cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance)
 {
     #ifdef CMC_WITH_T8CODE
     /* Save the error tolerance */
-    t8_data->settings.max_err = maximim_error_tolerance;
-    t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED;
+    t8_data->settings.max_err = maximum_error_tolerance;
+
+    /* Set a flag that the exclude criterion will be applied */
+    if (t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED)
+    {
+        /* If no criterion has been specified, set the relative error criterion */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD;
+    } else if (t8_data->settings.compression_criterium != CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD)
+    {
+        /* If another criterion already has been specified, set the combined flag */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION;
+    }
+    #endif
+}
+
+template<typename T>
+static std::pair<int,int>
+cmc_t8_geo_data_get_area_threshold(const var_array_t& coordinate, T start_val, T end_val)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Obtain the smaller and the bigger value of the threshold */
+    const T smaller_val = start_val <= end_val ? start_val : end_val;
+    const T bigger_val = start_val > end_val ? start_val : end_val;
+
+    /* Check if there is a 'real' threshold supplied */
+    if(bigger_val - smaller_val <= 0)
+    {
+        /* In this case there will be no threshold applied for the given coordinate dimension */
+        cmc_warn_msg("The supplied exclude-area threshold will have no effect (please check the given min/max values for the desired area to be excluded from the compression).");
+        return std::make_pair<int, int>(-1, INT_MAX);
+    }
+
+    bool flag_descending_order{false};
+
+    /* Get the pointer to the coordinate data */
+    T* coord_ptr = static_cast<T*>(coordinate.get_initial_data_ptr());
+
+    /* Declare a return value */
+    std::pair<int, int> ret_val{-1, INT_MAX};
+
+    /* Check the ordering of the coordinate data */
+    size_t iter{0};
+    while (iter + 1 < coordinate.size())
+    {
+        if (*(coord_ptr + iter) == *(coord_ptr + iter + 1))
+        {
+            continue;
+        } else if (*(coord_ptr + iter) > *(coord_ptr + iter + 1))
+        {
+            /* If the order is descending */
+            flag_descending_order = true;
+            break;
+        } else
+        {
+            /* If anascending order is found, we just break since the flag's default is false */
+            break;
+        }
+        
+        /* Increment the iterator variable */
+        ++iter;
+    }
+
+    /* Find the integer values resembling the actual domain of the threshold */
+    if (flag_descending_order)
+    {
+        /* In case of a descending order */
+        size_t i{0};
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) <= bigger_val)
+            {
+                /* We have found the start index */
+                ret_val.second = static_cast<int>(coordinate.size() - i);
+                break;
+            }
+        }
+        /* Check for the end index */
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) <= smaller_val)
+            {
+                /* We have found the end index */
+                ret_val.first = static_cast<int>(coordinate.size() - i);
+                break;
+            }
+        }
+    }
+    /* In case of an ascending order */
+    else
+    {
+        size_t i{0};
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) >= smaller_val)
+            {
+                /* We have found the start index */
+                ret_val.first = static_cast<int>(i);
+                break;
+            }
+        }
+        /* Check for the end index */
+        for (; i < coordinate.size(); ++i)
+        {
+            if (*(coord_ptr + i) >= bigger_val)
+            {
+                /* We have found the end index */
+                ret_val.second = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+
+    return ret_val;
+    #endif
+}
+
+// Currently, we assume that coordinates are ordered incrementally, e.g. longitude: -90, -85, ...,-5, 0, 5, ..., 85, 90 
+void
+cmc_t8_geo_data_set_exclude_area(cmc_t8_data_t t8_data, const CMC_COORD_IDS coord_id, const cmc_universal_type_t& starting_value, const cmc_universal_type_t& end_value)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Currently, only possible for longitude, latitiude and elevation */
+    cmc_assert(coord_id == CMC_COORD_IDS::CMC_LON || coord_id == CMC_COORD_IDS::CMC_LAT || coord_id == CMC_COORD_IDS::CMC_LEV);
+    
+    /* Get the coordinate array */
+    var_array_t& coordinate = t8_data->geo_data->coords->operator[](coord_id);
+
+    /* Check the data type */
+    switch (coordinate.get_data_type())
+    {
+        case CMC_INT32_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int32_t>(starting_value), std::get<int32_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<float>(starting_value), std::get<float>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<double>(starting_value), std::get<double>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int16_t>(starting_value), std::get<int16_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int64_t>(starting_value), std::get<int64_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint64_t>(starting_value), std::get<uint64_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint32_t>(starting_value), std::get<uint32_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<int8_t>(starting_value), std::get<int8_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint8_t>(starting_value), std::get<uint8_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<uint16_t>(starting_value), std::get<uint16_t>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Coordinate values of type byte are not supported.");
+        break;
+        case CMC_CHAR:
+        {
+            /* Get the integer indices corresponding to the supplied threshold */
+            std::pair<int, int> threshold_indices = cmc_t8_geo_data_get_area_threshold(coordinate, std::get<char>(starting_value), std::get<char>(end_value));
+
+            /* Save the indices in the compression settings */
+            t8_data->settings.exclude_area_start_indices[coord_id] = threshold_indices.first;
+            t8_data->settings.exclude_area_end_indices[coord_id] = threshold_indices.second;
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+    
+    /* Set a flag that the exclude criterion will be applied */
+    if (t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED)
+    {
+        /* If no criterion has been specified, set the excldue area */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA;
+    } else if (t8_data->settings.compression_criterium != CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA)
+    {
+        /* If another criterion already has been specified, set the combined flag */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION;
+    }
+
+    std::cout << "Settings for start is now: " << t8_data->settings.exclude_area_start_indices[0] << ", " << t8_data->settings.exclude_area_start_indices[1] << ", " << t8_data->settings.exclude_area_start_indices[2] << ", " << t8_data->settings.exclude_area_start_indices[3] << ", " << std::endl;
+    std::cout << "Settings for  end  is now: " << t8_data->settings.exclude_area_end_indices[0] << ", " << t8_data->settings.exclude_area_end_indices[1] << ", " << t8_data->settings.exclude_area_end_indices[2] << ", " << t8_data->settings.exclude_area_end_indices[3] << ", " << std::endl;
     #endif
 }

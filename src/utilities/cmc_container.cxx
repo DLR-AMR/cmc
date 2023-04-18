@@ -1,5 +1,4 @@
-#include "utilities/cmc_container.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_container.h"
 
 struct var_array
 {
@@ -111,402 +110,6 @@ switch (data->type)
         cmc_err_msg("An unknown cmc data type has been supplied.");
 }
 #endif
-void
-var_array_t::_intern_axpy(void* scale_factor, var_array_t& array)
-{
-    assert(array.data->type == data->type);
-    assert(data->num_elements == array.data->num_elements);
-
-    switch(data->type)
-    {
-        case CMC_INT32_T:
-        {
-            int32_t* dest_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
-            int32_t* src_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
-            const int32_t scaling{*(static_cast<int32_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_FLOAT:
-        {
-            float* dest_ptr{static_cast<float*>(data->initial_data_ptr)};
-            float* src_ptr{static_cast<float*>(data->initial_data_ptr)};
-            const float scaling{*(static_cast<float*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_DOUBLE:
-        {
-            double* dest_ptr{static_cast<double*>(data->initial_data_ptr)};
-            double* src_ptr{static_cast<double*>(data->initial_data_ptr)};
-            const double scaling{*(static_cast<double*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_INT16_T:
-        {
-            int16_t* dest_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
-            int16_t* src_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
-            const int16_t scaling{*(static_cast<int16_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_INT64_T:
-        {
-            int64_t* dest_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
-            int64_t* src_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
-            const int64_t scaling{*(static_cast<int64_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_UINT64_T:
-        {
-            uint64_t* dest_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
-            uint64_t* src_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
-            const uint64_t scaling{*(static_cast<uint64_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_UINT32_T:
-        {
-            uint32_t* dest_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
-            uint32_t* src_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
-            const uint32_t scaling{*(static_cast<uint32_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_INT8_T:
-        {
-            int8_t* dest_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
-            int8_t* src_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
-            const int8_t scaling{*(static_cast<int8_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_UINT8_T:
-        {
-            uint8_t* dest_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
-            uint8_t* src_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
-            const uint8_t scaling{*(static_cast<uint8_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_UINT16_T:
-        {
-            uint16_t* dest_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
-            uint16_t* src_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
-            const uint16_t scaling{*(static_cast<uint16_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        case CMC_BYTE:
-        {
-            cmc_err_msg("Cannot apply scaling to data of type byte.");
-        }
-        break;
-        case CMC_CHAR:
-        {
-            char* dest_ptr{static_cast<char*>(data->initial_data_ptr)};
-            char* src_ptr{static_cast<char*>(data->initial_data_ptr)};
-            const char scaling{*(static_cast<char*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + src_ptr[i];
-            }
-        }
-        break;
-        default:
-            cmc_err_msg("An unknown cmc data type has been supplied.");
-    }
-}
-
-void
-var_array_t::_intern_axpy_scalar(void* scale_factor, void* const_summand)
-{
-    switch(data->type)
-    {
-        case CMC_INT32_T:
-        {
-            int32_t* dest_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
-            const int32_t scaling{*(static_cast<int32_t*>(scale_factor))};
-            const int32_t summand{*(static_cast<int32_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_FLOAT:
-        {
-            float* dest_ptr{static_cast<float*>(data->initial_data_ptr)};
-            const float scaling{*(static_cast<float*>(scale_factor))};
-            const float summand{*(static_cast<float*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_DOUBLE:
-        {
-            double* dest_ptr{static_cast<double*>(data->initial_data_ptr)};
-            const double scaling{*(static_cast<double*>(scale_factor))};
-            const double summand{*(static_cast<double*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_INT16_T:
-        {
-            int16_t* dest_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
-            const int16_t scaling{*(static_cast<int16_t*>(scale_factor))};
-            const int16_t summand{*(static_cast<int16_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_INT64_T:
-        {
-            int64_t* dest_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
-            const int64_t scaling{*(static_cast<int64_t*>(scale_factor))};
-            const int64_t summand{*(static_cast<int64_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_UINT64_T:
-        {
-            uint64_t* dest_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
-            const uint64_t scaling{*(static_cast<uint64_t*>(scale_factor))};
-            const uint64_t summand{*(static_cast<uint64_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_UINT32_T:
-        {
-            uint32_t* dest_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
-            const uint32_t scaling{*(static_cast<uint32_t*>(scale_factor))};
-            const uint32_t summand{*(static_cast<uint32_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_INT8_T:
-        {
-            int8_t* dest_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
-            const int8_t scaling{*(static_cast<int8_t*>(scale_factor))};
-            const int8_t summand{*(static_cast<int8_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_UINT8_T:
-        {
-            uint8_t* dest_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
-            const uint8_t scaling{*(static_cast<uint8_t*>(scale_factor))};
-            const uint8_t summand{*(static_cast<uint8_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_UINT16_T:
-        {
-            uint16_t* dest_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
-            const uint16_t scaling{*(static_cast<uint16_t*>(scale_factor))};
-            const uint16_t summand{*(static_cast<uint16_t*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        case CMC_BYTE:
-            cmc_err_msg("Cannot apply scaling to data of type byte.");
-        break;
-        case CMC_CHAR:
-        {
-            char* dest_ptr{static_cast<char*>(data->initial_data_ptr)};
-            const char scaling{*(static_cast<char*>(scale_factor))};
-            const char summand{*(static_cast<char*>(const_summand))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] = scaling * dest_ptr[i] + summand;
-            }
-        }
-        break;
-        default:
-            cmc_err_msg("An unknown cmc data type has been supplied.");
-    }
-}
-
-void
-var_array_t::_intern_scale(void* scale_factor)
-{
-
-    switch(data->type)
-    {
-        case CMC_INT32_T:
-        {
-            int32_t* dest_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
-            const int32_t scaling{*(static_cast<int32_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_FLOAT:
-        {
-            float* dest_ptr{static_cast<float*>(data->initial_data_ptr)};
-            const float scaling{*(static_cast<float*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_DOUBLE:
-        {
-            double* dest_ptr{static_cast<double*>(data->initial_data_ptr)};
-            const double scaling{*(static_cast<double*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_INT16_T:
-        {
-            int16_t* dest_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
-            const int16_t scaling{*(static_cast<int16_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_INT64_T:
-        {
-            int64_t* dest_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
-            const int64_t scaling{*(static_cast<int64_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_UINT64_T:
-        {
-            uint64_t* dest_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
-            const uint64_t scaling{*(static_cast<uint64_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_UINT32_T:
-        {
-            uint32_t* dest_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
-            const uint32_t scaling{*(static_cast<uint32_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_INT8_T:
-        {
-            int8_t* dest_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
-            const int8_t scaling{*(static_cast<int8_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_UINT8_T:
-        {
-            uint8_t* dest_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
-            const uint8_t scaling{*(static_cast<uint8_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_UINT16_T:
-        {
-            uint16_t* dest_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
-            const uint16_t scaling{*(static_cast<uint16_t*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        case CMC_BYTE:
-            cmc_err_msg("Cannot applay scaling to data of type byte.");
-        break;
-        case CMC_CHAR:
-        {
-            char* dest_ptr{static_cast<char*>(data->initial_data_ptr)};
-            const char scaling{*(static_cast<char*>(scale_factor))};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] *= scaling;
-            }
-        }
-        break;
-        default:
-            cmc_err_msg("An unknown cmc data type has been supplied.");
-    }
-}
 
 //TODO: complete these functions
 template<typename T>
@@ -2001,7 +1604,7 @@ var_array_t::scale_with_missing_vals(const cmc_universal_type_t& scale_factor, c
         }
         break;
         case CMC_BYTE:
-            cmc_err_msg("Cannot applay scaling to data of type byte.");
+            cmc_err_msg("Cannot apply scaling to data of type byte.");
         break;
         case CMC_CHAR:
         {
@@ -2179,136 +1782,6 @@ var_array_t::add(var_array_t& array)
     }
 }
 
-void
-var_array_t::_intern_add_const(void* constant_value)
-{
-    switch(data->type)
-    {
-        case CMC_INT32_T:
-        {
-            int32_t* dest_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
-            const int32_t value{*static_cast<int32_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_FLOAT:
-        {
-            float* dest_ptr{static_cast<float*>(data->initial_data_ptr)};
-            const float value{*static_cast<float*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_DOUBLE:
-        {
-            double* dest_ptr{static_cast<double*>(data->initial_data_ptr)};
-            const double value{*static_cast<double*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_INT16_T:
-        {
-            int16_t* dest_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
-            const int16_t value{*static_cast<int16_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_INT64_T:
-        {
-            int64_t* dest_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
-            const int64_t value{*static_cast<int64_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_UINT64_T:
-        {
-            uint64_t* dest_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
-            const uint64_t value{*static_cast<uint64_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_UINT32_T:
-        {
-            uint32_t* dest_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
-            const uint32_t value{*static_cast<uint32_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_INT8_T:
-        {
-            int8_t* dest_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
-            const int8_t value{*static_cast<int8_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_UINT8_T:
-        {
-            uint8_t* dest_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
-            const uint8_t value{*static_cast<uint8_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_UINT16_T:
-        {
-            uint16_t* dest_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
-            const uint16_t value{*static_cast<uint16_t*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        case CMC_BYTE:
-            cmc_err_msg("Cannot add data of type byte.");
-        break;
-        case CMC_CHAR:
-        {
-            char* dest_ptr{static_cast<char*>(data->initial_data_ptr)};
-            const char value{*static_cast<char*>(constant_value)};
-            for(size_t i{0}; i < data->num_elements; ++i)
-            {
-                dest_ptr[i] += value;
-            }
-        }
-        break;
-        default:
-            cmc_err_msg("An unknown cmc data type has been supplied.");
-    }
-}
-
-
-void
-var_array_t::_intern_assign(const size_t index, void* value)
-{
-    memcpy(static_cast<std::byte*>(data->initial_data_ptr) + index * cmc_type_to_bytes[data->type], value, cmc_type_to_bytes[data->type]);
-}
-
 size_t
 var_array_t::size() const
 {
@@ -2448,6 +1921,1057 @@ var_array_t::sum_over_range(const size_t start_index, const size_t end_index) co
             cmc_err_msg("An unknown cmc data type has been supplied.");
     }
     return cmc_universal_type_t{0};
+}
+
+void
+var_array_t::scale(const cmc_universal_type_t& scale_factor)
+{
+    switch(data->type)
+    {
+        case CMC_INT32_T:
+        {
+            if(std::holds_alternative<int32_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                int32_t* dest_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+                const int32_t scaling{std::get<int32_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int32_t* src_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            if(std::holds_alternative<float>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                float* dest_ptr{static_cast<float*>(data->initial_data_ptr)};
+                const float scaling{std::get<float>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                float* src_ptr{static_cast<float*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            if(std::holds_alternative<double>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                double* dest_ptr{static_cast<double*>(data->initial_data_ptr)};
+                const double scaling{std::get<double>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                double* src_ptr{static_cast<double*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            if(std::holds_alternative<int16_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                int16_t* dest_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+                const int16_t scaling{std::get<int16_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int16_t* src_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            if(std::holds_alternative<int64_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                int64_t* dest_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+                const int64_t scaling{std::get<int64_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int64_t* src_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            if(std::holds_alternative<uint64_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint64_t* dest_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+                const uint64_t scaling{std::get<uint64_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint64_t* src_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            if(std::holds_alternative<uint32_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint32_t* dest_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+                const uint32_t scaling{std::get<uint32_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint32_t* src_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            if(std::holds_alternative<int8_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                int8_t* dest_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+                const int8_t scaling{std::get<int8_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int8_t* src_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            if(std::holds_alternative<uint8_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint8_t* dest_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+                const uint8_t scaling{std::get<uint8_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint8_t* src_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            if(std::holds_alternative<uint16_t>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint16_t* dest_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+                const uint16_t scaling{std::get<uint16_t>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint16_t* src_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Cannot apply scaling to data of type byte.");
+        break;
+        case CMC_CHAR:
+        {
+            if(std::holds_alternative<char>(scale_factor))
+            {
+                /* If the scale factor is of the same type as the data */
+                char* dest_ptr{static_cast<char*>(data->initial_data_ptr)};
+                const char scaling{std::get<char>(scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] *= scaling;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                char* src_ptr{static_cast<char*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(scaling) * static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+}
+
+void
+var_array_t::add_const(const cmc_universal_type_t& constant_summand)
+{
+    switch(data->type)
+    {
+        case CMC_INT32_T:
+        {
+            if(std::holds_alternative<int32_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                int32_t* dest_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+                const int32_t offset{std::get<int32_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int32_t* src_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            if(std::holds_alternative<float>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                float* dest_ptr{static_cast<float*>(data->initial_data_ptr)};
+                const float offset{std::get<float>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                float* src_ptr{static_cast<float*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            if(std::holds_alternative<double>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                double* dest_ptr{static_cast<double*>(data->initial_data_ptr)};
+                const double offset{std::get<double>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                double* src_ptr{static_cast<double*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            if(std::holds_alternative<int16_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                int16_t* dest_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+                const int16_t offset{std::get<int16_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int16_t* src_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            if(std::holds_alternative<int64_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                int64_t* dest_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+                const int64_t offset{std::get<int64_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int64_t* src_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            if(std::holds_alternative<uint64_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint64_t* dest_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+                const uint64_t offset{std::get<uint64_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint64_t* src_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            if(std::holds_alternative<uint32_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint32_t* dest_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+                const uint32_t offset{std::get<uint32_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint32_t* src_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            if(std::holds_alternative<int8_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                int8_t* dest_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+                const int8_t offset{std::get<int8_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int8_t* src_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            if(std::holds_alternative<uint8_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint8_t* dest_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+                const uint8_t offset{std::get<uint8_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint8_t* src_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            if(std::holds_alternative<uint16_t>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint16_t* dest_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+                const uint16_t offset{std::get<uint16_t>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint16_t* src_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Cannot apply scaling to data of type byte.");
+        break;
+        case CMC_CHAR:
+        {
+            if(std::holds_alternative<char>(constant_summand))
+            {
+                /* If the scale factor is of the same type as the data */
+                char* dest_ptr{static_cast<char*>(data->initial_data_ptr)};
+                const char offset{std::get<char>(constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] += offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                char* src_ptr{static_cast<char*>(data->initial_data_ptr)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, constant_summand)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = static_cast<cmc_standard_type>(offset) + static_cast<cmc_standard_type>(src_ptr[i]);
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+}
+
+void
+var_array_t::axpy_scalar(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset)
+{
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            if(std::holds_alternative<int32_t>(scale_factor) && std::holds_alternative<int32_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                int32_t* dest_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+                const int32_t scaling{std::get<int32_t>(scale_factor)};
+                const int32_t offset{std::get<int32_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int32_t* src_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            if(std::holds_alternative<float>(scale_factor) && std::holds_alternative<float>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                float* dest_ptr{static_cast<float*>(data->initial_data_ptr)};
+                const float scaling{std::get<float>(scale_factor)};
+                const float offset{std::get<float>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                float* src_ptr{static_cast<float*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            if(std::holds_alternative<double>(scale_factor) && std::holds_alternative<double>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                double* dest_ptr{static_cast<double*>(data->initial_data_ptr)};
+                const double scaling{std::get<double>(scale_factor)};
+                const double offset{std::get<double>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                double* src_ptr{static_cast<double*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            if(std::holds_alternative<int16_t>(scale_factor) && std::holds_alternative<int16_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                int16_t* dest_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+                const int16_t scaling{std::get<int16_t>(scale_factor)};
+                const int16_t offset{std::get<int16_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int16_t* src_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            if(std::holds_alternative<int64_t>(scale_factor) && std::holds_alternative<int64_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                int64_t* dest_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+                const int64_t scaling{std::get<int64_t>(scale_factor)};
+                const int64_t offset{std::get<int64_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int64_t* src_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            if(std::holds_alternative<uint64_t>(scale_factor) && std::holds_alternative<uint64_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint64_t* dest_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+                const uint64_t scaling{std::get<uint64_t>(scale_factor)};
+                const uint64_t offset{std::get<uint64_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint64_t* src_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            if(std::holds_alternative<uint32_t>(scale_factor) && std::holds_alternative<uint32_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint32_t* dest_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+                const uint32_t scaling{std::get<uint32_t>(scale_factor)};
+                const uint32_t offset{std::get<uint32_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint32_t* src_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            if(std::holds_alternative<int8_t>(scale_factor) && std::holds_alternative<int8_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                int8_t* dest_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+                const int8_t scaling{std::get<int8_t>(scale_factor)};
+                const int8_t offset{std::get<int8_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                int8_t* src_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            if(std::holds_alternative<uint8_t>(scale_factor) && std::holds_alternative<uint8_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint8_t* dest_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+                const uint8_t scaling{std::get<uint8_t>(scale_factor)};
+                const uint8_t offset{std::get<uint8_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint8_t* src_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            if(std::holds_alternative<uint16_t>(scale_factor) && std::holds_alternative<uint16_t>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                uint16_t* dest_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+                const uint16_t scaling{std::get<uint16_t>(scale_factor)};
+                const uint16_t offset{std::get<uint16_t>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                uint16_t* src_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Cannot add to data to type byte.");
+        break;
+        case CMC_CHAR:
+        {
+            if(std::holds_alternative<char>(scale_factor) && std::holds_alternative<char>(add_offset))
+            {
+                /* If the scale factor is of the same type as the data */
+                char* dest_ptr{static_cast<char*>(data->initial_data_ptr)};
+                const char scaling{std::get<char>(scale_factor)};
+                const char offset{std::get<char>(add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * dest_ptr[i] + offset;
+                }
+            } else
+            {
+                /* If the scale factor and the data are NOT of the same data type */
+                /* All data will be casted to the standard type (in the hope the data will represented correct. However, this cannot be ensured) */
+                var_array* data_new = new var_array{data->num_elements, get_cmc_type<cmc_standard_type>()};
+                cmc_standard_type* dest_ptr{static_cast<cmc_standard_type*>(data_new->initial_data_ptr)};
+                char* src_ptr{static_cast<char*>(data->initial_data_ptr)};
+                const cmc_standard_type scaling{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, scale_factor)};
+                const cmc_standard_type offset{std::visit([](auto& value)->cmc_standard_type {return static_cast<cmc_standard_type>(value);}, add_offset)};
+                for(size_t i{0}; i < data->num_elements; ++i)
+                {
+                    dest_ptr[i] = scaling * static_cast<cmc_standard_type>(src_ptr[i]) + offset;
+                }
+                /* Deallocate the old data array */
+                delete data;
+                /* Assign the scaled data array */
+                data = data_new;
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
 }
 
 void
@@ -3551,7 +4075,6 @@ var_array_t::check_range_fullfills_deviation_threshold_from_value(const size_t s
             return false;
     }
 }
-
 
 cmc_type
 var_array_t::get_data_type() const

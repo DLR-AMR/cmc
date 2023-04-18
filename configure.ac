@@ -64,7 +64,9 @@ AC_ARG_WITH([moddir],
     [AS_HELP_STRING([--with-moddir], [Specify the path for Fortran module files])],,
     [withval=no])
 
-if test "x$withval" != xno ; then
+if test "x$withval" = xyes ; then
+    AC_MSG_ERROR([missing directory path for the module directory])
+elif test "x$withval" != xno ; then
     AC_DEFINE([WITH_MODDIR], 1, [Specify the Fortran module files output directory.])
 fi
 AM_CONDITIONAL([WITH_MODDIR], [test "x$withval" != xno])
@@ -145,19 +147,17 @@ AC_PROG_CXX_C_O
 AC_PROG_CPP
 AC_PROG_CXXCPP
 if test "x$CMC_ENABLE_FORTRAN" != xno; then
-    cmc_mod_dir=""
     AC_PROG_F77
     AC_PROG_F77_C_O
     AC_PROG_FC
     AC_PROG_FC_C_O
+    AC_F77_WRAPPERS
+    AC_FC_WRAPPERS
     AC_FC_MODULE_EXTENSION
     AC_FC_MODULE_FLAG
     AC_FC_MODULE_OUTPUT_FLAG
-    if test -n "$ac_cv_fc_module_output_flag"; then
-        if test "x$CMC_WITH_MODDIR" != xno; then
-            FCFLAGS+=" ${ac_cv_fc_module_output_flag}${CMC_WITH_MODDIR}"
-            FFLAGS+=" ${ac_cv_fc_module_output_flag}${CMC_WITH_MODDIR}"
-        fi
+    if test "x$CMC_WITH_MODDIR" != xno; then
+      AC_SUBST(CMC_MODDIR, $CMC_WITH_MODDIR)
     fi
 fi
 
