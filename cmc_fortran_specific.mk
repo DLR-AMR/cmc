@@ -20,7 +20,7 @@ $(MODSOURCES): %.f90 : | create-moddir
 
 # Rule to create the module directory
 create-moddir:
-	$(MKDIR_P) @CMC_MODDIR@
+	@$(MKDIR_P) @CMC_MODDIR@
 
 # Save the module directory
 cmc_current_moddir += @CMC_MODDIR@/
