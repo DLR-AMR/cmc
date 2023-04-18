@@ -20,27 +20,29 @@ main(int argc, char* argv[])
   {
     /* Open a netCDF file with geo-spatial data */
     //For opening out of the 'cmc_v03' directory
-    //int ncid = cmc_nc_open("../data/ECMWF_ERA-40_subset.nc");
+    //int ncid = cmc_nc_open("../../data/ECMWF_ERA-40_subset.nc");
+    int ncid = cmc_nc_open("../../data/test_nc4_file.nc");
     /* Open a MESSy simulation file */
-    int ncid = cmc_nc_open("../data/MESSy_DATA/MESSy2/raw/tracer/RC1-base-07_0028_restart_0001_tracer_gp.nc");
+    //int ncid = cmc_nc_open("../../data/MESSy_DATA/MESSy2/raw/tracer/RC1-base-07_0028_restart_0001_tracer_gp.nc");
 
     /* Create a class holding the data from the netCDF-File */
     //CMC_NC_DATA_T nc_data{ncid};
     cmc_nc_data_t nc_data{cmc_nc_create(ncid)};
 
     /* Define a hyperslab of the data */
-    /*This hyperslab will be read in and used for the compression */
-    //const size_t start_ptr[3] = {0,0,0};  //Example netCDF File
-    //const size_t count_ptr[3] = {1,73,144}; //Example netCDF File
+    /* This hyperslab will be read in and used for the compression */
+    const size_t start_ptr[3] = {0,0,0};  //Example netCDF File
+    const size_t count_ptr[3] = {1,73,144}; //Example netCDF File
     //const size_t start_ptr[4] = {0,0,0,0}; //Example MESSy netCDF File 
     //const size_t count_ptr[4] = {1,19,32,64}; // Example MESSy netCDF File
     
-    const size_t start_ptr[3] = {0,0,0};  //MESSy Tracer Initialization File
-    const size_t count_ptr[3] = {5,64,128}; //MESSy Tracer Initialization File
+    //const size_t start_ptr[3] = {0,0,0};  //MESSy Tracer Initialization File
+    //const size_t count_ptr[3] = {90,64,128}; //MESSy Tracer Initialization File
+    //const size_t count_ptr[3] = {5,64,128}; //MESSy Tracer Initialization File
 
     /* Inquire given data/variables which are defined on a geo-spatial domain (latitude, longitude, height, (time)) */
-    //cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "tco3", "p2t");
-    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "O3", "CH4");
+    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t");
+    //cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "O3");
 
     /* Define data classes holding the variable data and forests as well as additional information during the compression process */
     cmc_amr_data_t amr_data;
@@ -51,8 +53,19 @@ main(int argc, char* argv[])
     /* Split the 3D variable */
     //cmc_amr_pre_setup_split_3D_variable(amr_data, 0, DATA_LAYOUT::CMC_2D_LAT_LON);
 
-    /* Set a compression criterium - e.g. error threshold woth a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.02);
+    cmc_universal_type_t lon_min = static_cast<float>(275);
+    cmc_universal_type_t lon_max = static_cast<float>(330);
+    cmc_universal_type_t lat_min = static_cast<float>(22);
+    cmc_universal_type_t lat_max = static_cast<float>(-58);
+    cmc_amr_pre_setup_set_compression_criterium_exclude_area(amr_data, CMC_COORD_IDS::CMC_LON, lon_min, lon_max);
+    cmc_amr_pre_setup_set_compression_criterium_exclude_area(amr_data, CMC_COORD_IDS::CMC_LAT, lat_min, lat_max);
+
+    //cmc_universal_type_t lev_min = static_cast<double>(20);
+    //cmc_universal_type_t lev_max = static_cast<double>(30);
+    //cmc_amr_pre_setup_set_compression_criterium_exclude_area(amr_data, CMC_COORD_IDS::CMC_LEV, lev_min, lev_max);
+
+    /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
+    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.01);
     
     /* Write out a netCDF File containing the uncompressed data */
     //cmc_amr_write_netcdf_file(amr_data, "example_initial.nc");
@@ -73,7 +86,7 @@ main(int argc, char* argv[])
 
   
   	/* Write a vtk file of the decompressed data */
-    cmc_amr_write_vtk_file(amr_data, "cmc_decompressed_data");
+    //cmc_amr_write_vtk_file(amr_data, "cmc_decompressed_data");
 
     /* Write a netCDF file */
     /* Write out a netCDF File containing the uncompressed data */
