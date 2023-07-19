@@ -32,8 +32,6 @@ public:
     int num_global_atts{0}; //might be useful later
     int id_unlimited_dim{-1}; //might be useful later for time series data
 
-    /* Vector for storing the coodinate variables */
-    //var_vector_t coords;
     /* Information about the global coordinate system */
     cmc_global_coordinate_system_t coordinates{nullptr};
 
@@ -68,6 +66,7 @@ cmc_nc_start(const char* path_to_file, const enum cmc_nc_opening_mode mode, cons
     switch(mode)
     {
         case cmc_nc_opening_mode::CMC_NC_SERIAL:
+            /* Open the file in a serial mode */
             ncid = cmc_nc_open_serial(path_to_file);
         break;
         case cmc_nc_opening_mode::CMC_NC_PARALLEL:
@@ -78,14 +77,21 @@ cmc_nc_start(const char* path_to_file, const enum cmc_nc_opening_mode mode, cons
             err = MPI_Comm_size(comm, &comm_size);
             cmc_mpi_check_err(err);
 
-            /* Assert if no parallel access would not be needed anyways */
-            cmc_assert(comm_size > 1);
+            /* Check whether there are several processs in the communicator for actually reading in parallel from the file */
+            if (comm_size > 1)
+            {
+                /* Open the file for parallel access */
+                ncid = cmc_nc_open_parallel(path_to_file, comm);
 
-            /* Open the file for parallel access */
-            ncid = cmc_nc_open_parallel(path_to_file, comm);
+                /* Set the flag for parallel access */
+                parallel_access = true;
+            } else
+            {
+                cmc_warn_msg("The file is ought to be opened in a parallel mode but there is not more than one process within the supplied communicator. Therfore, the fll be opened in a serial mode.");
 
-            /* Set the flag for parallel access */
-            parallel_access = true;
+                /* Open the file in a serial mode */
+                ncid = cmc_nc_open_serial(path_to_file);
+            }
             #else
             cmc_err_msg("NetCDF's parallel file access functions are not available. Please ensure that 'netcdf_par.h' is present when cmc is linked against netCDF.");
             #endif
@@ -135,7 +141,7 @@ cmc_nc_set_mpi_communicator(cmc_nc_data_t nc_data, MPI_Comm comm)
     nc_data->comm = comm;
 }
 
-/* Set a preferred paralled distribution for reading the data */
+/* Set a preferred (blockwise) paralled distribution for reading the data */
 void
 cmc_nc_set_blocked_reading(cmc_nc_data_t nc_data, const std::vector<int> blocked_domain_num_processes_per_dimension)
 {
@@ -619,7 +625,49 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
             switch(nc_data->data_distribution)
             {
                 case data_distribution_t::CMC_BLOCKED:
+                    /* Calculate a blocked data dsitribution */
                     distributed_data = cmc_mpi_calculate_nc_reading_data_distribution_blocked(nc_data->vars[i]->start_ptr, nc_data->vars[i]->count_ptr, nc_data->comm, nc_data->distribution_offsets);
+                break;
+                case data_distribution_t::DISTRIBUTION_UNDEFINED:
+                {
+                    /* If no distribution has been specified, we default to a blocked distribution */
+                    /* Size of the MPI communicator */
+                    int comm_size{1};
+                    #ifdef CMC_ENABLE_MPI
+                    /* Get the actual size of the communicator */
+                    int err = MPI_Comm_size(nc_data->comm, &comm_size);
+                    cmc_mpi_check_err(err);
+                    #endif
+
+                    int num_considered_dims = 0;
+                    /* Define a vector for a blocked distribution */
+                    std::vector<int> p_distribution(nc_data->vars[i]->num_dimensions, 1);
+                    /* Iterate over the count vector and inquire the general data dimensions (e.g. 2D or 3D) */
+                    for (int dims{0}; dims < nc_data->vars[i]->num_dimensions; ++dims)
+                    {
+                        if (nc_data->vars[i]->count_ptr[dims] > 1)
+                        {
+                            ++num_considered_dims;
+                        }
+                    }
+
+                    cmc_assert(num_considered_dims > 0);
+                    
+                    /* Calculate a n equal distribution per dimension */
+                    const int equal_dim_distribution = static_cast<int>(std::pow(comm_size, 1.0/num_considered_dims));
+                    cmc_debug_msg("calculated equal dim ditribution: ", equal_dim_distribution);
+                    /* Iterate again over the count vector in order to assign a blocked distribution at the correct dimensions */
+                    for (int dims{0}; dims < nc_data->vars[i]->num_dimensions; ++dims)
+                    {
+                        if (nc_data->vars[i]->count_ptr[dims] > 1)
+                        {
+                            p_distribution[dims] = equal_dim_distribution;
+                        }
+                    }
+
+                    /* Calculate a blocked data dsitribution */
+                    distributed_data = cmc_mpi_calculate_nc_reading_data_distribution_blocked(nc_data->vars[i]->start_ptr, nc_data->vars[i]->count_ptr, nc_data->comm, p_distribution);
+                }
                 break;
                 default:
                     cmc_err_msg("An unknown data distribution for parallel reading was supplied.");
@@ -634,12 +682,11 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
         for (int dims{0}; dims < nc_data->vars[i]->num_dimensions; ++dims)
         {
             /* Save the actual dimension length of the data */
-            //(nc_data->vars[i]->dim_lengths).push_back(count_ptr[dims]);
             (nc_data->vars[i]->dim_lengths).push_back(nc_data->vars[i]->count_ptr[dims]);
             /* Reduce the data points per dimension in order to obtain the overall amount of data points of the variable */
             num_data_points *= nc_data->vars[i]->count_ptr[dims];
         }
-        std::cout << "NUM data points: " << num_data_points << std::endl;
+
         /* Allocate memory for an array able to hold the data of the variable */
         nc_data->vars[i]->data = new var_array_t{num_data_points, static_cast<cmc_type>(nc_data->vars[i]->var_type)};
 
@@ -652,7 +699,6 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
         {
             start_values.push_back(static_cast<size_t>(nc_data->vars[i]->start_ptr[dim_id]));
             count_values.push_back(static_cast<size_t>(nc_data->vars[i]->count_ptr[dim_id]));
-            std::cout << "Dim id = " << dim_id << "; Start: " << start_values.back() << ", COunt: " << count_values.back() << std::endl;
         }
 
         /* Differentiate between parallel and serial reading of the data */
@@ -681,23 +727,6 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
             }
         }
 
-        /* Save the reference coordinates describing the data */
-        /* If the data is read in blocked distribution, we just save the description of the block by the (already stored) start and count values */
-        //nc_data->vars[i]->coordinate_representation = cmc_coordinate_type::CMC_GEO_DOMAIN_DEFINED_BY_BOX;
-        
-        cmc_debug_msg("The data of variable ", nc_data->vars[i]->name, " has the process-local view of:");
-        cmc_debug_msg("Start_Values:");
-        for (int idd = 0; idd < static_cast<int>(nc_data->vars[i]->num_dimensions); ++idd)
-        {
-            std::cout << start_values[idd] << ", ";
-        }
-        std::cout << std::endl;
-        cmc_debug_msg("Count_Values:");
-        for (int idd = 0; idd < static_cast<int>(nc_data->vars[i]->num_dimensions); ++idd)
-        {
-            std::cout << count_values[idd] << ", ";
-        }
-        std::cout << std::endl;
         /* Save the data scheme */
         nc_data->vars[i]->data_scheme = CMC_DATA_ORDERING_SCHEME::CMC_GEO_DATA_LINEAR;
 
@@ -990,7 +1019,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         {
             if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LON])
             {
-                if (t8_data->vars[var_id]->var->dim_lengths[i] > 1)
+                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LON);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LON] = t8_data->vars[var_id]->var->dim_lengths[i];
@@ -1000,7 +1029,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 }
             } else if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LAT])
             {
-                if (t8_data->vars[var_id]->var->dim_lengths[i] > 1)
+                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LAT);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LAT] = t8_data->vars[var_id]->var->dim_lengths[i];
@@ -1010,7 +1039,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 }
             } else if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LEV])
             {
-                if (t8_data->vars[var_id]->var->dim_lengths[i] > 1)
+                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LEV);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LEV] = t8_data->vars[var_id]->var->dim_lengths[i];
@@ -1022,7 +1051,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
             {
                 //Time series are currently not supported, therefore the time coordinates are skipped
                 #if 0
-                if (nc_data->coord_lengths[CMC_COORD_IDS::CMC_TIME] > 1)
+                if (nc_data->coord_lengths[CMC_COORD_IDS::CMC_TIME] != 1)
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_TIME);
                 }
@@ -1054,7 +1083,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         for (size_t j{0}; j < t8_data->vars[var_id]->var->count_ptr.size(); ++j)
         {
             /* Check if this dimension is considered in the data hyperslab */
-            if (t8_data->vars[var_id]->var->count_ptr[j] <= 1)
+            if (t8_data->vars[var_id]->var->count_ptr[j] == 1)
             {
                 /* If the dimension is not considered, erase it */
                 t8_data->vars[var_id]->var->count_ptr.erase(t8_data->vars[var_id]->var->count_ptr.begin() + j);

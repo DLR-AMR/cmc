@@ -4139,146 +4139,164 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
             cmc_debug_msg("Size of sorted morton indices: ", sorted_morton_indices.back().size());
         }
 
+        cmc_debug_msg("Size of sorted_morton_indices is: ", sorted_morton_indices.size());
+
         /* Define a vector which will hold the merged sequence of all Morton indices */
         std::vector<uint64_t> morton_indices;
 
-        /* Merge all sequences of sorted Morton indices */
-        for (size_t vec_iter{0}; vec_iter < sorted_morton_indices.size() - 1; ++vec_iter)
+        if(sorted_morton_indices.size() > 1)
         {
-            /* Allocate a new vector capable of holding the merged sequence */
-            std::vector<uint64_t> merged_sequence;
+            /* Merge all sequences of sorted Morton indices */
+            for (size_t vec_iter{0}; vec_iter < sorted_morton_indices.size() - 1; ++vec_iter)
+            {
+                /* Allocate a new vector capable of holding the merged sequence */
+                std::vector<uint64_t> merged_sequence;
 
-            /* Allocate memory for the vector */
-            if (vec_iter < sorted_morton_indices.size() -2)
-            {
-                /* Allocate just enough memeory for the merged sequence */
-                merged_sequence.reserve(sorted_morton_indices[vec_iter].size() + sorted_morton_indices[vec_iter + 1].size());
-            } else
-            {
-                /* In the last iteration, we are going to allocate as much elements as the forest holds locally, since we need to fill up some 'holes' within the data */
-                merged_sequence.reserve(t8_forest_get_local_num_elements(forest));
+                /* Allocate memory for the vector */
+                if (vec_iter < sorted_morton_indices.size() -2)
+                {
+                    /* Allocate just enough memeory for the merged sequence */
+                    merged_sequence.reserve(sorted_morton_indices[vec_iter].size() + sorted_morton_indices[vec_iter + 1].size());
+                } else
+                {
+                    /* In the last iteration, we are going to allocate as much elements as the forest holds locally, since we need to fill up some 'holes' within the data */
+                    merged_sequence.reserve(t8_forest_get_local_num_elements(forest));
+                }
+
+                /* Merge the two sorted sequences of Morton indices */
+                std::merge(sorted_morton_indices[vec_iter].begin(), sorted_morton_indices[vec_iter].end(), sorted_morton_indices[vec_iter +1].begin(), sorted_morton_indices[vec_iter +1].end(), std::back_inserter(merged_sequence));
+
+                /* Swap the merged sequence */
+                if (vec_iter < sorted_morton_indices.size() -2)
+                {
+                    /* Swap the merged sequence with the latter sorted_morton_indices-array */
+                    std::swap(sorted_morton_indices[vec_iter + 1], merged_sequence);
+                } else
+                {
+                    /* In the last iteration, swap the current merged-sequence with the outside vector, in order to access the fully sorted Morton indices array later */
+                    std::swap(morton_indices, merged_sequence);
+                }
             }
-
-            /* Merge the two sorted sequences of Morton indices */
-            std::merge(sorted_morton_indices[vec_iter].begin(), sorted_morton_indices[vec_iter].end(), sorted_morton_indices[vec_iter +1].begin(), sorted_morton_indices[vec_iter +1].end(), std::back_inserter(merged_sequence));
-
-            /* Swap the merged sequence */
-            if (vec_iter < sorted_morton_indices.size() -2)
-            {
-                /* Swap the merged sequence with the latter sorted_morton_indices-array */
-                std::swap(sorted_morton_indices[vec_iter + 1], merged_sequence);
-            } else
-            {
-                /* In the last iteration, swap the current merged-sequence with the outside vector, in order to access the fully sorted Morton indices array later */
-                std::swap(morton_indices, merged_sequence);
-            }
+        } else if (sorted_morton_indices.size() == 1) 
+        {
+            /* If we received data only from one process, we do not have to merge */
+            morton_indices = std::move(sorted_morton_indices.front());
         }
 
         /* Since the forest on which the data is mapped may eventually be greater than the geographical domain on which the variable's data is defined. There may be some holes within the Morton indices, which we need to fill missing values */
         std::vector<std::pair<size_t, size_t>> gaps_to_fill;
 
-        /* Check for gaps in the data at the beginning  */
-        if (morton_indices[0] != offsets[rank])
-        {
-            /* In this case our first local Morton index is not equal to the first local element. Therefore, we have to insert some missing_values */
-            
-            int counter_skipped_elems = 0;
-            t8_element_t* element;
-            uint64_t morton_offset_calc = 0;
+        /* We need to iterate later through the Morton indices and obtain the corresponding data and store it within the correct variables */
+        /* Since we may have more than one variable we are going to create a mapping to use for each variables which will be filled later */
+        std::vector<std::vector<uint64_t>> sequence_mappings;
+        sequence_mappings.reserve(recv_list.size());
 
-            while (morton_offset_calc < morton_indices[0] -1 && static_cast<size_t>(counter_skipped_elems + 1) < static_cast<size_t>(t8_forest_get_local_num_elements(forest) -1))
+        /* Check if there is some real data on this process */
+        if (morton_indices.size() > 0)
+        {
+            /* Check for gaps in the data at the beginning  */
+            if (morton_indices[0] != offsets[rank])
             {
-                ++counter_skipped_elems;
-                element = t8_forest_get_element_in_tree(forest, 0, counter_skipped_elems);
-                morton_offset_calc += std::pow(t8_element_num_children(scheme_eclass, element), t8_data->geo_data->initial_refinement_lvl - t8_element_level(scheme_eclass, element));
-            }
+                /* In this case our first local Morton index is not equal to the first local element. Therefore, we have to insert some missing_values */
 
-            /* Save the position and length of the gap */
-            gaps_to_fill.emplace_back(std::make_pair(0, counter_skipped_elems));
-
-            /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gapsof missing values */
-            morton_indices.insert(morton_indices.begin(), counter_skipped_elems, (offsets[rank] - 1 >= 0 ? offsets[rank] -1 : 0));
-        }
-        cmc_debug_msg("All gaps in morton indices have been found at start");
-
-        /* We cannot start at morton_indices.begin() if we have added some missing_values before the first (data) Morton index */
-        int offset_for_iteration = 0;
-        if (gaps_to_fill.size() > 0)
-        {
-            /* Get the amount of elements to skip */
-            offset_for_iteration = gaps_to_fill.back().second;
-        }
-
-        /* Check for gaps in the data somewhere in between */
-        size_t current_length = morton_indices.size() - 1;
-
-        for (size_t iter{static_cast<size_t>(offset_for_iteration)}; iter < current_length; ++iter)
-        {
-            /* Check if neighboring Morton_indices do not vary by exactly one */
-            if (morton_indices[iter] + 1 < morton_indices[iter + 1])
-            {
-                /** If not, we have a hole needed to be filled by missing values **/
                 int counter_skipped_elems = 0;
                 t8_element_t* element;
-                uint64_t morton_offset_calc = morton_indices[iter];
+                uint64_t morton_offset_calc = 0;
 
-                while (morton_offset_calc < morton_indices[iter + 1] -1 && iter + counter_skipped_elems + 1 < static_cast<size_t>(t8_forest_get_local_num_elements(forest) -1))
+                while (morton_offset_calc < morton_indices[0] -1 && static_cast<size_t>(counter_skipped_elems + 1) < static_cast<size_t>(t8_forest_get_local_num_elements(forest) -1))
                 {
                     ++counter_skipped_elems;
-                    element = t8_forest_get_element_in_tree(forest, 0, iter + counter_skipped_elems);
+                    element = t8_forest_get_element_in_tree(forest, 0, counter_skipped_elems);
                     morton_offset_calc += std::pow(t8_element_num_children(scheme_eclass, element), t8_data->geo_data->initial_refinement_lvl - t8_element_level(scheme_eclass, element));
                 }
 
                 /* Save the position and length of the gap */
-                gaps_to_fill.emplace_back(std::make_pair(iter + 1, counter_skipped_elems));
+                gaps_to_fill.emplace_back(std::make_pair(0, counter_skipped_elems));
 
                 /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gapsof missing values */
-                morton_indices.insert(std::next(morton_indices.begin(), iter + 1), counter_skipped_elems, morton_indices[iter]);
-
-                /* Advance the iterator to the correct position */
-                iter += counter_skipped_elems;
-                current_length += counter_skipped_elems;
+                morton_indices.insert(morton_indices.begin(), counter_skipped_elems, (offsets[rank] - 1 >= 0 ? offsets[rank] -1 : 0));
             }
-        }
+            cmc_debug_msg("All gaps in morton indices have been found at start");
 
-        /* Check if there are missing values at the end of our data */
-        /* If there are some Morton indices missing at the end, we can just add the missing values equal to the amount of (local forest elements - amount of local Morton indices) */
-        if (morton_indices.size() < static_cast<size_t>(t8_forest_get_local_num_elements(forest)))
-        {
-            /* If this is case, the last Morton index should not be equal to the partition boundary */
-            cmc_assert(((rank == size -1 ? t8_forest_get_global_num_elements(forest) - 1 : offsets[rank + 1] -1) - morton_indices.back()) > 0);
-
-            /* Save the position and length of the gap */
-            gaps_to_fill.emplace_back(std::make_pair(morton_indices.size(), t8_forest_get_local_num_elements(forest) - static_cast<int>(morton_indices.size())));
-        
-            /* Insert the missing values at the end */
-            morton_indices.insert(morton_indices.end(), static_cast<size_t>(t8_forest_get_local_num_elements(forest)) - morton_indices.size(), morton_indices.back());//(rank == size -1 ? t8_forest_get_local_num_elements(forest) - 1 : offsets[rank + 1] - 1));
-        }
-
-        /* Now we need to iterate through the Morton indices and obtain the corresponding data and store it within the correct variables */
-        /* Since we may have more than one variable we are going to create a mapping to use for each variables */
-        std::vector<std::vector<uint64_t>> sequence_mappings;
-        sequence_mappings.reserve(recv_list.size());
-
-        /* Iterate over the recv_list */
-        for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter)
-        {
-            /* Create a new vector for the current receiver and allocate memory for it */
-            sequence_mappings.emplace_back(std::vector<uint64_t>());
-            sequence_mappings.back().reserve(iter->second.received_morton_indices);
-
-            /* Check the received data */
-            for (int morton_iter{0}; morton_iter < iter->second.received_morton_indices; ++morton_iter)
+            /* We cannot start at morton_indices.begin() if we have added some missing_values before the first (data) Morton index */
+            int offset_for_iteration = 0;
+            if (gaps_to_fill.size() > 0)
             {
-                /* Perform a binary search for of the received Morton index */
-                auto bin_search_result = std::lower_bound(morton_indices.begin(), morton_indices.end(), iter->second.morton_indices[morton_iter]);
-                /* The element should be found in the fully osrted array of Morton indices. Therefore, the assertion */
-                cmc_assert(bin_search_result != morton_indices.end());
-                /* Now we store the position of the Morton-index (in the fully sorted array) within our mapping */
-                sequence_mappings.back().emplace_back(std::distance(morton_indices.begin(), bin_search_result));
+                /* Get the amount of elements to skip */
+                offset_for_iteration = gaps_to_fill.back().second;
             }
-        }
 
+            /* Check for gaps in the data somewhere in between */
+            size_t current_length = morton_indices.size() - 1;
+
+            for (size_t iter{static_cast<size_t>(offset_for_iteration)}; iter < current_length; ++iter)
+            {
+                /* Check if neighboring Morton_indices do not vary by exactly one */
+                if (morton_indices[iter] + 1 < morton_indices[iter + 1])
+                {
+                    /** If not, we have a hole needed to be filled by missing values **/
+                    int counter_skipped_elems = 0;
+                    t8_element_t* element;
+                    uint64_t morton_offset_calc = morton_indices[iter];
+
+                    while (morton_offset_calc < morton_indices[iter + 1] -1 && iter + counter_skipped_elems + 1 < static_cast<size_t>(t8_forest_get_local_num_elements(forest) -1))
+                    {
+                        ++counter_skipped_elems;
+                        element = t8_forest_get_element_in_tree(forest, 0, iter + counter_skipped_elems);
+                        morton_offset_calc += std::pow(t8_element_num_children(scheme_eclass, element), t8_data->geo_data->initial_refinement_lvl - t8_element_level(scheme_eclass, element));
+                    }
+
+                    /* Save the position and length of the gap */
+                    gaps_to_fill.emplace_back(std::make_pair(iter + 1, counter_skipped_elems));
+
+                    /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gapsof missing values */
+                    morton_indices.insert(std::next(morton_indices.begin(), iter + 1), counter_skipped_elems, morton_indices[iter]);
+
+                    /* Advance the iterator to the correct position */
+                    iter += counter_skipped_elems;
+                    current_length += counter_skipped_elems;
+                }
+            }
+
+            /* Check if there are missing values at the end of our data */
+            /* If there are some Morton indices missing at the end, we can just add the missing values equal to the amount of (local forest elements - amount of local Morton indices) */
+            if (morton_indices.size() < static_cast<size_t>(t8_forest_get_local_num_elements(forest)))
+            {
+                /* If this is case, the last Morton index should not be equal to the partition boundary */
+                cmc_assert(((rank == size -1 ? t8_forest_get_global_num_elements(forest) - 1 : offsets[rank + 1] -1) - morton_indices.back()) > 0);
+
+                /* Save the position and length of the gap */
+                gaps_to_fill.emplace_back(std::make_pair(morton_indices.size(), t8_forest_get_local_num_elements(forest) - static_cast<int>(morton_indices.size())));
+
+                /* Insert the missing values at the end */
+                morton_indices.insert(morton_indices.end(), static_cast<size_t>(t8_forest_get_local_num_elements(forest)) - morton_indices.size(), morton_indices.back());//(rank == size -1 ? t8_forest_get_local_num_elements(forest) - 1 : offsets[rank + 1] - 1));
+            }
+
+            /* Iterate over the recv_list */
+            for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter)
+            {
+                /* Create a new vector for the current receiver and allocate memory for it */
+                sequence_mappings.emplace_back(std::vector<uint64_t>());
+                sequence_mappings.back().reserve(iter->second.received_morton_indices);
+
+                /* Check the received data */
+                for (int morton_iter{0}; morton_iter < iter->second.received_morton_indices; ++morton_iter)
+                {
+                    /* Perform a binary search for of the received Morton index */
+                    auto bin_search_result = std::lower_bound(morton_indices.begin(), morton_indices.end(), iter->second.morton_indices[morton_iter]);
+                    /* The element should be found in the fully sorted array of Morton indices. Therefore, the assertion */
+                    cmc_assert(bin_search_result != morton_indices.end());
+                    /* Now we store the position of the Morton-index (in the fully sorted array) within our mapping */
+                    sequence_mappings.back().emplace_back(std::distance(morton_indices.begin(), bin_search_result));
+                }
+            }
+
+        } else
+        {
+            /* Since no morton indices were sent to this process, we will fill everything with missing values */
+            gaps_to_fill.emplace_back(std::make_pair(0, t8_forest_get_local_num_elements(forest)));
+        }
+        
         /* Allocate memory for all variables */
         /* This approach leads to the case that each rank holds data from each variable. Therefore, all variables are distributed */
         for (size_t var_iter{0}; var_iter < t8_data->vars.size(); ++var_iter)
@@ -4294,7 +4312,6 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
                 {
                     /* Copy-assign the variable's missing value */
                     t8_data->vars[var_iter]->var->data_new->assign(static_cast<size_t>(gap_iter->first + num_elems_to_insert), t8_data->vars[var_iter]->var->missing_value);
-
                 }
             }
         }
@@ -4310,7 +4327,6 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
             /* Iterate over the received variables */
             for (size_t var_iter{0}; var_iter < iter->second.data.size(); ++var_iter)
             {
-                //size_t size_of_data = t8_data->vars[iter->second.variable_indices[var_iter]]->get_data_size();
                 size_t size_of_data = t8_data->vars[var_iter]->get_data_size();
 
                 std::byte* initial_data_ptr = static_cast<std::byte*>(iter->second.data[var_iter]->get_initial_data_ptr());
@@ -4328,12 +4344,13 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
         /* Exchange the 'old' unordered data with the newly ordered array (compliant to the Morton curve) */
         for (size_t var_iter{0}; var_iter < t8_data->vars.size(); ++var_iter)
         {
+            cmc_debug_msg("        bis hier-...", var_iter);
             /* Free the 'unordered' data and assign the 'newly ordered' data for each variable */
             t8_data->vars[var_iter]->var->switch_data();
             /* Set the Morton Curve ordering flag */
             t8_data->vars[var_iter]->var->data_scheme = CMC_DATA_ORDERING_SCHEME::CMC_GEO_DATA_Z_CURVE;
         }
-
+    
         /* Free the allocated data */
         free(offsets);
         
