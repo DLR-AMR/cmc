@@ -448,11 +448,14 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
     /* Build an enclosing mesh */
     cmc_t8_create_enclosing_geo_mesh(*(amr_data->t8_data));
 
-    // Test: distribute the data in parallel
-    //cmc_t8_distribute_data((amr_data->t8_data));
-
-    /* Apply the z-curve ordering to all variables */
-    cmc_t8_apply_zcurve_ordering(*(amr_data->t8_data), CMC_APPLY_ZCURVE_TO_ALL_VARS);
+    if (amr_data->t8_data->use_distributed_data)
+    {
+        cmc_t8_geo_data_distribute_and_apply_ordering((amr_data->t8_data));
+    } else 
+    {
+        /* Apply the z-curve ordering to all variables */
+        cmc_t8_apply_zcurve_ordering(*(amr_data->t8_data), CMC_APPLY_ZCURVE_TO_ALL_VARS);
+    }
 
     #ifdef CMC_ENABLE_DEBUG
     char file_prefix[55];
@@ -473,7 +476,7 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
         }
     }
     /* Write out the forest with the variable's data at the beginning of the compression process */
-    //cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix); 
+    cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix); 
     #endif
     #endif
 }
@@ -497,7 +500,9 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* In case a relative error criterion has been chosen */
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
+                //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold_parallel, cmc_t8_geo_data_interpolate_std_mean);
+
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 /* In case an exclude area crierion has been chosen */

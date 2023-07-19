@@ -48,8 +48,8 @@ cmc_t8_var::get_data_layout() const
 size_t
 cmc_t8_geo_data::get_coord_length(const CMC_COORD_IDS cmc_coord_id) const
 {
-    cmc_assert(coords->size() >= CMC_NUM_COORD_IDS);
-    return (coords->operator[](cmc_coord_id)).size();
+    cmc_assert(coordinates->coords.size() >= CMC_NUM_COORD_IDS);
+    return (coordinates->coords.operator[](cmc_coord_id)).size();
 }
 
 /* Write the forest as well as the variables in a vtk-file (depending on the compression mode (if supplied) one file with all variables or one file per variable is written) */
@@ -257,6 +257,7 @@ cmc_t8_write_forest_all_vars(cmc_t8_data_t t8_data, const char* file_prefix)
 
                 } else
                 {
+                    cmc_assert(t8_data->vars[*iter]->var->data->size() == static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[*iter]->assets->forest)));
                     /* Set the type of the data and pointer to the data */
                     snprintf(vtk_data[0].description, 50, "%s", (t8_data->vars[*iter]->var->name).c_str());
                     //Quick fix for visualization

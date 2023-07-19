@@ -64,4 +64,9 @@ cmc_nc_inquire_vars(cmc_nc_data_t nc_data, const size_t* start_ptr, const size_t
     #endif
 };
 
+/* Set a blocked reading if the file is processed in parallel */
+void
+cmc_nc_set_blocked_reading(cmc_nc_data_t nc_data, const std::vector<int> blocked_domain_num_processes_per_dimension);
+
+
 #endif /* CMC_NETCDF_HXX */

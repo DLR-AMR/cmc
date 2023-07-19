@@ -7,6 +7,7 @@
 
 #include "cmc_t8code_data.h"
 #include "mpi/cmc_mpi.h"
+#include "mpi/cmc_mpi_io.h"
 #include "utilities/cmc_geo_util.h"
 #include "utilities/cmc_container.h"
 
@@ -45,7 +46,10 @@ public:
     int element_anchor_max_lvl{0}; //!< The maximum possible refinement level in case of a 2D or 3D mesh (respective of the @var dim).
     var_vector_t* coords{nullptr}; //!< A pointer to a @struct var_array_t holding all geo-spatial coordinate data (e.g. longitude, latitude, elevation and time coordinates).
 
-    size_t get_coord_length(const CMC_COORD_IDS cmc_coord_id) const;
+    std::vector<size_t> global_dim_lengths; //!< The global dimension lenghts
+    cmc_global_coordinate_system* coordinates{nullptr}; //!< The global coordinate system
+    std::vector<cmc_ref_coordinates*> ref_coordinates; //!< The reference coordinates corresponding to the global coordinate system
+    size_t get_coord_length(const CMC_COORD_IDS cmc_coord_id) const; //!< A member function returning the length of a supplied coordinate dimension
 };
 
 /**
@@ -196,6 +200,9 @@ public:
 
     bool variables_are_defined_on_the_same_domain{true}; //!< A flag indicating whether the domain of all variables is the same or if the variables are defined on different geo-spatial domains (e.g. var1 is defined on 'lat x lon'; var2 is defined on 'lon x lev')
 
+    bool use_distributed_data{false}; //!< A flag indicating whether the variable's data is distributed among processses or not
+    data_distribution_t data_dist{data_distribution_t::DISTRIBUTION_UNDEFINED}; //!< An enum defining the current parallel distribution style of the data
+    
     cmc_amr_compression_settings settings{};
 };
 
@@ -212,17 +219,27 @@ public:
     : t8_data{_t8_data}, current_var_id{_var_id}{};
     ~cmc_t8_adapt_data(){};
 
+    /* Some general informations */
     cmc_t8_data_t t8_data{nullptr}; //!< A pointer to @struct cmc_t8_data holding all information about the variables and their underlying geo-spatial domains
     int current_var_id{-1}; //!< In case a 'One for One' compression mode is chosen (different meshes are considered for the different variables; this @var current_var_ids helps distinguishing which variable is currently adapted)
     int adapt_step{0}; //!< A counter indicating the amount of adaptation steps that have been applied previously
     
-    size_t coarsening_counter{0}; //!< A counter counting the times element families have been coarsened before (during the same adaptation step)
     var_vector_t* adapted_data{nullptr}; //!< A pointer to an universal array which may be used to save data that has been calculated during the adaptation, but may also be used during the interpolation (if for example the same calculations have to be performed)
     
     std::vector<std::unordered_map<t8_locidx_t, t8_locidx_t>> initial_ref_lvl_ids; //!< A hash table saving for each key (the key is id of the coarse element in the current mesh) the id of the first initial element id (in the initial mesh before any coarsening has been introduced) laying within the physical area of the coarse element as a value. This hash table helps to keep track of all initial data points during the coarsening in order to fullfill predefined error threshold criteria.
     int _counter; //!< This counter is used for accesing the hash table @var initial_ref_lvl_ids at the right positions
     int _counter_nxt_lvl; //!< This counter is used for accesing the hash table @var initial_ref_lvl_ids at the right position
 
+    /* Vectors needed for the relative error citerion */
+    std::vector<uint64_t> associated_deviations_gelement_id; //!< Save the previous deviations element ids
+    std::vector<std::vector<double>> associated_max_deviations; //!< Saves the previous maximum deviation per variable for each element id (corresponding to @var associated_deviations_gelement_id)
+    std::vector<uint64_t> associated_deviations_gelement_id_new; //!< Saves the new elemenmt ids which obtain a maximum deviaiton (those are all elements which will be coarsened)
+    std::vector<std::vector<double>> associated_max_deviations_new; //!< Saves the calculated maximum deviation which will result from the coarsening (the ordering of the data corresponds to @var associated_deviations_gelement_id_new)
+    
+    t8_gloidx_t first_global_elem_id{0}; //!< The first global element id the MPI rank holds
+    uint64_t coarsening_counter{0}; //!< This value counts the number of (process-local) coarsenings
+    t8_forest_t forest_reference{nullptr}; //!< A variable for holding a reference forest which may be needed
+    
     cmc_amr_compression_settings* settings{nullptr}; //!< A pointer to @struct cmc_amr_compression_settings which saves information about the compression criterium
 };
 

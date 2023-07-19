@@ -57,6 +57,9 @@ cmc_setup_messy_data(const MPI_Fint comm)
     #endif
     cmc_debug_msg("The cmc_messy_data struct will be initialized and passed back to MESSy");
     return new cmc_messy_data(c_comm);
+    #else
+    cmc_err_msg("The MESSy setup cannot be completed, because Fortran is not enabled. Please re-configure cmc with --enable-fortran.");
+    return new cmc_messy_data();
     #endif
 }
 

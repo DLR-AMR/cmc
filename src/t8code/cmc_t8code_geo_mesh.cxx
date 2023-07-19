@@ -2,19 +2,27 @@
 #include "cmc_t8code_data.hxx"
 #include "cmc_t8_adapt_callbacks.h"
 #include "utilities/cmc_log_functions.h"
-/////new try
 
 /** Begin STATIC Functions **/
 /** Calculate the maximum refinement level needed per direction/dimension in order to build an enclosing t8code mesh */
 #ifdef CMC_WITH_T8CODE
 
 static int
-cmc_t8_calc_geo_refinement_level(const cmc_t8_data& t8_data, const int var_id)
+cmc_t8_calc_geo_refinement_level(const cmc_t8_data& t8_data, const int var_id, const bool use_global_dim_lenghts = false)
 {
-    cmc_assert(var_id >= 0 && var_id < static_cast<int>(t8_data.vars.size()));
-    const size_t max_elem_per_direction{*std::max_element(t8_data.vars[var_id]->var->dim_lengths.begin(), t8_data.vars[var_id]->var->dim_lengths.end())};
-    /* Calculate the induced initial refinement level needed in order to build an enclosing mesh */
-    return static_cast<int>(std::ceil(std::log2(max_elem_per_direction) + std::numeric_limits<double>::epsilon()));
+    if (use_global_dim_lenghts)
+    {
+        const size_t max_elem_per_direction{*std::max_element(&(t8_data.geo_data->global_dim_lengths[0]), &(t8_data.geo_data->global_dim_lengths[CMC_NUM_COORD_IDS]))};
+        /* Calculate the induced initial refinement level needed in order to build an enclosing mesh */
+        return static_cast<int>(std::ceil(std::log2(max_elem_per_direction) + std::numeric_limits<double>::epsilon()));
+    }
+    else
+    {
+        cmc_assert(var_id >= 0 && var_id < static_cast<int>(t8_data.vars.size()));
+        const size_t max_elem_per_direction{*std::max_element(t8_data.vars[var_id]->var->dim_lengths.begin(), t8_data.vars[var_id]->var->dim_lengths.end())};
+        /* Calculate the induced initial refinement level needed in order to build an enclosing mesh */
+        return static_cast<int>(std::ceil(std::log2(max_elem_per_direction) + std::numeric_limits<double>::epsilon()));
+    }
 }
 
 static std::string
@@ -70,6 +78,7 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
     t8_forest_t forest{initial_forest};
     t8_forest_t forest_adapt;
 
+    std::cout << "In coarsesn geo mesh " << std::endl;
     int refinement_step{0};
     t8_gloidx_t num_elems_former_forest{0};
     /* Create an 'adaption struct' */
@@ -78,10 +87,11 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
     /* If no id is explicitly given, it will be assumed that each variable is defined on the same geo-spatial domain. Therfore, the first variable id is (arbitrarily) assigned */
     adapt_data->current_var_id = (var_id <= -1 ? 0 : var_id);
     /* Set the partition for coarsening flag for the 'partition'-routine */
-    const int partition_for_coarsening = 0;
+    const int partition_for_coarsening = 0; //Currently, there is no other option supported
     /* Adapt the forest as much as possible by coarsen the 'dummy' elements which do not resemble a geo-spatial data point */
     while (refinement_step < initial_refinement_lvl && num_elems_former_forest != t8_forest_get_global_num_elements(forest))
     {
+        std::cout << "Coarsen step: " << refinement_step << std::endl;
         /* Initialize the new forest */
         t8_forest_init(&forest_adapt);
         /* Save the number of elements of the former forest */
@@ -239,7 +249,8 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
         
         /* Calculate the initial refinement level needed in order to circumvent the geo-grid with a t8code mesh */
         //t8_data.geo_data->initial_refinement_lvl = cmc_t8_calc_geo_refinement_level(t8_data.geo_data->coords);
-        t8_data.geo_data->initial_refinement_lvl = cmc_t8_calc_geo_refinement_level(t8_data, 0);
+        t8_data.geo_data->initial_refinement_lvl = cmc_t8_calc_geo_refinement_level(t8_data, 0, t8_data.use_distributed_data);
+        std::cout << "initial ref level is: " << t8_data.geo_data->initial_refinement_lvl << std::endl;
         #if CMC_ENABLE_DEBUG
         /* Assertions in Debug-Mode */
         if (t8_data.geo_data->dim == 2)
@@ -301,6 +312,9 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
         }
     } else
     {
+        //Currently it is not possible to use parallel data in 'not on the same domain defined' cases
+        cmc_assert(t8_data.use_distributed_data == false);
+
         /* Currently, in this case the compression mode can only be of type 'One for One' */
         cmc_assert(t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D || t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_3D);
 
@@ -348,7 +362,7 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
             cmesh = t8_cmesh_new_hypercube((t8_data.vars[var_ids[group_id].front()]->var->num_dimensions == 2 ? T8_ECLASS_QUAD : T8_ECLASS_HEX), t8_data.comm, 0, 0, 1);
 
             /* Calculate the initial refinement level for this geo-spatial domain */
-            initial_ref_lvl = cmc_t8_calc_geo_refinement_level(t8_data, var_ids[group_id].front());
+            initial_ref_lvl = cmc_t8_calc_geo_refinement_level(t8_data, var_ids[group_id].front(), t8_data.use_distributed_data);
 
             /* Allocate assets */
             for (size_t sub_id{0}; sub_id < var_ids[group_id].size(); ++sub_id)
@@ -494,7 +508,7 @@ int
 cmc_t8_elem_inside_geo_mesh(const t8_element_t* element, t8_eclass_scheme_c* ts, const cmc_t8_data& t8_data, const int var_id)
 {
     #ifdef CMC_WITH_T8CODE
-    cmc_assert(t8_data.geo_data->coords->size() >= CMC_NUM_COORD_IDS);
+    cmc_assert(t8_data.geo_data->coordinates->coords.size() >= CMC_NUM_COORD_IDS);
     
     /* Check whether the element is inside the "lat x lon x lev" mesh or not */
     return cmc_t8_elem_inside_geo_domain(element, ts, t8_data, var_id, 0, t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LAT), 0, t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LON), 0, t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LEV));

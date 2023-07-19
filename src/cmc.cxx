@@ -54,12 +54,27 @@ cmc_initialize_mpi_comm(MPI_Comm comm)
 void
 cmc_finalize()
 {
+  #ifdef CMC_ENABLE_MPI
+  int err, rank;
+  /* Get the rank of the process */
+  err = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  cmc_mpi_check_err(err);
+  #endif
+
   /* Finalize t8code */
   cmc_t8code_finalize(0);
   /* Finalize MPI */
   cmc_mpi_finalize();
+  #ifdef CMC_ENABLE_MPI
+  /* Only print out the initilization info on rank zero */
+  if (rank == 0)
+  {
+    std::cout << "[cmc] cmc has been finalized." << std::endl;
+  }
+  #else
   /* Print out the finalizing info */
   std::cout << "[cmc] cmc has been finalized." << std::endl;
+  #endif
 }
 
 /** Finalize cmc and it's submodules except MPI */

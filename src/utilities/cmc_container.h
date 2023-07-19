@@ -37,6 +37,9 @@ public:
     
     bool check_range_fullfills_deviation_threshold_from_value(const size_t start_index, const size_t end_index, const double deviation, const cmc_universal_type_t& value, const cmc_universal_type_t& missing_value) const;
     
+    std::vector<double> calculate_relative_deviations(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value) const;
+    std::vector<double> calculate_relative_deviations_w_missing_values(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value, const cmc_universal_type_t& missing_value) const;
+
     void assign(const size_t index, const cmc_universal_type_t& value);
     /* This function performs a type check of the data inside 'value' */
     void assign_value(const size_t index, const cmc_universal_type_t& value);
@@ -51,6 +54,7 @@ public:
     void axpy_scalar(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset);    
     void axpy_scalar_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset, const cmc_universal_type_t& missing_value);
     
+    std::vector<double> retrieve_double_vector() const;
     // Opaque pointer to the internal data structure
     struct var_array* data{nullptr};
 private:
@@ -59,8 +63,7 @@ private:
     void _destroy_array();
 };
 
-class
-var_dynamic_array_t
+class var_dynamic_array_t
 {
 public:
     var_dynamic_array_t(const size_t num_elements, const cmc_type _type){
@@ -70,8 +73,11 @@ public:
         _destroy_array();
     };
     size_t size() const;
+    size_t capacity() const;
+    void* get_initial_data_ptr() const;
+    cmc_type get_type() const;
     void push_back(const cmc_universal_type_t& value);
-
+    void resize(const size_t num_elements);
     struct var_dynamic_array* data{nullptr};
 private:
     void _init_array(const size_t, const cmc_type);
@@ -109,7 +115,6 @@ private:
     void _init_vector();
     void _destroy_vector();
 };
-
 
 template<typename T>
 cmc_type

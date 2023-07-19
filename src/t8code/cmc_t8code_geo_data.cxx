@@ -9,609 +9,6 @@
 /** Begin STATIC Functions **/
 /****************************/
 
-
-/*********************************************/
-/************ MPI TEST AREA ******************/
-
-
-struct cmc_t8_mpi_data
-{
-    cmc_t8_mpi_data(){};
-    cmc_t8_mpi_data(const int rank, const int num_vars)
-    : partner_rank{rank}
-    {
-        data.reserve(num_vars);
-    };
-    ~cmc_t8_mpi_data(){};
-
-    int partner_rank{-1};
-    size_t num_receiving_elems{0};
-    std::vector<var_dynamic_array_t*> data;
-    std::vector<uint64_t> morton_indices; //Currently, it is only possible to perform parallel computations if all variables are defined on the same domain.
-};
-
-/* Typedefs for sending and receiving data */
-typedef struct cmc_t8_mpi_data cmc_t8_mpi_send_data;
-typedef struct cmc_t8_mpi_data cmc_t8_mpi_recv_data;
-
-/****************************/
-/** Begin Static Functions **/
-#if defined CMC_WITH_T8CODE && defined CMC_ENABLE_MPI
-#if 1
-static int
-cmc_t8_elem_in_storage_domain(const int dim, const int initial_refinement_lvl, const t8_element_t* element, t8_eclass_scheme_c* ts, const DATA_LAYOUT data_layout,
-                              const int x_min, const int y_min, const int z_min, const int x_max, const int y_max, const int z_max)
-{
-    #if defined CMC_WITH_T8CODE && defined CMC_ENABLE_MPI
-
-    int element_anchor[3];
-    t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
-
-    /* Maximum refinement level depending on the dimension of the data */
-    const int element_anchor_max_lvl{(dim == 2 ? P4EST_MAXLEVEL : P8EST_MAXLEVEL)};
-    /* Receive the integer anchor coodinates of the element */ 
-    ts_c->t8_element_anchor (element, element_anchor);
-
-    /* Transform coordinates into the range of the initial-refinement-level coordinate values */
-    for (int index{0}; index < dim; ++index)
-    {
-        element_anchor[index] >>= (element_anchor_max_lvl - initial_refinement_lvl);
-    }
-
-    if (dim == 2)
-    {
-        if (element_anchor[0] >= x_min && element_anchor[0] < x_max &&
-            element_anchor[1] >= y_min && element_anchor[1] < y_max)
-        {
-            /* The 2D element is inside the "lat x lon" data */
-            return 1;
-        }
-    }
-    else
-    {
-        if (element_anchor[0] >= x_min && element_anchor[0] < x_max &&
-            element_anchor[1] >= y_min && element_anchor[1] < y_max &&
-            element_anchor[2] >= z_min && element_anchor[2] < z_max)
-        {
-            /* The 3D is inside the "lat x lon x lev" data */
-            return 1;
-        }
-    }
-    return 0;
-    #else
-    return CMC_ERR;
-    #endif
-}
-
-#endif
-#if 0
-/* Transform the zcurve id, to a linear id */
-static std::tuple<uint64_t,uint64_t,uint64_t>
-cmc_zcurve_id_to_linear_id(const int dim, const uint64_t zcurve_id)
-{
-    cmc_assert(dim == 2 || dim == 3);
-    if (dim == 2)
-    {
-        /* 2D case */
-        uint64_t x = zcurve_id & 0x5555555555555555;
-        x = (x | (x >> 1)) & 0x3333333333333333;
-        x = (x | (x >> 2)) & 0x0f0f0f0f0f0f0f0f;
-        x = (x | (x >> 4)) & 0x00ff00ff00ff00ff;
-        x = (x | (x >> 8)) & 0x0000ffff0000ffff;
-
-        uint64_t y = (zcurve_id >> 1) & 0x5555555555555555;
-        y = (y | (y >> 1)) & 0x3333333333333333;
-        y = (y | (y >> 2)) & 0x0f0f0f0f0f0f0f0f;
-        y = (y | (y >> 4)) & 0x00ff00ff00ff00ff;
-        y = (y | (y >> 8)) & 0x0000ffff0000ffff;
-
-        return std::make_tuple(x,y,0);
-    }
-    else
-    {
-        /* 3D case */
-        /* Retrieve the x-coordinate */
-        uint64_t x = zcurve_id & 0x9249249249249249;
-        x = (x | (x >> 2))  & 0x30c30c30c30c30c3;
-        x = (x | (x >> 4))  & 0xf00f00f00f00f00f;
-        x = (x | (x >> 8))  & 0x00ff0000ff0000ff;
-        x = (x | (x >> 16)) & 0xffff00000000ffff;
-        x = (x | (x >> 32)) & 0x00000000ffffffff;
-
-        /* Retrieve the y-coordinate */
-        uint64_t y = (zcurve_id >> 1) & 0x9249249249249249;
-        y = (y | (y >> 2))  & 0x30c30c30c30c30c3;
-        y = (y | (y >> 4))  & 0xf00f00f00f00f00f;
-        y = (y | (y >> 8))  & 0x00ff0000ff0000ff;
-        y = (y | (y >> 16)) & 0xffff00000000ffff;
-        y = (y | (y >> 32)) & 0x00000000ffffffff;
-
-        /* Retrieve the z-coordinate */
-        uint64_t z = (zcurve_id >> 2) & 0x9249249249249249;
-        z = (z | (z >> 2))  & 0x30c30c30c30c30c3;
-        z = (z | (z >> 4))  & 0xf00f00f00f00f00f;
-        z = (z | (z >> 8))  & 0x00ff0000ff0000ff;
-        z = (z | (z >> 16)) & 0xffff00000000ffff;
-        z = (z | (z >> 32)) & 0x00000000ffffffff;
-
-        return std::make_tuple(x,y,z);
-    }
-}
-#endif
-/* Transform a cartesian coordinate to a morton index */
-static uint64_t
-cmc_linear_id_to_zcurve_id(const int dim, uint64_t x, uint64_t y, uint64_t z)
-{
-    cmc_assert(dim == 2 || dim == 3);
-
-    /* Prepare the coordinates for interleaving */
-    if (dim == 2)
-    {
-        /* 2D case */
-        x = (x | (x << 16)) & 0x0000ffff0000ffff;
-        x = (x | (x << 8)) & 0x00ff00ff00ff00ff;
-        x = (x | (x << 4)) & 0x0f0f0f0f0f0f0f0f;
-        x = (x | (x << 2)) & 0x3333333333333333;
-        x = (x | (x << 1)) & 0x5555555555555555;
-
-        y = (y | (y << 16)) & 0x0000ffff0000ffff;
-        y = (y | (y << 8)) & 0x00ff00ff00ff00ff;
-        y = (y | (y << 4)) & 0x0f0f0f0f0f0f0f0f;
-        y = (y | (y << 2)) & 0x3333333333333333;
-        y = (y | (y << 1)) & 0x5555555555555555;
-
-        /* Interleave the two integers */
-        return (x | (y << 1));
-    } else
-    {
-        /* 3D case */
-        x &= 0x1fffff;
-        x = (x | x << 32) & 0x1f00000000ffff;
-        x = (x | x << 16) & 0x1f0000ff0000ff;
-        x = (x | x << 8) & 0x100f00f00f00f00f;
-        x = (x | x << 4) & 0x10c30c30c30c30c3;
-        x = (x | x << 2) & 0x1249249249249249;
-
-        y &= 0x1fffff;
-        y = (y | y << 32) & 0x1f00000000ffff;
-        y = (y | y << 16) & 0x1f0000ff0000ff;
-        y = (y | y << 8) & 0x100f00f00f00f00f;
-        y = (y | y << 4) & 0x10c30c30c30c30c3;
-        y = (y | y << 2) & 0x1249249249249249;
-
-        z &= 0x1fffff;
-        z = (z | z << 32) & 0x1f00000000ffff;
-        z = (z | z << 16) & 0x1f0000ff0000ff;
-        z = (z | z << 8) & 0x100f00f00f00f00f;
-        z = (z | z << 4) & 0x10c30c30c30c30c3;
-        z = (z | z << 2) & 0x1249249249249249;
-
-        /* Interleave the three integers */
-        return (x | (y << 1) | (z << 2));
-    }
-
-}
-
-/* Examine to which rank the supplied morton index belongs */
-static int
-get_rank_assignment(const std::vector<uint64_t>& offsets, const int size, const uint64_t& morton_index)
-{
-    for (int rank_id{0}; rank_id < size -1; ++rank_id)
-    {
-        if (offsets[rank_id +1] > morton_index)
-        {
-            return rank_id;
-        } else
-        {
-            continue;
-        }
-    }
-    return size -1;
-}
-
-#if 0
-/* Add the element to the sender list */
-//TODO: This can be made more general/efficient. If all variables are defined on the same geo-domain, we won't need to iterate through every variable seperately and check if the receiving rank is already in the send_list etc. 
-static void
-check_send_list_for_current_recv_rank(cmc_t8_mpi_send_data& send_list, const int num_vars, const int recv_rank, const uint64_t morton_index, const size_t& size_hint)
-{
-    /* Iterate over all senders */
-    for (int sender{0}; sender < send_list.partner_rank.size(); ++sender)
-    {
-        /* If the receiving rank is already in the sender list */
-        if (send_list.partner_rank[sender] == recv_rank)
-        {
-            send_list.data[sender]->push_back(value);
-            send_lsit.ids[sender].morton_indices.push_back(morton_index);
-            return;
-        }
-    }
-    /* If the receiving rank is not yet in the sender list, it will be added */
-    send_list.emplace_back(cmc_t8_mpi_send_data(num_vars, recv_rank, morton_index, size_hint));
-}
-
-/* Add the element to the receiver list */
-static void
-assign_elem_to_receiver_list(std::vector<cmc_t8_mpi_recv_data>& recv_list, const int send_rank)
-{
-    for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter)
-    {
-        if ((*iter).partner_rank == send_rank)
-        {
-            ++((*iter).num_elems);
-            return;
-        }
-    }
-    /* If the sender rank is not yet in the receiver list */
-    recv_list.emplace_back(cmc_t8_mpi_recv_data(send_rank));
-    ++(recv_list.back().num_elems);
-}
-#endif 
-#endif
-/** End Static Functions **/
-/**************************/
-
-
-/** @note Currently, it is only possible to perorm calculations if all variables are defined on the same geo-spatial domain */
-static void
-cmc_t8_mpi_distribute_data(cmc_t8_data& t8_data, const t8_forest_t forest)
-{
-    #if defined CMC_ENABLE_MPI && defined CMC_WITH_T8CODE
-    if (t8_data.variables_are_defined_on_the_same_domain == false)
-    {
-        cmc_err_msg("For parallel data distribution, all variables must be defined on the same underlying geo-spatial domain currently.");
-    }
-    int err, rank, comm_size;
-
-    /* Get the size of the communicator */
-    err = MPI_Comm_size(t8_data.comm, &comm_size);
-    cmc_mpi_check_err(err);
-    
-    /* Get the (local) rank id */
-    err = MPI_Comm_rank(t8_data.comm, &rank);
-    cmc_mpi_check_err(err);
-
-    /* Schemes for quadrilaterals and hexahedrons */
-    t8_default_scheme_quad_c scheme_quad;
-    t8_default_scheme_hex_c scheme_hex;
-    t8_eclass_scheme_c* scheme_eclass;
-
-    if (t8_data.geo_data->dim == 2)
-    {
-        scheme_eclass = static_cast<t8_eclass_scheme_c*>(&scheme_quad);
-    } else
-    {
-        cmc_assert(t8_data.geo_data->dim == 3);
-        scheme_eclass = static_cast<t8_eclass_scheme_c*>(&scheme_hex);
-    }
-
-    /*********************************/
-    /**** Gather all Rank offsets ****/
-
-    /* Get the (local) element offsets */
-    /* This has to be the offset in a uniform refinement, otherwise the calcultaed morton indices will not be correct */
-    /* Therefore obtain the first local element and retrieve it's uniform id */ 
-    uint32_t elem_offset = static_cast<uint32_t>(t8_element_get_linear_id (scheme_eclass,
-                                                 t8_forest_get_element_in_tree(forest, 0, 0),
-                                                 t8_data.geo_data->initial_refinement_lvl));
-    /* We also do need all start and count ptrs in order to know from which rank we will receive data */
-    std::array<uint32_t, 7> all_offsets;
-    /* The first entry is the offset of the first local element */
-    all_offsets[0] = elem_offset;
-    /* Followed by start_pointers and lasty three count_pointers */
-    /* Start pointers for the first and second dimension */
-    all_offsets[1] = static_cast<uint32_t>(t8_data.vars[0]->var->start_ptr[0]);
-    all_offsets[2] = static_cast<uint32_t>(t8_data.vars[0]->var->start_ptr[1]);
-    /* If 3D data is considered */
-    all_offsets[3] = (t8_data.vars[0]->var->num_dimensions == 2) ? 0 : static_cast<uint32_t>(t8_data.vars[0]->var->start_ptr[2]);
-    /* Count pointers for the first and second dimension */
-    all_offsets[4] = static_cast<uint32_t>(t8_data.vars[0]->var->count_ptr[0]);
-    all_offsets[5] = static_cast<uint32_t>(t8_data.vars[0]->var->count_ptr[1]);
-    /* If 3D data is considered */
-    all_offsets[6] = (t8_data.vars[0]->var->num_dimensions == 2) ? 0 : static_cast<uint32_t>(t8_data.vars[0]->var->count_ptr[2]);
-    /* Disribute the offsets between all ranks */
-    uint64_t* offsets = (uint64_t*) malloc(sizeof(uint64_t) * 7 * comm_size);
-    err = MPI_Allgather(all_offsets.data(), 7, MPI_UINT32_T, offsets, 7, MPI_UINT32_T, t8_data.comm);
-    cmc_mpi_check_err(err);
-
-    /*********************************/
-
-    /* Seperate the element offsets */
-    std::vector<uint64_t> elem_offsets;
-    elem_offsets.reserve(comm_size);
-    for (int i{0}; i < comm_size; ++i)
-    {
-        elem_offsets.push_back(static_cast<uint64_t>(offsets[i * 7]));
-    }
-
-    //delete later
-    if (rank == 0)
-    {
-        std::cout << "offsets in rank 0 are:\n";
-        for (int i{0}; i < comm_size; ++i)
-        {
-            std::cout << elem_offsets[i] << ", ";
-        }
-    }
-
-    /** Calculate the data which will be send **/
-    /* Vector storing all 'send information' */
-    std::vector<cmc_t8_mpi_send_data> send_list;
-    send_list.reserve(comm_size);
-    uint64_t morton_index{0};
-    int recv_rank{-1};
-
-    /* Get the global number of elements */
-    const size_t global_num_elems{static_cast<size_t>(t8_forest_get_global_num_elements(forest))};
-    /* Get the local number of elements */
-    const size_t local_num_elems{static_cast<size_t>(t8_forest_get_local_num_elements(forest))};
-    std::cout << "Rank " << rank << " has " << local_num_elems << " local num elements" << std::endl;
-    /* A size_hint for allocation for members of 'cmc_t8_mpi_send_data' */
-    const size_t size_hint{global_num_elems / comm_size +1};
-
-    /* This variable resembles the linear storage id of the current data point */
-    size_t linear_count_of_data_entries{0};
-    /* This flag indicates whether the rank which will receive the data is already in the 'send_list' */
-    bool rank_already_receives_data{false};
-    int receiving_rank{-1};
-
-    /**************************************************/
-    /** Examine to which processes data will be sent **/
-    std::cout << "rank " << rank << " has " << t8_data.vars[0]->var->count_ptr[0] * t8_data.vars[0]->var->count_ptr[1] << "data points" << std::endl;
-    /* Check if we got a 2D or 3D variable */
-    if (t8_data.geo_data->dim == 2)
-    {
-        /* If the variable is 2D */
-        /* Iterate over the coordinates the local data is defined on and determine to which rank the data needs to be transferred */
-        //TODO: currently, this depends on the start and count ptr of the first variable, this works in case all vairables are defined on the same domain, but this information about start and count should be stored in 'general place'
-        std::cout << "Rank " << rank << ", hat start_ptr: " << t8_data.vars[0]->var->start_ptr[0] << " und " << t8_data.vars[0]->var->start_ptr[1] <<  "; und count_ptr: " << t8_data.vars[0]->var->count_ptr[0] << " und " << t8_data.vars[0]->var->count_ptr[1] <<  std::endl;
-        for (uint64_t dim1{t8_data.vars[0]->var->start_ptr[0]}; dim1 < t8_data.vars[0]->var->start_ptr[0] + t8_data.vars[0]->var->count_ptr[0]; ++dim1)
-        {
-            for (uint64_t dim2{t8_data.vars[0]->var->start_ptr[1]}; dim2 < t8_data.vars[0]->var->start_ptr[1] + t8_data.vars[0]->var->count_ptr[1]; ++dim2)
-            {
-                /* Calculate the morton index */
-                morton_index = cmc_linear_id_to_zcurve_id(2, dim1, dim2, 0);
-                /* Check to which rank the element has to be transferred to */
-                recv_rank = get_rank_assignment(elem_offsets, comm_size, morton_index);
-                /* Check if the receiving rank already is in the 'send list'. If so, assign the new element, oterwise a new receiver will be added */
-                for (size_t receiver{0}; receiver < send_list.size(); ++receiver)
-                {
-                    if (send_list[receiver].partner_rank == recv_rank)
-                    {
-                        receiving_rank = receiver;
-                        rank_already_receives_data = true;
-                    }
-                }
-                /* If the rank does not yet receive data, add it to the list */
-                if (rank_already_receives_data == false)
-                {
-                    /* Set the correct rank id */
-                    receiving_rank = send_list.size();
-                    /* If the receiving rank is not yet in the 'send list', it will be added */
-                    send_list.emplace_back(cmc_t8_mpi_send_data(recv_rank, t8_data.vars.size()));
-                    /* Reserve memory for the morton indices */
-                    send_list[receiving_rank].morton_indices.reserve(size_hint);
-                    /* Allocate the dynamic arrays holding the data */
-                    for (size_t var_id{0}; var_id < t8_data.vars.size(); ++var_id)
-                    {
-                        send_list[receiving_rank].data.push_back(new var_dynamic_array_t(size_hint, t8_data.vars[var_id]->get_type()));
-                    }
-                }
-
-                /* Add the morton index */
-                send_list[receiving_rank].morton_indices.push_back(morton_index);
-                /* Add the data of each variable */
-                for (size_t var_id{0}; var_id < t8_data.vars.size(); ++var_id)
-                {
-                    send_list[receiving_rank].data[var_id]->push_back(t8_data.vars[var_id]->var->data->operator[](linear_count_of_data_entries));
-                }
-
-                /* Reset the flag */
-                rank_already_receives_data = false;
-                /* Increment the pointer */
-                ++linear_count_of_data_entries;
-            }
-        }
-    } else
-    {
-        cmc_assert (t8_data.geo_data->dim == 3);
-        /* If the variable is 3D */
-        /* Iterate over the coordinates the local data is defined on and determine to which rank the data needs to be transferred */
-        for (uint64_t dim1{t8_data.vars[0]->var->start_ptr[0]}; dim1 < t8_data.vars[0]->var->start_ptr[0] + t8_data.vars[0]->var->count_ptr[0]; ++dim1)
-        {
-            for (uint64_t dim2{t8_data.vars[0]->var->start_ptr[1]}; dim2 < t8_data.vars[0]->var->start_ptr[1] + t8_data.vars[0]->var->count_ptr[1]; ++dim2)
-            {
-                for (uint64_t dim3{t8_data.vars[0]->var->start_ptr[2]}; dim3 < t8_data.vars[0]->var->start_ptr[2] + t8_data.vars[0]->var->count_ptr[2]; ++dim3)
-                {
-                    /* Calculate the morton index */
-                    morton_index = cmc_linear_id_to_zcurve_id(2, dim1, dim2, dim3);
-                    /* Check to which rank the element has to be transferred to */
-                    recv_rank = get_rank_assignment(elem_offsets, comm_size, morton_index);
-                    /* Check if the receiving rank already is in the 'send list'. If so, assign the new element, oterwise a new receiver will be added */
-                    for (size_t receiver{0}; receiver < send_list.size(); ++receiver)
-                    {
-                        if (send_list[receiver].partner_rank == recv_rank)
-                        {
-                            receiving_rank = receiver;
-                            rank_already_receives_data = true;
-                        }
-                    }
-                    /* If the rank does not yet receive data, add it to the list */
-                    if (rank_already_receives_data == false)
-                    {
-                        /* Set the correct rank id */
-                        receiving_rank = send_list.size();
-                        /* If the receiving rank is not yet in the 'send list', it will be added */
-                        send_list.emplace_back(cmc_t8_mpi_send_data(recv_rank, t8_data.vars.size()));
-                        /* Reserve memory for the morton indices */
-                        send_list[receiving_rank].morton_indices.reserve(size_hint);
-                        /* Allocate the dynamic arrays holding the data */
-                        for (size_t var_id{0}; var_id < t8_data.vars.size(); ++var_id)
-                        {
-                            send_list[receiving_rank].data.push_back(new var_dynamic_array_t(size_hint, t8_data.vars[var_id]->get_type()));
-                        }
-                    }
-
-                    /* Add the morton index */
-                    send_list[receiving_rank].morton_indices.push_back(morton_index);
-                    /* Add the data of each variable */
-                    for (size_t var_id{0}; var_id < t8_data.vars.size(); ++var_id)
-                    {
-                        send_list[receiving_rank].data[var_id]->push_back(t8_data.vars[var_id]->var->data->operator[](linear_count_of_data_entries));
-                    }
-
-                    /* Reset the flag */
-                    rank_already_receives_data = false;
-                    /* Increment the pointer */
-                    ++linear_count_of_data_entries;
-                }
-            }
-        }
-    }
-
-    /**************************************************/
-
-    //delete later
-    #if 1
-    if (rank >= 0)
-    {
-        /* The sender list has been filled */
-        std::cout << "Size of send list: " << send_list.size() << std::endl;
-        std::cout << "Rank " << rank << " hat folgende Send Liste:" << "\n";
-        for (size_t s{0}; s < send_list.size(); ++s)
-        {
-            std::cout << "Receiving rank: " << send_list[s].partner_rank << " -> bekommt " << send_list[s].data[0]->size() << " Elemente.";
-            std::cout << "\n";
-            std::cout << "Size morton indices: " << send_list[s].morton_indices.size() << "\n";
-        }
-        std::cout <<std::endl;
-    }
-    #endif
-
-    //delete later
-    #if 0
-    if (rank >= 0)
-    {
-        /* The sender list has been filled */
-        std::cout << "Size of sender list: " << send_list.size() << std::endl;
-        std::cout << "Rank " << rank << " hat folgende Sender Liste:\n";
-        for (size_t s{0}; s < send_list.size(); ++s)
-        {
-            std::cout << "Receiving rank: " << send_list[s].partner_rank << " -> ";
-            for (size_t z{0}; z < send_list[s].morton_indices.size(); ++z)
-            {
-                std::cout << "(" << send_list[s].morton_indices[z] << ", " << "), ";  //<< send_list[s].data[z] << "), "; 
-            }
-            std::cout << "\n";
-        }
-        std::cout <<std::endl;
-    }
-    #endif
-
-    /********************************************************/
-    /** Examine from which processes data will be received **/
-    /* List of receiving data */
-    std::vector<cmc_t8_mpi_recv_data> recv_list;
-    recv_list.reserve(comm_size);
-
-    /* Cartesian coordinate */
-    std::tuple<uint64_t,uint64_t,uint64_t> linear_id;
-
-    /* Variables for a mesh element and its coordinates */
-    t8_element_t *elem;
-    //int x_coord{0}, y_coord{0}, z_coord{0};
-    //int vertex_coords[3];
-
-    /* offset variable for accesssing the all_offsets vector */
-    size_t offset_geo_domains = 0;
-
-    /* Flag indicating whether the a new sender will be added to the receivng list */
-    bool sender_already_in_recv_list{false};
-
-    /* Check from which rank data will be received */
-    for (size_t elem_id{0}; elem_id < local_num_elems; ++elem_id)
-    {
-        /* Get the element to the corresponding element id */
-        elem = t8_forest_get_element_in_tree(forest, 0, elem_id);
-
-        /* Check which rank needs this data */
-        for (int rank_id{0}; rank_id < comm_size; ++rank_id)
-        {
-            /* Skip the entries of all fromer ranks and the local element offset */
-            offset_geo_domains = rank_id * 7 + 1;
-            if (cmc_t8_elem_in_storage_domain(t8_data.geo_data->dim, t8_data.geo_data->initial_refinement_lvl, elem, scheme_eclass, t8_data.vars[0]->get_data_layout(),
-                                              all_offsets[offset_geo_domains], all_offsets[offset_geo_domains + 1], all_offsets[offset_geo_domains + 2],
-                                              all_offsets[offset_geo_domains] + all_offsets[offset_geo_domains + 3],
-                                              all_offsets[offset_geo_domains + 1] + all_offsets[offset_geo_domains + 4],
-                                              all_offsets[offset_geo_domains + 2] + all_offsets[offset_geo_domains + 5]) != 0)
-            {
-               
-                /* If the element is inside of the domain of the rank 'rank_id', we need to receive this data */
-                /* Check if the receiving rank already is in the 'send list'. If so, assign the new element, oterwise a new receiver will be added */
-                for (size_t sender{0}; sender < recv_list.size(); ++sender)
-                {
-                    if (recv_list[sender].partner_rank == rank_id)
-                    {
-                        sender_already_in_recv_list = true;
-                        ++(recv_list[sender].num_receiving_elems);
-                        break;
-                    }
-                }
-                /* If the rank is not already in the receiving_list, we add it and the increment the count for this rank */
-                if (sender_already_in_recv_list == false)
-                {
-                    recv_list.emplace_back(cmc_t8_mpi_recv_data(rank_id, t8_data.vars.size()));
-                    ++(recv_list.back().num_receiving_elems);
-                }
-                break;
-            }
-        }
-
-        /* Reset the flag */
-        sender_already_in_recv_list = false;
-    }
-
-    //delete later
-    #if 1
-    if (rank >= 0)
-    {
-        /* The sender list has been filled */
-        std::cout << "Size of recv list: " << recv_list.size() << std::endl;
-        std::cout << "Rank " << rank << " hat folgende Receiver Liste:\n";
-        for (size_t s{0}; s < recv_list.size(); ++s)
-        {
-            std::cout << "Receiving rank: " << recv_list[s].partner_rank << " -> bekommt " << recv_list[s].num_receiving_elems << " Elemente.";
-            std::cout << "\n";
-        }
-        std::cout <<std::endl;
-    }
-    #endif
-
-#if 0
-    /* After examining the amount of data which will be received, allocate the memory */
-    for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter)
-    {
-        for (size_t var_id{0}; var_id < t8_data.vars.size(); ++var_id)
-        {
-            (*iter).data.push_back(new var_dynamic_array_t((*iter).num_receiving_elems), t8_data.vars[var_id]->get_type());
-        }
-    }
-#endif
-
-    /********************************************************/
-
-    #endif
-}
-
-void
-cmc_t8_distribute_data(cmc_t8_data_t t8_data)
-{
-    cmc_assert(t8_data->initial_forest != nullptr);
-    cmc_t8_mpi_distribute_data(*t8_data, t8_data->initial_forest);   
-}
-
-/*********************************************/
-/*********************************************/
 #ifdef CMC_WITH_T8CODE
 /** \note: These functions are considered to be used when linear ordered data is transformed to z-curve compliant data.
   * \note: It is assumed that longitude coordinates are ordered like: lon=0.0, 2.5, 5.0, ..., 357.5
@@ -643,7 +40,7 @@ cmc_t8_calc_lin_order_offset_for_zcurve_lat_lon(const std::vector<size_t>& dim_l
 {
     #ifdef CMC_WITH_T8CODE
     /* In this case the data layout equals 'CMC_2D_LAT_LON' */
-    return x_coord + (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 -y_coord) * dim_lengths[CMC_COORD_IDS::CMC_LON];
+    return x_coord + (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 - y_coord) * dim_lengths[CMC_COORD_IDS::CMC_LON];
     #else
     return CMC_ERR;
     #endif
@@ -654,7 +51,7 @@ cmc_t8_calc_lin_order_offset_for_zcurve_lat_lev(const std::vector<size_t>& dim_l
 {
     #ifdef CMC_WITH_T8CODE
     /* In this case the data layout equals 'CMC_2D_LAT_LEV' */
-    return y_coord + x_coord * dim_lengths[CMC_COORD_IDS::CMC_LEV];
+    return y_coord + (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 - x_coord) * dim_lengths[CMC_COORD_IDS::CMC_LEV];
     #else
     return CMC_ERR;
     #endif
@@ -665,7 +62,7 @@ cmc_t8_calc_lin_order_offset_for_zcurve_lev_lat(const std::vector<size_t>& dim_l
 {
     #ifdef CMC_WITH_T8CODE
     /* In this case the data layout equals 'CMC_2D_LEV_LAT' */
-    return x_coord + y_coord * dim_lengths[CMC_COORD_IDS::CMC_LAT];
+    return (dim_lengths[CMC_COORD_IDS::CMC_LAT] -1 -x_coord) + y_coord * dim_lengths[CMC_COORD_IDS::CMC_LAT];
     #else
     return CMC_ERR;
     #endif
@@ -1648,6 +1045,14 @@ cmc_geo_data_fetch_2d_data(const cmc_t8_var& var3d, cmc_t8_var& var2d, const siz
     #endif
 }
 
+/**
+ * @brief This functions sets up the adapatation and interpolation structs based on a given compression criterion (Allcoations etc. may be done here)
+ * 
+ * @param adapt_data The @struct cmc_t8_adapt_data to set up based on the compression criterion
+ * @param interpolation_data The @struct cmc_t8_interpolation_data to set up based on the compression criterion
+ * @param t8_data A pointer to the @struct cmc_t8_data holding all variables and data
+ * @param var_id Eventually a var_id (only used within a 'One For One' compression mode)
+ */
 static void
 cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, const cmc_t8_data_t t8_data, const int var_id = -1)
 {
@@ -1682,6 +1087,10 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Create a var_vector holding data which may be used by the interpolation */
                 adapt_data.adapted_data = new var_vector_t();
                 adapt_data.adapted_data->reserve(t8_data->vars.size());
+
+                /* Initialize the deviations vectors */
+                adapt_data.associated_max_deviations.insert(adapt_data.associated_max_deviations.begin(), t8_data->vars.size(), std::vector<double>());
+                adapt_data.associated_max_deviations_new.insert(adapt_data.associated_max_deviations_new.begin(), t8_data->vars.size(), std::vector<double>());
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 // In this case nothing has to be set up
@@ -1716,6 +1125,16 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Save the initial data */
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
                 adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[var_id]->assets->forest) / pow(t8_data->vars[var_id]->var->num_dimensions, 2)));
+
+                /* Clear all previous vectors in order to start new for the next variable */
+                adapt_data.associated_max_deviations.clear();
+                adapt_data.associated_max_deviations_new.clear();
+                adapt_data.associated_deviations_gelement_id.clear();
+                adapt_data.associated_deviations_gelement_id_new.clear();
+                /* Initialize the deviations vectors */
+                adapt_data.associated_max_deviations.push_back(std::vector<double>());
+                adapt_data.associated_max_deviations_new.push_back(std::vector<double>());
+
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 /* Reset the adapt_data class */
@@ -1733,6 +1152,9 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Save the initial data */
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
                 adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[var_id]->assets->forest) / pow(t8_data->vars[var_id]->var->num_dimensions, 2)));
+            
+                adapt_data.associated_max_deviations.push_back(std::vector<double>());
+                adapt_data.associated_max_deviations_new.push_back(std::vector<double>());
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1834,14 +1256,331 @@ cmc_t8_adapt_struct_allocate_one_for_one(cmc_t8_adapt_data& adapt_data)
     cmc_assert(adapt_data.t8_data != nullptr);
     /* Allocate space for all unordered maps (for each varibale) */
     adapt_data.initial_ref_lvl_ids.reserve(adapt_data.t8_data->vars.size());
-    //adapt_data._counter.reserve(adapt_data.t8_data->vars.size());
-    //adapt_data._counter_nxt_lvl.reserve(adapt_data.t8_data->vars.size());
     /* Create a var_vector holding data which may be used by the interpolation */
     adapt_data.adapted_data = new var_vector_t();
     adapt_data.adapted_data->reserve(1);
     #endif
 }
 
+struct
+cmc_t8_mpi_recv_max_deviations
+{
+    uint64_t* elem_ids; //!> A vector collecting the received element ids to which the deviaitons corresponds 
+    double** deviations; //!< A vector of double vecctor receiving the deviaitons for each variable
+    int num_receiving_elems{0}; //!< Number of elements which has been received
+};
+
+/**
+ * @brief This functions updates and partitions the deviations calcultaed for the realtive error criterion. The deviaitons will be associated with the (partitined) forest
+ *        and communicated acordintgly.
+ * 
+ * @param adapt_data The @struct cmc_t8_adapt_data which holds all information about the data, the deviations and the reference forest (indicating the partition)
+ */
+static void
+cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& adapt_data)
+{
+    #ifdef CMC_WITH_T8CODE
+    #ifdef CMC_ENABLE_MPI
+
+    cmc_debug_msg("The maximum relative deviations from the previous adaptation step will be updated and partitioned."); 
+
+    cmc_assert(adapt_data.forest_reference != nullptr);
+
+    /* Adjust the previous maximum deviations element ids, such that they comply with the new adapted forest */
+    int err, mpisize, mpirank;
+
+    /* Get the size of the communicator */
+    err = MPI_Comm_size(adapt_data.t8_data->comm, &mpisize);
+    cmc_mpi_check_err(err);
+    
+    /* Get the (local) rank id */
+    err = MPI_Comm_rank(adapt_data.t8_data->comm, &mpirank);
+    cmc_mpi_check_err(err);
+
+    /* Allocate memory for the Allgather function call */
+    uint64_t* amount_of_coarsenings = new uint64_t[mpisize];
+
+    /* Allocate an offset array holding the SFC index (at the intitial refinement level) of each starting process-local element from each process */
+    uint64_t* offsets = new uint64_t[mpisize];
+
+    /* Get the offest of the first local element as a SFC index (at the initial refienment level) */
+    uint64_t elem_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id(adapt_data.forest_reference));
+
+    //TODO: Maybe make just one call of both
+    /* Distribute the offsets between all processes */
+    err = MPI_Allgather(&elem_offset, 1, MPI_UINT64_T, offsets, 1, MPI_UINT64_T, adapt_data.t8_data->comm);
+    cmc_mpi_check_err(err);
+
+    /* Inquire the amount of coarsenings per process */
+    err = MPI_Allgather(&(adapt_data.coarsening_counter), 1, MPI_UINT64_T, amount_of_coarsenings, 1, MPI_UINT64_T, adapt_data.t8_data->comm);
+    cmc_mpi_check_err(err);
+
+    uint64_t num_preceeding_coarsenings = 0;
+
+    /* Calculate the coarsenings which have happend up to my local process */
+    for (int i = 0; i < mpirank; ++i)
+    {
+        /* Add up all preceeding coarsenings */
+        num_preceeding_coarsenings += amount_of_coarsenings[i];
+    }
+
+    /* Get the scheme of the forest's only tree */
+    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (adapt_data.forest_reference, t8_forest_get_eclass(adapt_data.forest_reference, 0));
+
+    /* Get the childrent the elements refine to */
+    const uint64_t num_children = static_cast<uint64_t>(ts->t8_element_num_children(t8_forest_get_element_in_tree(adapt_data.forest_reference, 0, 0)));
+
+    /* Multiply this number by the amount of element reduction per coarsening */
+    num_preceeding_coarsenings *= (num_children - 1);
+
+    /* Update the global ids (corresponding to the forest which was not adapted) by subtracting the num_preceeding_coarsenings. This is possible because there is no refinement ever introduced during the compression step */
+    for (auto iter = adapt_data.associated_deviations_gelement_id_new.begin(); iter != adapt_data.associated_deviations_gelement_id_new.end(); ++iter)
+    {
+        /* Subtract the coarsenings */
+        *iter = *iter - num_preceeding_coarsenings;
+        /* Update the num_preceeding_coarsenings by this coarsening */
+        num_preceeding_coarsenings += (num_children - 1);
+    }
+
+    /* Save the lcoal offset andf length of the data which will stay process-local within this pair (first: local_offset within array; second: length of prospective process-local range) */
+    std::pair<int, int> already_process_local_range;
+
+    /* Create a vector of MPI requests */
+    std::vector<MPI_Request> send_requests;
+    send_requests.reserve((mpisize - 1) * adapt_data.associated_max_deviations_new.size());
+
+    /* A counter for the send requests */
+    size_t send_req_idx = 0;
+
+    /* Define an arbitrary tag for the element ids */
+    const int mpi_tag_gelem_ids = adapt_data.associated_max_deviations_new.size();
+
+    /* A flag indicating whether some objects are already correctly distributed or if all elements have been sent away to different ranks */
+    bool flag_some_data_elements_are_kept_local = false;
+
+    /* Itearte over all element ids (of the deviations) */
+    for (auto elem_id_iter = adapt_data.associated_deviations_gelement_id_new.begin(); elem_id_iter != adapt_data.associated_deviations_gelement_id_new.end();)
+    {
+        int recv_rank = mpisize -1;
+        for (int ir{0}; ir < mpisize -1; ++ir)
+        {
+            if (*elem_id_iter >= offsets[ir] && *elem_id_iter < offsets[ir+1])
+            {
+                recv_rank = ir;
+                break;
+            }
+        }
+
+        /* Check the length of the contiguous elements which will be sent to this process */
+        const int msg_length = std::min(static_cast<int>(std::distance(elem_id_iter, adapt_data.associated_deviations_gelement_id_new.end())), static_cast<int>((recv_rank != mpisize - 1 ?  offsets[recv_rank +1] - *elem_id_iter : t8_forest_get_global_num_elements(adapt_data.forest_reference) - *elem_id_iter)));
+
+        /* Since at least one element has been found before, this assertion should be fullfilled */
+        cmc_assert(msg_length > 0);
+
+        if (recv_rank != mpirank)
+        {
+            /* If the receiver is any other rank than itself, we can send the corresponding data */
+            /* We will send the data concerning the element ids first */
+            err = MPI_Isend(adapt_data.associated_deviations_gelement_id_new.data() + std::distance(adapt_data.associated_deviations_gelement_id_new.begin(), elem_id_iter), msg_length, MPI_UINT64_T, recv_rank, mpi_tag_gelem_ids, adapt_data.t8_data->comm, &send_requests[send_req_idx]);
+            cmc_mpi_check_err(err);
+
+            /* Increment the send_req_idx counter */
+            ++send_req_idx;
+
+            /* Afterwards we will send the deviations per variable */
+            for (size_t var_iter = 0; var_iter < adapt_data.associated_max_deviations_new.size(); ++var_iter)
+            {
+                err = MPI_Isend(adapt_data.associated_max_deviations_new.data() + std::distance(adapt_data.associated_deviations_gelement_id_new.begin(), elem_id_iter), msg_length, MPI_DOUBLE, recv_rank, var_iter, adapt_data.t8_data->comm, &send_requests[send_req_idx]);
+                cmc_mpi_check_err(err);
+
+                /* Increment the send_req_idx counter */
+                ++send_req_idx;
+            }
+        } else
+        {
+            /* Save which (already process-local) range belongs to this process */
+            already_process_local_range = std::make_pair(std::distance(adapt_data.associated_deviations_gelement_id_new.begin(), elem_id_iter), msg_length);
+        
+            /* Set the flag that some elements reside locallly */
+            flag_some_data_elements_are_kept_local = true;
+        }
+
+
+        /* Now we can skip all elements which we have sent */
+        std::advance(elem_id_iter, msg_length);
+    }
+
+    /* Wait until all messages are staged */
+    err = MPI_Barrier(adapt_data.t8_data->comm);
+    cmc_mpi_check_err(err);
+
+    
+    /* Counter for the amount of data which will be process-local */
+    uint64_t counter_max_deviations = already_process_local_range.second;
+
+    /* Create a map saving the received data */
+    std::map<int, cmc_t8_mpi_recv_max_deviations> recv_list;
+
+    /* Variable which will hold the amount of elements within the message */
+    int received_objs = 0;
+
+    /* MPI Status objects for the send commands */
+    MPI_Status recv_stat, actual_recv_stat;
+
+    /* Flags for working through the received messages */
+    bool flag_messages_present = true;
+    int mpi_msg_flag = 0;
+    
+    /* Receive the messages concerning the max deviations */
+    /* Since all messages have been staged before, the MPI_Iprobe call finds a matching message in each iteration */
+    while (flag_messages_present)
+    {
+        /* Check for a message containing the global element indices of the deviations or the deviations themself from another rank */
+        err = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, adapt_data.t8_data->comm, &mpi_msg_flag, &recv_stat);
+        cmc_mpi_check_err(err);
+
+        /* Check if a message from any source with any tag is available */
+        if (mpi_msg_flag)
+        {
+            /* Get the size of the message, respectively the amount of max deviations which will be received */
+            /* This number equals the amount of data which will be receied from the partner rank for each variable */
+            err = MPI_Get_count(&recv_stat, (recv_stat.MPI_TAG != mpi_tag_gelem_ids ? MPI_DOUBLE : MPI_UINT64_T), &received_objs);
+            cmc_mpi_check_err(err);
+
+            /* Check if the rank which has sent the data is already in the 'recv_list' */
+            /* Check for the sending rank in the 'recv_list' */
+            auto sender = recv_list.find(recv_stat.MPI_SOURCE);
+
+            /* Check if the rank is not yet a sending rank in the 'recv_list' */
+            if (sender == recv_list.end())
+            {
+                /* Create a new cmc_mpi_t8_recv_data in the recv_list */
+                recv_list[recv_stat.MPI_SOURCE] = cmc_t8_mpi_recv_max_deviations();
+                /* Reserve memory for the incoming bytes resembling the global eleemnt id and the maximum deviation */
+                recv_list[recv_stat.MPI_SOURCE].elem_ids = new uint64_t[received_objs];
+                /* Reserve memory for the deviations to come */
+                recv_list[recv_stat.MPI_SOURCE].deviations = new double*[adapt_data.associated_max_deviations_new.size()];
+                for (size_t dev_iter = 0; dev_iter < adapt_data.associated_max_deviations_new.size(); ++dev_iter)
+                {
+                    recv_list[recv_stat.MPI_SOURCE].deviations[dev_iter] = new double[received_objs];
+                }
+                /* Save the amount of received objects from this rank */
+                recv_list[recv_stat.MPI_SOURCE].num_receiving_elems = received_objs;
+            }
+
+            /* Distinguish between global element ids and deviation data */
+            if (recv_stat.MPI_TAG == mpi_tag_gelem_ids)
+            {
+                /* In this case we have received element ids corresponding to the deviation data */
+                err = MPI_Recv(recv_list[recv_stat.MPI_SOURCE].elem_ids, received_objs, MPI_UINT64_T, recv_stat.MPI_SOURCE, mpi_tag_gelem_ids, adapt_data.t8_data->comm, &actual_recv_stat);
+                cmc_mpi_check_err(err);
+
+                /* Accumulate the incoming elements */
+                counter_max_deviations += received_objs;
+            } else
+            {
+                /* In this case we have received deviation data */
+                err = MPI_Recv(recv_list[recv_stat.MPI_SOURCE].deviations[recv_stat.MPI_TAG], received_objs, MPI_DOUBLE, recv_stat.MPI_SOURCE, recv_stat.MPI_TAG, adapt_data.t8_data->comm, &actual_recv_stat);
+                cmc_mpi_check_err(err);
+            }
+
+            cmc_debug_msg("Received ", received_objs, " data elements from rank ", actual_recv_stat.MPI_SOURCE, " with tag ", actual_recv_stat.MPI_TAG);
+        } else
+        {
+            /* If none messages are left */
+            flag_messages_present = false;
+        }
+    }
+
+
+    /* If all messages are received, we can order the data */
+    /* Therefore, we resize the previous associated_deviations_gelement_id array to the correct size and copy the already ordered element ids from the other ranks */
+    adapt_data.associated_deviations_gelement_id.resize(counter_max_deviations);
+
+    /* Resize the arrays holding the deviations of all variables */
+    for(size_t var_iter = 0; var_iter < adapt_data.associated_max_deviations_new.size(); ++var_iter)
+    {
+        adapt_data.associated_max_deviations[var_iter].resize(counter_max_deviations);
+    }
+
+    /* An offset for copying the data */
+    int offset = 0;
+    int offset_for_previous_local_data = 0;
+
+    /* Since the map is already ordered by the ranks which have sent the data, we can iteratively draw the data from the map */
+    for (auto iter = recv_list.begin(); iter != recv_list.end(); ++iter)  
+    {
+        /* Copy all element ids over */
+        std::copy(iter->second.elem_ids, iter->second.elem_ids + iter->second.num_receiving_elems, adapt_data.associated_deviations_gelement_id.begin() + offset + (iter->first < mpirank ? 0 : already_process_local_range.second));
+        /* Copy the data for each variable */
+        for(size_t var_iter = 0; var_iter < adapt_data.associated_max_deviations_new.size(); ++var_iter)
+        {
+            std::copy(iter->second.deviations[var_iter], iter->second.deviations[var_iter] + iter->second.num_receiving_elems, adapt_data.associated_max_deviations[var_iter].begin() + offset + (iter->first < mpirank ? 0 : already_process_local_range.second));
+        }
+        if (iter->first < mpirank)
+        {
+            /* Save the offset until the data from this rank will come */
+            offset_for_previous_local_data += iter->second.num_receiving_elems;
+        }
+        /* Save the general offest currently present in the array */
+        offset += iter->second.num_receiving_elems;
+    }
+    
+    /* If some data was already local, we need to copy it as well */
+    if (flag_some_data_elements_are_kept_local)
+    {
+        /* Copy all element ids over */
+        std::copy(adapt_data.associated_deviations_gelement_id_new.data() + already_process_local_range.first, adapt_data.associated_deviations_gelement_id_new.data() + already_process_local_range.first + already_process_local_range.second, adapt_data.associated_deviations_gelement_id.begin() + offset_for_previous_local_data);
+        /* Copy the data for each variable */
+        for(size_t var_iter = 0; var_iter < adapt_data.associated_max_deviations_new.size(); ++var_iter)
+        {
+            std::copy(adapt_data.associated_max_deviations_new[var_iter].data() + already_process_local_range.first, adapt_data.associated_max_deviations_new[var_iter].data() + already_process_local_range.first + already_process_local_range.second, adapt_data.associated_max_deviations[var_iter].begin() + offset_for_previous_local_data);
+        }
+    }
+
+    /* If all messages have been sent, we can clear the array associated_max_deviations_new for the next iteration */
+    err = MPI_Waitall(send_req_idx, send_requests.data(), MPI_STATUS_IGNORE);
+    cmc_mpi_check_err(err);
+
+    /* Clear the arrays and the element indices */
+    for (size_t var_iter = 0; var_iter < adapt_data.associated_max_deviations_new.size(); ++var_iter)
+    {
+        adapt_data.associated_max_deviations_new[var_iter].clear();
+    }
+    adapt_data.associated_deviations_gelement_id_new.clear();
+
+    /* For convenience, we store the global element offset of the partitined forest in here */
+    adapt_data.first_global_elem_id = elem_offset;
+
+    /* Deallocate the array holding the coarsenings per process and the array holding the offsets */
+    delete[] amount_of_coarsenings;
+    delete[] offsets;
+
+    /* Delete the allocated array within the recv_list */
+    for (auto iter = recv_list.begin(); iter != recv_list.end(); ++iter)  
+    {
+        /* Delete the array containing the received element ids */
+        delete[] iter->second.elem_ids;
+        /* Delete all arrays holding the deviations from the varibales */
+        for (size_t var_iter = 0; var_iter < adapt_data.associated_max_deviations.size(); ++var_iter)
+        {
+            delete[] iter->second.deviations[var_iter];
+        }
+        /* Delete the array deviations array itself */
+        delete[] iter->second.deviations;
+    }
+
+    cmc_debug_msg("The maximum relative deviations from the previous adaptation step were updated and partitioned.");
+    #endif
+    #endif
+}
+
+/**
+ * @brief This functions updates the adapt and interpolation structs at the beginning of new adaptation step depending on the used compression mode and compression criterion
+ * 
+ * @param adapt_data The @struct cmc_t8_adapt_data to update/reset
+ * @param interpolation_data The @struct cmc_t8_interpolation_data to update/reset
+ */
 static void
 cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data)
 {
@@ -1860,6 +1599,14 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
+
+                if (adapt_data.t8_data->use_distributed_data)
+                {
+                    /* In parallel environment, we need to communicate the previous maximum deviations */
+                    /* Within this function call, we communicate the maximum deviations, order them and return them within the adapt_data for the next iteration */
+                    /* The global elementid of the first local element (of the adapt_data->forest_reference) is inquired there as well and stored withint the adapt_data for the next iteratzion */
+                    cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+                }
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1886,6 +1633,13 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
 
+                if (adapt_data.t8_data->use_distributed_data)
+                {
+                    /* In parallel environment, we need to communicate the previous maximum deviations */
+                    /* Within this function call, we communicate the maximum deviations, order them and return them within the adapt_data for the next iteration */
+                    /* The global elementid of the first local element (of the adapt_data->forest_reference) is inquired there as well and stored withint the adapt_data for the next iteratzion */
+                    cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+                }
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1904,6 +1658,12 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
     #endif
 }
 
+/**
+ * @brief This functions deallocates previous members of the adapt and interpolation struct when all adaptation steps are finished 
+ * 
+ * @param adapt_data The @struct cmc_t8_adapt_data to update/reset
+ * @param interpolation_data The @struct cmc_t8_interpolation_data to update/reset
+ */
 static void
 cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data)
 {
@@ -1959,9 +1719,137 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
     #endif
 }
 
-/** We are passing 't8_data' as a member of the amr_adapt_data to the forest, in order to have the maximum access to the current data of all variables
- *  This even allows us to check for example if certain thresholds are satisfied on/for all levels/layers/variables 
-*/ 
+/**
+ * @brief This function performs the repartitioning of the forest and the data during a compression/coarsening step
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding all variables and data
+ * @param forest The forest which will be partitioned
+ * @param var_id Eventually an id indicating to which variable the forest belongs (only in a 'One For One'-mode, otherwise this parameter has no effect)
+ * @note The onwership of the forest is taken, if it is not references directly before calling this funciton (@see t8_forest_ref(...))
+ * @return t8_forest_t The partitioned forest (The @var t8_data holds now the partitioned data corresponding to this retunred forest)
+ */
+static
+t8_forest_t
+cmc_t8_geo_data_repartition_during_compression(cmc_t8_data_t t8_data, t8_forest_t forest, const int var_id = -1)
+{
+    #ifdef CMC_WITH_T8CODE
+    cmc_debug_msg("Repartition forest and data during the compression.");
+
+    /* Declare a new forest variable */
+    t8_forest_t forest_partitioned;
+    /* Initialize the forest */
+    t8_forest_init(&forest_partitioned);
+
+    const int partition_for_coarsening = 0; //Currently, this is not yet available
+
+    /* We need to distinguish between the compression modes */
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
+        t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    {
+        /* If a 'One For All' compression is used */
+        /* Reference the forest */
+        t8_forest_ref(forest);
+        /* Set the forest from which the partition will be derived */
+        t8_forest_set_partition(forest_partitioned, forest, partition_for_coarsening);
+        /* Commit the forest */
+        t8_forest_commit(forest_partitioned);
+
+        /* Partition all variables */
+        for (size_t var_iter = 0; var_iter < t8_data->vars.size(); ++var_iter)
+        {
+            /* Create an sc input array from the variable's data */
+            sc_array_t in_data;
+
+            /* Set up the sc_array of the input */
+            in_data.elem_size = t8_data->vars[var_iter]->get_data_size();
+            in_data.elem_count = t8_data->vars[var_iter]->var->data->size();
+            in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
+            in_data.array = static_cast<char*>(t8_data->vars[var_iter]->var->data->get_initial_data_ptr());
+
+            /* Allcate a new array in data_new which will hold the partitioned data */
+            t8_data->vars[var_iter]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_iter]->get_type());
+
+            /* Create an sc output array for the partitioned variable's data */
+            sc_array_t out_data;
+
+            /* Setup the output sc array */
+            out_data.elem_size = t8_data->vars[var_iter]->get_data_size();
+            out_data.elem_count = t8_forest_get_local_num_elements(forest_partitioned);
+            out_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * t8_forest_get_local_num_elements(forest_partitioned));
+            out_data.array = static_cast<char*>(t8_data->vars[var_iter]->get_initial_data_new_ptr());
+
+            /* The data has to be partitioned as well according to new partitioning scheme of the forest */
+            t8_forest_partition_data(forest, forest_partitioned, &in_data, &out_data);
+
+            /* Switch the old with the partitioned data */
+            t8_data->vars[var_iter]->var->switch_data();
+        }
+
+        /* Dereference the old partitioned forest */
+        t8_forest_unref(&forest);
+
+        cmc_debug_msg("The forest and the data has been re-partitioned.");
+
+        /* Return the newly partitioned forest */
+        return forest_partitioned;
+    }
+    else
+    {
+        /* If a 'One for One' compression mode is used */
+        /* Reference the forest */
+        t8_forest_ref(forest);
+        /* Set the forest from which the partition will be derived */
+        t8_forest_set_partition(forest_partitioned, forest, partition_for_coarsening);
+        /* Commit the forest */
+        t8_forest_commit(forest_partitioned);
+
+        /* Create an sc input array from the variable's data */
+        sc_array_t in_data;
+
+        /* Set up the sc_array of the input */
+        in_data.elem_size = t8_data->vars[var_id]->get_data_size();
+        in_data.elem_count = t8_data->vars[var_id]->var->data->size();
+        in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
+        in_data.array = static_cast<char*>(t8_data->vars[var_id]->var->data->get_initial_data_ptr());
+
+        /* Allcate a new array in data_new which will hold the partitioned data */
+        t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_id]->get_type());
+
+        /* Create an sc output array for the partitioned variable's data */
+        sc_array_t out_data;
+
+        /* Setup the output sc array */
+        out_data.elem_size = t8_data->vars[var_id]->get_data_size();
+        out_data.elem_count = t8_forest_get_local_num_elements(forest_partitioned);
+        out_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * t8_forest_get_local_num_elements(forest_partitioned));
+        out_data.array = static_cast<char*>(t8_data->vars[var_id]->get_initial_data_new_ptr());
+
+        /* The data has to be partitioned as well according to new partitioning scheme of the forest */
+        t8_forest_partition_data(forest, forest_partitioned, &in_data, &out_data);
+
+        /* Switch the old with the partitioned data */
+        t8_data->vars[var_id]->var->switch_data();
+
+        /* Dereference the old partitioned forest */
+        t8_forest_unref(&forest);
+
+        cmc_debug_msg("The forest and the data has been re-partitioned.");
+
+        /* Return the newly partitioned forest */
+        return forest_partitioned;
+
+    }
+    #endif
+}
+
+/**
+ * @brief This functions perform the adaptation and interpolation of the forest and the variables in an 'One For All' compression mode.
+ *        This means all variables are defined on the same forest and the coarsening/compression happes analogously for all variables.
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the forest and the variables
+ * @param adapt_function The adapt_function to use
+ * @param interpolation_function The interpolation funcion to use
+ */
 static void
 cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function)
 {
@@ -1997,6 +1885,13 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
     {
         /* Update the data structurs at the beginning of a iteration */
         cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(adapt_data, interpolation_data);
+
+        /* Check if the data is distributed */
+        if(t8_data->use_distributed_data)
+        {
+            /* In case we are using a parallel environment, we store the global element id of the first local element */
+            adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest);
+        }
 
         /** Adaptation process starts **/
         /* Keep the 'forest' after the adaptation step */
@@ -2046,6 +1941,15 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
         /* Decrement the refinement level */
         --ref_lvl;
 
+        /* In case of a parallel execution with distributed data, we need to repartition the forest, as well as the data at this stage */
+        if (t8_data->use_distributed_data)
+        {
+            /* Repartition the variable's data */
+            forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest);
+            /* Save the partitioned forest temporarily in case the adapt-interpolate function needs it */
+            adapt_data.forest_reference = forest;
+        }
+
         /* Update the data striucts at the end of a iteration */
         cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data);
     }
@@ -2061,6 +1965,14 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
     #endif
 }
 
+/**
+ * @brief This functions perform the adaptation and interpolation of the forest and the variables in an 'One For One' compression mode.
+ *        This means each variable is defined on the seperate forest and the coarsening/compression happes independently of the otehr variables.
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the variables and their forests
+ * @param adapt_function The adapt_function to use
+ * @param interpolation_function The interpolation funcion to use
+ */
 static void
 cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function)
 {
@@ -2101,6 +2013,13 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
         /* Set up the adaptation and interpoaltion data based on the compression mode and on the compression settings */
         cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(adapt_data, interpolation_data, t8_data, var_id);
     
+        /* Check if the data is distributed */
+        if(t8_data->use_distributed_data)
+        {
+            /* In case we are using a parallel environment, we store the global element id of the first local element */
+            adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest);
+        }
+        
         /* Reference the initial forest */
         t8_forest_ref(forest);
 
@@ -2141,13 +2060,22 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
             /* Free the former forest */
             t8_forest_unref(&forest);
 
-            /* Switch to coarsened forest */
+            /* Switch to the coarsened forest */
             forest = coarsened_forest;
 
             /* Decrement the refinement level */
             --ref_lvl;
 
-            /* Update the adapt and inerpolation struct at the end of the iteration */
+            /* In case of a parallel execution with distributed data, we need to repartition the forest, as well as the data at this stage */
+            if (t8_data->use_distributed_data)
+            {
+                /* Repartition the variable's data */
+                forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest, var_id);
+                /* Save the partitioned forest temporarily in case the adapt-interpolate function needs it */
+                adapt_data.forest_reference = forest;
+            }
+
+            /* Update the adapt and interpolation struct at the end of the iteration */
             cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data);
         }
     
@@ -2164,6 +2092,13 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
     #endif
 }
 
+/**
+ * @brief This functions calls the correspondning adapt_and_inerpoalte function concerning the used compression mode.
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the forest(s) and the variables
+ * @param adapt_function The adapt_function to use
+ * @param interpolation_function The interpolation_function to use
+ */
 static void
 cmc_t8_adapt_interpolate_data_func(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function)
 {
@@ -2190,6 +2125,7 @@ cmc_t8_adapt_interpolate_data_func(cmc_t8_data_t t8_data, t8_forest_adapt_t adap
 /**************************/
 
 /** Transform 3D variables into 2D variables by spliiting up a direction */
+//TODO: update for parallelization
 void
 cmc_geo_data_transform_3d_var_to_2d(cmc_t8_data_t t8_data, const int var_id, const DATA_LAYOUT preferred_layout)
 {
@@ -2611,7 +2547,7 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
 {
     #ifdef CMC_WITH_T8CODE
 
-    /* Vector storing the ids of the variables which will be reordered */
+    /* Vector storing the ids of the variables which will be scaled */
     std::vector<int> ids_apply_scaling;
     /* Check whether all variables should be scaled or just a single one */
     if (var_id != CMC_APPLY_OFFSET_AND_SCALING_TO_ALL_VARS)
@@ -3164,3 +3100,1268 @@ cmc_t8_geo_data_set_exclude_area(cmc_t8_data_t t8_data, const CMC_COORD_IDS coor
     std::cout << "Settings for  end  is now: " << t8_data->settings.exclude_area_end_indices[0] << ", " << t8_data->settings.exclude_area_end_indices[1] << ", " << t8_data->settings.exclude_area_end_indices[2] << ", " << t8_data->settings.exclude_area_end_indices[3] << ", " << std::endl;
     #endif
 }
+
+/**
+ * @brief This functions calculates a Morton-Index from a 2D or 3D cartesian coordinate.
+ * 
+ * @param lin_coords The cartesian coordinate whose Morton-Index will be calculated
+ * @param dim The dimension of the coordinate point (i.e. 2D or 3D)
+ * @return uint64_t The Morton-Index
+ * @note This calculation is based on the bit-interleaving of the single coordinate dimensions
+ */
+static
+uint64_t
+cmc_get_morton_index(std::tuple<uint64_t, uint64_t, uint64_t> lin_coords, const int dim)
+{
+    cmc_assert(dim == 2 || dim == 3);
+
+    if (dim == 2)
+    {
+        /* In a 2D case */
+        uint64_t x{std::get<0>(lin_coords)};
+        uint64_t y{std::get<1>(lin_coords)};
+
+        cmc_assert(x < (static_cast<uint64_t>(1) << 32) && y < (static_cast<uint64_t>(1) << 32));
+
+        /** Prepare all coordinates for interleaving by fragmenting the bits, like:
+         * (...b4 b3 b2 b1 b0) -> (...0 b4 0 b3 0 b2 0 b1 0 b0) */
+        x = (x | (x << 16)) & 0x0000FFFF0000FFFF;
+        x = (x | (x << 8))  & 0x00FF00FF00FF00FF;
+        x = (x | (x << 4))  & 0x0F0F0F0F0F0F0F0F;
+        x = (x | (x << 2))  & 0x3333333333333333;
+        x = (x | (x << 1))  & 0x5555555555555555;
+        
+        y = (y | (y << 16)) & 0x0000FFFF0000FFFF;
+        y = (y | (y << 8))  & 0x00FF00FF00FF00FF;
+        y = (y | (y << 4))  & 0x0F0F0F0F0F0F0F0F;
+        y = (y | (y << 2))  & 0x3333333333333333;
+        y = (y | (y << 1))  & 0x5555555555555555;
+
+        /* Interleave both coordinates */
+        return x | (y << 1);
+    } else
+    {
+        /* In a 3D case */
+        uint64_t x{std::get<0>(lin_coords)};
+        uint64_t y{std::get<1>(lin_coords)};
+        uint64_t z{std::get<2>(lin_coords)};
+        cmc_assert(x < (1 << 21) && y < (1 << 21) && z < (1 << 21));
+
+        /** Prepare all coordinates for interleaving by fragmenting the bits, like:
+         * (...b4 b3 b2 b1 b0) -> (...0 0 b4 0 0 b3 0 0 b2 0 0 b1 0 0 b0) */
+        x = (x | (x << 14)  | (x << 28)) & 0x0001FC000FE0007F;
+        x = (x | (x << 10)) & 0x06007C3003E1801F;
+        x = (x | ((x << 6)  & ~(0x00000C0000600000))) & 0x06181C30C0E18607;
+        x = (x | (x << 2))  & 0x1248649243249219;
+        x = (x | (x << 2))  & 0x1249249249249249;
+
+        y = (y | (y << 14)  | (y << 28)) & 0x0001FC000FE0007F;
+        y = (y | (y << 10)) & 0x06007C3003E1801F;
+        y = (y | ((y << 6)  & ~(0x00000C0000600000))) & 0x06181C30C0E18607;
+        y = (y | (y << 2))  & 0x1248649243249219;
+        y = (y | (y << 2))  & 0x1249249249249249;
+
+        z = (z | (z << 14)  | (z << 28)) & 0x0001FC000FE0007F;
+        z = (z | (z << 10)) & 0x06007C3003E1801F;
+        z = (z | ((z << 6)  & ~(0x00000C0000600000))) & 0x06181C30C0E18607;
+        z = (z | (z << 2))  & 0x1248649243249219;
+        z = (z | (z << 2))  & 0x1249249249249249;
+
+        /* Interleave all three coordinates */
+        return x | (y << 1) | (z << 2);
+    }
+}
+
+/**
+ * @brief This functions calculates which process need to receive local data in order to set up a partition compliant to t8code.
+ *        Therefore this functions is used for example when 'outside' data (for example in a blockwise-partitined manner) is transferred
+ *        to us and we need to redistribute it compliant to the Morton order and t8code's partitioning scheme
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the incorrectly ordered data and the initial forest (onto which we want to distribute the data)
+ * @param send_list A reference to the send_list. This list will be filled with the communications which need to take place
+ * @param offsets An array holding the partiotion offsets of the forest, we want to distribute the data onto. (The size of the array is @var comm_size)
+ * @param comm_size The size of the communicator
+ */
+static
+void
+cmc_t8_data_fill_sender_list_for_initial_distribution(cmc_t8_data_t t8_data, std::map<int, cmc_mpi_t8_send_data>& send_list, uint64_t* offsets, const int comm_size)
+{
+    #ifdef CMC_WITH_T8CODE
+    cmc_assert(t8_data->variables_are_defined_on_the_same_domain);
+
+    int err, rank;
+
+    /* Get the rank of the process */
+    err = MPI_Comm_rank(t8_data->comm, &rank);
+    cmc_mpi_check_err(err);
+
+    /* Therefore, we are examining which variables are defined on the exact same domain with the same layout, since they can share the reference coordinates */
+    std::map<DATA_LAYOUT, std::vector<size_t>> reference_coordinate_variable_groups;
+
+    /* Create variable groups based on their data layout */
+    for (size_t id{0}; id < t8_data->vars.size(); ++id)
+    {
+        cmc_assert(t8_data->vars[id]->var->num_dimensions == 2 || t8_data->vars[id]->var->num_dimensions == 3);
+        
+        /* Check if varibale(s) with the same data layout already have been grouped */
+        auto iter = reference_coordinate_variable_groups.find(t8_data->vars[id]->var->data_layout);
+
+        if (iter != reference_coordinate_variable_groups.end())
+        {
+            /* If the data layout already has been added to the groups */
+            /* Save the id of the current variable */
+            reference_coordinate_variable_groups[t8_data->vars[id]->var->data_layout].push_back(id);
+        }
+        else
+        {
+            /* If the data layout is not equal to any previous variables */
+            /* Create a new group of variables and assign the current variable id */
+            reference_coordinate_variable_groups[t8_data->vars[id]->var->data_layout] = std::vector{id};
+            reference_coordinate_variable_groups[t8_data->vars[id]->var->data_layout].reserve(t8_data->vars.size());
+        }
+    }
+
+    std::cout << "Die Map hat groeße: " << reference_coordinate_variable_groups.size() << std::endl;
+
+    /* Iterate over all variable groups and create their reference coordinates */
+    /* Iterate over all variable groups with the same data layout */
+    for (auto group_iter{reference_coordinate_variable_groups.begin()}; group_iter != reference_coordinate_variable_groups.end(); ++group_iter)
+    {
+        std::cout << "Group hat num variables: " << (group_iter->second).size() << std::endl;
+
+        /* Iterate over all coordinates in order to calculate their Morton index and the correct process ownership */
+        /* Since the group is defined on the exact same domain, we choose the first variable of the group in order to access the reference coordinates */
+
+        /* Based on the reference coordinate representation, the data will be evaluated */
+        switch (t8_data->vars[(group_iter->second)[0]]->var->ref_coordinates->coordinate_representation)
+        {
+            case cmc_coordinate_type::CMC_CARTESIAN_COORDINATES:
+            {
+                /* Swap contents with a temporary vector (in order for automatic deallocation), because the cartesian coordinates will not be needed hereafter */
+                std::vector<std::tuple<uint64_t, uint64_t, uint64_t>> coordinates;
+                std::swap(coordinates, t8_data->vars[(group_iter->second)[0]]->var->ref_coordinates->cartesian_coordinates);
+
+                /* Get the reference of the morton indices vector */
+                std::vector<uint64_t>& morton_indices = t8_data->vars[(group_iter->second)[0]]->var->ref_coordinates->morton_indices;
+                morton_indices.reserve(coordinates.size());
+
+                /* Dimensionality of the data */
+                const int dim = t8_data->geo_data->dim;
+
+                /* Iterate over all coordinates */
+                for (auto coord_iter{coordinates.begin()}; coord_iter != coordinates.end(); ++coord_iter)
+                {
+                    /* Transform the cartesian coordinate into a morton index (since this accounts for the initial disitribution, the cartesian coordnates are in range of the initial refienement level) */
+                    morton_indices.push_back(cmc_get_morton_index(*coord_iter, dim));
+                }
+
+                size_t index_counter{0};
+                for (auto morton_iter{morton_indices.begin()}; morton_iter != morton_indices.end(); ++morton_iter, ++index_counter)
+                {
+                    //TODO: make this a binary search with lower_bound
+                    int recv_rank = comm_size -1;
+                    for (int ir{0}; ir < comm_size -1; ++ir)
+                    {
+                        if (*morton_iter >= offsets[ir] && *morton_iter < offsets[ir+1])
+                        {
+                            recv_rank = ir;
+                            break;
+                        }
+                    }
+                    //auto process_rank_iter = std::lower_bound(offsets, offsets + comm_size, *morton_iter);
+                    //int recv_rank = (process_rank_iter  != offsets + comm_size ? std::distance(offsets, process_rank_iter) : comm_size -1);
+
+                    /* Check for the receiving rank in the 'send_list' */
+                    auto receiver = send_list.find(recv_rank);
+
+                    /* Check if the rank is alraedy a receiving rank in the 'send_list' */
+                    if (receiver != send_list.end())
+                    {
+                        /* If the receiving rank is already listed within the 'send_list', we add the data to it */
+                        receiver->second.morton_indices.push_back(*morton_iter);
+
+                        size_t var_id_within_group{0};
+
+                        /* Itearte over all varibales within the group */
+                        for (auto var_iter{group_iter->second.begin()}; var_iter != group_iter->second.end(); ++var_iter, ++var_id_within_group)
+                        {
+                            /* Push back the variable's data to the dynamic array */
+                            receiver->second.data[var_id_within_group]->push_back(t8_data->vars[*var_iter]->var->data->operator[](index_counter));  
+                        }
+                    } else
+                    {
+                        /* If the rank is not already present as receiver */
+                        /* Create a new 'send_list-entry' */
+                        send_list[recv_rank] = cmc_mpi_t8_data();
+
+                        /* Reserve some memory for the morton indices */
+                        send_list[recv_rank].morton_indices.reserve(morton_indices.size() / comm_size + 1);
+                        
+                        /* Save the first morton indiex for this receiving rank */
+                        send_list[recv_rank].morton_indices.push_back(*morton_iter);
+
+                        /* Allocate memory for all variables within the reference group */
+                        send_list[recv_rank].data.reserve(group_iter->second.size());
+
+                        /* Push the data for each variable to the dynamic_array */
+                        /* Create a dynamic array for all variables */
+                        size_t var_id_within_group{0};
+                        for (auto var_iter{group_iter->second.begin()}; var_iter != group_iter->second.end(); ++var_iter, ++var_id_within_group)
+                        {
+                            /* Create a new dynamic array */
+                            std::cout << "wie groß ist: " << morton_indices.size() / comm_size + 1 << " und wie groß ist der type: " << cmc_type_to_bytes[t8_data->vars[*var_iter]->var->data->get_data_type()] << std::endl;
+                            send_list[recv_rank].data.push_back(new var_dynamic_array_t{morton_indices.size() / comm_size + 1, t8_data->vars[*var_iter]->var->data->get_data_type()});
+                            /* Push back the first variable's data to the dynamic array */
+                            send_list[recv_rank].data[var_id_within_group]->push_back(t8_data->vars[*var_iter]->var->data->operator[](index_counter));
+                            /* Save the (global) variable_id of the variable concerning the t8_data struct */
+                            send_list[recv_rank].variable_indices.push_back(*var_iter);/////TODO DIEse abhaengigkeit aufloesen und den vector komplett loswerden
+                            std::cout << "Hallo2" << std::endl;
+                        }
+                    }
+                }
+
+                /* Check if some elements retain on this process */
+                auto self_receiving = send_list.find(rank);
+                if (self_receiving != send_list.end())
+                {
+                    /* We save the amount of Morton indices which will retain on this process manually, since this will not be communicated otherwise */
+                    send_list[rank].received_morton_indices = send_list[rank].morton_indices.size();
+                }
+            }
+            break;
+            case cmc_coordinate_type::CMC_MORTON_INDEX:
+                cmc_err_msg("Not yet implemented");
+            break;
+            default:
+                cmc_err_msg("An undefined coordinate type is set for the reference coordinate. Therefore, a parallel distribution over the domain cannot be defined.");
+        }
+    }
+    #endif
+}
+
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lat(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the current position of the latitude */
+    const size_t lat_pos_in_current_lon = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Increase the linear index to the next full hyperslab */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos_in_current_lon);
+    /* Get the longitude coordinate */
+    const uint64_t lon = static_cast<uint64_t>((linear_index / dim_lengths[CMC_COORD_IDS::CMC_LAT]));
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(lon, static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos_in_current_lon), 0);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lon(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the current position of the longitude */
+    const size_t lon_pos_in_current_lat = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    /* Increase the linear index to the next full hyperslab */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LON] - 1 - lon_pos_in_current_lat);
+    /* Get the latitude coordinate */
+    const size_t lat = linear_index / dim_lengths[CMC_COORD_IDS::CMC_LON];
+    /* Return a tuple with the cartesian coordinates */
+    //cmc_debug_msg("Cartesian coordinate von linear index: ", linear_index, " ist lon: ", lon_pos_in_current_lat, ", lat: ",dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat);
+    return std::make_tuple(static_cast<uint64_t>(lon_pos_in_current_lat), static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat), 0);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lev(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the current position of the elevation */
+    const size_t lev_pos_in_current_lat = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Increase the linear index to the next full hyperslab */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LEV] - 1 - lev_pos_in_current_lat);
+    /* Get the latitude coordinate */
+    const size_t lat = linear_index / dim_lengths[CMC_COORD_IDS::CMC_LEV];
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat), lev_pos_in_current_lat , 0);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lat(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the current position of the latitude */
+    const size_t lat_pos_in_current_lev = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Increase the linear index to the next full hyperslab */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos_in_current_lev);
+    /* Get the elevation coordinate */
+    const uint64_t lev = static_cast<uint64_t>(linear_index / dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos_in_current_lev), lev , 0);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lev(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the current position of the elevation */
+    const size_t lev_pos_in_current_lon = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Increase the linear index to the next full hyperslab */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LEV] - 1 - lev_pos_in_current_lon);
+    /* Get the longitude coordinate */
+    const uint64_t lon = static_cast<uint64_t>(linear_index / dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(lon, static_cast<uint64_t>(lev_pos_in_current_lon), 0);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lon(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the current position of the longitude */
+    const size_t lon_pos_in_current_lev = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    /* Increase the linear index to the next full hyperslab */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LON] - 1 - lon_pos_in_current_lev);
+    /* Get the elevation coordinate */
+    const uint64_t lev = static_cast<uint64_t>(linear_index / dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(static_cast<uint64_t>(lon_pos_in_current_lev), lev, 0);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lat_lev(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the longitude position */
+    const size_t lon_pos = linear_index / (dim_lengths[CMC_COORD_IDS::CMC_LAT] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Transform the linear index of the current slice (shift into the range of a single 'incomplete' slice) */
+    linear_index -= (lon_pos * dim_lengths[CMC_COORD_IDS::CMC_LAT] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Get the elevation position */
+    const size_t lev_pos = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Increase the linear index to the next full slice */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LEV] - 1 - lev_pos);
+    /* Get the latitude coordinate */
+    const size_t lat_pos = linear_index / dim_lengths[CMC_COORD_IDS::CMC_LEV];
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(static_cast<uint64_t>(lon_pos), static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos), static_cast<uint64_t>(lev_pos));
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lon_lat(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the elevation position */
+    const size_t lev_pos = linear_index / (dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Transform the linear index of the current slice (shift into the range of a single 'incomplete' slice) */
+    linear_index -= (lev_pos * dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Get the latitude position */
+    const size_t lat_pos = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Increase the linear index to the next full slice */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos);
+    /* Get the longitude coordinate */
+    const uint64_t lon_pos = static_cast<uint64_t>(linear_index / dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(lon_pos, static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos), static_cast<uint64_t>(lev_pos));
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lev_lat(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the longitude position */
+    const size_t lon_pos = linear_index / (dim_lengths[CMC_COORD_IDS::CMC_LAT] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Transform the linear index of the current slice (shift into the range of a single 'incomplete' slice) */
+    linear_index -= (lon_pos * dim_lengths[CMC_COORD_IDS::CMC_LAT] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Get the latitude position */
+    const size_t lat_pos = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Increase the linear index to the next full slice */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos);
+    /* Get the elevation coordinate */
+    const uint64_t lev_pos = static_cast<uint64_t>(linear_index / dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(static_cast<uint64_t>(lon_pos), static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos), lev_pos);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lat_lon(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the elevation position */
+    const size_t lev_pos = linear_index / (dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Transform the linear index of the current slice (shift into the range of a single 'incomplete' slice) */
+    linear_index -= (lev_pos * dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LAT]);
+    /* Get the longitude position */
+    const size_t lon_pos = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    /* Increase the linear index to the next full slice */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LON] - 1 - lon_pos);
+    /* Get the latitude coordinate */
+    const size_t lat_pos = linear_index / dim_lengths[CMC_COORD_IDS::CMC_LON];
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(static_cast<uint64_t>(lon_pos), static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos), static_cast<uint64_t>(lev_pos));
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lev_lon(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the latitude position */
+    const size_t lat_pos = linear_index / (dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Transform the linear index of the current slice (shift into the range of a single 'incomplete' slice) */
+    linear_index -= (lat_pos * dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Get the longitude position */
+    const size_t lon_pos = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    /* Increase the linear index to the next full slice */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LON] - 1 - lon_pos);
+    /* Get the elevation coordinate */
+    const uint64_t lev_pos = static_cast<uint64_t>(linear_index / dim_lengths[CMC_COORD_IDS::CMC_LON]);
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(static_cast<uint64_t>(lon_pos), static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos), lev_pos);
+}
+
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lon_lev(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    /* Get the latitude position */
+    const size_t lat_pos = linear_index / (dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Transform the linear index of the current slice (shift into the range of a single 'incomplete' slice) */
+    linear_index -= (lat_pos * dim_lengths[CMC_COORD_IDS::CMC_LON] * dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Get the elevation position */
+    const size_t lev_pos = linear_index % (dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Increase the linear index to the next full slice */
+    linear_index += (dim_lengths[CMC_COORD_IDS::CMC_LEV] - 1 - lev_pos);
+    /* Get the longitude coordinate */
+    const uint64_t lon_pos = static_cast<uint64_t>(linear_index / dim_lengths[CMC_COORD_IDS::CMC_LEV]);
+    /* Return a tuple with the cartesian coordinates */
+    return std::make_tuple(lon_pos, static_cast<uint64_t>(dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - lat_pos), static_cast<uint64_t>(lev_pos));
+}
+
+/* A generic error function if the deduction of the correct 'calc_cart_coord'-function has failed */
+static
+std::tuple<uint64_t, uint64_t, uint64_t>
+cmc_t8_calc_cart_coord_from_lin_idx_err(const std::vector<size_t>& dim_lengths, size_t linear_index)
+{
+    cmc_err_msg("The deduction of the correct function for calculating a cartesian coordinate from an linear index has failed.");
+    return std::make_tuple(0UL, 0UL, 0UL);
+}
+
+/* Array holding all functions for calculating a cartesian coordinate from a linear index for each data layout */
+const std::array<std::function<std::tuple<uint64_t, uint64_t, uint64_t>(const std::vector<size_t>&, size_t)>, 13> _offset_functions_lin_idx_to_cart
+{
+/* 2D Offset funcions */
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lat,
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lon,
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lev,
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lat,
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lev,
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lon,
+/* 3D offset functions */
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lat_lev,
+cmc_t8_calc_cart_coord_from_lin_idx_lon_lev_lat,
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lon_lat,
+cmc_t8_calc_cart_coord_from_lin_idx_lev_lat_lon,
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lev_lon,
+cmc_t8_calc_cart_coord_from_lin_idx_lat_lon_lev,
+/* Error function */
+cmc_t8_calc_cart_coord_from_lin_idx_err};
+
+
+/* Return a function based on the data layout of the variable corresponding to the given id for calculating a cartesian coordinate from a linear index and the data_layout */
+static
+std::function<std::tuple<uint64_t, uint64_t, uint64_t>(const std::vector<size_t>&, size_t)>
+cmc_t8_get_offset_function_lin_idx_to_cart_coord_based_on_data_layout(const DATA_LAYOUT data_layout)
+{
+    #ifdef CMC_WITH_T8CODE
+    switch (data_layout)
+    {
+        case DATA_LAYOUT::CMC_2D_LON_LAT:
+            return _offset_functions_lin_idx_to_cart[0];
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LON:
+            return _offset_functions_lin_idx_to_cart[1];
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LEV:
+            return _offset_functions_lin_idx_to_cart[2];
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LAT:
+            return _offset_functions_lin_idx_to_cart[3];
+        break;
+        case DATA_LAYOUT::CMC_2D_LON_LEV:
+            return _offset_functions_lin_idx_to_cart[4];
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LON:
+            return _offset_functions_lin_idx_to_cart[5];
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LAT_LEV:
+            return _offset_functions_lin_idx_to_cart[6];
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LEV_LAT:
+            return _offset_functions_lin_idx_to_cart[7];
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LON_LAT:
+            return _offset_functions_lin_idx_to_cart[8];
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LAT_LON:
+            return _offset_functions_lin_idx_to_cart[9];
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LEV_LON:
+            return _offset_functions_lin_idx_to_cart[10];
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LON_LEV:
+            return _offset_functions_lin_idx_to_cart[11];
+        break;
+        default :
+            cmc_err_msg("The variable contains an undefined data layout.");
+            return _offset_functions_lin_idx_to_cart[12];
+    }
+    #endif
+}
+
+/**
+ * @brief Adds a global offset to a local cartesian coordinate.
+ * 
+ * @param cart_coord The local cartesian coordinate
+ * @param global_dim_lengths The global dimension lengths
+ * @param start_offset The global offset this process has
+ * @param local_dim_lengths The process-local dimension lengths
+ * @param data_layout The data layout 
+ */
+static
+void
+add_start_offset_to_cart_coord(std::tuple<uint64_t, uint64_t, uint64_t>& cart_coord, const std::vector<size_t>& global_dim_lengths, const std::vector<size_t>& start_offset, const std::vector<size_t>& local_dim_lengths, const DATA_LAYOUT data_layout)
+{
+    cmc_assert(start_offset.size() >= 2);
+    /* Obtain references to the elements of the tuple */
+    auto& [x, y, z] = cart_coord;
+    switch (data_layout)
+    {
+        case DATA_LAYOUT::CMC_2D_LON_LAT:
+            x += start_offset[0];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[1]);
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LON:
+            x += start_offset[1];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[0]);
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LEV:
+            x = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - x) + start_offset[0]);
+            y += start_offset[1];
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LAT:
+            x = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - x) + start_offset[1]);
+            y += start_offset[0];
+        break;
+        case DATA_LAYOUT::CMC_2D_LON_LEV:
+            x += start_offset[0];
+            y += start_offset[1];
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LON:
+            x += start_offset[1];
+            y += start_offset[0];
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LAT_LEV:
+            x += start_offset[0];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[1]);
+            z += start_offset[2];
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LEV_LAT:
+            x += start_offset[0];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[2]);
+            z += start_offset[1];
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LON_LAT:
+            x += start_offset[1];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[2]);
+            z += start_offset[0];
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LAT_LON:
+            x += start_offset[2];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[1]);
+            z += start_offset[0];
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LEV_LON:
+            x += start_offset[2];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[0]);
+            z += start_offset[1];
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LON_LEV:
+            x += start_offset[1];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[0]);
+            z += start_offset[2];
+        break;
+        default :
+            cmc_err_msg("The variable contains an undefined data layout.");
+    }
+}
+
+/**
+ * @brief This functions creates linear integer coordinates for the variables regarding a global coordinate system
+ * 
+ * @param global_system The global coordinate system
+ * @param var The local variable to consider
+ * @param coord_type The current type of the coordinates
+ * @return cmc_ref_coordinates_t The calculated integer reference coordinates for the variable @var var 
+ */
+static
+cmc_ref_coordinates_t
+cmc_create_ref_coordinates(cmc_global_coordinate_system_t global_system, cmc_var_t var, const cmc_coordinate_type coord_type)
+{
+    cmc_assert(global_system != nullptr);
+    /* Create new reference coordinates */
+    cmc_ref_coordinates_t ref_coords = new cmc_ref_coordinates();
+
+    /* Craete avector with global dimension length*/
+    std::vector<size_t> global_dim_lengths;
+    global_dim_lengths.reserve(CMC_NUM_COORD_IDS);
+
+    /* Assign the global dimension lengths */
+    for (int coord_dim{0}; coord_dim < CMC_NUM_COORD_IDS; ++coord_dim)
+    {
+        global_dim_lengths.push_back(global_system->coords.operator[](static_cast<CMC_COORD_IDS>(coord_dim)).size());
+        std::cout << "Global dim_length fuer coord_dim: " << global_dim_lengths.back() << std::endl;
+    }
+    /* Create the reference coordinates based on the coordinate type the data currently has */
+    switch(coord_type)
+    {
+        case cmc_coordinate_type::CMC_CARTESIAN_COORDINATES:
+        {
+            cmc_err_msg("Not yet implemented");
+        }
+        break;
+        case cmc_coordinate_type::CMC_MORTON_INDEX:
+        {
+            cmc_err_msg("Not yet implemented");
+        }
+        break;
+        case cmc_coordinate_type::CMC_GEO_DOMAIN_DEFINED_BY_BOX:
+        {
+            // In this case, we assume the data to be sorted corectly compliant to a default ascending ordering scheme in each coordinate diemnsion 
+            cmc_assert(var->start_ptr.size() > 0 && var->count_ptr.size() > 0);
+            //TODO: Maybe check for sorting order of the values?
+
+            /* Obtain an offset function for converting the boxed domain layout to cartesian reference coordinates */
+            std::function<std::tuple<uint64_t, uint64_t, uint64_t>(const std::vector<size_t>&, size_t)> lin_idx_to_cart_coord = cmc_t8_get_offset_function_lin_idx_to_cart_coord_based_on_data_layout(var->data_layout);
+            
+            /* We 'linearize' over all dimensions (using a single loop to cover all dimensions) */
+            const size_t total_length = std::reduce(var->count_ptr.begin(), var->count_ptr.end(), 1, std::multiplies<>());
+
+            /* Allocate memory for all reference coordinates */
+            ref_coords->cartesian_coordinates.reserve(total_length);
+
+            /* Iterate linearily over all coordinates of the variable's data */
+            for (size_t linear_id{0}; linear_id < total_length; ++linear_id)
+            {
+                /* Get a (local) cartesian coordinate description of the linear index */
+                std::tuple<uint64_t, uint64_t, uint64_t> cart_coord = lin_idx_to_cart_coord(var->dim_lengths, linear_id);
+                /* Apply the start vector offset for the (local) domain reference coordinates (in order to obtain global reference coordinates) */
+                add_start_offset_to_cart_coord(cart_coord, global_dim_lengths, var->start_ptr, var->dim_lengths, var->data_layout);
+                /* Save the cartesian reference coordinate */
+                ref_coords->cartesian_coordinates.push_back(cart_coord);
+            }
+
+            /* Set the flag which coordinate type is represent in the reference coordinates */
+            ref_coords->coordinate_representation = cmc_coordinate_type::CMC_CARTESIAN_COORDINATES;
+        }
+        break;
+        default:
+            cmc_err_msg("An unknwon coordinate type was supplied from which no refernece cooridnates are retrieveable.");
+    }
+
+    return ref_coords;
+}
+
+/**
+ * @brief This functions calculates integer reference coordinates for all variables within the @var t8_data
+ * 
+ * @param t8_data The @struct cmc_t8_data holding the process-local data of the variables for which the reference coordinates will be calculated
+ */
+static
+void
+cmc_t8_data_create_cartesian_reference_coords_for_all_vars(cmc_t8_data_t t8_data)
+{
+    /* Construct the reference coordinates for the variables */
+    /* Therefore, we are examining which variables are defined on the exact same domain with the same layout, since they can share the reference coordinates */
+    std::map<DATA_LAYOUT, std::vector<size_t>> reference_coordinate_variable_groups;
+
+    /* Create variable groups based on their data layout */
+    for (size_t id{0}; id < t8_data->vars.size(); ++id)
+    {
+        cmc_assert(t8_data->vars[id]->var->num_dimensions == 2 || t8_data->vars[id]->var->num_dimensions == 3);
+        
+        /* Check if varibale(s) with the same data layout already have been grouped */
+        auto iter = reference_coordinate_variable_groups.find(t8_data->vars[id]->var->data_layout);
+
+        if (iter != reference_coordinate_variable_groups.end())
+        {
+            /* If the data layout already has been added to the groups */
+            /* Save the id of the current variable */
+            reference_coordinate_variable_groups[t8_data->vars[id]->var->data_layout].push_back(id);
+        }
+        else
+        {
+            /* If the data layout is not equal to any previous variables */
+            /* Create a new group of variables and assign the current variable id */
+            reference_coordinate_variable_groups[t8_data->vars[id]->var->data_layout] = std::vector{id};
+            reference_coordinate_variable_groups[t8_data->vars[id]->var->data_layout].reserve(t8_data->vars.size());
+        }
+    }
+
+    /* Iterate over all variable groups and create their reference coordinates */
+    /* The references are saved generally in t8_geo_data in order to have a central ownership */
+    
+    /* Reserve memory for all reference coordinates */
+    t8_data->geo_data->ref_coordinates.reserve(reference_coordinate_variable_groups.size());
+
+    /* Iterate over all variable groups with the same data layout */
+    for (auto iter{reference_coordinate_variable_groups.begin()}; iter != reference_coordinate_variable_groups.end(); ++iter)
+    {
+        /* Create the reference coordinates for the first variable of the group */
+        t8_data->geo_data->ref_coordinates.push_back(cmc_create_ref_coordinates(t8_data->geo_data->coordinates, t8_data->vars[(iter->second)[0]]->var, cmc_coordinate_type::CMC_GEO_DOMAIN_DEFINED_BY_BOX));        
+
+        /* Assign those reference coordinates to all variables from the group */
+        for (size_t var_id{0}; var_id < (iter->second).size(); ++var_id)
+        {
+            /* Assign the newly created reference coordinates */
+            t8_data->vars[(iter->second)[var_id]]->var->ref_coordinates = t8_data->geo_data->ref_coordinates.back();
+        }
+    }
+}
+
+#ifdef CMC_ENABLE_MPI
+inline constexpr std::array<MPI_Datatype, cmc_type::CMC_NUM_TYPES> cmc_type_to_mpi_type{MPI_BYTE, MPI_INT8_T, MPI_CHAR, MPI_INT16_T, MPI_INT32_T, MPI_FLOAT, MPI_DOUBLE, MPI_UINT8_T, MPI_UINT16_T, MPI_UINT32_T, MPI_INT64_T, MPI_UINT64_T};
+#endif
+
+
+/**
+ * @brief This funciton performs the initial communication which has been calculated previously with the fucntion cmc_t8_data_fill_sender_list_for_initial_distribution(...)
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the (process-local) data which will be distributed
+ * @param send_list The list containg the communications which have to be performed
+ * @param offsets An array holding the partition offsets of the forest compliant to which the data will be distributed (the array has the size @var comm_size)
+ * @param comm_size The size of the communicator
+ * @return std::map<int, cmc_mpi_t8_recv_data> A map holding the data which was received from the other processes
+ */
+static
+std::map<int, cmc_mpi_t8_recv_data>
+cmc_t8_data_mpi_initial_communication(cmc_t8_data_t t8_data, std::map<int, cmc_mpi_t8_send_data>& send_list, uint64_t* offsets, const int comm_size)
+{
+    #ifdef CMC_ENABLE_MPI
+
+    cmc_debug_msg("Initial parallel data distribution begins.");
+
+    int rank, err;
+
+    /* Get the process-local rank of the communicator */
+    err = MPI_Comm_rank(t8_data->comm, &rank);
+    cmc_mpi_check_err(err);
+
+    /* TODO: Big loop over these send and receive calls for different data distributions */
+    
+    /* Create a map saving the received data */
+    std::map<int, cmc_mpi_t8_recv_data> recv_list;
+
+    /* Define an arbitrarly tag for the Morton indices */
+    const int tag_morton_indices = static_cast<int>(t8_data->vars.size());
+
+    /* Create a vector of MPI requests */
+    std::vector<MPI_Request> send_requests;
+    send_requests.reserve(send_list.size());
+
+    /* Counter for the amount of data which will reside on this process and does not have to be sent to other ranks */
+    uint64_t count_of_objs_retained = 0;
+
+    /* A flag indicating whether some objects are already correctly distributed or if all elements have been sent away to different ranks */
+    bool flag_some_data_elements_are_kept_local = false;
+
+    /* Iterate over the 'send_list' and send the messages to all processes */
+    size_t send_req_idx = 0;
+
+    /* Iterate over the send_list */
+    for (auto iter = send_list.begin(); iter != send_list.end(); ++iter, ++send_req_idx)
+    {
+        /* Do not let the process send data to itself */
+        if (iter->first != rank)
+        {
+            /* Distribute the Morton indices */
+            err = MPI_Isend(iter->second.morton_indices.data(), iter->second.morton_indices.size(), MPI_UINT64_T, iter->first, tag_morton_indices, t8_data->comm, &send_requests[send_req_idx]);
+            cmc_mpi_check_err(err);
+
+            cmc_debug_msg("Sending ", iter->second.morton_indices.size(), " data elements to rank ", iter->first, " with tag ", tag_morton_indices);
+        } else
+        {
+            /* Set the flag that some elements remain on this process */
+            flag_some_data_elements_are_kept_local = true;
+            /* Save the amount of elements which are kept local */
+            count_of_objs_retained = static_cast<uint64_t>(iter->second.morton_indices.size());
+        }
+    }
+    
+    cmc_debug_msg("The amount of data elements which will reside on this processs are ", count_of_objs_retained, " data elements per variable.");
+    
+    /* Wait until all messages are staged */
+    err = MPI_Barrier(t8_data->comm);
+    cmc_mpi_check_err(err);
+
+    /* A vector collecting thr IDs of ranks from which data is received */
+    std::vector<int> partner_ranks;
+    partner_ranks.reserve(send_list.size()); 
+
+    /* Counter variable fot the while loop */
+    size_t curr_recv_id = 0;
+
+    /* Variable which will hold the amount of elements within the message */
+    int recveied_objs = 0;
+
+    /* MPI Status objects for the send commands */
+    MPI_Status recv_stat, actual_recv_stat;
+
+    /* Flags for working through the received messages */
+    bool flag_messages_present = true;
+    int mpi_msg_flag = 0;
+    
+    /* Receive the messages concerning the Morton indices */
+    /* Since all messages have been staged before, the MPI_Iprobe call finds a matching message in each iteration */
+    while (flag_messages_present)
+    {
+        /* Check for a message containing the morton indices from another rank */
+        err = MPI_Iprobe(MPI_ANY_SOURCE, tag_morton_indices, t8_data->comm, &mpi_msg_flag, &recv_stat);
+        cmc_mpi_check_err(err);
+
+        /* Check if a message from any source with any tag is available */
+        if (mpi_msg_flag)
+        {
+            /* Get the size of the message, respectively the amount of Morton indices which will be received */
+            /* This number equals the amount of data which will be receied from the partner rank for each variable */
+            err = MPI_Get_count(&recv_stat, MPI_UINT64_T, &recveied_objs);
+            cmc_mpi_check_err(err);
+
+            /* Check if the rank which has sent the data is already in the 'recv_list' */
+            /* Check for the sending rank in the 'recv_list' */
+            auto sender = recv_list.find(recv_stat.MPI_SOURCE);
+
+            /* Check if the rank is not yet a sending rank in the 'recv_list' */
+            if (sender == recv_list.end())
+            {
+                /* Create a new cmc_mpi_t8_recv_data in the recv_list */
+                recv_list[recv_stat.MPI_SOURCE] = cmc_mpi_t8_data();
+                /* Reserve memory for the incoming morton indices */
+                recv_list[recv_stat.MPI_SOURCE].morton_indices.reserve(recveied_objs);
+                /* Reserve memory for the vector containing the variable data and fill it with nullptrs */
+                recv_list[recv_stat.MPI_SOURCE].data = std::vector<var_dynamic_array_t*>(t8_data->vars.size(), nullptr);
+            }
+
+            /* If a message is available, receive the Morton indices */
+            err = MPI_Recv(recv_list[recv_stat.MPI_SOURCE].morton_indices.data(), recveied_objs, MPI_UINT64_T, recv_stat.MPI_SOURCE, recv_stat.MPI_TAG, t8_data->comm, &actual_recv_stat);
+            cmc_mpi_check_err(err);
+            
+            /* Store the received morton_indices */
+            recv_list[recv_stat.MPI_SOURCE].received_morton_indices = recveied_objs;
+
+            cmc_debug_msg("Received ", recveied_objs, " data elements from rank ", actual_recv_stat.MPI_SOURCE, " with tag ", actual_recv_stat.MPI_TAG);
+
+            /* Save the IDs of the ranks which have sent data */
+            partner_ranks.push_back(actual_recv_stat.MPI_SOURCE);
+
+            ++curr_recv_id;
+        } else
+        {
+            /* If none messages are left */
+            flag_messages_present = false;
+        }
+    }
+
+    /** Send the variable's data to the other ranks **/
+
+    /* A vector of requests for the send-operations */
+    std::vector<MPI_Request> sending_requests(send_list.size() * t8_data->vars.size());
+
+    /* An additional counter fot the loop */
+    size_t rank_counter = 0;
+
+    /* Iterate over the send_list */
+    for (auto iter = send_list.begin(); iter != send_list.end(); ++iter, ++rank_counter)
+    {
+        /* Do not let the process send data to itself */
+        if (iter->first != rank)
+        {
+            /* Iterate over all variables */
+            for (size_t var_iter{0}; var_iter < iter->second.data.size(); ++var_iter)
+            {
+                cmc_debug_msg("Sending ", iter->second.data[var_iter]->size(), " data elements of variable ", t8_data->vars[iter->second.variable_indices[var_iter]]->var->name, " to rank ", iter->first);
+                
+                /* Send the data of the current variable */
+                err = MPI_Isend(iter->second.data[var_iter]->get_initial_data_ptr(), iter->second.data[var_iter]->size(), MPI_DOUBLE, iter->first, iter->second.variable_indices[var_iter], t8_data->comm, &sending_requests[rank_counter * iter->second.data.size() + var_iter]);
+                cmc_mpi_check_err(err);
+            }
+        }
+    }
+
+    /* Create a vector for the receiving statuses */
+    MPI_Status receiving_stat;
+
+    /* Receive all messages concerning the variable's data (one message for each partner rank and each variable) */
+    for (size_t iter{0}; iter < partner_ranks.size() * t8_data->vars.size(); ++iter)
+    {
+        /* Check (and wait) for an incoming message */
+        err = MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, t8_data->comm, &receiving_stat);
+        cmc_mpi_check_err(err);
+
+        /* Get the data type of the variable from from the t8_data->vars[tag]->var->get_type() or so */
+        const cmc_type variable_type = t8_data->vars[receiving_stat.MPI_TAG]->get_type();
+
+        /* Define a variable containing the size of the message */
+        int receiving_objs = 0;
+
+        /* Get the size of the receiving message */
+        err = MPI_Get_count(&receiving_stat, cmc_type_to_mpi_type[variable_type], &receiving_objs);
+        cmc_mpi_check_err(err);
+
+        /* Allocate an array for receiving the data */
+        recv_list[receiving_stat.MPI_SOURCE].data[receiving_stat.MPI_TAG] = new var_dynamic_array_t{static_cast<size_t>(receiving_objs), t8_data->vars[receiving_stat.MPI_TAG]->get_type()};
+
+        /* Receive the message */
+        err = MPI_Recv(recv_list[receiving_stat.MPI_SOURCE].data[receiving_stat.MPI_TAG]->get_initial_data_ptr(), receiving_objs, cmc_type_to_mpi_type[variable_type], receiving_stat.MPI_SOURCE, receiving_stat.MPI_TAG, t8_data->comm, MPI_STATUS_IGNORE);
+        cmc_mpi_check_err(err);
+
+        cmc_debug_msg("Received ", receiving_objs, " data elements of variable ", t8_data->vars[receiving_stat.MPI_TAG]->var->name, " from rank ", receiving_stat.MPI_SOURCE);
+    }
+
+    /* If some elements did not have to be communicated because they are already correctly distributed and local to this rank, we move them over from the send_list to the recv_list */
+    if(flag_some_data_elements_are_kept_local)
+    {
+        /* Just move the local elements from the send_list to the recv_list */
+        recv_list[rank] = std::move(send_list[rank]);
+    }
+    cmc_debug_msg("Halllooo");
+    
+    return recv_list;
+    #else
+    return std::map<int, cmc_mpi_t8_recv_data>();
+    #endif
+}
+
+/**
+ * @brief This function redistributes parallel data and orders is compliant to t8code's ordering scheme (i.e. Morton-Order)
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the distributed variable_s data which will be redistributed
+ */
+void
+cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
+{
+    #ifdef CMC_WITH_T8CODE
+    #ifdef CMC_ENABLE_MPI
+
+    cmc_debug_msg("Redistributing data for t8code.");
+    /* Only redistribute the data initially if the flag is set */
+    if(t8_data->use_distributed_data)
+    {
+        //Currently, it is only possible to distribute data if all variables are defined on the same domain 
+        //cmc_assert(t8_data->variables_are_defined_on_the_same_domain);
+        const t8_forest_t forest = t8_data->initial_forest;
+        int err, rank, size;
+
+        /* Get the size of the communicator */
+        err = MPI_Comm_size(t8_data->comm, &size);
+        cmc_mpi_check_err(err);
+        
+        /* Get the (local) rank id */
+        err = MPI_Comm_rank(t8_data->comm, &rank);
+        cmc_mpi_check_err(err);
+
+        /* Schemes for quadrilaterals and hexahedrons */
+        t8_default_scheme_quad_c scheme_quad;
+        t8_default_scheme_hex_c scheme_hex;
+        t8_eclass_scheme_c* scheme_eclass;
+
+        if (t8_data->geo_data->dim == 2)
+        {
+            scheme_eclass = static_cast<t8_eclass_scheme_c*>(&scheme_quad);
+        } else
+        {
+            cmc_assert(t8_data->geo_data->dim == 3);
+            scheme_eclass = static_cast<t8_eclass_scheme_c*>(&scheme_hex);
+        }
+
+        /* Get the offest of the first local element as a SFC index (at the initial refienment level) */
+        uint64_t elem_offset = static_cast<uint64_t>(t8_element_get_linear_id (scheme_eclass,
+                                                                               t8_forest_get_element_in_tree(forest, 0, 0),
+                                                                               t8_data->geo_data->initial_refinement_lvl));
+
+        //TODO: The offets do not have to be gathered, they might be accessible directly via t8code's internal data structure
+        
+        /* Allocate an offset array holding the SFC index (at the intitial refinement level) of each starting process-local element from each process */
+        uint64_t* offsets = (uint64_t*) malloc(sizeof(uint64_t) * size);
+
+        /* Distribute the offsets between all processes */
+        err = MPI_Allgather(&elem_offset, 1, MPI_UINT64_T, offsets, 1, MPI_UINT64_T, t8_data->comm);
+        cmc_mpi_check_err(err);
+
+        /* Eventually communicate here the global coordinate domain (if it is not present on all processes) */
+
+        /* Create reference coordinates in order to calculate the distribution later */
+        cmc_t8_data_create_cartesian_reference_coords_for_all_vars(t8_data);
+
+        /* A map collecting the receiver rank id as a key and the associated data which will be sent to it later */
+        std::map<int, cmc_mpi_t8_send_data> send_list;
+
+        /* Calculate the data which will be sent */
+        cmc_t8_data_fill_sender_list_for_initial_distribution(t8_data, send_list, offsets, size);
+
+        /* A map collecting the correctly distributed data after the communication */
+        std::map<int, cmc_mpi_t8_send_data> recv_list = cmc_t8_data_mpi_initial_communication(t8_data, send_list, offsets, size);
+
+        /** Now that the data is redistributed and residing in the recv_list, we have to sort/combine the data from the different ranks compliant to the z-curve order **/
+
+        /** Since all indices are already in order morton order and the distribution in t8code is linearily, we can just fill up the missing morton indices (which are not present; in the range of the offsets of this rank) with the missing values */
+        /** Die Luecken die nicht besetzt sind muessen gefuellt werden, das Problem: wir wissen nciht wie viele Elemente dort aufgefuellt werden muessen */
+        /** Deswegen, muss ab dem ersten Element der Luecke durch den forest itertiert werden, bis wir auf eine Element treffen, das auf dem initial refinement ist und dessen element_id der des naechsten Elements direkt nach der Luecke entspricht */
+        /** Diese Elemente muessen gezaehlt werden und anschließend dazwischenkopiert werden */
+        cmc_debug_msg("Initial communication is over");
+        /* Define a vector holding the sorted Morton indices from each rank */
+        std::vector<std::vector<uint64_t>> sorted_morton_indices;
+        sorted_morton_indices.reserve(recv_list.size());
+
+        /* Count all elements */
+        size_t num_elements = 0;
+
+        /* Iterate over the recv_list */
+        for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter)
+        {
+            /* Save the amount of Morton indices */
+            num_elements += iter->second.received_morton_indices;
+
+            /* Create a new vector */
+            sorted_morton_indices.emplace_back(std::vector<uint64_t>());
+
+            /* Copy the unsorted Morton indices */
+            std::copy(iter->second.morton_indices.data(), iter->second.morton_indices.data() + iter->second.received_morton_indices , std::back_inserter(sorted_morton_indices.back()));
+
+            /* Sort the indices */
+            std::sort(sorted_morton_indices.back().begin(), sorted_morton_indices.back().end());
+
+            cmc_debug_msg("Size of sorted morton indices: ", sorted_morton_indices.back().size());
+        }
+
+        /* Define a vector which will hold the merged sequence of all Morton indices */
+        std::vector<uint64_t> morton_indices;
+
+        /* Merge all sequences of sorted Morton indices */
+        for (size_t vec_iter{0}; vec_iter < sorted_morton_indices.size() - 1; ++vec_iter)
+        {
+            /* Allocate a new vector capable of holding the merged sequence */
+            std::vector<uint64_t> merged_sequence;
+
+            /* Allocate memory for the vector */
+            if (vec_iter < sorted_morton_indices.size() -2)
+            {
+                /* Allocate just enough memeory for the merged sequence */
+                merged_sequence.reserve(sorted_morton_indices[vec_iter].size() + sorted_morton_indices[vec_iter + 1].size());
+            } else
+            {
+                /* In the last iteration, we are going to allocate as much elements as the forest holds locally, since we need to fill up some 'holes' within the data */
+                merged_sequence.reserve(t8_forest_get_local_num_elements(forest));
+            }
+
+            /* Merge the two sorted sequences of Morton indices */
+            std::merge(sorted_morton_indices[vec_iter].begin(), sorted_morton_indices[vec_iter].end(), sorted_morton_indices[vec_iter +1].begin(), sorted_morton_indices[vec_iter +1].end(), std::back_inserter(merged_sequence));
+
+            /* Swap the merged sequence */
+            if (vec_iter < sorted_morton_indices.size() -2)
+            {
+                /* Swap the merged sequence with the latter sorted_morton_indices-array */
+                std::swap(sorted_morton_indices[vec_iter + 1], merged_sequence);
+            } else
+            {
+                /* In the last iteration, swap the current merged-sequence with the outside vector, in order to access the fully sorted Morton indices array later */
+                std::swap(morton_indices, merged_sequence);
+            }
+        }
+
+        /* Since the forest on which the data is mapped may eventually be greater than the geographical domain on which the variable's data is defined. There may be some holes within the Morton indices, which we need to fill missing values */
+        std::vector<std::pair<size_t, size_t>> gaps_to_fill;
+
+        /* Check for gaps in the data at the beginning  */
+        if (morton_indices[0] != offsets[rank])
+        {
+            /* In this case our first local Morton index is not equal to the first local element. Therefore, we have to insert some missing_values */
+            
+            int counter_skipped_elems = 0;
+            t8_element_t* element;
+            uint64_t morton_offset_calc = 0;
+
+            while (morton_offset_calc < morton_indices[0] -1 && static_cast<size_t>(counter_skipped_elems + 1) < static_cast<size_t>(t8_forest_get_local_num_elements(forest) -1))
+            {
+                ++counter_skipped_elems;
+                element = t8_forest_get_element_in_tree(forest, 0, counter_skipped_elems);
+                morton_offset_calc += std::pow(t8_element_num_children(scheme_eclass, element), t8_data->geo_data->initial_refinement_lvl - t8_element_level(scheme_eclass, element));
+            }
+
+            /* Save the position and length of the gap */
+            gaps_to_fill.emplace_back(std::make_pair(0, counter_skipped_elems));
+
+            /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gapsof missing values */
+            morton_indices.insert(morton_indices.begin(), counter_skipped_elems, (offsets[rank] - 1 >= 0 ? offsets[rank] -1 : 0));
+        }
+        cmc_debug_msg("All gaps in morton indices have been found at start");
+
+        /* We cannot start at morton_indices.begin() if we have added some missing_values before the first (data) Morton index */
+        int offset_for_iteration = 0;
+        if (gaps_to_fill.size() > 0)
+        {
+            /* Get the amount of elements to skip */
+            offset_for_iteration = gaps_to_fill.back().second;
+        }
+
+        /* Check for gaps in the data somewhere in between */
+        size_t current_length = morton_indices.size() - 1;
+
+        for (size_t iter{static_cast<size_t>(offset_for_iteration)}; iter < current_length; ++iter)
+        {
+            /* Check if neighboring Morton_indices do not vary by exactly one */
+            if (morton_indices[iter] + 1 < morton_indices[iter + 1])
+            {
+                /** If not, we have a hole needed to be filled by missing values **/
+                int counter_skipped_elems = 0;
+                t8_element_t* element;
+                uint64_t morton_offset_calc = morton_indices[iter];
+
+                while (morton_offset_calc < morton_indices[iter + 1] -1 && iter + counter_skipped_elems + 1 < static_cast<size_t>(t8_forest_get_local_num_elements(forest) -1))
+                {
+                    ++counter_skipped_elems;
+                    element = t8_forest_get_element_in_tree(forest, 0, iter + counter_skipped_elems);
+                    morton_offset_calc += std::pow(t8_element_num_children(scheme_eclass, element), t8_data->geo_data->initial_refinement_lvl - t8_element_level(scheme_eclass, element));
+                }
+
+                /* Save the position and length of the gap */
+                gaps_to_fill.emplace_back(std::make_pair(iter + 1, counter_skipped_elems));
+
+                /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gapsof missing values */
+                morton_indices.insert(std::next(morton_indices.begin(), iter + 1), counter_skipped_elems, morton_indices[iter]);
+
+                /* Advance the iterator to the correct position */
+                iter += counter_skipped_elems;
+                current_length += counter_skipped_elems;
+            }
+        }
+
+        /* Check if there are missing values at the end of our data */
+        /* If there are some Morton indices missing at the end, we can just add the missing values equal to the amount of (local forest elements - amount of local Morton indices) */
+        if (morton_indices.size() < static_cast<size_t>(t8_forest_get_local_num_elements(forest)))
+        {
+            /* If this is case, the last Morton index should not be equal to the partition boundary */
+            cmc_assert(((rank == size -1 ? t8_forest_get_global_num_elements(forest) - 1 : offsets[rank + 1] -1) - morton_indices.back()) > 0);
+
+            /* Save the position and length of the gap */
+            gaps_to_fill.emplace_back(std::make_pair(morton_indices.size(), t8_forest_get_local_num_elements(forest) - static_cast<int>(morton_indices.size())));
+        
+            /* Insert the missing values at the end */
+            morton_indices.insert(morton_indices.end(), static_cast<size_t>(t8_forest_get_local_num_elements(forest)) - morton_indices.size(), morton_indices.back());//(rank == size -1 ? t8_forest_get_local_num_elements(forest) - 1 : offsets[rank + 1] - 1));
+        }
+
+        /* Now we need to iterate through the Morton indices and obtain the corresponding data and store it within the correct variables */
+        /* Since we may have more than one variable we are going to create a mapping to use for each variables */
+        std::vector<std::vector<uint64_t>> sequence_mappings;
+        sequence_mappings.reserve(recv_list.size());
+
+        /* Iterate over the recv_list */
+        for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter)
+        {
+            /* Create a new vector for the current receiver and allocate memory for it */
+            sequence_mappings.emplace_back(std::vector<uint64_t>());
+            sequence_mappings.back().reserve(iter->second.received_morton_indices);
+
+            /* Check the received data */
+            for (int morton_iter{0}; morton_iter < iter->second.received_morton_indices; ++morton_iter)
+            {
+                /* Perform a binary search for of the received Morton index */
+                auto bin_search_result = std::lower_bound(morton_indices.begin(), morton_indices.end(), iter->second.morton_indices[morton_iter]);
+                /* The element should be found in the fully osrted array of Morton indices. Therefore, the assertion */
+                cmc_assert(bin_search_result != morton_indices.end());
+                /* Now we store the position of the Morton-index (in the fully sorted array) within our mapping */
+                sequence_mappings.back().emplace_back(std::distance(morton_indices.begin(), bin_search_result));
+            }
+        }
+
+        /* Allocate memory for all variables */
+        /* This approach leads to the case that each rank holds data from each variable. Therefore, all variables are distributed */
+        for (size_t var_iter{0}; var_iter < t8_data->vars.size(); ++var_iter)
+        {
+            /* Create a new var_array for the variable */
+            t8_data->vars[var_iter]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest)), t8_data->vars[var_iter]->get_type());  
+            cmc_debug_msg("missing value is: ", std::get<double>(t8_data->vars[var_iter]->var->missing_value));
+            /* Fill in the gaps with missing values for each variable */
+            for (auto gap_iter{gaps_to_fill.begin()}; gap_iter != gaps_to_fill.end(); ++gap_iter)
+            {
+                /* Copy the amount of missing values to each gap */
+                for (size_t num_elems_to_insert{0}; num_elems_to_insert < gap_iter->second; ++num_elems_to_insert)
+                {
+                    /* Copy-assign the variable's missing value */
+                    t8_data->vars[var_iter]->var->data_new->assign(static_cast<size_t>(gap_iter->first + num_elems_to_insert), t8_data->vars[var_iter]->var->missing_value);
+
+                }
+            }
+        }
+        
+        /* Define a counter for accessing at the current recv_list's position */
+        int recv_list_counter = 0;
+
+        /** Copy the data for each of the received variables from each rank **/
+
+        /* Iterate over the recv_list */
+        for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter, ++recv_list_counter)
+        {
+            /* Iterate over the received variables */
+            for (size_t var_iter{0}; var_iter < iter->second.data.size(); ++var_iter)
+            {
+                //size_t size_of_data = t8_data->vars[iter->second.variable_indices[var_iter]]->get_data_size();
+                size_t size_of_data = t8_data->vars[var_iter]->get_data_size();
+
+                std::byte* initial_data_ptr = static_cast<std::byte*>(iter->second.data[var_iter]->get_initial_data_ptr());
+                std::byte* initial_data_new_ptr = static_cast<std::byte*>(t8_data->vars[var_iter]->get_initial_data_new_ptr());
+
+                /* Fill in the actual variable's data */
+                for (int morton_id{0}; morton_id < iter->second.received_morton_indices; ++morton_id)
+                {
+                    /* Copy the data value from the 'old' array (with the wrong ordering) to the new Morton-Curve-compliant ordering array */
+                    memcpy(static_cast<void*>(initial_data_new_ptr + size_of_data * ((sequence_mappings[recv_list_counter])[morton_id])), static_cast<void*>(initial_data_ptr + size_of_data * morton_id), size_of_data);
+                }
+            }
+        }
+
+        /* Exchange the 'old' unordered data with the newly ordered array (compliant to the Morton curve) */
+        for (size_t var_iter{0}; var_iter < t8_data->vars.size(); ++var_iter)
+        {
+            /* Free the 'unordered' data and assign the 'newly ordered' data for each variable */
+            t8_data->vars[var_iter]->var->switch_data();
+            /* Set the Morton Curve ordering flag */
+            t8_data->vars[var_iter]->var->data_scheme = CMC_DATA_ORDERING_SCHEME::CMC_GEO_DATA_Z_CURVE;
+        }
+
+        /* Free the allocated data */
+        free(offsets);
+        
+        cmc_debug_msg("The data has been initially redistributed compliant to t8code.");
+
+        err = MPI_Barrier(t8_data->comm);
+        cmc_mpi_check_err(err);
+    }
+
+    #endif
+    #endif
+}
+
+#if 0
+static
+cmc_var_vector_t
+cmc_get_default_sorted_coords(cmc_var_vector_t initial_coords)
+{
+    /* Default sorting means ascending longitude. latitude and elevation coordinates */
+    /* E.g. longitude = 0°, 2°, 4°, ..., 356°, 358° or longitude = -180°, -178°, ..., 0, 2*, ..., 178° */
+    /*      latitude  = -90°, -88°, ..., 0°, 2°, ..., 90° */
+    /*      elevation = 0km, 1km, 2km, ... */
+    
+    /* First, we need to check wich coordinate dimension are not sorted compliant to the default scheme */
+
+    /* Sort the coordinates */
+
+    /* Return the sorted coordinates */
+
+}
+#endif

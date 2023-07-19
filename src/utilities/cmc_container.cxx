@@ -3213,7 +3213,7 @@ var_array_t::mean_value(const size_t start_index, const size_t end_index) const
 cmc_universal_type_t
 var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const
 {
-    cmc_assert(end_index > start_index && end_index < data->num_elements);
+    cmc_assert(end_index >= start_index && end_index < data->num_elements);
     /* It is assumed that the missing value is of the same data type as the data variable itself */
     switch (data->type)
     {
@@ -3791,6 +3791,571 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
     }   
 }
 
+std::vector<double>
+var_array_t::calculate_relative_deviations_w_missing_values(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value, const cmc_universal_type_t& missing_value) const
+{
+    cmc_assert(data->type == static_cast<cmc_type>(nominal_value.index()));
+    cmc_assert(end_index >= start_index);
+
+    std::vector<double> deviations(end_index - start_index + 1);
+
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* data_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            const int32_t reference_val{std::get<int32_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const int32_t missing_val{std::get<int32_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                    } else
+                    {
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* data_ptr{static_cast<float*>(data->initial_data_ptr)};
+            const float reference_val{std::get<float>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const float missing_val{std::get<float>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                    } else
+                    {
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* data_ptr{static_cast<double*>(data->initial_data_ptr)};
+            const double reference_val{std::get<double>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const double missing_val{std::get<double>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        /* Calculate the relative deviation */
+                        deviations.push_back(std::abs(data_ptr[i] - reference_val) / std::abs(reference_val));
+                    } else
+                    {
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(std::abs(data_ptr[i] - reference_val) / ((std::abs(data_ptr[i]) + std::abs(reference_val)) * 0.5));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* data_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            const int16_t reference_val{std::get<int16_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const int16_t missing_val{std::get<int16_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                    } else
+                    {
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* data_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            const int64_t reference_val{std::get<int64_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const int64_t missing_val{std::get<int64_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                    } else
+                    {
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            const uint64_t reference_val{std::get<uint64_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const uint64_t missing_val{std::get<uint64_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        const uint64_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                    } else
+                    {
+                        const uint64_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            const uint32_t reference_val{std::get<uint32_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const uint32_t missing_val{std::get<uint32_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        const uint32_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                    } else
+                    {
+                        const uint32_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* data_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            const int8_t reference_val{std::get<int8_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const int8_t missing_val{std::get<int8_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                    } else
+                    {
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            const uint8_t reference_val{std::get<uint8_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const uint8_t missing_val{std::get<uint8_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        const uint8_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                    } else
+                    {
+                        const uint8_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            const uint16_t reference_val{std::get<uint16_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const uint16_t missing_val{std::get<uint16_t>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        const uint16_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                    } else
+                    {
+                        const uint16_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Cannot add data of type byte.");
+        break;
+        case CMC_CHAR:
+        {
+            char* data_ptr{static_cast<char*>(data->initial_data_ptr)};
+            const char reference_val{std::get<char>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            const char missing_val{std::get<char>(missing_value)};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    if (!reference_val_equal_to_zero)
+                    {
+                        /* Calculate the relative deviation */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                    } else
+                    {
+                        /* In case the reference value is zero, we use an indicator of relative difference */
+                        deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                    }
+                } else 
+                {
+                    /* Missing values are not cosnidered, therefore there is no deviation */
+                    deviations.push_back(0.0);
+                }
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+
+    return deviations;
+}
+
+
+std::vector<double>
+var_array_t::calculate_relative_deviations(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value) const
+{
+    cmc_assert(data->type == static_cast<cmc_type>(nominal_value.index()));
+    cmc_assert(end_index >= start_index);
+
+    std::vector<double> deviations(end_index - start_index + 1);
+
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* data_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            const int32_t reference_val{std::get<int32_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+
+                if (!reference_val_equal_to_zero)
+                {
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                } else
+                {
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                }
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* data_ptr{static_cast<float*>(data->initial_data_ptr)};
+            const float reference_val{std::get<float>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                } else
+                {
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                }
+
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* data_ptr{static_cast<double*>(data->initial_data_ptr)};
+            const double reference_val{std::get<double>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    /* Calculate the relative deviation */
+                    deviations.push_back(std::abs(data_ptr[i] - reference_val) / std::abs(reference_val));
+                } else
+                {
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(std::abs(data_ptr[i] - reference_val) / ((std::abs(data_ptr[i]) + std::abs(reference_val)) * 0.5));
+                }
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* data_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            const int16_t reference_val{std::get<int16_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                } else
+                {
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                }
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* data_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            const int64_t reference_val{std::get<int64_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                } else
+                {
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                }
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            const uint64_t reference_val{std::get<uint64_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    const uint64_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                } else
+                {
+                    const uint64_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                }
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            const uint32_t reference_val{std::get<uint32_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    const uint32_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                } else
+                {
+                    const uint32_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                }
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* data_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            const int8_t reference_val{std::get<int8_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                } else
+                {
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                }
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            const uint8_t reference_val{std::get<uint8_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    const uint8_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                } else
+                {
+                    const uint8_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                }
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            const uint16_t reference_val{std::get<uint16_t>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    const uint16_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(dividend) / static_cast<double>(reference_val));
+                } else
+                {
+                    const uint16_t dividend = (data_ptr[i] >= reference_val ? data_ptr[i] - reference_val : reference_val - data_ptr[i]);
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(dividend) / ((static_cast<double>(data_ptr[i] + reference_val) * 0.5)));
+                }
+            }
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Cannot add data of type byte.");
+        break;
+        case CMC_CHAR:
+        {
+            char* data_ptr{static_cast<char*>(data->initial_data_ptr)};
+            const char reference_val{std::get<char>(nominal_value)};
+            const bool reference_val_equal_to_zero{reference_val == 0};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!reference_val_equal_to_zero)
+                {
+                    /* Calculate the relative deviation */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / static_cast<double>(std::abs(reference_val)));
+                } else
+                {
+                    /* In case the reference value is zero, we use an indicator of relative difference */
+                    deviations.push_back(static_cast<double>(std::abs(data_ptr[i] - reference_val)) / (static_cast<double>((std::abs(data_ptr[i]) + std::abs(reference_val))) * 0.5));
+                }
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+
+    return deviations;
+}
+
 bool
 var_array_t::check_range_fullfills_deviation_threshold_from_value(const size_t start_index, const size_t end_index, const double deviation, const cmc_universal_type_t& value, const cmc_universal_type_t& missing_value) const
 {
@@ -4311,12 +4876,16 @@ public:
     var_dynamic_array(const cmc_type _type)
     {
         /* If no size is specified, we just allocate for 8 values */
-        array = new var_array_t(8, _type);
+        //array = new var_array_t{8, _type};
+        array = new var_array(8, _type);
 
     };
     var_dynamic_array(const size_t _num_elems, const cmc_type _type)
     : capacity{_num_elems}{
-        array = new var_array_t(_num_elems, _type);
+        std::cout << "wie is hier" << std::endl;
+        //array = new var_array_t{_num_elems, _type};
+        array = new var_array(_num_elems, _type);
+        std::cout << "und mal wieder hier" << std::endl;
     };
     ~var_dynamic_array(){
         if (array != nullptr)
@@ -4326,15 +4895,17 @@ public:
         }
     };
 
-    size_t capacity{8}; //!< The capacity of the dynamic array, if no capacity is specified, by default the array is able of holding 8 elements
+    size_t capacity{8}; //!< The capacity of the dynamic array, if no capacity is specified, by default the array is capable of holding 8 elements
     size_t size{0}; //!< The current size of the dynamic array
-    var_array_t* array{nullptr};
+    var_array* array{nullptr};
 };
 
 void
 var_dynamic_array_t::_init_array(const size_t num_elements, const cmc_type _type)
 {
+    std::cout << "hier" << std::endl;
     data = new var_dynamic_array(num_elements, _type);
+    std::cout << "o doch hier" << std::endl;
 }
 
 void
@@ -4347,18 +4918,159 @@ var_dynamic_array_t::_destroy_array()
     }
 }
 
+void*
+var_dynamic_array_t::get_initial_data_ptr() const
+{
+    return data->array->initial_data_ptr;
+}
+
 size_t
 var_dynamic_array_t::size() const
 {
     return data->size;
 }
 
+size_t
+var_dynamic_array_t::capacity() const
+{
+    return data->capacity;
+}
+
+cmc_type
+var_dynamic_array_t::get_type() const
+{
+    return data->array->type;
+}
+
+void 
+var_dynamic_array_t::resize(const size_t num_elements)
+{
+    if (num_elements > data->capacity)
+    {
+        std::cout << "resizzzeeee" << std::endl;
+        /* Create a new array with the given number of elements */
+        //var_array_t* resized_data = new var_array_t{num_elements, data->array->get_data_type()};
+        var_array* resized_data = new var_array(num_elements, data->array->type);
+        /* Copy the current array entries over */
+        memcpy(resized_data->initial_data_ptr, data->array->initial_data_ptr, data->size * cmc_type_to_bytes[data->array->type]);
+        /* The current size stays the same, but the capacity changes */
+        data->capacity = num_elements;
+        /* Delete the old data */
+        data->array->~var_array();
+        /* Save the new resized array */
+        data->array = resized_data;
+    }
+}
+
+#if 0
 void 
 var_dynamic_array_t::push_back(const cmc_universal_type_t& value)
 {
-    cmc_assert(data->size < data->capacity);
-    //TODO: if the assertion is not true, values need to be copied to a larger mem location 
+    //cmc_assert(data->size < data->capacity);
+    //TODO: if the assertion is not true, values need to be copied to a larger memory location
+    if (data->size >= data->capacity)
+    {
+        cmc_debug_msg("The dynamic array will be be resized.");
+        /* Resize the array (Double the current memory) */
+        this->resize(2 * data->capacity);
+    }
     data->array->assign_value(data->size, value);
+    ++(data->size);
+}
+#endif
+
+
+void
+var_dynamic_array_t::push_back(const cmc_universal_type_t& value)
+{
+    /* Check if the dynamic array is still large enough */
+    if (data->size >= data->capacity)
+    {
+        cmc_debug_msg("The dynamic array will be be resized.");
+        /* Resize the array (Double the current memory) */
+        this->resize(2 * data->capacity);
+    }
+
+    /* Push back the supplied value based on the type of the dynamic array */
+    switch (data->array->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* data_ptr{static_cast<int32_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<int32_t>(value);
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* data_ptr{static_cast<float*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<float>(value);
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* data_ptr{static_cast<double*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<double>(value);
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* data_ptr{static_cast<int16_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<int16_t>(value);
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* data_ptr{static_cast<int64_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<int64_t>(value);
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<uint64_t>(value);
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<uint32_t>(value);
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* data_ptr{static_cast<int8_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<int8_t>(value);
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<uint8_t>(value);
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<uint16_t>(value);
+        }
+        break;
+        case CMC_BYTE:
+        {
+            std::byte* data_ptr{static_cast<std::byte*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<std::byte>(value);
+        }
+        break;
+        case CMC_CHAR:
+        {
+            char* data_ptr{static_cast<char*>(data->array->initial_data_ptr)};
+            data_ptr[data->size] = std::get<char>(value);
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+
+    /* Increment the size */
     ++(data->size);
 }
 
@@ -4468,4 +5180,121 @@ void
 var_vector_t::reserve(const size_t num_arrays)
 {
     vec->vector.reserve(num_arrays);
+}
+
+std::vector<double>
+var_array_t::retrieve_double_vector() const
+{
+    std::vector<double> transformed_vector;
+    transformed_vector.reserve(data->num_elements);
+
+    switch(data->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* ptr{static_cast<float*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* ptr{static_cast<double*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        case CMC_BYTE:
+            cmc_err_msg("Cannot transform byte.");
+        break;
+        case CMC_CHAR:
+        {
+            char* ptr{static_cast<char*>(data->initial_data_ptr)};
+            for(size_t i{0}; i < data->num_elements; ++i)
+            {
+                transformed_vector.push_back(static_cast<double>(ptr[i]));
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+
+    return transformed_vector;
 }

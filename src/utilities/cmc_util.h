@@ -10,6 +10,7 @@
 #include <vector>
 #include <cassert>
 #include <algorithm>
+#include <numeric>
 #include <variant>
 #include <limits>
 #include <cstring>

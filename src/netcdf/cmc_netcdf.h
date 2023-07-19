@@ -27,8 +27,31 @@ extern "C" {
 #endif
 #endif
 
+/* Enum describing an access mode for netCDF files */
+enum cmc_nc_opening_mode {CMC_NC_SERIAL = 0, CMC_NC_PARALLEL};
+
 /* Opaque pointer typedefs for netCDF data structs */
 typedef struct cmc_nc_data* cmc_nc_data_t;
+
+/**
+ * @brief This function (@fn cmc_nc_data_t cmc_nc_start(const char* path_to_file, const enum cmc_nc_opening_mode mode, const MPI_Comm comm)
+ * opens a netCDF given a specific @var mode (serial or parallel) and allocates a @struct cmc_nc_data and returns a pointer to it
+ * 
+ * @param path_to_file The path to the netCDF file which will be opened
+ * @param mode Whether the filt should be opened for serial or parallel access
+ * @param comm The MPI communicator to use in a parallel environment
+ * @return A pointer to the allocated struct
+ */
+#ifdef __cplusplus
+cmc_nc_data_t
+cmc_nc_start(const char* path_to_file, const enum cmc_nc_opening_mode mode, const MPI_Comm comm = MPI_COMM_WORLD);
+#else
+cmc_nc_data_t
+cmc_nc_start(const char* path_to_file, const enum cmc_nc_opening_mode mode, const MPI_Comm comm = MPI_COMM_WORLD);
+#endif
+
+void
+cmc_nc_finish(cmc_nc_data_t nc_data);
 
 #ifdef __cplusplus
 [[noreturn]]
@@ -71,7 +94,7 @@ cmc_nc_destroy(const cmc_nc_data_t _nc_data);
 /**
  * @brief This function (@fn int cmc_nc_open(const char* path_to_file, MPI_Comm comm)) opens a netCDF file
  * 
- * @param path_to_file The path to the netCDF file which will be opnened
+ * @param path_to_file The path to the netCDF file which will be opened
  * @param comm The MPI communicator to use in a parallel environment
  * @return An integer resembling the unique id of the opened netCDF file
  *
@@ -85,6 +108,25 @@ int
 cmc_nc_open(const char* path_to_file, MPI_Comm comm);
 #endif
 
+/**
+ * @brief Open a file explicitly without parallel access
+ * 
+ * @param path_to_file The path to the netCDF file which will be opened
+ * @return int An integer resembling the unique id of the opened netCDF file
+ */
+int
+cmc_nc_open_serial(const char* path_to_file);
+
+/**
+ * @brief Open a file explicitly for parallel access 
+ * 
+ * @param path_to_file The path to the netCDF file which will be opened
+ * @param comm The MPI communicator to use in a parallel environment
+ * @return int An integer resembling the unique id of the opened netCDF file
+ * @note In order to use parallel access, the header file 'netcdf_par.h' has to be present when cmc is linked against netCDF
+ */
+int
+cmc_nc_open_parallel(const char* path_to_file, MPI_Comm comm);
 
 /**
  * @brief This function closes a (previously opened) netCDF file
