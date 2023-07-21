@@ -501,7 +501,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* In case a relative error criterion has been chosen */
                 //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold_parallel, cmc_t8_geo_data_interpolate_std_mean);
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_error_threshold, cmc_t8_geo_data_interpolate_std_mean);
 
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
@@ -514,30 +514,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
             break;
             default :
                 cmc_err_msg("An unknown compression criterion has bee supplied.");
-        } 
-
-        #if 0
-        /* Perform the adaptation/compression with predefined adapt and replace functions */
-        switch (amr_data->t8_data->compression_mode)
-        {
-            case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_2D:
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
-                break;
-            case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE_2D:
-                //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_by_err_tol_on_tracer, cmc_t8_geo_data_interpolate_std_mean);
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
-                break;
-            case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_3D:
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_exclude_area, cmc_t8_geo_data_interpolate_std_mean);
-                break;
-            case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE_3D:
-                //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_by_err_tol_on_tracer, cmc_t8_geo_data_interpolate_std_mean);
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
-                break;
-            default:
-                cmc_err_msg("An unknown compression_mode was supplied.");
         }
-        #endif
     }
     cmc_debug_msg("The Lossy AMR compressor has been successfully applied.");
     
@@ -609,7 +586,7 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
                 approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
                 if (exact_value > 0.0 && approx_value > 0.0)
                 {
-                    current_err = (approx_value - exact_value) / exact_value;
+                    current_err = std::abs(approx_value - exact_value) / exact_value;
                     if (max_error[var_id] < current_err)
                     {
                         max_error[var_id] = current_err;
@@ -633,6 +610,7 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
         for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
         {
             max_err = 0.0;
+            cmc_assert((amr_data->t8_data->initial_data[var_id]).size() == amr_data->t8_data->vars[var_id]->var->data->size());
             for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->vars[var_id]->assets->forest)); ++i)
             {
                 /* Check if a missing value would be at the position of the exact value */
@@ -642,10 +620,15 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
                     approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
                     if (exact_value > 0.0 && approx_value > 0.0)
                     {
-                        current_err = (approx_value - exact_value) / exact_value;
+                        current_err = std::abs(approx_value - exact_value) / exact_value;
                         if (max_err < current_err)
                         {
                             max_err = current_err;
+                        }
+                        //cmc_debug_msg(i, " hat Fehlerantewil: ", current_err);
+                        if(current_err > 0.02)
+                        {
+                            //cmc_debug_msg("Hier ist zu viel fehler lelement_id: ", i, " und der fehler ist: ", current_err);
                         }
                     } else
                     {

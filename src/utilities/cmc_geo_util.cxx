@@ -401,9 +401,10 @@ cmc_value_equal_to_zero(const cmc_universal_type_t& value)
 }
 
 double
-calculate_two_step_max_deviation(const double previous_max_deviation, const double current_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean)
+calculate_two_step_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean)
 {
     cmc_assert(previous_mean.index() == current_mean.index());
+    cmc_assert(previous_max_deviation < 1.0 && previous_max_deviation >= 0.0);
 
     /* Convert the previous mean value to double */
     const double dprevious_mean = std::visit([](auto& val) -> double {return static_cast<double>(val);}, previous_mean);
@@ -411,16 +412,28 @@ calculate_two_step_max_deviation(const double previous_max_deviation, const doub
     /* Convert the mean value to double */
     const double dmean = std::visit([](auto& val) -> double {return static_cast<double>(val);}, current_mean);
 
-    if (dmean != static_cast<double>(0.0))
+    if (!cmc_approx_cmp(dmean, static_cast<double>(0.0))) //maybe use an approx_cmp
     {
-        /* If the current mean value is not zero */
-        return std::abs(dprevious_mean * previous_max_deviation / dmean) + current_max_deviation;
+        if (dprevious_mean < dmean && dprevious_mean >= 0.0)
+        {
+            return std::abs((dprevious_mean * (1.0 - previous_max_deviation) - dmean) / ((1.0 - previous_max_deviation) * dprevious_mean)); 
+        } else
+        {
+            return std::abs((dprevious_mean * (1.0 + previous_max_deviation) - dmean) / ((1.0 - previous_max_deviation) * dprevious_mean)); 
+        }
     } else
     {
         /* If the current mean value is zero */
-        return ((std::abs(dprevious_mean * previous_max_deviation) + std::abs(current_max_deviation * dmean)) / (0.5 * (std::abs((1.0 + previous_max_deviation) * dprevious_mean) + std::abs(dmean))));
+        if (dprevious_mean < dmean && dprevious_mean >= 0.0)
+        {
+            return ((std::abs(dprevious_mean * (1.0 - previous_max_deviation)) + std::abs(dmean)) / (0.5 * (std::abs((1.0 - previous_max_deviation) * dprevious_mean) + std::abs(dmean))));
+        } else
+        {
+            return ((std::abs(dprevious_mean * (1.0 + previous_max_deviation)) + std::abs(dmean)) / (0.5 * (std::abs((1.0 - previous_max_deviation) * dprevious_mean) + std::abs(dmean))));
+        }
     }
 }
+
 
 inline
 uint64_t

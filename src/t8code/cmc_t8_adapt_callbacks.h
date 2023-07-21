@@ -58,7 +58,7 @@ cmc_t8_adapt_callback_coarsen_combined_criteria (t8_forest_t forest,
                                                  t8_element_t * elements[]);
 
 t8_locidx_t
-cmc_t8_adapt_callback_coarsen_error_threshold_parallel (t8_forest_t forest,
+cmc_t8_adapt_callback_coarsen_based_on_error_threshold (t8_forest_t forest,
                                                         t8_forest_t forest_from,
                                                         int which_tree,
                                                         int lelement_id,

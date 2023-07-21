@@ -1271,58 +1271,17 @@ cmc_t8_mpi_recv_max_deviations
 };
 
 /**
- * @brief This functions updates and partitions the deviations calcultaed for the realtive error criterion. The deviaitons will be associated with the (partitined) forest
- *        and communicated acordintgly.
+ * @brief This functions updates the deviations calcultaed for the realtive error criterion. The deviaitons will be associated with the adapted forest
+ *        and updated acordintgly. 
  * 
- * @param adapt_data The @struct cmc_t8_adapt_data which holds all information about the data, the deviations and the reference forest (indicating the partition)
+ * @param adapt_data The @struct cmc_t8_adapt_data which holds all information about the data, the deviations and the reference forest
  */
 static void
-cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& adapt_data)
+cmc_rel_error_threshold_update_deviations(cmc_t8_adapt_data& adapt_data, int num_preceeding_coarsenings = 0)
 {
     #ifdef CMC_WITH_T8CODE
-    #ifdef CMC_ENABLE_MPI
-
-    cmc_debug_msg("The maximum relative deviations from the previous adaptation step will be updated and partitioned."); 
 
     cmc_assert(adapt_data.forest_reference != nullptr);
-
-    /* Adjust the previous maximum deviations element ids, such that they comply with the new adapted forest */
-    int err, mpisize, mpirank;
-
-    /* Get the size of the communicator */
-    err = MPI_Comm_size(adapt_data.t8_data->comm, &mpisize);
-    cmc_mpi_check_err(err);
-    
-    /* Get the (local) rank id */
-    err = MPI_Comm_rank(adapt_data.t8_data->comm, &mpirank);
-    cmc_mpi_check_err(err);
-
-    /* Allocate memory for the Allgather function call */
-    uint64_t* amount_of_coarsenings = new uint64_t[mpisize];
-
-    /* Allocate an offset array holding the SFC index (at the intitial refinement level) of each starting process-local element from each process */
-    uint64_t* offsets = new uint64_t[mpisize];
-
-    /* Get the offest of the first local element as a SFC index (at the initial refienment level) */
-    uint64_t elem_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id(adapt_data.forest_reference));
-
-    //TODO: Maybe make just one call of both
-    /* Distribute the offsets between all processes */
-    err = MPI_Allgather(&elem_offset, 1, MPI_UINT64_T, offsets, 1, MPI_UINT64_T, adapt_data.t8_data->comm);
-    cmc_mpi_check_err(err);
-
-    /* Inquire the amount of coarsenings per process */
-    err = MPI_Allgather(&(adapt_data.coarsening_counter), 1, MPI_UINT64_T, amount_of_coarsenings, 1, MPI_UINT64_T, adapt_data.t8_data->comm);
-    cmc_mpi_check_err(err);
-
-    uint64_t num_preceeding_coarsenings = 0;
-
-    /* Calculate the coarsenings which have happend up to my local process */
-    for (int i = 0; i < mpirank; ++i)
-    {
-        /* Add up all preceeding coarsenings */
-        num_preceeding_coarsenings += amount_of_coarsenings[i];
-    }
 
     /* Get the scheme of the forest's only tree */
     t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (adapt_data.forest_reference, t8_forest_get_eclass(adapt_data.forest_reference, 0));
@@ -1341,6 +1300,95 @@ cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& ada
         /* Update the num_preceeding_coarsenings by this coarsening */
         num_preceeding_coarsenings += (num_children - 1);
     }
+
+    #endif
+}
+
+/**
+ * @brief This function is the serial equivalent to the function 'cmc_rel_error_threshold_update_and_partition_deviations(...)'. The vectors are prepared and switched for the next iteration
+ *        and the element ids are updated such that they comply with the adapted forest.
+ * 
+ * @param adapt_data The @struct cmc_t8_adapt_data which holds all information about the data, the deviations and the reference forest
+ */
+static void
+cmc_rel_error_threshold_update_deviations_serial(cmc_t8_adapt_data& adapt_data)
+{
+    #ifdef CMC_WITH_T8CODE
+
+    /* Update the deviations accordingly to the reference forest */
+    cmc_rel_error_threshold_update_deviations(adapt_data);
+
+    /* Swap the vectors holding the global element ids */
+    std::swap(adapt_data.associated_deviations_gelement_id, adapt_data.associated_deviations_gelement_id_new);
+
+    /* Clear the associated_deviations_gelement_id_new in order to fill it within the next adaptation step */
+    adapt_data.associated_deviations_gelement_id_new.clear();
+
+    const size_t num_deviation_vars = adapt_data.associated_max_deviations_new.size();
+
+    for(size_t var_iter = 0; var_iter < num_deviation_vars; ++var_iter)
+    {
+        /* Swap the deviations */
+        std::swap(adapt_data.associated_max_deviations[var_iter], adapt_data.associated_max_deviations_new[var_iter]);
+        /* Clear the previous deviations */
+        adapt_data.associated_max_deviations_new[var_iter].clear();
+    }
+    #endif
+}
+
+/**
+ * @brief This functions updates and partitions the deviations calculated for the relative error criterion. The deviaitons will be associated with the (partitined) forest
+ *        and communicated acordintgly.
+ * 
+ * @param adapt_data The @struct cmc_t8_adapt_data which holds all information about the data, the deviations and the reference forest (indicating the partition)
+ */
+static void
+cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt_data)
+{
+    #ifdef CMC_WITH_T8CODE
+    #ifdef CMC_ENABLE_MPI
+
+    cmc_debug_msg("The maximum relative deviations from the previous adaptation step will be updated and partitioned."); 
+
+    /* Adjust the previous maximum deviations element ids, such that they comply with the new adapted forest */
+    int err, mpisize, mpirank;
+
+    /* Get the size of the communicator */
+    err = MPI_Comm_size(adapt_data.t8_data->comm, &mpisize);
+    cmc_mpi_check_err(err);
+
+    /* Get the (local) rank id */
+    err = MPI_Comm_rank(adapt_data.t8_data->comm, &mpirank);
+    cmc_mpi_check_err(err);
+
+    /* Allocate memory for the Allgather function call */
+    uint64_t* amount_of_coarsenings = new uint64_t[mpisize];
+
+    /* Allocate an offset array holding the SFC index (at the intitial refinement level) of each starting process-local element from each process */
+    uint64_t* offsets = new uint64_t[mpisize];
+
+    /* Get the offest of the first local element as a SFC index (at the initial refienment level) */
+    uint64_t elem_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id(adapt_data.forest_reference));
+
+    /* Distribute the offsets between all processes */
+    err = MPI_Allgather(&elem_offset, 1, MPI_UINT64_T, offsets, 1, MPI_UINT64_T, adapt_data.t8_data->comm);
+    cmc_mpi_check_err(err);
+
+    /* Inquire the amount of coarsenings per process */
+    err = MPI_Allgather(&(adapt_data.coarsening_counter), 1, MPI_UINT64_T, amount_of_coarsenings, 1, MPI_UINT64_T, adapt_data.t8_data->comm);
+    cmc_mpi_check_err(err);
+
+    uint64_t num_preceeding_coarsenings = 0;
+
+    /* Calculate the coarsenings which have happend up to my local process */
+    for (int i = 0; i < mpirank; ++i)
+    {
+        /* Add up all preceeding coarsenings */
+        num_preceeding_coarsenings += amount_of_coarsenings[i];
+    }
+
+    /* Update the deviations according the amount of coarsenings that had happend */
+    cmc_rel_error_threshold_update_deviations(adapt_data, num_preceeding_coarsenings);
 
     /* Save the lcoal offset andf length of the data which will stay process-local within this pair (first: local_offset within array; second: length of prospective process-local range) */
     std::pair<int, int> already_process_local_range;
@@ -1400,7 +1448,7 @@ cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& ada
         {
             /* Save which (already process-local) range belongs to this process */
             already_process_local_range = std::make_pair(std::distance(adapt_data.associated_deviations_gelement_id_new.begin(), elem_id_iter), msg_length);
-        
+
             /* Set the flag that some elements reside locallly */
             flag_some_data_elements_are_kept_local = true;
         }
@@ -1414,7 +1462,7 @@ cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& ada
     err = MPI_Barrier(adapt_data.t8_data->comm);
     cmc_mpi_check_err(err);
 
-    
+
     /* Counter for the amount of data which will be process-local */
     uint64_t counter_max_deviations = already_process_local_range.second;
 
@@ -1430,7 +1478,7 @@ cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& ada
     /* Flags for working through the received messages */
     bool flag_messages_present = true;
     int mpi_msg_flag = 0;
-    
+
     /* Receive the messages concerning the max deviations */
     /* Since all messages have been staged before, the MPI_Iprobe call finds a matching message in each iteration */
     while (flag_messages_present)
@@ -1525,7 +1573,7 @@ cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& ada
         /* Save the general offest currently present in the array */
         offset += iter->second.num_receiving_elems;
     }
-    
+
     /* If some data was already local, we need to copy it as well */
     if (flag_some_data_elements_are_kept_local)
     {
@@ -1576,6 +1624,28 @@ cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& ada
 }
 
 /**
+ * @brief This function updates the members of the adapt_data which are responsible for the relative error criterion. Based on the whether
+ *        or not the data is distributed, the deviations will be partitioned after updating.
+ * 
+ * @param adapt_data The @struct cmc_t8_adapt_data whose member concerning the relative error criterion will be updated
+ */
+static void
+cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& adapt_data)
+{
+    #ifdef CMC_WITH_T8CODE
+    if (adapt_data.t8_data->use_distributed_data)
+    {
+        /* In case of a parallel environment */
+        cmc_rel_error_threshold_update_and_partition_deviations(adapt_data);
+    } else
+    {
+        /* In case of a serial environemnt */
+        cmc_rel_error_threshold_update_deviations_serial(adapt_data);
+    }
+    #endif
+}
+
+/**
  * @brief This functions updates the adapt and interpolation structs at the beginning of new adaptation step depending on the used compression mode and compression criterion
  * 
  * @param adapt_data The @struct cmc_t8_adapt_data to update/reset
@@ -1600,13 +1670,21 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
 
+                cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+
+                #if 0
                 if (adapt_data.t8_data->use_distributed_data)
                 {
                     /* In parallel environment, we need to communicate the previous maximum deviations */
                     /* Within this function call, we communicate the maximum deviations, order them and return them within the adapt_data for the next iteration */
                     /* The global elementid of the first local element (of the adapt_data->forest_reference) is inquired there as well and stored withint the adapt_data for the next iteratzion */
                     cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+                } else
+                {
+                    /* In a serial environment, it suffices to just update the deviations */
+                    cmc_rel_error_threshold_update_deviations(adapt_data);
                 }
+                #endif
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1633,13 +1711,22 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
 
+                cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+
+                #if 0
                 if (adapt_data.t8_data->use_distributed_data)
                 {
                     /* In parallel environment, we need to communicate the previous maximum deviations */
                     /* Within this function call, we communicate the maximum deviations, order them and return them within the adapt_data for the next iteration */
                     /* The global elementid of the first local element (of the adapt_data->forest_reference) is inquired there as well and stored withint the adapt_data for the next iteratzion */
                     cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+                } else
+                {
+                    /* In a serial environment, it suffices to just update the deviations */
+                    cmc_rel_error_threshold_update_deviations(adapt_data);
                 }
+                #endif
+
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1946,11 +2033,12 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
         {
             /* Repartition the variable's data */
             forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest);
-            /* Save the partitioned forest temporarily in case the adapt-interpolate function needs it */
-            adapt_data.forest_reference = forest;
         }
 
-        /* Update the data striucts at the end of a iteration */
+        /* Save the adapated and/or partitioned forest temporarily in case the adapt-interpolate function needs it */
+        adapt_data.forest_reference = forest;
+
+        /* Update the data structs at the end of a iteration */
         cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data);
     }
 
@@ -2071,9 +2159,10 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
             {
                 /* Repartition the variable's data */
                 forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest, var_id);
-                /* Save the partitioned forest temporarily in case the adapt-interpolate function needs it */
-                adapt_data.forest_reference = forest;
             }
+
+            /* Save the adapated and/or partitioned forest temporarily in case the adapt-interpolate function needs it */
+            adapt_data.forest_reference = forest;
 
             /* Update the adapt and interpolation struct at the end of the iteration */
             cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data);

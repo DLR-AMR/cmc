@@ -26,8 +26,8 @@ main(int argc, char* argv[])
     const size_t start_ptr[3] = {0,0,0};  //Example netCDF File
     const size_t count_ptr[3] = {1,73,144}; //Example netCDF File
 
-    std::vector<int> p_dist{1,2,2};
-    cmc_nc_set_blocked_reading(nc_data, p_dist);
+    //std::vector<int> p_dist{1,2,2};
+    //cmc_nc_set_blocked_reading(nc_data, p_dist);
 
     cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t", "tco3");
 
@@ -41,13 +41,15 @@ main(int argc, char* argv[])
     cmc_nc_finish(nc_data);
 
     /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.02);
+    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.05);
 
     /* Setup the compression for a given 'compression mode' */
     cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);
+
+    cmc_amr_decompress(amr_data);
 
     /* Deallocate the Lossy AMR Compression data */
     cmc_amr_destroy(amr_data);
