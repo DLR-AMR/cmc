@@ -44,7 +44,7 @@ main(int argc, char* argv[])
     cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.05);
 
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);
@@ -114,7 +114,7 @@ main(int argc, char* argv[])
     //cmc_amr_write_netcdf_file(amr_data, "example_initial.nc", CMC_AMR_WRITE_ALL_VARS_TO_NETCDF);
     
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
 
     /* Write a vtk file of the decompressed data */
     cmc_amr_write_vtk_file(amr_data, "cmc_initial_data");

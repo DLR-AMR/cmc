@@ -197,13 +197,14 @@ public:
     MPI_Comm comm; //!< The communicator to use in a parallel environment 
 
     CMC_T8_COMPRESSION_MODE compression_mode{CMC_T8_COMPRESSION_UNDEFINED}; //!< An @enum CMC_T8_COMPRESSION_MODE indicating which compression scheme will be used (@see @enum CMC_T8_COMPRESSION_MODE)
-
+    int dimension_of_compression_mode{0}; //!< The dimensionaliy of the compression mode (e.g. for 2D data equals 2) 
+    bool is_initial_data_kept{false}; //!< A flag indicating whether or not the initial data (prior to the compression) is saved or not
     bool variables_are_defined_on_the_same_domain{true}; //!< A flag indicating whether the domain of all variables is the same or if the variables are defined on different geo-spatial domains (e.g. var1 is defined on 'lat x lon'; var2 is defined on 'lon x lev')
 
     bool use_distributed_data{false}; //!< A flag indicating whether the variable's data is distributed among processses or not
     data_distribution_t data_dist{data_distribution_t::DISTRIBUTION_UNDEFINED}; //!< An enum defining the current parallel distribution style of the data
     
-    cmc_amr_compression_settings settings{};
+    cmc_amr_compression_settings settings{}; //!< A struct holding information about the compression criterion to use
 };
 
 /**

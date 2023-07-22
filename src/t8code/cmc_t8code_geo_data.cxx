@@ -1069,8 +1069,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
     }
 
     /* Set up the data structures based on the compression mode */
-    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* If a 'One for All' compression mode is used */
         switch (t8_data->settings.compression_criterium)
@@ -1168,8 +1167,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
 {
     #ifdef CMC_WITH_T8CODE
     /* Set up the data structures based on the compression mode */
-    if (adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* If a 'One for All' compression mode is used */
         switch (adapt_data.t8_data->settings.compression_criterium)
@@ -1656,8 +1654,7 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
 {
     #ifdef CMC_WITH_T8CODE
     /* Set up the data structures based on the compression mode */
-    if (adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* If a 'One for All' compression mode is used */
         switch (adapt_data.t8_data->settings.compression_criterium)
@@ -1756,8 +1753,7 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
 {
     #ifdef CMC_WITH_T8CODE
     /* Set up the data structures based on the compression mode */
-    if (adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (adapt_data.t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* If a 'One for All' compression mode is used */
         switch (adapt_data.t8_data->settings.compression_criterium)
@@ -1830,8 +1826,7 @@ cmc_t8_geo_data_repartition_during_compression(cmc_t8_data_t t8_data, t8_forest_
     const int partition_for_coarsening = 0; //Currently, this is not yet available
 
     /* We need to distinguish between the compression modes */
-    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* If a 'One For All' compression is used */
         /* Reference the forest */
@@ -2195,12 +2190,10 @@ cmc_t8_adapt_interpolate_data_func(cmc_t8_data_t t8_data, t8_forest_adapt_t adap
     cmc_assert(t8_data->compression_mode != CMC_T8_COMPRESSION_MODE::CMC_T8_COMPRESSION_UNDEFINED);
     
     /* Check if a 'one for all' or 'one for one' approach is considered */
-    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         cmc_t8_adapt_interpolate_data_func_one_for_all(t8_data, adapt_function, interpolation_function);
-    } else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D ||
-               t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_3D)
+    } else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE)
     {
         cmc_t8_adapt_interpolate_data_func_one_for_one(t8_data, adapt_function, interpolation_function);
     } else
@@ -2584,29 +2577,14 @@ cmc_t8_apply_zcurve_ordering(cmc_t8_data& t8_data, const int var_id)
         case CMC_T8_COMPRESSION_MODE::CMC_T8_COMPRESSION_UNDEFINED:
             cmc_err_msg("No compression mode was supplied. Therefore, the elements cannot be reordered by 'cmc_t8_apply_zcurve_ordering'()");
             break;
-        case CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D:
+        case CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL:
             cmc_debug_msg("The variables will be reorderd (compliant to the z-curve order). The selected compression mode was 'one for all'");
-            cmc_t8_apply_zcurve_ordering_one_for_all(t8_data, ids_apply_reordering, 2);
+            cmc_t8_apply_zcurve_ordering_one_for_all(t8_data, ids_apply_reordering, t8_data.dimension_of_compression_mode);
             break;
-        case CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D:
+        case CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE:
             cmc_debug_msg("The variables will be reorderd (compliant to the z-curve order). The selected compression mode was 'one for one'");
-            cmc_t8_apply_zcurve_ordering_one_for_one(t8_data, ids_apply_reordering, 2);
+            cmc_t8_apply_zcurve_ordering_one_for_one(t8_data, ids_apply_reordering, t8_data.dimension_of_compression_mode);
             break;
-        case CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D:
-            cmc_debug_msg("The variables will be reorderd (compliant to the z-curve order). The selected compression mode was 'one for all'");
-            cmc_t8_apply_zcurve_ordering_one_for_all(t8_data, ids_apply_reordering, 3);
-            break;
-        case CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_3D:
-            cmc_debug_msg("The variables will be reorderd (compliant to the z-curve order). The selected compression mode was 'one for one'");
-            cmc_t8_apply_zcurve_ordering_one_for_one(t8_data, ids_apply_reordering, 3);
-            break;
-        case CMC_T8_COMPRESSION_MODE::GROUPED_2D:
-            cmc_err_msg("Not implemented yet");
-            break;
-        case CMC_T8_COMPRESSION_MODE::GROUPED_3D:
-            cmc_err_msg("Not implemented yet");
-            break;
-        
         default:
             cmc_err_msg("An unknown compression mode was supplied. Therefore, the elements cannot be reordered by 'cmc_t8_apply_zcurve_ordering'()");
     }
@@ -2788,8 +2766,7 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
     cmc_t8_adapt_data adapt_data{t8_data};
     cmc_t8_interpolation_data interpolation_data{t8_data};
 
-    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         forest = t8_data->assets->forest;
         cmc_debug_msg("De-Compression of variables starts...");
@@ -2860,8 +2837,7 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
         cmc_debug_msg("Adaptation/De-Compression is finished.");
 
     } 
-    else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D ||
-             t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_3D)
+    else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE)
     {
         /* Since every variable define its own mesh, we iterate over all variables */
         for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)

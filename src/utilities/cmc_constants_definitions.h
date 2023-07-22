@@ -28,7 +28,8 @@ enum cmc_type {CMC_UNDEFINED = -1, CMC_BYTE, CMC_INT8_T, CMC_CHAR, CMC_INT16_T, 
 
 /* Enumeration of possible compression mode (i.e. how the adaptation and interpolation functions should be applied) */
 /* If CMC is built with Fortran, we enforce the enum to be a 4-byte integer, in order to be compliant with Fortran's 'C_INT' */
-enum CMC_LOSSY_COMPRESSION_MODE {CMC_T8_COMPRESSION_UNDEFINED = -1, ONE_FOR_ALL_2D, ONE_FOR_ONE_2D, GROUPED_2D, ONE_FOR_ALL_3D, ONE_FOR_ONE_3D, GROUPED_3D
+//enum CMC_LOSSY_COMPRESSION_MODE {CMC_T8_COMPRESSION_UNDEFINED = -1, ONE_FOR_ALL_2D, ONE_FOR_ONE_2D, GROUPED_2D, ONE_FOR_ALL_3D, ONE_FOR_ONE_3D, GROUPED_3D
+enum CMC_LOSSY_COMPRESSION_MODE {CMC_T8_COMPRESSION_UNDEFINED = -1, ONE_FOR_ALL, ONE_FOR_ONE, GROUPED
 #ifdef CMC_ENABLE_FORTRAN
 , CMC_DUMMY_INT32_VAL = INT_MAX
 #endif

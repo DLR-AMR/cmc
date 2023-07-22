@@ -94,7 +94,6 @@ cmc_amr_pre_setup_set_compression_criterium_exclude_area(cmc_amr_data_t amr_data
  * In case of a 'One for All' compression, all variables are defined on the same mesh and will be compressed simultaneously, e.g. the compression criterium must be fulfilled for each variable.
  * Therefore, the compresseion of the variables is dependent on one another (One mesh for all variables).
  * 
- * @note If 3D varibales will be compressed, but a 2D compression mode (e.g. ONE_FOR_ONE_2D) is chosen, the 3D varibale will be automatically spliited in their elevation coordinate and converted to several 2D 'longitude x latitude' variables
  * @note By default, an error threshold criterium is used (if no else has been set via a 'cmc_amr_pre_setup_...'-function).
  * @note Any 'cmc_amr_pre_setup_...' have to be called before \fn void cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE compression_mode)
  *

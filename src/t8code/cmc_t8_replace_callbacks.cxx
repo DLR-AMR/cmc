@@ -16,8 +16,7 @@ cmc_t8_geo_data_interpolate_std_mean(t8_forest_t forest_old, t8_forest_t forest_
     if (refine == -1)
     {
         /* If a coarsening has been introduced */
-        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)
@@ -40,8 +39,7 @@ cmc_t8_geo_data_interpolate_std_mean(t8_forest_t forest_old, t8_forest_t forest_
     } else if (refine == 0)
     {
         /* If the element stays the same */
-        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)
@@ -83,8 +81,7 @@ cmc_t8_geo_data_interpolate_plain_copy_values(t8_forest_t forest_old, t8_forest_
     if (refine == 1)
     {
         /* If a refinement was introduced */
-        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)
@@ -112,8 +109,7 @@ cmc_t8_geo_data_interpolate_plain_copy_values(t8_forest_t forest_old, t8_forest_
     } else if (refine == 0)
     {
         /* If the element stays the same */
-        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)
@@ -154,8 +150,7 @@ cmc_t8_geo_data_interpolate_error_threshold_adaption(t8_forest_t forest_old, t8_
     if (refine == 0)
     {
         /* If the element stays the same */
-        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)
@@ -179,8 +174,7 @@ cmc_t8_geo_data_interpolate_error_threshold_adaption(t8_forest_t forest_old, t8_
     } else if (refine == -1)
     {
         /* If coarsening has been introduced */
-        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (interpolation_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* In case a 'One for All' compression is chosen */
             for (size_t var_id{0}; var_id < interpolation_data->t8_data->vars.size(); ++var_id)

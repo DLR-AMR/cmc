@@ -139,8 +139,8 @@ static inline
 bool cmc_t8_element_level_coarser_than_initial_refinement_level(cmc_t8_adapt_data_t adapt_data, t8_eclass_scheme_c * ts, t8_element_t* element)
 {
     #ifdef CMC_WITH_T8CODE
-    const int initial_ref_lvl{(adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-                               adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D) ?
+    /* Get the initial refinement level of the data based on the compression criterion */
+    const int initial_ref_lvl{(adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL) ?
                                adapt_data->t8_data->assets->initial_refinement_lvl :
                                adapt_data->t8_data->vars[adapt_data->current_var_id]->assets->initial_refinement_lvl};
     
@@ -161,11 +161,11 @@ static inline
 bool cmc_t8_elements_coarsened_from_the_beginning_onwards(cmc_t8_adapt_data_t adapt_data, t8_eclass_scheme_c * ts, t8_element_t* element)
 {
     #ifdef CMC_WITH_T8CODE
-
-    const int initial_ref_lvl{(adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-                               adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D) ?
+    /* Get the initial refinement level of the data based on the compression criterion */
+    const int initial_ref_lvl{(adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL) ?
                                adapt_data->t8_data->assets->initial_refinement_lvl :
                                adapt_data->t8_data->vars[adapt_data->current_var_id]->assets->initial_refinement_lvl};
+    /* Check if the current element level resemles a coarsening process of those elements from the beginning of the compression onwards */
     if (t8_element_level(ts, element) != initial_ref_lvl - adapt_data->adapt_step)
     {
         /* The element has not been coarsened before */
@@ -179,6 +179,11 @@ bool cmc_t8_elements_coarsened_from_the_beginning_onwards(cmc_t8_adapt_data_t ad
 }
 
 
+/**
+ * @brief This function's only application is within the serial relative error threshold criterion
+ * 
+ * @param adapt_data The current adapt_data resembling the status of the adaptation
+ */
 static inline
 void cmc_t8_update_counters_for_rel_error_threshold(cmc_t8_adapt_data_t adapt_data)
 {
@@ -198,7 +203,7 @@ void cmc_t8_update_counters_for_rel_error_threshold(cmc_t8_adapt_data_t adapt_da
  * @return false If the elements does not fulfill the error threshold and therefore cannot be coarsened 
  */
 static inline
-bool cmc_t8_elements_fulfill_rel_error_threshold(cmc_t8_adapt_data_t adapt_data, t8_locidx_t lelement_id, t8_eclass_scheme_c * ts, const int num_elements, t8_element_t * elements[])
+bool cmc_t8_elements_fulfill_rel_error_threshold_serial_with_initial_data_present(cmc_t8_adapt_data_t adapt_data, t8_locidx_t lelement_id, t8_eclass_scheme_c * ts, const int num_elements, t8_element_t * elements[])
 {
     #ifdef CMC_WITH_T8CODE
     
@@ -206,8 +211,7 @@ bool cmc_t8_elements_fulfill_rel_error_threshold(cmc_t8_adapt_data_t adapt_data,
     /* This is due to the fact, that in a 'One for All' compression mode, the threshold needs to be fullfilled for every varibale
      * whereas in a 'One for One' compression mode the threshold only needs to hold for a single variable itself */
     /* Check which mode is used */
-    if (adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* In case a 'One for All' compression mode is used */
         /* Check the element families mean value, and calculate the deviation introduced by this coarsening */
@@ -325,8 +329,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
     #ifdef CMC_WITH_T8CODE
 
     /* We distinguish between the compression mode, because dependent on it, we check has to be perfomed for all variables or just for a single variable */
-    if (adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+    if (adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
     {
         /* On the finest level we can just calculate the relative deviation, but on coarser levels we need to take previous coarsening steps into account */
         if (ts->t8_element_level(elements[0]) != adapt_data->t8_data->assets->initial_refinement_lvl)
@@ -615,7 +618,7 @@ cmc_t8_adapt_callback_coarsen_exclude_area(t8_forest_t forest,
                                            t8_eclass_scheme_c * ts,
                                            const int is_family,
                                            const int num_elements,
-                                           t8_element_t * elements[]) 
+                                           t8_element_t * elements[])
 {
     #ifdef CMC_WITH_T8CODE
 
@@ -654,6 +657,12 @@ cmc_t8_adapt_callback_coarsen_exclude_area(t8_forest_t forest,
     #endif
 }
 
+/**
+ * @brief This function is a variation of the relative error criterion, but it does only work in serial and when the initial data (prior to the compression is present).
+ *        The memory demand is quite high for this function because the initial data of all variables has to be kept. However, this enables the maximum possible compression for a relative error criterion.
+ * @note This function is deprecated and should not be used, the parallel counterpart is to be prefered. (@see cmc_t8_adapt_callback_coarsen_based_on_error_threshold(...))
+ * 
+ */
 t8_locidx_t
 cmc_t8_adapt_callback_coarsen_error_threshold (t8_forest_t forest,
                                                t8_forest_t forest_from,
@@ -700,7 +709,7 @@ cmc_t8_adapt_callback_coarsen_error_threshold (t8_forest_t forest,
     }
 
     /* Families of elements that have passed the previous checks are now conducted if they fulfill the given relative error threshold */
-    if (cmc_t8_elements_fulfill_rel_error_threshold(adapt_data, lelement_id, ts, num_elements, elements))
+    if (cmc_t8_elements_fulfill_rel_error_threshold_serial_with_initial_data_present(adapt_data, lelement_id, ts, num_elements, elements))
     {
         /* If the elements family fulfills the relative error threshold, we are able to coarsen the elements */
         return -1;
@@ -764,7 +773,7 @@ cmc_t8_adapt_callback_coarsen_combined_criteria (t8_forest_t forest,
     }
 
     /* Families of elements that have passed the previous checks are now conducted if they fulfill the given relative error threshold */
-    if (cmc_t8_elements_fulfill_rel_error_threshold(adapt_data, lelement_id, ts, num_elements, elements))
+    if (cmc_t8_elements_fulfill_rel_error_threshold_serial_with_initial_data_present(adapt_data, lelement_id, ts, num_elements, elements))
     {
         /* If the elements family fulfills the relative error threshold, we are able to coarsen the elements */
         return -1;

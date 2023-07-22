@@ -231,8 +231,7 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
     }
 
     /* Check if the compression mode is compliant with the variable's data domain */
-    if (((t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D) ||
-        (t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)) &&
+    if ((t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL) &&
         !t8_data.variables_are_defined_on_the_same_domain)
     {
         cmc_err_msg("The choosen compression mode is of type 'One for All', but the geo-spatial data domain does not coincide with all supplied variables.\n",
@@ -266,8 +265,7 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
         initial_forest = t8_forest_new_uniform(cmesh, t8_scheme_new_default_cxx(), t8_data.geo_data->initial_refinement_lvl, 0, t8_data.comm);
 
         /* Allocate assets (based on the compression mode) */
-        if (t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             t8_data.assets = new cmc_t8_assets(t8_data.geo_data->initial_refinement_lvl);
             t8_data.assets_allocated = true;
@@ -294,8 +292,7 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
         t8_data.initial_forest = cmc_t8_coarsen_geo_mesh(t8_data, initial_forest, t8_data.geo_data->initial_refinement_lvl);
 
         /* Save the initial forest and pointer to it accordingly for each variable (based on the compression mode) */
-        if (t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             t8_forest_ref(t8_data.initial_forest);
             t8_data.assets->forest = t8_data.initial_forest;
@@ -316,7 +313,7 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
         cmc_assert(t8_data.use_distributed_data == false);
 
         /* Currently, in this case the compression mode can only be of type 'One for One' */
-        cmc_assert(t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_2D || t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE_3D);
+        cmc_assert(t8_data.compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
 
         /* Group variables with the same geo-spatial domain */
         std::vector<std::vector<int>> var_ids;

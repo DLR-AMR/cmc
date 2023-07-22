@@ -28,6 +28,7 @@ struct cmc_amr_data
     ~cmc_amr_data(){};
 };
 
+#if 0
 /** Begin Static Functions **/
 #ifdef CMC_WITH_T8CODE
 static
@@ -55,6 +56,8 @@ get_dimensionality_of_compression_mode(const CMC_AMR_COMPRESSION_MODE mode)
     }
 }
 #endif
+#endif
+
 
 /* In order to write a netCDF-file of the decompressed data, the data has to be defined on the same geo domain */
 #ifdef CMC_WITH_NETCDF
@@ -413,68 +416,61 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
     /* Perform different actions based on the compression approach */
     switch (amr_data->t8_data->compression_mode)
     {
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_2D:
-            cmc_debug_msg("Lossy AMR 'One for All 2D' compression will be applied...");
-            /** Check if 3D data is given
-             *  If so, it has to be splitted into 2D variables   
-            **/
-            /** \note: If no 3D variables are present, this function will just return.
-             *         After the creation of the 'amr_data' (via 'cmc_create_amr_compression_...()') and before calling the 'amr_setup'-function,
-             *         the pre-setup function '' may be called in order to split the 3D variables in a custom way */
-            cmc_geo_data_transform_3d_var_to_2d(amr_data->t8_data, CMC_APPLY_TRANSFORMATION_3D_TO_2D_TO_ALL_VARS, DATA_LAYOUT::CMC_2D_LAT_LON);
+        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL:
+            cmc_debug_msg("Lossy AMR 'One for All' compression will be applied...");
             break;
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE_2D:
-            cmc_debug_msg("Lossy AMR 'One for One 2D' compression will be applied...");
-            /** Check if 3D data is given
-             *  If so, it has to be splitted into 2D variables   
-            **/
-            /** \note: If no 3D variables are present, this function will just return.
-             *         After the creation of the 'amr_data' (via 'cmc_create_amr_compression_...()') and before calling the 'amr_setup'-function,
-             *         the pre-setup function '' may be called in order to split the 3D variables in a custom way */
-            cmc_geo_data_transform_3d_var_to_2d(amr_data->t8_data, CMC_APPLY_TRANSFORMATION_3D_TO_2D_TO_ALL_VARS, DATA_LAYOUT::CMC_2D_LAT_LON);
-            break;
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_3D:
-            cmc_debug_msg("Lossy AMR 'One for All 3D' compression will be applied...");
-            cmc_assert(amr_data->t8_data->geo_data->dim == 3);
-            break;
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE_3D:
-            cmc_debug_msg("Lossy AMR 'One for One 3D' compression will be applied...");
-            cmc_assert(amr_data->t8_data->geo_data->dim == 3);
+        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE:
+            cmc_debug_msg("Lossy AMR 'One for One' compression will be applied...");
             break;
         default:
             cmc_err_msg("An unknown compression_mode was supplied.");
     }
 
+    /* Save the diemensionality of the data */
+    amr_data->t8_data->dimension_of_compression_mode = amr_data->t8_data->geo_data->dim;
     /* Build an enclosing mesh */
     cmc_t8_create_enclosing_geo_mesh(*(amr_data->t8_data));
 
+    /* Check if the data is distributed and we are using a parallel environment */
     if (amr_data->t8_data->use_distributed_data)
     {
+        /* In the parallel case, we need to distribute the data first and apply the ordering afterwards */
         cmc_t8_geo_data_distribute_and_apply_ordering((amr_data->t8_data));
     } else 
     {
-        /* Apply the z-curve ordering to all variables */
+        /* In a serial mode, we are able to directly apply the correct z-curve ordering to all variables */
         cmc_t8_apply_zcurve_ordering(*(amr_data->t8_data), CMC_APPLY_ZCURVE_TO_ALL_VARS);
     }
 
     #ifdef CMC_ENABLE_DEBUG
+    /* In a DEBUG-configuration we are writing the initial data to '.vtu'-files */
     char file_prefix[55];
-    if (compression_mode == CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        compression_mode == CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+
+    /* Create a file-name dependent on the compression mode */
+    switch (compression_mode)
     {
-        int ret_val{snprintf(file_prefix, 49, "%s%d%s", "cmc_amr_lossy_comp-Initial_Forest_One_For_All_", get_dimensionality_of_compression_mode(amr_data->t8_data->compression_mode), "D")};
-        if (ret_val < 0)
+        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL:
         {
-            cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            int ret_val{snprintf(file_prefix, 49, "%s%d%s", "cmc_amr_lossy_comp-Initial_Forest_One_For_All_", amr_data->t8_data->dimension_of_compression_mode, "D")};
+            if (ret_val < 0)
+            {
+                cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            }
         }
-    } else
-    {
-        int ret_val{snprintf(file_prefix, 49, "%s%d%s", "cmc_amr_lossy_comp-Initial_Forest_One_For_One_", get_dimensionality_of_compression_mode(amr_data->t8_data->compression_mode), "D")};
-        if (ret_val < 0)
+        break;
+        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE:
         {
-            cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            int ret_val{snprintf(file_prefix, 49, "%s%d%s", "cmc_amr_lossy_comp-Initial_Forest_One_For_One_", amr_data->t8_data->dimension_of_compression_mode, "D")};
+            if (ret_val < 0)
+            {
+                cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            }
         }
+        break;
+        default:
+            cmc_err_msg("An unknown compression mode ist present.");
     }
+    
     /* Write out the forest with the variable's data at the beginning of the compression process */
     cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix); 
     #endif
@@ -522,26 +518,37 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
     amr_data->compression_applied = true;
 
     #ifdef CMC_ENABLE_DEBUG
+    /* In a DEBUG-configuration we are writing out the comrpessed data */
     char file_prefix[55];
-    if (amr_data->t8_data->compression_mode == CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        amr_data->t8_data->compression_mode == CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+
+    switch (amr_data->t8_data->compression_mode)
     {
-        int ret_val{snprintf(file_prefix, 52, "%s%d%s", "cmc_amr_lossy_comp-Compressed_Forest_One_For_All_", get_dimensionality_of_compression_mode(amr_data->t8_data->compression_mode), "D")};
-        if (ret_val < 0)
+        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL:
         {
-            cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            int ret_val{snprintf(file_prefix, 52, "%s%d%s", "cmc_amr_lossy_comp-Compressed_Forest_One_For_All_", amr_data->t8_data->dimension_of_compression_mode, "D")};
+            if (ret_val < 0)
+            {
+                cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            }
         }
-    } else
-    {
-        int ret_val{snprintf(file_prefix, 52, "%s%d%s", "cmc_amr_lossy_comp-Compressed_Forest_One_For_One_", get_dimensionality_of_compression_mode(amr_data->t8_data->compression_mode), "D")};
-        if (ret_val < 0)
+        break;
+        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE:
         {
-            cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            int ret_val{snprintf(file_prefix, 52, "%s%d%s", "cmc_amr_lossy_comp-Compressed_Forest_One_For_One_", amr_data->t8_data->dimension_of_compression_mode, "D")};
+            if (ret_val < 0)
+            {
+                cmc_err_msg("An error occured during the creation of a file name for the vtk-output file.");
+            }
         }
+        break;
+        default:
+            cmc_err_msg("An unknown compression mode ist present.");
     }
-    /* Save the compressed data point in a file */
-    std::ofstream compresseion_results("compression_elem_count.txt");
-    compresseion_results << "Elements of compressed forests\nMax error = " << amr_data->t8_data->settings.max_err << std::endl;
+
+    #if 0
+    /* Save the amount of compressed data points in a file */
+    std::ofstream compresseion_results("compression_result_element_count_per_variable.txt");
+    compresseion_results << "Elements of the compressed forests\nMax error = " << amr_data->t8_data->settings.max_err << std::endl;
     for (size_t i{0}; i < amr_data->t8_data->vars.size(); ++i)
     {
         compresseion_results << t8_forest_get_global_num_elements(amr_data->t8_data->vars[i]->assets->forest) << " Elements has the forest of variable (name: " << amr_data->t8_data->vars[i]->var->name << ")" << std::endl; 
@@ -550,6 +557,8 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
 
     /* Write out the forest(s) with the compressed data */
     cmc_t8_write_forest_all_vars(amr_data->t8_data, file_prefix);
+    #endif
+
     #endif
     #endif
 }
@@ -567,89 +576,99 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
 
     cmc_debug_msg("Decompression has been finished.");
     
-    cmc_debug_msg("The Lossy AMR compressor introduced a maximum error of:");
-    double max_err{0.0}, current_err{0.0};
-    double approx_value{0.0};
-    double exact_value{1.0};
+    /* If the initial data is kept, we can calculate the maximum introduced data inaccuracy */
+    if (amr_data->t8_data->is_initial_data_kept)
+    {
+        /* Declare some variables needed for the computation */
+        double max_err{0.0}, current_err{0.0};
+        double approx_value{0.0};
+        double exact_value{1.0};
 
-    /* Check which mode is used */
-    if (amr_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-        amr_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
-    {
-        std::vector<double> max_error(amr_data->t8_data->vars.size(), 0.0);
-        
-        for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->assets->forest)); ++i)
+        /* If the data is distributed, we need to partition the initial data accordingly in order to check the error */
+        if (amr_data->t8_data->use_distributed_data)
         {
-            for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
-            {
-                exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
-                approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
-                if (exact_value > 0.0 && approx_value > 0.0)
-                {
-                    current_err = std::abs(approx_value - exact_value) / exact_value;
-                    if (max_error[var_id] < current_err)
-                    {
-                        max_error[var_id] = current_err;
-                    }
-                } else
-                {
-                    if (exact_value == 0.0 && max_error[var_id] < approx_value)
-                    {
-                        max_error[var_id] = approx_value;
-                    }
-                }
-            }
+            //..partition here
         }
-        for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
+
+        cmc_debug_msg("The Lossy AMR compressor introduced a maximum point-wise relative error of:");
+
+        /* Check which mode is used */
+        if (amr_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
-            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_error[var_id] * 100, "%.");
-        }
-    }
-    else
-    {
-        for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
-        {
-            max_err = 0.0;
-            cmc_assert((amr_data->t8_data->initial_data[var_id]).size() == amr_data->t8_data->vars[var_id]->var->data->size());
-            for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->vars[var_id]->assets->forest)); ++i)
+            std::vector<double> max_error(amr_data->t8_data->vars.size(), 0.0);
+            
+            for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->assets->forest)); ++i)
             {
-                /* Check if a missing value would be at the position of the exact value */
-                if (!(amr_data->t8_data->vars[var_id]->var->is_equal_to_missing_value(i)))
+                for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
                 {
                     exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
                     approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
                     if (exact_value > 0.0 && approx_value > 0.0)
                     {
                         current_err = std::abs(approx_value - exact_value) / exact_value;
-                        if (max_err < current_err)
+                        if (max_error[var_id] < current_err)
                         {
-                            max_err = current_err;
-                        }
-                        //cmc_debug_msg(i, " hat Fehlerantewil: ", current_err);
-                        if(current_err > 0.02)
-                        {
-                            //cmc_debug_msg("Hier ist zu viel fehler lelement_id: ", i, " und der fehler ist: ", current_err);
+                            max_error[var_id] = current_err;
                         }
                     } else
                     {
-                        #if 0
-                        if (exact_value == 0.0 && max_err < approx_value)
+                        if (exact_value == 0.0 && max_error[var_id] < approx_value)
                         {
-                            max_err = approx_value;
+                            max_error[var_id] = approx_value;
                         }
-                        #endif
-                    }
-                    if (max_err > 10 &&  i < 100)
-                    {
-                        std::cout << "approx value: " << approx_value << " und exact value: " << exact_value << std::endl;
-                        std::cout << "zu hoher fehler " << max_err << " bei var_id: " << var_id << " und i=" << i << std::endl;
                     }
                 }
             }
-            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_err * 100, "%.");
+            for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
+            {
+                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_error[var_id] * 100, "%.");
+            }
+        }
+        else
+        {
+            for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
+            {
+                max_err = 0.0;
+                cmc_assert((amr_data->t8_data->initial_data[var_id]).size() == amr_data->t8_data->vars[var_id]->var->data->size());
+                for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->vars[var_id]->assets->forest)); ++i)
+                {
+                    /* Check if a missing value would be at the position of the exact value */
+                    if (!(amr_data->t8_data->vars[var_id]->var->is_equal_to_missing_value(i)))
+                    {
+                        exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
+                        approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
+                        if (exact_value > 0.0 && approx_value > 0.0)
+                        {
+                            current_err = std::abs(approx_value - exact_value) / exact_value;
+                            if (max_err < current_err)
+                            {
+                                max_err = current_err;
+                            }
+                            //cmc_debug_msg(i, " hat Fehlerantewil: ", current_err);
+                            if(current_err > 0.02)
+                            {
+                                //cmc_debug_msg("Hier ist zu viel fehler lelement_id: ", i, " und der fehler ist: ", current_err);
+                            }
+                        } else
+                        {
+                            #if 0
+                            if (exact_value == 0.0 && max_err < approx_value)
+                            {
+                                max_err = approx_value;
+                            }
+                            #endif
+                        }
+                        if (max_err > 10 &&  i < 100)
+                        {
+                            std::cout << "approx value: " << approx_value << " und exact value: " << exact_value << std::endl;
+                            std::cout << "zu hoher fehler " << max_err << " bei var_id: " << var_id << " und i=" << i << std::endl;
+                        }
+                    }
+                }
+                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_err * 100, "%.");
+            }
         }
     }
-
     /* Set the comrpession flag */
     amr_data->compression_applied = false;
 

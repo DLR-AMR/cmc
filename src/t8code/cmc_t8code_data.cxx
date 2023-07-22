@@ -100,8 +100,7 @@ cmc_t8_write_forest_all_vars(cmc_t8_data_t t8_data, const char* file_prefix)
     else
     {
         /* If all variables are defined on the same forest with an 'One For All'-compression mode */
-        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_2D ||
-            t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL_3D)
+        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
             /* Get the amount of variables to write out */
             const size_t num_data_vars{var_ids_zcurve.size()};
