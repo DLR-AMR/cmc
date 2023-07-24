@@ -28,37 +28,6 @@ struct cmc_amr_data
     ~cmc_amr_data(){};
 };
 
-#if 0
-/** Begin Static Functions **/
-#ifdef CMC_WITH_T8CODE
-static
-int
-get_dimensionality_of_compression_mode(const CMC_AMR_COMPRESSION_MODE mode)
-{
-    switch (mode)
-    {
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_2D:
-            [[fallthrough]];
-        case CMC_AMR_COMPRESSION_MODE::GROUPED_2D:
-            [[fallthrough]];
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE_2D:
-            return 2;
-            break;
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ALL_3D:
-            [[fallthrough]];
-        case CMC_AMR_COMPRESSION_MODE::GROUPED_3D:
-            [[fallthrough]];
-        case CMC_AMR_COMPRESSION_MODE::ONE_FOR_ONE_3D:
-            return 3;
-            break;
-        default:
-            return CMC_ERR;
-    }
-}
-#endif
-#endif
-
-
 /* In order to write a netCDF-file of the decompressed data, the data has to be defined on the same geo domain */
 #ifdef CMC_WITH_NETCDF
 static void
@@ -352,6 +321,21 @@ cmc_create_amr_compression_data_messy(cmc_messy_data_t messy_data, const MPI_Com
 }
 #endif
 
+/* Set a flag indicating whether or not the initial data should be saved */
+void
+cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(cmc_amr_data_t amr_data, const int flag_keep_initial_data)
+{
+    if (flag_keep_initial_data != 0)
+    {
+        /* If true, we will keep the data */
+        amr_data->t8_data->is_initial_data_kept = true;
+    } else
+    {
+        /* if the flag is false, we will abandon the initial data during the compression */
+        amr_data->t8_data->is_initial_data_kept = false;
+    }
+}
+
 /* Perform pre-setup steps: Divide a 3D variable into several 2D variables by spliiting up a given coordinate dimension */
 void
 cmc_amr_pre_setup_split_3D_variable(cmc_amr_data_t amr_data, const int var_id, const DATA_LAYOUT preferred_data_layout)
@@ -563,6 +547,110 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
     #endif
 }
 
+/**
+ * @brief Calculate the introduced data inaccuracy after the decompression if the initial data has been kept
+ * 
+ * @param amr_data The amr_data holding the decompressed data as well as the intial data
+ */
+static void
+cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
+{
+    cmc_assert(!amr_data->compression_applied);
+    cmc_assert(amr_data->t8_data->is_initial_data_kept);
+
+    /* Declare some variables needed for the computation */
+    double max_err{0.0}, current_err{0.0};
+    double approx_value{0.0};
+    double exact_value{1.0};
+
+    #if 0
+    /* If the data is distributed, we need to partition the initial data accordingly in order to check the error */
+    if (amr_data->t8_data->use_distributed_data)
+    {
+        /* The initial data has to be partitioned */
+    }
+    #endif
+    cmc_debug_msg("The Lossy AMR compressor introduced a maximum point-wise relative error of:");
+
+    /* Check which mode is used */
+    if (amr_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
+    {
+        std::vector<double> max_error(amr_data->t8_data->vars.size(), 0.0);
+        
+        for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->assets->forest)); ++i)
+        {
+            for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
+            {
+                exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
+                approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
+                if (exact_value > 0.0 && approx_value > 0.0)
+                {
+                    current_err = std::abs(approx_value - exact_value) / exact_value;
+                    if (max_error[var_id] < current_err)
+                    {
+                        max_error[var_id] = current_err;
+                    }
+                } else
+                {
+                    if (exact_value == 0.0 && max_error[var_id] < approx_value)
+                    {
+                        max_error[var_id] = approx_value;
+                    }
+                }
+            }
+        }
+        for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
+        {
+            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_error[var_id] * 100, "%.");
+        }
+    }
+    else
+    {
+        for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
+        {
+            max_err = 0.0;
+            cmc_assert((amr_data->t8_data->initial_data[var_id]).size() == amr_data->t8_data->vars[var_id]->var->data->size());
+            for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->vars[var_id]->assets->forest)); ++i)
+            {
+                /* Check if a missing value would be at the position of the exact value */
+                if (!(amr_data->t8_data->vars[var_id]->var->is_equal_to_missing_value(i)))
+                {
+                    exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
+                    approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
+                    if (exact_value > 0.0 && approx_value > 0.0)
+                    {
+                        current_err = std::abs(approx_value - exact_value) / exact_value;
+                        if (max_err < current_err)
+                        {
+                            max_err = current_err;
+                        }
+                        //cmc_debug_msg(i, " hat Fehlerantewil: ", current_err);
+                        if(current_err > 0.02)
+                        {
+                            //cmc_debug_msg("Hier ist zu viel fehler lelement_id: ", i, " und der fehler ist: ", current_err);
+                        }
+                    } else
+                    {
+                        #if 0
+                        if (exact_value == 0.0 && max_err < approx_value)
+                        {
+                            max_err = approx_value;
+                        }
+                        #endif
+                    }
+                    if (max_err > 10 &&  i < 100)
+                    {
+                        std::cout << "approx value: " << approx_value << " und exact value: " << exact_value << std::endl;
+                        std::cout << "zu hoher fehler " << max_err << " bei var_id: " << var_id << " und i=" << i << std::endl;
+                    }
+                }
+            }
+            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_err * 100, "%.");
+        }
+    }
+
+}
+
 void
 cmc_amr_decompress(cmc_amr_data_t amr_data)
 {
@@ -576,101 +664,14 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
 
     cmc_debug_msg("Decompression has been finished.");
     
+    /* Set the (de-)comrpession flag */
+    amr_data->compression_applied = false;
+
     /* If the initial data is kept, we can calculate the maximum introduced data inaccuracy */
     if (amr_data->t8_data->is_initial_data_kept)
     {
-        /* Declare some variables needed for the computation */
-        double max_err{0.0}, current_err{0.0};
-        double approx_value{0.0};
-        double exact_value{1.0};
-
-        /* If the data is distributed, we need to partition the initial data accordingly in order to check the error */
-        if (amr_data->t8_data->use_distributed_data)
-        {
-            //..partition here
-        }
-
-        cmc_debug_msg("The Lossy AMR compressor introduced a maximum point-wise relative error of:");
-
-        /* Check which mode is used */
-        if (amr_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
-        {
-            std::vector<double> max_error(amr_data->t8_data->vars.size(), 0.0);
-            
-            for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->assets->forest)); ++i)
-            {
-                for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
-                {
-                    exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
-                    approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
-                    if (exact_value > 0.0 && approx_value > 0.0)
-                    {
-                        current_err = std::abs(approx_value - exact_value) / exact_value;
-                        if (max_error[var_id] < current_err)
-                        {
-                            max_error[var_id] = current_err;
-                        }
-                    } else
-                    {
-                        if (exact_value == 0.0 && max_error[var_id] < approx_value)
-                        {
-                            max_error[var_id] = approx_value;
-                        }
-                    }
-                }
-            }
-            for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
-            {
-                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_error[var_id] * 100, "%.");
-            }
-        }
-        else
-        {
-            for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
-            {
-                max_err = 0.0;
-                cmc_assert((amr_data->t8_data->initial_data[var_id]).size() == amr_data->t8_data->vars[var_id]->var->data->size());
-                for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->vars[var_id]->assets->forest)); ++i)
-                {
-                    /* Check if a missing value would be at the position of the exact value */
-                    if (!(amr_data->t8_data->vars[var_id]->var->is_equal_to_missing_value(i)))
-                    {
-                        exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
-                        approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
-                        if (exact_value > 0.0 && approx_value > 0.0)
-                        {
-                            current_err = std::abs(approx_value - exact_value) / exact_value;
-                            if (max_err < current_err)
-                            {
-                                max_err = current_err;
-                            }
-                            //cmc_debug_msg(i, " hat Fehlerantewil: ", current_err);
-                            if(current_err > 0.02)
-                            {
-                                //cmc_debug_msg("Hier ist zu viel fehler lelement_id: ", i, " und der fehler ist: ", current_err);
-                            }
-                        } else
-                        {
-                            #if 0
-                            if (exact_value == 0.0 && max_err < approx_value)
-                            {
-                                max_err = approx_value;
-                            }
-                            #endif
-                        }
-                        if (max_err > 10 &&  i < 100)
-                        {
-                            std::cout << "approx value: " << approx_value << " und exact value: " << exact_value << std::endl;
-                            std::cout << "zu hoher fehler " << max_err << " bei var_id: " << var_id << " und i=" << i << std::endl;
-                        }
-                    }
-                }
-                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_err * 100, "%.");
-            }
-        }
+        cmc_amr_check_inaccuracy_after_decompression(amr_data);
     }
-    /* Set the comrpession flag */
-    amr_data->compression_applied = false;
 
     #endif
 }

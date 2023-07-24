@@ -351,9 +351,9 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 for (int i = 0; i < num_elements; ++i)
                 {
                     /* Get the previous maximum deviation */
-                    auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(lelement_id + i));
+                    auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
                     int pos = std::distance(adapt_data->associated_deviations_gelement_id.begin(), iter_last_max_dev_elem_id);
-
+                    cmc_debug_msg("Last max elem deviation: ", *iter_last_max_dev_elem_id, " an position: ", pos);
                     cmc_assert(iter_last_max_dev_elem_id != adapt_data->associated_deviations_gelement_id.end());
 
                     /* Calculate the maximum deviation taking the the previous deviation into account as well */
@@ -461,9 +461,15 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             for (int i = 0; i < num_elements; ++i)
             {
                 /* Get the previous maximum deviation */
-                auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(lelement_id + i));
+                auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
                 int pos = std::distance(adapt_data->associated_deviations_gelement_id.begin(), iter_last_max_dev_elem_id);
-
+                //cmc_debug_msg("Last max elem deviation: ", *iter_last_max_dev_elem_id, " an position: ", pos);
+                //cmc_debug_msg("Position is: ", pos, " und max deviation: ", adapt_data->associated_max_deviations.front()[pos]);
+                if (iter_last_max_dev_elem_id == adapt_data->associated_deviations_gelement_id.end())
+                {
+                    cmc_debug_msg("ELEMENT NOT FOUND IN PREV DEVS: ", static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
+                    return false;
+                }
                 cmc_assert(iter_last_max_dev_elem_id != adapt_data->associated_deviations_gelement_id.end());
 
                 /* Calculate the maximum deviation taking the the previous deviation into account as well */
@@ -488,7 +494,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             /* We need to store the maximum deviation for further adaptation steps */
             adapt_data->associated_max_deviations_new.front().push_back(max_dev_new_adjusted);
 
-            cmc_debug_msg("Adjusted Max deviation: ", max_dev_new_adjusted);
+            //cmc_debug_msg("Adjusted Max deviation: ", max_dev_new_adjusted);
             /* Increment the coarsening counter */
             ++(adapt_data->coarsening_counter);
 

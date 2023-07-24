@@ -29,7 +29,7 @@ main(int argc, char* argv[])
     //std::vector<int> p_dist{1,2,2};
     //cmc_nc_set_blocked_reading(nc_data, p_dist);
 
-    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t", "tco3");
+    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t");
 
     /* Define data classes holding the variable data and forests as well as additional information during the compression process */
     cmc_amr_data_t amr_data;
@@ -43,13 +43,20 @@ main(int argc, char* argv[])
     /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
     cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.05);
 
+    /* Keep the initial data in order to check the actual introduced data inaccurcy after the decompression */
+    cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 0);
+
     /* Setup the compression for a given 'compression mode' */
     cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);
 
+    cmc_amr_write_vtk_file(amr_data, "example_compressed.nc");
+
     cmc_amr_decompress(amr_data);
+    
+    cmc_amr_write_vtk_file(amr_data, "example_decompressed.nc");
 
     /* Deallocate the Lossy AMR Compression data */
     cmc_amr_destroy(amr_data);

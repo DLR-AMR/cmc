@@ -69,6 +69,17 @@ void
 cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_data, const double maximum_error_tolerance);
 
 /**
+ * @brief This function sets whether or not the initial data is saved or lost during the compression.
+ * 
+ * @param flag_keep_initial_data A Value unequal to zero indicates that the data should be kept during the compression
+ *
+ * @note By default, the initial data is will vanish after the first adaptation/compression step and therefore is not kept.
+ * @note A benefit from keeping the data would be for example if a compression is directly followed by a decompression, we could afterwards verify the introduced data inaccuracy if the data was kept
+ */
+void
+cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(cmc_amr_data_t amr_data, const int flag_keep_initial_data);
+
+/**
  * @brief This function sets an error threshold compression criterium for the lossy AMR compressor. The data of all variables will be compressed compliant to the this threshold.
  * Precisly, the introduced data loss during the compression will not excced @var maximum_error_tolerance.
  * 

@@ -1284,11 +1284,11 @@ cmc_rel_error_threshold_update_deviations(cmc_t8_adapt_data& adapt_data, int num
     /* Get the scheme of the forest's only tree */
     t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (adapt_data.forest_reference, t8_forest_get_eclass(adapt_data.forest_reference, 0));
 
-    /* Get the childrent the elements refine to */
-    const uint64_t num_children = static_cast<uint64_t>(ts->t8_element_num_children(t8_forest_get_element_in_tree(adapt_data.forest_reference, 0, 0)));
+    /* Get the amounts of elements vanishing during a coarsening step */
+    const uint64_t num_elements_lost = static_cast<uint64_t>(ts->t8_element_num_children(t8_forest_get_element_in_tree(adapt_data.forest_reference, 0, 0))) - 1;
 
     /* Multiply this number by the amount of element reduction per coarsening */
-    num_preceeding_coarsenings *= (num_children - 1);
+    num_preceeding_coarsenings *= num_elements_lost;
 
     /* Update the global ids (corresponding to the forest which was not adapted) by subtracting the num_preceeding_coarsenings. This is possible because there is no refinement ever introduced during the compression step */
     for (auto iter = adapt_data.associated_deviations_gelement_id_new.begin(); iter != adapt_data.associated_deviations_gelement_id_new.end(); ++iter)
@@ -1296,7 +1296,7 @@ cmc_rel_error_threshold_update_deviations(cmc_t8_adapt_data& adapt_data, int num
         /* Subtract the coarsenings */
         *iter = *iter - num_preceeding_coarsenings;
         /* Update the num_preceeding_coarsenings by this coarsening */
-        num_preceeding_coarsenings += (num_children - 1);
+        num_preceeding_coarsenings += num_elements_lost;
     }
 
     #endif
@@ -1348,7 +1348,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
 
     cmc_debug_msg("The maximum relative deviations from the previous adaptation step will be updated and partitioned."); 
 
-    /* Adjust the previous maximum deviations element ids, such that they comply with the new adapted forest */
+    /* Adjust the previous maximum deviations corresponding element ids, such that they comply with the new adapted forest */
     int err, mpisize, mpirank;
 
     /* Get the size of the communicator */
@@ -1388,8 +1388,8 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     /* Update the deviations according the amount of coarsenings that had happend */
     cmc_rel_error_threshold_update_deviations(adapt_data, num_preceeding_coarsenings);
 
-    /* Save the lcoal offset andf length of the data which will stay process-local within this pair (first: local_offset within array; second: length of prospective process-local range) */
-    std::pair<int, int> already_process_local_range;
+    /* Save the local offset and length of the data which will stay process-local within this pair (first: local_offset within array; second: length of prospective process-local range) */
+    std::pair<int, int> already_process_local_range{std::make_pair(0,0)};
 
     /* Create a vector of MPI requests */
     std::vector<MPI_Request> send_requests;
@@ -1436,7 +1436,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
             /* Afterwards we will send the deviations per variable */
             for (size_t var_iter = 0; var_iter < adapt_data.associated_max_deviations_new.size(); ++var_iter)
             {
-                err = MPI_Isend(adapt_data.associated_max_deviations_new.data() + std::distance(adapt_data.associated_deviations_gelement_id_new.begin(), elem_id_iter), msg_length, MPI_DOUBLE, recv_rank, var_iter, adapt_data.t8_data->comm, &send_requests[send_req_idx]);
+                err = MPI_Isend(adapt_data.associated_max_deviations_new[var_iter].data() + std::distance(adapt_data.associated_deviations_gelement_id_new.begin(), elem_id_iter), msg_length, MPI_DOUBLE, recv_rank, var_iter, adapt_data.t8_data->comm, &send_requests[send_req_idx]);
                 cmc_mpi_check_err(err);
 
                 /* Increment the send_req_idx counter */
@@ -1556,6 +1556,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     /* Since the map is already ordered by the ranks which have sent the data, we can iteratively draw the data from the map */
     for (auto iter = recv_list.begin(); iter != recv_list.end(); ++iter)  
     {
+        cmc_debug_msg("Copy from rank ", iter->first, " of ", iter->second.num_receiving_elems," elements to position ", offset + (iter->first < mpirank ? 0 : already_process_local_range.second));
         /* Copy all element ids over */
         std::copy(iter->second.elem_ids, iter->second.elem_ids + iter->second.num_receiving_elems, adapt_data.associated_deviations_gelement_id.begin() + offset + (iter->first < mpirank ? 0 : already_process_local_range.second));
         /* Copy the data for each variable */
@@ -1575,6 +1576,8 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     /* If some data was already local, we need to copy it as well */
     if (flag_some_data_elements_are_kept_local)
     {
+        cmc_debug_msg("Local copy of ", already_process_local_range.second," elements from position ", already_process_local_range.first, " to position ", offset_for_previous_local_data);
+
         /* Copy all element ids over */
         std::copy(adapt_data.associated_deviations_gelement_id_new.data() + already_process_local_range.first, adapt_data.associated_deviations_gelement_id_new.data() + already_process_local_range.first + already_process_local_range.second, adapt_data.associated_deviations_gelement_id.begin() + offset_for_previous_local_data);
         /* Copy the data for each variable */
@@ -1666,22 +1669,8 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
-
+                /* Communicate and update the deviations from the previous caorsening step */
                 cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
-
-                #if 0
-                if (adapt_data.t8_data->use_distributed_data)
-                {
-                    /* In parallel environment, we need to communicate the previous maximum deviations */
-                    /* Within this function call, we communicate the maximum deviations, order them and return them within the adapt_data for the next iteration */
-                    /* The global elementid of the first local element (of the adapt_data->forest_reference) is inquired there as well and stored withint the adapt_data for the next iteratzion */
-                    cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
-                } else
-                {
-                    /* In a serial environment, it suffices to just update the deviations */
-                    cmc_rel_error_threshold_update_deviations(adapt_data);
-                }
-                #endif
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1707,23 +1696,8 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
-
+                /* Communicate and update the deviations from the previous caorsening step */
                 cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
-
-                #if 0
-                if (adapt_data.t8_data->use_distributed_data)
-                {
-                    /* In parallel environment, we need to communicate the previous maximum deviations */
-                    /* Within this function call, we communicate the maximum deviations, order them and return them within the adapt_data for the next iteration */
-                    /* The global elementid of the first local element (of the adapt_data->forest_reference) is inquired there as well and stored withint the adapt_data for the next iteratzion */
-                    cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
-                } else
-                {
-                    /* In a serial environment, it suffices to just update the deviations */
-                    cmc_rel_error_threshold_update_deviations(adapt_data);
-                }
-                #endif
-
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1807,23 +1781,22 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
  * 
  * @param t8_data A pointer to the @struct cmc_t8_data holding all variables and data
  * @param forest The forest which will be partitioned
+ * @param partition_for_coarsening This value indicates whether or not the partitioning shall be made for a coarsening step
  * @param var_id Eventually an id indicating to which variable the forest belongs (only in a 'One For One'-mode, otherwise this parameter has no effect)
  * @note The onwership of the forest is taken, if it is not references directly before calling this funciton (@see t8_forest_ref(...))
  * @return t8_forest_t The partitioned forest (The @var t8_data holds now the partitioned data corresponding to this retunred forest)
  */
 static
 t8_forest_t
-cmc_t8_geo_data_repartition_during_compression(cmc_t8_data_t t8_data, t8_forest_t forest, const int var_id = -1)
+cmc_t8_geo_data_repartition(cmc_t8_data_t t8_data, t8_forest_t forest, const int partition_for_coarsening, const int var_id = -1)
 {
     #ifdef CMC_WITH_T8CODE
-    cmc_debug_msg("Repartition forest and data during the compression.");
+    cmc_debug_msg("Repartitioning of the forest and the data starts.");
 
     /* Declare a new forest variable */
     t8_forest_t forest_partitioned;
     /* Initialize the forest */
     t8_forest_init(&forest_partitioned);
-
-    const int partition_for_coarsening = 0; //Currently, this is not yet available
 
     /* We need to distinguish between the compression modes */
     if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
@@ -1915,12 +1888,49 @@ cmc_t8_geo_data_repartition_during_compression(cmc_t8_data_t t8_data, t8_forest_
         /* Dereference the old partitioned forest */
         t8_forest_unref(&forest);
 
-        cmc_debug_msg("The forest and the data has been re-partitioned.");
+        cmc_debug_msg("The forest and the data have been re-partitioned.");
 
         /* Return the newly partitioned forest */
         return forest_partitioned;
 
     }
+    #endif
+}
+
+/**
+ * @brief This function performs the repartitioning of the forest and the data during a compression/coarsening step
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding all variables and data
+ * @param forest The forest which will be partitioned
+ * @param var_id Eventually an id indicating to which variable the forest belongs (only in a 'One For One'-mode, otherwise this parameter has no effect)
+ * @note The onwership of the forest is taken, if it is not references directly before calling this funciton (@see t8_forest_ref(...))
+ * @return t8_forest_t The partitioned forest (The @var t8_data holds now the partitioned data corresponding to this retunred forest)
+ */
+static
+t8_forest_t
+cmc_t8_geo_data_repartition_during_compression(cmc_t8_data_t t8_data, t8_forest_t forest, const int var_id = -1)
+{
+    #ifdef CMC_WITH_T8CODE
+    const int partition_for_coarsening = 0; //Currently, this is not available
+    return cmc_t8_geo_data_repartition(t8_data, forest, partition_for_coarsening, var_id);
+    #endif
+}
+
+/**
+ * @brief This function performs the repartitioning of the forest and the data during a decompression/refinement step
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding all variables and data
+ * @param forest The forest which will be partitioned
+ * @param var_id Eventually an id indicating to which variable the forest belongs (only in a 'One For One'-mode, otherwise this parameter has no effect)
+ * @note The onwership of the forest is taken, if it is not references directly before calling this funciton (@see t8_forest_ref(...))
+ * @return t8_forest_t The partitioned forest (The @var t8_data holds now the partitioned data corresponding to this retunred forest)
+ */
+static
+t8_forest_t
+cmc_t8_geo_data_repartition_during_decompression(cmc_t8_data_t t8_data, t8_forest_t forest, const int var_id = -1)
+{
+    #ifdef CMC_WITH_T8CODE
+    return cmc_t8_geo_data_repartition(t8_data, forest, 0, var_id);
     #endif
 }
 
@@ -1952,12 +1962,16 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
     /* Set up the adapt data struct based on the given compression criterium and the compression mode */
     cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(adapt_data, interpolation_data, t8_data);
 
-    /* Reserve enough space for the initial data of all variables */ 
-    t8_data->initial_data.reserve(t8_data->vars.size());
-    /* Save the initial data of each variable */
-    for (size_t id{0}; id < t8_data->vars.size(); ++id)
+    /* Check whether or not the initial data should be kept */
+    if (t8_data->is_initial_data_kept)
     {
-        t8_data->initial_data.push_back(t8_data->vars[id]->var->data);
+        /* Reserve enough space for the initial data of all variables */ 
+        t8_data->initial_data.reserve(t8_data->vars.size());
+        /* Save the initial data of each variable */
+        for (size_t id{0}; id < t8_data->vars.size(); ++id)
+        {
+            t8_data->initial_data.push_back(t8_data->vars[id]->var->data);
+        }
     }
 
     cmc_debug_msg("Adaptation of the forest starts.");
@@ -2003,8 +2017,8 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
         /* Iterate over all variables */
         for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
         {
-            /* Delete the previous (fine/uncrompressed) data (except in the first iteration, because the intitial data is kept) */
-            if (t8_data->assets->initial_refinement_lvl != ref_lvl)
+            /* Delete the previous (fine/uncrompressed) data (except in the first iteration, if the intitial data ahould be kept) */
+            if (t8_data->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
             {
                 delete t8_data->vars[var_id]->var->data;
             }
@@ -2073,6 +2087,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
 
     /* Create an adapt data struct, and pass eventually supplied compression settings */
     cmc_t8_adapt_data adapt_data(t8_data);
+
     /* Allocate members in the adapt struct */
     cmc_t8_adapt_struct_allocate_one_for_one(adapt_data);
 
@@ -2084,8 +2099,12 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
     {
         cmc_debug_msg("Adaptation of the forest of variable ", t8_data->vars[var_id]->var->name, " starts.");
 
-        /* Save the initial data */
-        t8_data->initial_data.push_back(t8_data->vars[var_id]->var->data);
+        /* Eventually, save the initial data */
+        if (t8_data->is_initial_data_kept)
+        {
+            t8_data->initial_data.push_back(t8_data->vars[var_id]->var->data);
+        }
+
         /* Reset to the initial refinement level (this equals the maximum number of possible coarsening steps) */
         ref_lvl = t8_data->vars[var_id]->assets->initial_refinement_lvl;
         /* Get a pointer to the forest of the variable */
@@ -2130,8 +2149,8 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
             /* Interpolate the element data onto the new coarsened forest */
             t8_forest_iterate_replace(coarsened_forest, forest, interpolation_function);
 
-            /* Delete and Release the previous (fine/uncrompressed) data */
-            if (t8_data->vars[var_id]->assets->initial_refinement_lvl != ref_lvl)
+            /* Delete and Release the previous (fine/uncrompressed) data (Do not so, if the data should be kept) */
+            if (t8_data->vars[var_id]->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
             {
                 delete t8_data->vars[var_id]->var->data;
             }
@@ -2754,6 +2773,7 @@ cmc_t8_apply_offset_and_scaling(cmc_t8_data_t t8_data, const int var_id)
     #endif
 }
 
+/* Refine the forest and the data back onto the initial refinement level */
 void
 cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 {
@@ -2803,25 +2823,7 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
                 /* Assign the (coarsened/compressed) data */
                 t8_data->vars[var_id]->var->data = t8_data->vars[var_id]->var->data_new;
             }
-            #if 0
-            /* Iterate over all variables */
-            for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
-            {
 
-                /* Allocate memory equal to the new elements */
-                t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)), t8_data->vars[var_id]->get_type());
-                
-                /* Set the interpolation data accordingly */
-                t8_forest_set_user_data(adapted_forest, static_cast<void*>(&interpolation_data));
-                /* Interpolate the element data onto the new coarsened forest */
-                t8_forest_iterate_replace(adapted_forest, forest, cmc_t8_geo_data_interpolate_plain_copy_values);
-
-                /* Deallocate previous (fine/uncompressed) data */
-                delete t8_data->vars[var_id]->var->data;
-                /* Assign the (coarsened/compressed) data */
-                t8_data->vars[var_id]->var->data = t8_data->vars[var_id]->var->data_new;
-            }
-            #endif
             /** Interpolation process ends **/
 
             /* Free the former forest */
@@ -2829,6 +2831,13 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 
             /* Switch to coarsened forest */
             forest = adapted_forest;
+
+            /* In case of a parallel execution with distributed data, we need to repartition the forest, as well as the data at this stage */
+            if (t8_data->use_distributed_data)
+            {
+                /* Repartition the variable's data */
+                forest = cmc_t8_geo_data_repartition_during_decompression(t8_data, adapted_forest);
+            }
         }
 
         /* Free the former forest and Save the adapted forest */
@@ -2883,6 +2892,13 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 
                 /* Switch to coarsened forest */
                 forest = adapted_forest;
+
+                /* In case of a parallel execution with distributed data, we need to repartition the forest, as well as the data at this stage */
+                if (t8_data->use_distributed_data)
+                {
+                    /* Repartition the variable's data */
+                    forest = cmc_t8_geo_data_repartition_during_decompression(t8_data, adapted_forest, var_id);
+                }
             }
 
             /* Free the former forest and Save the adapted forest */

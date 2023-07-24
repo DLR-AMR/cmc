@@ -77,7 +77,7 @@ cmc_t8_geo_data_interpolate_plain_copy_values(t8_forest_t forest_old, t8_forest_
     /* Get the interpolation data */
     cmc_t8_interpolation_data_t interpolation_data = static_cast<cmc_t8_interpolation_data_t>(t8_forest_get_user_data(forest_new));
     
-    /* Check if elements get replaced in the new adapted forest (num_incoming < num_outgoing) */
+    /* Check if elements got replaced in the new adapted forest (num_incoming > num_outgoing) */
     if (refine == 1)
     {
         /* If a refinement was introduced */
