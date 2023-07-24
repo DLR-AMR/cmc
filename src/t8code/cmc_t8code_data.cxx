@@ -46,10 +46,10 @@ cmc_t8_var::get_data_layout() const
 }
 
 size_t
-cmc_t8_geo_data::get_coord_length(const CMC_COORD_IDS cmc_coord_id) const
+cmc_t8_geo_data::get_global_coord_length(const CMC_COORD_IDS cmc_coord_id) const
 {
-    cmc_assert(coordinates->coords.size() >= CMC_NUM_COORD_IDS);
-    return (coordinates->coords.operator[](cmc_coord_id)).size();
+    cmc_assert(global_dim_lengths.size() >= CMC_NUM_COORD_IDS);
+    return global_dim_lengths[cmc_coord_id];
 }
 
 /* Write the forest as well as the variables in a vtk-file (depending on the compression mode (if supplied) one file with all variables or one file per variable is written) */

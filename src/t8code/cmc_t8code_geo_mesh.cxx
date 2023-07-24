@@ -78,7 +78,6 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
     t8_forest_t forest{initial_forest};
     t8_forest_t forest_adapt;
 
-    std::cout << "In coarsesn geo mesh " << std::endl;
     int refinement_step{0};
     t8_gloidx_t num_elems_former_forest{0};
     /* Create an 'adaption struct' */
@@ -91,7 +90,6 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
     /* Adapt the forest as much as possible by coarsen the 'dummy' elements which do not resemble a geo-spatial data point */
     while (refinement_step < initial_refinement_lvl && num_elems_former_forest != t8_forest_get_global_num_elements(forest))
     {
-        std::cout << "Coarsen step: " << refinement_step << std::endl;
         /* Initialize the new forest */
         t8_forest_init(&forest_adapt);
         /* Save the number of elements of the former forest */
@@ -115,7 +113,7 @@ cmc_t8_coarsen_geo_mesh(cmc_t8_data& t8_data, t8_forest_t initial_forest, const 
     /* Print some information in Debug-Mode */
     cmc_debug_msg("The coarsened forest contains ", t8_forest_get_global_num_elements(forest_adapt)," elements.");
     cmc_debug_msg("Data dimensions are:"),
-    cmc_debug_msg("#Latitude: ", t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LAT), ", #Longitude: ", t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LON), ", #Elevation: ", t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LEV));
+    cmc_debug_msg("#Latitude: ", t8_data.geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LAT), ", #Longitude: ", t8_data.geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LON), ", #Elevation: ", t8_data.geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LEV));
 
     /* Return the coarsened forest */
     return forest;
@@ -249,7 +247,7 @@ cmc_t8_create_enclosing_geo_mesh(cmc_t8_data& t8_data)
         /* Calculate the initial refinement level needed in order to circumvent the geo-grid with a t8code mesh */
         //t8_data.geo_data->initial_refinement_lvl = cmc_t8_calc_geo_refinement_level(t8_data.geo_data->coords);
         t8_data.geo_data->initial_refinement_lvl = cmc_t8_calc_geo_refinement_level(t8_data, 0, t8_data.use_distributed_data);
-        std::cout << "initial ref level is: " << t8_data.geo_data->initial_refinement_lvl << std::endl;
+
         #if CMC_ENABLE_DEBUG
         /* Assertions in Debug-Mode */
         if (t8_data.geo_data->dim == 2)
@@ -508,7 +506,7 @@ cmc_t8_elem_inside_geo_mesh(const t8_element_t* element, t8_eclass_scheme_c* ts,
     cmc_assert(t8_data.geo_data->coordinates->coords.size() >= CMC_NUM_COORD_IDS);
     
     /* Check whether the element is inside the "lat x lon x lev" mesh or not */
-    return cmc_t8_elem_inside_geo_domain(element, ts, t8_data, var_id, 0, t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LAT), 0, t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LON), 0, t8_data.geo_data->get_coord_length(CMC_COORD_IDS::CMC_LEV));
+    return cmc_t8_elem_inside_geo_domain(element, ts, t8_data, var_id, 0, t8_data.geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LAT), 0, t8_data.geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LON), 0, t8_data.geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LEV));
     #else
     return CMC_ERR;
     #endif

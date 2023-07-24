@@ -56,37 +56,37 @@ cmc_amr_write_nc_file_decompressed_data(cmc_amr_data_t amr_data, const char* pat
 
     /* Define netCDF dimensions (if they are considered) and their coordinate variables */
     /** \note The 'cmc_type' is equal to the 'nc_type' */
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LAT) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LAT) > 1)
     {
         /* Define the coordinate dimension */
-        err = nc_def_dim(ncid, "lat", static_cast<size_t>(amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LAT)), &(dim_ptrs[CMC_COORD_IDS::CMC_LAT]));
+        err = nc_def_dim(ncid, "lat", static_cast<size_t>(amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LAT)), &(dim_ptrs[CMC_COORD_IDS::CMC_LAT]));
         cmc_nc_check_err(err);
         /* Define the coordinate variable */
         err = nc_def_var(ncid, "lat", (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_LAT].get_data_type(), 1, &(dim_ptrs[CMC_COORD_IDS::CMC_LAT]), &(coordinate_vars[CMC_COORD_IDS::CMC_LAT]));
         cmc_nc_check_err(err);
     }
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LON) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LON) > 1)
     {
         /* Define the coordinate dimension */
-        err = nc_def_dim(ncid, "lon", static_cast<size_t>(amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LON)), &(dim_ptrs[CMC_COORD_IDS::CMC_LON]));
+        err = nc_def_dim(ncid, "lon", static_cast<size_t>(amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LON)), &(dim_ptrs[CMC_COORD_IDS::CMC_LON]));
         cmc_nc_check_err(err);
         /* Define the coordinate variable */
         err = nc_def_var(ncid, "lon", (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_LON].get_data_type(), 1, &(dim_ptrs[CMC_COORD_IDS::CMC_LON]), &(coordinate_vars[CMC_COORD_IDS::CMC_LON]));
         cmc_nc_check_err(err);
     }
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LEV) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LEV) > 1)
     {
         /* Define the coordinate dimension */
-        err = nc_def_dim(ncid, "lev", static_cast<size_t>(amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LEV)), &(dim_ptrs[CMC_COORD_IDS::CMC_LEV]));
+        err = nc_def_dim(ncid, "lev", static_cast<size_t>(amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LEV)), &(dim_ptrs[CMC_COORD_IDS::CMC_LEV]));
         cmc_nc_check_err(err);
         /* Define the coordinate variable */
         err = nc_def_var(ncid, "lev", (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_LEV].get_data_type(), 1, &(dim_ptrs[CMC_COORD_IDS::CMC_LEV]), &(coordinate_vars[CMC_COORD_IDS::CMC_LEV]));
         cmc_nc_check_err(err);
     }
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_TIME) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_TIME) > 1)
     {
         /* Define the coordinate dimension */
-        err = nc_def_dim(ncid, "time", static_cast<size_t>(amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_TIME)), &(dim_ptrs[CMC_COORD_IDS::CMC_TIME]));
+        err = nc_def_dim(ncid, "time", static_cast<size_t>(amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_TIME)), &(dim_ptrs[CMC_COORD_IDS::CMC_TIME]));
         cmc_nc_check_err(err);
         /* Define the coordinate variable */
         err = nc_def_var(ncid, "time", (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_TIME].get_data_type(), 1, &(dim_ptrs[CMC_COORD_IDS::CMC_TIME]), &(coordinate_vars[CMC_COORD_IDS::CMC_TIME]));
@@ -262,22 +262,22 @@ cmc_amr_write_nc_file_decompressed_data(cmc_amr_data_t amr_data, const char* pat
     cmc_nc_check_err(err);
 
     /* Write the data of all coordinate variables to the file */
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LAT) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LAT) > 1)
     {
         err = nc_put_var(ncid, coordinate_vars[CMC_COORD_IDS::CMC_LAT], (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_LAT].get_initial_data_ptr());
         cmc_nc_check_err(err);
     }
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LON) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LON) > 1)
     {
         err = nc_put_var(ncid, coordinate_vars[CMC_COORD_IDS::CMC_LON], (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_LON].get_initial_data_ptr());
         cmc_nc_check_err(err);
     }
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LEV) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LEV) > 1)
     {
         err = nc_put_var(ncid, coordinate_vars[CMC_COORD_IDS::CMC_LEV], (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_LEV].get_initial_data_ptr());
         cmc_nc_check_err(err);
     }
-    if (amr_data->t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_TIME) > 1)
+    if (amr_data->t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_TIME) > 1)
     {
         err = nc_put_var(ncid, coordinate_vars[CMC_COORD_IDS::CMC_TIME], (*(amr_data->t8_data->geo_data->coords))[CMC_COORD_IDS::CMC_TIME].get_initial_data_ptr());
         cmc_nc_check_err(err);

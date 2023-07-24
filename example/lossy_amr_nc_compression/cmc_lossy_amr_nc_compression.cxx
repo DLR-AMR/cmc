@@ -44,7 +44,7 @@ main(int argc, char* argv[])
     cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.05);
 
     /* Keep the initial data in order to check the actual introduced data inaccurcy after the decompression */
-    cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 0);
+    cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 1);
 
     /* Setup the compression for a given 'compression mode' */
     cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);

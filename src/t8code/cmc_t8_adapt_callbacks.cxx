@@ -353,9 +353,18 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                     /* Get the previous maximum deviation */
                     auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
                     int pos = std::distance(adapt_data->associated_deviations_gelement_id.begin(), iter_last_max_dev_elem_id);
-                    cmc_debug_msg("Last max elem deviation: ", *iter_last_max_dev_elem_id, " an position: ", pos);
-                    cmc_assert(iter_last_max_dev_elem_id != adapt_data->associated_deviations_gelement_id.end());
 
+                    /* If the element was not found (it was maybe a missing_value dummy element) and therefore, we do not coarsen at the moment */
+                    if (iter_last_max_dev_elem_id == adapt_data->associated_deviations_gelement_id.end())
+                    {
+                        /* If we have to stop early, we need to pop back the last deviations */
+                        for (size_t rm_var_iter = 0; rm_var_iter < var_iter; ++rm_var_iter)
+                        {
+                            adapt_data->associated_max_deviations_new[rm_var_iter].pop_back();
+                        }
+                        /* Do not coarsen the family */
+                        return false;
+                    }
                     /* Calculate the maximum deviation taking the the previous deviation into account as well */
                     adjusted_deviations.push_back(calculate_two_step_max_deviation(adapt_data->associated_max_deviations[var_iter][pos], adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + i)), mean));
 
@@ -463,14 +472,12 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 /* Get the previous maximum deviation */
                 auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
                 int pos = std::distance(adapt_data->associated_deviations_gelement_id.begin(), iter_last_max_dev_elem_id);
-                //cmc_debug_msg("Last max elem deviation: ", *iter_last_max_dev_elem_id, " an position: ", pos);
-                //cmc_debug_msg("Position is: ", pos, " und max deviation: ", adapt_data->associated_max_deviations.front()[pos]);
+
+                /* If the element was not found (it was maybe a missing_value dummy element) and therefore, we do not coarsen at the moment */
                 if (iter_last_max_dev_elem_id == adapt_data->associated_deviations_gelement_id.end())
                 {
-                    cmc_debug_msg("ELEMENT NOT FOUND IN PREV DEVS: ", static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
                     return false;
                 }
-                cmc_assert(iter_last_max_dev_elem_id != adapt_data->associated_deviations_gelement_id.end());
 
                 /* Calculate the maximum deviation taking the the previous deviation into account as well */
                 adjusted_deviations.push_back(calculate_two_step_max_deviation(adapt_data->associated_max_deviations.front()[pos], adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + i)), mean));
@@ -494,7 +501,6 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             /* We need to store the maximum deviation for further adaptation steps */
             adapt_data->associated_max_deviations_new.front().push_back(max_dev_new_adjusted);
 
-            //cmc_debug_msg("Adjusted Max deviation: ", max_dev_new_adjusted);
             /* Increment the coarsening counter */
             ++(adapt_data->coarsening_counter);
 
@@ -506,7 +512,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             
             /* Get the maximum deviation */
             auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
-            double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0);
+            double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
 
             /* Check if the deviation complies with the error threshold */
             if (max_dev <= adapt_data->t8_data->settings.max_err)
@@ -514,7 +520,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 /* Store the global element id of the first element */
                 adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
 
-                /* If the 'interpolated reference value is not equal to zero, we need to adjust the 'perspective of the relative deviation' */
+                /* If the 'interpolated reference value' is not equal to zero, we need to adjust the 'perspective of the relative deviation' */
                 if (!cmc_value_equal_to_zero(mean))
                 {
                     /* Scale the deviation, such that the calculated value (e.g. mean) is central for the relative deviation */

@@ -655,7 +655,7 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
                     
                     /* Calculate a n equal distribution per dimension */
                     const int equal_dim_distribution = static_cast<int>(std::pow(comm_size, 1.0/num_considered_dims));
-                    cmc_debug_msg("calculated equal dim ditribution: ", equal_dim_distribution);
+
                     /* Iterate again over the count vector in order to assign a blocked distribution at the correct dimensions */
                     for (int dims{0}; dims < nc_data->vars[i]->num_dimensions; ++dims)
                     {
@@ -975,7 +975,6 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
     t8_data->geo_data->global_dim_lengths.reserve(CMC_NUM_COORD_IDS);
     for (size_t i{0}; i < CMC_NUM_COORD_IDS; ++i)
     {
-        std::cout << "Fuer " << i << " ist global dim length: " << t8_data->geo_data->coordinates->coords.operator[](i).size() << std::endl;
         t8_data->geo_data->global_dim_lengths.push_back(t8_data->geo_data->coordinates->coords.operator[](i).size());
     }
 
@@ -1096,7 +1095,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 num_pts *= t8_data->vars[var_id]->var->count_ptr[j];
             }
         }
-        std::cout << "t8 dim lenghts hat insgesamt : " << num_pts << std::endl;
+
         /* Set the new dimension lenghts */
         t8_data->vars[var_id]->var->dim_lengths = cmc_t8_dim_lengths;
 

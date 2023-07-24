@@ -1365,7 +1365,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     /* Allocate an offset array holding the SFC index (at the intitial refinement level) of each starting process-local element from each process */
     uint64_t* offsets = new uint64_t[mpisize];
 
-    /* Get the offest of the first local element as a SFC index (at the initial refienment level) */
+    /* Get the offset of the first local element as a SFC index (at the initial refienment level) */
     uint64_t elem_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id(adapt_data.forest_reference));
 
     /* Distribute the offsets between all processes */
@@ -1385,13 +1385,15 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
         num_preceeding_coarsenings += amount_of_coarsenings[i];
     }
 
+    cmc_assert(adapt_data.coarsening_counter == adapt_data.associated_deviations_gelement_id_new.size());
+
     /* Update the deviations according the amount of coarsenings that had happend */
     cmc_rel_error_threshold_update_deviations(adapt_data, num_preceeding_coarsenings);
 
     /* Save the local offset and length of the data which will stay process-local within this pair (first: local_offset within array; second: length of prospective process-local range) */
     std::pair<int, int> already_process_local_range{std::make_pair(0,0)};
 
-    /* Create a vector of MPI requests */
+    /* Create a vector of MPI requests (SInce no push_back methods are used, the vector is only used as a hull for the dynamic memory allocation for all possible requests) */
     std::vector<MPI_Request> send_requests;
     send_requests.reserve((mpisize - 1) * adapt_data.associated_max_deviations_new.size());
 
@@ -1407,6 +1409,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     /* Itearte over all element ids (of the deviations) */
     for (auto elem_id_iter = adapt_data.associated_deviations_gelement_id_new.begin(); elem_id_iter != adapt_data.associated_deviations_gelement_id_new.end();)
     {
+        //TODO: Switch to lower_bound
         int recv_rank = mpisize -1;
         for (int ir{0}; ir < mpisize -1; ++ir)
         {
@@ -1417,8 +1420,11 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
             }
         }
 
-        /* Check the length of the contiguous elements which will be sent to this process */
-        const int msg_length = std::min(static_cast<int>(std::distance(elem_id_iter, adapt_data.associated_deviations_gelement_id_new.end())), static_cast<int>((recv_rank != mpisize - 1 ?  offsets[recv_rank +1] - *elem_id_iter : t8_forest_get_global_num_elements(adapt_data.forest_reference) - *elem_id_iter)));
+        /* Find the end of the partition */
+        auto find_partition_end = std::lower_bound(elem_id_iter, adapt_data.associated_deviations_gelement_id_new.end(), static_cast<uint64_t>((recv_rank != mpisize - 1 ? offsets[recv_rank +1] - 1 : t8_forest_get_global_num_elements(adapt_data.forest_reference) - 1)));
+        
+        /* Determine the maximum length of the message */
+        const int msg_length = std::distance(elem_id_iter, find_partition_end) + (find_partition_end == adapt_data.associated_deviations_gelement_id_new.end() ? 0 : 1);
 
         /* Since at least one element has been found before, this assertion should be fullfilled */
         cmc_assert(msg_length > 0);
@@ -1447,7 +1453,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
             /* Save which (already process-local) range belongs to this process */
             already_process_local_range = std::make_pair(std::distance(adapt_data.associated_deviations_gelement_id_new.begin(), elem_id_iter), msg_length);
 
-            /* Set the flag that some elements reside locallly */
+            /* Set the flag that some elements reside locally */
             flag_some_data_elements_are_kept_local = true;
         }
 
@@ -1556,7 +1562,6 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     /* Since the map is already ordered by the ranks which have sent the data, we can iteratively draw the data from the map */
     for (auto iter = recv_list.begin(); iter != recv_list.end(); ++iter)  
     {
-        cmc_debug_msg("Copy from rank ", iter->first, " of ", iter->second.num_receiving_elems," elements to position ", offset + (iter->first < mpirank ? 0 : already_process_local_range.second));
         /* Copy all element ids over */
         std::copy(iter->second.elem_ids, iter->second.elem_ids + iter->second.num_receiving_elems, adapt_data.associated_deviations_gelement_id.begin() + offset + (iter->first < mpirank ? 0 : already_process_local_range.second));
         /* Copy the data for each variable */
@@ -1576,8 +1581,6 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     /* If some data was already local, we need to copy it as well */
     if (flag_some_data_elements_are_kept_local)
     {
-        cmc_debug_msg("Local copy of ", already_process_local_range.second," elements from position ", already_process_local_range.first, " to position ", offset_for_previous_local_data);
-
         /* Copy all element ids over */
         std::copy(adapt_data.associated_deviations_gelement_id_new.data() + already_process_local_range.first, adapt_data.associated_deviations_gelement_id_new.data() + already_process_local_range.first + already_process_local_range.second, adapt_data.associated_deviations_gelement_id.begin() + offset_for_previous_local_data);
         /* Copy the data for each variable */
@@ -2278,7 +2281,7 @@ cmc_geo_data_transform_3d_var_to_2d(cmc_t8_data_t t8_data, const int var_id, con
     std::vector<cmc_t8_var_t> new_vars;
     /* Allocate a loose upper bound */
     //new_vars.reserve(t8_data->vars.size() * (1 << t8_data->vars[]>initial_refinement_lvl));
-    new_vars.reserve(t8_data->vars.size() * std::max(std::initializer_list<size_t> {t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LAT), t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LON), t8_data->geo_data->get_coord_length(CMC_COORD_IDS::CMC_LEV)}));
+    new_vars.reserve(t8_data->vars.size() * std::max(std::initializer_list<size_t> {t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LAT), t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LON), t8_data->geo_data->get_global_coord_length(CMC_COORD_IDS::CMC_LEV)}));
     /* Copy unchanged variables */
     if (var_id == CMC_APPLY_TRANSFORMATION_3D_TO_2D_TO_ALL_VARS)
     {
@@ -3302,14 +3305,10 @@ cmc_t8_data_fill_sender_list_for_initial_distribution(cmc_t8_data_t t8_data, std
         }
     }
 
-    std::cout << "Die Map hat groeße: " << reference_coordinate_variable_groups.size() << std::endl;
-
     /* Iterate over all variable groups and create their reference coordinates */
     /* Iterate over all variable groups with the same data layout */
     for (auto group_iter{reference_coordinate_variable_groups.begin()}; group_iter != reference_coordinate_variable_groups.end(); ++group_iter)
     {
-        std::cout << "Group hat num variables: " << (group_iter->second).size() << std::endl;
-
         /* Iterate over all coordinates in order to calculate their Morton index and the correct process ownership */
         /* Since the group is defined on the exact same domain, we choose the first variable of the group in order to access the reference coordinates */
 
@@ -3390,13 +3389,11 @@ cmc_t8_data_fill_sender_list_for_initial_distribution(cmc_t8_data_t t8_data, std
                         for (auto var_iter{group_iter->second.begin()}; var_iter != group_iter->second.end(); ++var_iter, ++var_id_within_group)
                         {
                             /* Create a new dynamic array */
-                            std::cout << "wie groß ist: " << morton_indices.size() / comm_size + 1 << " und wie groß ist der type: " << cmc_type_to_bytes[t8_data->vars[*var_iter]->var->data->get_data_type()] << std::endl;
                             send_list[recv_rank].data.push_back(new var_dynamic_array_t{morton_indices.size() / comm_size + 1, t8_data->vars[*var_iter]->var->data->get_data_type()});
                             /* Push back the first variable's data to the dynamic array */
                             send_list[recv_rank].data[var_id_within_group]->push_back(t8_data->vars[*var_iter]->var->data->operator[](index_counter));
                             /* Save the (global) variable_id of the variable concerning the t8_data struct */
                             send_list[recv_rank].variable_indices.push_back(*var_iter);/////TODO DIEse abhaengigkeit aufloesen und den vector komplett loswerden
-                            std::cout << "Hallo2" << std::endl;
                         }
                     }
                 }
@@ -3796,7 +3793,6 @@ cmc_create_ref_coordinates(cmc_global_coordinate_system_t global_system, cmc_var
     for (int coord_dim{0}; coord_dim < CMC_NUM_COORD_IDS; ++coord_dim)
     {
         global_dim_lengths.push_back(global_system->coords.operator[](static_cast<CMC_COORD_IDS>(coord_dim)).size());
-        std::cout << "Global dim_length fuer coord_dim: " << global_dim_lengths.back() << std::endl;
     }
     /* Create the reference coordinates based on the coordinate type the data currently has */
     switch(coord_type)
@@ -4110,8 +4106,7 @@ cmc_t8_data_mpi_initial_communication(cmc_t8_data_t t8_data, std::map<int, cmc_m
         /* Just move the local elements from the send_list to the recv_list */
         recv_list[rank] = std::move(send_list[rank]);
     }
-    cmc_debug_msg("Halllooo");
-    
+ 
     return recv_list;
     #else
     return std::map<int, cmc_mpi_t8_recv_data>();
@@ -4216,11 +4211,7 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
 
             /* Sort the indices */
             std::sort(sorted_morton_indices.back().begin(), sorted_morton_indices.back().end());
-
-            cmc_debug_msg("Size of sorted morton indices: ", sorted_morton_indices.back().size());
         }
-
-        cmc_debug_msg("Size of sorted_morton_indices is: ", sorted_morton_indices.size());
 
         /* Define a vector which will hold the merged sequence of all Morton indices */
         std::vector<uint64_t> morton_indices;
@@ -4297,7 +4288,6 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
                 /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gapsof missing values */
                 morton_indices.insert(morton_indices.begin(), counter_skipped_elems, (offsets[rank] - 1 >= 0 ? offsets[rank] -1 : 0));
             }
-            cmc_debug_msg("All gaps in morton indices have been found at start");
 
             /* We cannot start at morton_indices.begin() if we have added some missing_values before the first (data) Morton index */
             int offset_for_iteration = 0;
@@ -4384,7 +4374,7 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
         {
             /* Create a new var_array for the variable */
             t8_data->vars[var_iter]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest)), t8_data->vars[var_iter]->get_type());  
-            cmc_debug_msg("missing value is: ", std::get<double>(t8_data->vars[var_iter]->var->missing_value));
+
             /* Fill in the gaps with missing values for each variable */
             for (auto gap_iter{gaps_to_fill.begin()}; gap_iter != gaps_to_fill.end(); ++gap_iter)
             {
@@ -4425,7 +4415,6 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
         /* Exchange the 'old' unordered data with the newly ordered array (compliant to the Morton curve) */
         for (size_t var_iter{0}; var_iter < t8_data->vars.size(); ++var_iter)
         {
-            cmc_debug_msg("        bis hier-...", var_iter);
             /* Free the 'unordered' data and assign the 'newly ordered' data for each variable */
             t8_data->vars[var_iter]->var->switch_data();
             /* Set the Morton Curve ordering flag */

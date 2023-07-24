@@ -49,7 +49,7 @@ public:
     std::vector<size_t> global_dim_lengths; //!< The global dimension lenghts
     cmc_global_coordinate_system* coordinates{nullptr}; //!< The global coordinate system
     std::vector<cmc_ref_coordinates*> ref_coordinates; //!< The reference coordinates corresponding to the global coordinate system
-    size_t get_coord_length(const CMC_COORD_IDS cmc_coord_id) const; //!< A member function returning the length of a supplied coordinate dimension
+    size_t get_global_coord_length(const CMC_COORD_IDS cmc_coord_id) const; //!< A member function returning the global dimension length of the supplied coordinate dimension
 };
 
 /**

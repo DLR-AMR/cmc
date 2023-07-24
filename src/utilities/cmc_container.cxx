@@ -5294,10 +5294,7 @@ public:
     };
     var_dynamic_array(const size_t _num_elems, const cmc_type _type)
     : capacity{_num_elems}{
-        std::cout << "wie is hier" << std::endl;
-        //array = new var_array_t{_num_elems, _type};
         array = new var_array(_num_elems, _type);
-        std::cout << "und mal wieder hier" << std::endl;
     };
     ~var_dynamic_array(){
         if (array != nullptr)
@@ -5315,9 +5312,7 @@ public:
 void
 var_dynamic_array_t::_init_array(const size_t num_elements, const cmc_type _type)
 {
-    std::cout << "hier" << std::endl;
     data = new var_dynamic_array(num_elements, _type);
-    std::cout << "o doch hier" << std::endl;
 }
 
 void
@@ -5359,9 +5354,7 @@ var_dynamic_array_t::resize(const size_t num_elements)
 {
     if (num_elements > data->capacity)
     {
-        std::cout << "resizzzeeee" << std::endl;
         /* Create a new array with the given number of elements */
-        //var_array_t* resized_data = new var_array_t{num_elements, data->array->get_data_type()};
         var_array* resized_data = new var_array(num_elements, data->array->type);
         /* Copy the current array entries over */
         memcpy(resized_data->initial_data_ptr, data->array->initial_data_ptr, data->size * cmc_type_to_bytes[data->array->type]);
