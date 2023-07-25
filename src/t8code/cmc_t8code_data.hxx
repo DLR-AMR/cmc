@@ -239,8 +239,9 @@ public:
     
     t8_gloidx_t first_global_elem_id{0}; //!< The first global element id the MPI rank holds
     uint64_t coarsening_counter{0}; //!< This value counts the number of (process-local) coarsenings
-    t8_forest_t forest_reference{nullptr}; //!< A variable for holding a reference forest which may be needed
-    
+    t8_forest_t forest_begin{nullptr}; //!< A variable for holding a reference forest before the adaption step (at the beginning of the compression step)
+    t8_forest_t forest_end{nullptr}; //!< A variable for holding a reference forest after the adaption, interpolation and partition step (at the end of the actual compression step)
+    t8_forest_replace_t interpolation_function; //!< A function pointer to the interpolation function (this is for example important for the relative error critertion)
     cmc_amr_compression_settings* settings{nullptr}; //!< A pointer to @struct cmc_amr_compression_settings which saves information about the compression criterium
 };
 

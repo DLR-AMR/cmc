@@ -1054,7 +1054,7 @@ cmc_geo_data_fetch_2d_data(const cmc_t8_var& var3d, cmc_t8_var& var2d, const siz
  * @param var_id Eventually a var_id (only used within a 'One For One' compression mode)
  */
 static void
-cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, const cmc_t8_data_t t8_data, const int var_id = -1)
+cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, const cmc_t8_data_t t8_data, t8_forest_t forest_start, t8_forest_replace_t interpolation_function, const int var_id = -1)
 {
     #ifdef CMC_WITH_T8CODE
     /* Set a pointer to t8_data if it has not happend before */
@@ -1079,6 +1079,12 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
             cmc_warn_msg("No compression criterion has been specified.");
             [[fallthrough]];
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
+                /* Check if the data is distributed */
+                if(t8_data->use_distributed_data)
+                {
+                    /* In case we are using a parallel environment, we store the global element id of the first local element */
+                    adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest_start);
+                }
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
                 adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->assets->forest) / pow(t8_data->geo_data->dim, 2)));
                 adapt_data._counter = 0;
@@ -1090,6 +1096,8 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Initialize the deviations vectors */
                 adapt_data.associated_max_deviations.insert(adapt_data.associated_max_deviations.begin(), t8_data->vars.size(), std::vector<double>());
                 adapt_data.associated_max_deviations_new.insert(adapt_data.associated_max_deviations_new.begin(), t8_data->vars.size(), std::vector<double>());
+                /* Save the supplied interpolation function */
+                adapt_data.interpolation_function = interpolation_function;
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 // In this case nothing has to be set up
@@ -1116,6 +1124,12 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
             /* If the mode is undefined, we use by default an error threshold criterium */
             [[fallthrough]];
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
+                /* Check if the data is distributed */
+                if(t8_data->use_distributed_data)
+                {
+                    /* In case we are using a parallel environment, we store the global element id of the first local element */
+                    adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest_start);
+                }
                 /* Reset the adapt_data class */
                 adapt_data.adapt_step = 0;
                 /* Save the current variable ID */
@@ -1163,7 +1177,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
 }
 
 static void
-cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, const int var_id = -1)
+cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, t8_forest_t forest_begin, const int var_id = -1)
 {
     #ifdef CMC_WITH_T8CODE
     /* Set up the data structures based on the compression mode */
@@ -1197,6 +1211,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
                 adapt_data.coarsening_counter = 0;
+                adapt_data.forest_begin = forest_begin;
                 interpolation_data.coarsening_counter = 0;
                 /* Allocate space for each variable in order to save data which may be used by the interpolation */
                 for (size_t id{0}; id < adapt_data.t8_data->vars.size(); ++id)
@@ -1223,6 +1238,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 adapt_data._counter = 0;
                 adapt_data._counter_nxt_lvl = 0;
                 adapt_data.coarsening_counter = 0;
+                adapt_data.forest_begin = forest_begin;
                 adapt_data.adapted_data->push_back(new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapt_data.t8_data->vars[var_id]->assets->forest) / (2 * adapt_data.t8_data->vars[var_id]->var->num_dimensions) +1), adapt_data.t8_data->vars[var_id]->get_type()));
                 /* Save a pointer to the 'adapted_data' for the interpolation */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
@@ -1279,13 +1295,13 @@ cmc_rel_error_threshold_update_deviations(cmc_t8_adapt_data& adapt_data, int num
 {
     #ifdef CMC_WITH_T8CODE
 
-    cmc_assert(adapt_data.forest_reference != nullptr);
+    cmc_assert(adapt_data.forest_end != nullptr);
 
     /* Get the scheme of the forest's only tree */
-    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (adapt_data.forest_reference, t8_forest_get_eclass(adapt_data.forest_reference, 0));
+    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (adapt_data.forest_end, t8_forest_get_eclass(adapt_data.forest_end, 0));
 
     /* Get the amounts of elements vanishing during a coarsening step */
-    const uint64_t num_elements_lost = static_cast<uint64_t>(ts->t8_element_num_children(t8_forest_get_element_in_tree(adapt_data.forest_reference, 0, 0))) - 1;
+    const uint64_t num_elements_lost = static_cast<uint64_t>(ts->t8_element_num_children(t8_forest_get_element_in_tree(adapt_data.forest_end, 0, 0))) - 1;
 
     /* Multiply this number by the amount of element reduction per coarsening */
     num_preceeding_coarsenings *= num_elements_lost;
@@ -1366,7 +1382,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
     uint64_t* offsets = new uint64_t[mpisize];
 
     /* Get the offset of the first local element as a SFC index (at the initial refienment level) */
-    uint64_t elem_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id(adapt_data.forest_reference));
+    uint64_t elem_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id(adapt_data.forest_end));
 
     /* Distribute the offsets between all processes */
     err = MPI_Allgather(&elem_offset, 1, MPI_UINT64_T, offsets, 1, MPI_UINT64_T, adapt_data.t8_data->comm);
@@ -1421,7 +1437,7 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
         }
 
         /* Find the end of the partition */
-        auto find_partition_end = std::lower_bound(elem_id_iter, adapt_data.associated_deviations_gelement_id_new.end(), static_cast<uint64_t>((recv_rank != mpisize - 1 ? offsets[recv_rank +1] - 1 : t8_forest_get_global_num_elements(adapt_data.forest_reference) - 1)));
+        auto find_partition_end = std::lower_bound(elem_id_iter, adapt_data.associated_deviations_gelement_id_new.end(), static_cast<uint64_t>((recv_rank != mpisize - 1 ? offsets[recv_rank +1] - 1 : t8_forest_get_global_num_elements(adapt_data.forest_end) - 1)));
         
         /* Determine the maximum length of the message */
         const int msg_length = std::distance(elem_id_iter, find_partition_end) + (find_partition_end == adapt_data.associated_deviations_gelement_id_new.end() ? 0 : 1);
@@ -1656,7 +1672,7 @@ cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& ada
  * @param interpolation_data The @struct cmc_t8_interpolation_data to update/reset
  */
 static void
-cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data)
+cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, t8_forest_t forest_end)
 {
     #ifdef CMC_WITH_T8CODE
     /* Set up the data structures based on the compression mode */
@@ -1672,6 +1688,8 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
+                /* Before the communication of the deviations, we need to save a reference to the new (partitioned) forest */
+                adapt_data.forest_end = forest_end;
                 /* Communicate and update the deviations from the previous caorsening step */
                 cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
             break;
@@ -1699,6 +1717,8 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 /* Free the data which has been saved during the adaptation */
                 adapt_data.adapted_data->clear();
                 interpolation_data.adapted_data = nullptr;
+                /* Before the communication of the deviations, we need to save a reference to the new (partitioned) forest */
+                adapt_data.forest_end = forest_end;
                 /* Communicate and update the deviations from the previous caorsening step */
                 cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
             break;
@@ -1794,108 +1814,116 @@ t8_forest_t
 cmc_t8_geo_data_repartition(cmc_t8_data_t t8_data, t8_forest_t forest, const int partition_for_coarsening, const int var_id = -1)
 {
     #ifdef CMC_WITH_T8CODE
-    cmc_debug_msg("Repartitioning of the forest and the data starts.");
-
-    /* Declare a new forest variable */
-    t8_forest_t forest_partitioned;
-    /* Initialize the forest */
-    t8_forest_init(&forest_partitioned);
-
-    /* We need to distinguish between the compression modes */
-    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
+    /* Check if the data needs to repartitioned */
+    if (t8_data->use_distributed_data)
     {
-        /* If a 'One For All' compression is used */
-        /* Reference the forest */
-        t8_forest_ref(forest);
-        /* Set the forest from which the partition will be derived */
-        t8_forest_set_partition(forest_partitioned, forest, partition_for_coarsening);
-        /* Commit the forest */
-        t8_forest_commit(forest_partitioned);
+        cmc_debug_msg("Repartitioning of the forest and the data starts.");
 
-        /* Partition all variables */
-        for (size_t var_iter = 0; var_iter < t8_data->vars.size(); ++var_iter)
+        /* Declare a new forest variable */
+        t8_forest_t forest_partitioned;
+        /* Initialize the forest */
+        t8_forest_init(&forest_partitioned);
+
+        /* We need to distinguish between the compression modes */
+        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
         {
+            /* If a 'One For All' compression is used */
+            /* Reference the forest */
+            t8_forest_ref(forest);
+            /* Set the forest from which the partition will be derived */
+            t8_forest_set_partition(forest_partitioned, forest, partition_for_coarsening);
+            /* Commit the forest */
+            t8_forest_commit(forest_partitioned);
+
+            /* Partition all variables */
+            for (size_t var_iter = 0; var_iter < t8_data->vars.size(); ++var_iter)
+            {
+                /* Create an sc input array from the variable's data */
+                sc_array_t in_data;
+
+                /* Set up the sc_array of the input */
+                in_data.elem_size = t8_data->vars[var_iter]->get_data_size();
+                in_data.elem_count = t8_data->vars[var_iter]->var->data->size();
+                in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
+                in_data.array = static_cast<char*>(t8_data->vars[var_iter]->var->data->get_initial_data_ptr());
+
+                /* Allcate a new array in data_new which will hold the partitioned data */
+                t8_data->vars[var_iter]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_iter]->get_type());
+
+                /* Create an sc output array for the partitioned variable's data */
+                sc_array_t out_data;
+
+                /* Setup the output sc array */
+                out_data.elem_size = t8_data->vars[var_iter]->get_data_size();
+                out_data.elem_count = t8_forest_get_local_num_elements(forest_partitioned);
+                out_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * t8_forest_get_local_num_elements(forest_partitioned));
+                out_data.array = static_cast<char*>(t8_data->vars[var_iter]->get_initial_data_new_ptr());
+
+                /* The data has to be partitioned as well according to new partitioning scheme of the forest */
+                t8_forest_partition_data(forest, forest_partitioned, &in_data, &out_data);
+
+                /* Switch the old with the partitioned data */
+                t8_data->vars[var_iter]->var->switch_data();
+            }
+
+            /* Dereference the old partitioned forest */
+            t8_forest_unref(&forest);
+
+            cmc_debug_msg("The forest and the data has been re-partitioned.");
+
+            /* Return the newly partitioned forest */
+            return forest_partitioned;
+        }
+        else
+        {
+            /* If a 'One for One' compression mode is used */
+            /* Reference the forest */
+            t8_forest_ref(forest);
+            /* Set the forest from which the partition will be derived */
+            t8_forest_set_partition(forest_partitioned, forest, partition_for_coarsening);
+            /* Commit the forest */
+            t8_forest_commit(forest_partitioned);
+
             /* Create an sc input array from the variable's data */
             sc_array_t in_data;
 
             /* Set up the sc_array of the input */
-            in_data.elem_size = t8_data->vars[var_iter]->get_data_size();
-            in_data.elem_count = t8_data->vars[var_iter]->var->data->size();
+            in_data.elem_size = t8_data->vars[var_id]->get_data_size();
+            in_data.elem_count = t8_data->vars[var_id]->var->data->size();
             in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
-            in_data.array = static_cast<char*>(t8_data->vars[var_iter]->var->data->get_initial_data_ptr());
+            in_data.array = static_cast<char*>(t8_data->vars[var_id]->var->data->get_initial_data_ptr());
 
             /* Allcate a new array in data_new which will hold the partitioned data */
-            t8_data->vars[var_iter]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_iter]->get_type());
+            t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_id]->get_type());
 
             /* Create an sc output array for the partitioned variable's data */
             sc_array_t out_data;
 
             /* Setup the output sc array */
-            out_data.elem_size = t8_data->vars[var_iter]->get_data_size();
+            out_data.elem_size = t8_data->vars[var_id]->get_data_size();
             out_data.elem_count = t8_forest_get_local_num_elements(forest_partitioned);
             out_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * t8_forest_get_local_num_elements(forest_partitioned));
-            out_data.array = static_cast<char*>(t8_data->vars[var_iter]->get_initial_data_new_ptr());
+            out_data.array = static_cast<char*>(t8_data->vars[var_id]->get_initial_data_new_ptr());
 
             /* The data has to be partitioned as well according to new partitioning scheme of the forest */
             t8_forest_partition_data(forest, forest_partitioned, &in_data, &out_data);
 
             /* Switch the old with the partitioned data */
-            t8_data->vars[var_iter]->var->switch_data();
+            t8_data->vars[var_id]->var->switch_data();
+
+            /* Dereference the old partitioned forest */
+            t8_forest_unref(&forest);
+
+            cmc_debug_msg("The forest and the data have been re-partitioned.");
+
+            /* Return the newly partitioned forest */
+            return forest_partitioned;
+
         }
-
-        /* Dereference the old partitioned forest */
-        t8_forest_unref(&forest);
-
-        cmc_debug_msg("The forest and the data has been re-partitioned.");
-
-        /* Return the newly partitioned forest */
-        return forest_partitioned;
-    }
-    else
+    } else
     {
-        /* If a 'One for One' compression mode is used */
-        /* Reference the forest */
-        t8_forest_ref(forest);
-        /* Set the forest from which the partition will be derived */
-        t8_forest_set_partition(forest_partitioned, forest, partition_for_coarsening);
-        /* Commit the forest */
-        t8_forest_commit(forest_partitioned);
-
-        /* Create an sc input array from the variable's data */
-        sc_array_t in_data;
-
-        /* Set up the sc_array of the input */
-        in_data.elem_size = t8_data->vars[var_id]->get_data_size();
-        in_data.elem_count = t8_data->vars[var_id]->var->data->size();
-        in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
-        in_data.array = static_cast<char*>(t8_data->vars[var_id]->var->data->get_initial_data_ptr());
-
-        /* Allcate a new array in data_new which will hold the partitioned data */
-        t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_id]->get_type());
-
-        /* Create an sc output array for the partitioned variable's data */
-        sc_array_t out_data;
-
-        /* Setup the output sc array */
-        out_data.elem_size = t8_data->vars[var_id]->get_data_size();
-        out_data.elem_count = t8_forest_get_local_num_elements(forest_partitioned);
-        out_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * t8_forest_get_local_num_elements(forest_partitioned));
-        out_data.array = static_cast<char*>(t8_data->vars[var_id]->get_initial_data_new_ptr());
-
-        /* The data has to be partitioned as well according to new partitioning scheme of the forest */
-        t8_forest_partition_data(forest, forest_partitioned, &in_data, &out_data);
-
-        /* Switch the old with the partitioned data */
-        t8_data->vars[var_id]->var->switch_data();
-
-        /* Dereference the old partitioned forest */
-        t8_forest_unref(&forest);
-
-        cmc_debug_msg("The forest and the data have been re-partitioned.");
-
-        /* Return the newly partitioned forest */
-        return forest_partitioned;
-
+        /* In case the data is not distributed, we do not need to repartition it */
+        return forest;
     }
     #endif
 }
@@ -1963,7 +1991,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
     cmc_t8_interpolation_data interpolation_data{t8_data};
 
     /* Set up the adapt data struct based on the given compression criterium and the compression mode */
-    cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(adapt_data, interpolation_data, t8_data);
+    cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(adapt_data, interpolation_data, t8_data, forest, interpolation_function);
 
     /* Check whether or not the initial data should be kept */
     if (t8_data->is_initial_data_kept)
@@ -1983,14 +2011,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
     while (ref_lvl > 0 && num_elems_former_forest != t8_forest_get_global_num_elements(forest))
     {
         /* Update the data structurs at the beginning of a iteration */
-        cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(adapt_data, interpolation_data);
-
-        /* Check if the data is distributed */
-        if(t8_data->use_distributed_data)
-        {
-            /* In case we are using a parallel environment, we store the global element id of the first local element */
-            adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest);
-        }
+        cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(adapt_data, interpolation_data, forest);
 
         /** Adaptation process starts **/
         /* Keep the 'forest' after the adaptation step */
@@ -2034,24 +2055,14 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
         /* Free the former forest */
         t8_forest_unref(&forest);
 
-        /* Switch to coarsened forest */
-        forest = coarsened_forest;
+        /* Repartition the forest as well as the variable's data */
+        forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest);
+
+        /* Update the data structs at the end of a iteration */
+        cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data, forest);
 
         /* Decrement the refinement level */
         --ref_lvl;
-
-        /* In case of a parallel execution with distributed data, we need to repartition the forest, as well as the data at this stage */
-        if (t8_data->use_distributed_data)
-        {
-            /* Repartition the variable's data */
-            forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest);
-        }
-
-        /* Save the adapated and/or partitioned forest temporarily in case the adapt-interpolate function needs it */
-        adapt_data.forest_reference = forest;
-
-        /* Update the data structs at the end of a iteration */
-        cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data);
     }
 
     /* Delete allocations or perform any finalizing steps */
@@ -2116,14 +2127,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
         num_elems_former_forest = 0;
 
         /* Set up the adaptation and interpoaltion data based on the compression mode and on the compression settings */
-        cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(adapt_data, interpolation_data, t8_data, var_id);
-    
-        /* Check if the data is distributed */
-        if(t8_data->use_distributed_data)
-        {
-            /* In case we are using a parallel environment, we store the global element id of the first local element */
-            adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest);
-        }
+        cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(adapt_data, interpolation_data, t8_data, forest, interpolation_function, var_id);
         
         /* Reference the initial forest */
         t8_forest_ref(forest);
@@ -2132,7 +2136,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
         while (ref_lvl > 0 && num_elems_former_forest != t8_forest_get_global_num_elements(forest))
         {
             /* Update the adapt and interpolation data at the beginning of the iteration */
-            cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(adapt_data, interpolation_data, var_id);
+            cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(adapt_data, interpolation_data, forest, var_id);
 
             /* Update the number of elements of the former forest */
             num_elems_former_forest = t8_forest_get_global_num_elements(forest);
@@ -2165,24 +2169,14 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
             /* Free the former forest */
             t8_forest_unref(&forest);
 
-            /* Switch to the coarsened forest */
-            forest = coarsened_forest;
+            /* Repartition the forest as well as the variable's data */
+            forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest, var_id);
+
+            /* Update the adapt and interpolation struct at the end of the iteration */
+            cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data, forest);
 
             /* Decrement the refinement level */
             --ref_lvl;
-
-            /* In case of a parallel execution with distributed data, we need to repartition the forest, as well as the data at this stage */
-            if (t8_data->use_distributed_data)
-            {
-                /* Repartition the variable's data */
-                forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest, var_id);
-            }
-
-            /* Save the adapated and/or partitioned forest temporarily in case the adapt-interpolate function needs it */
-            adapt_data.forest_reference = forest;
-
-            /* Update the adapt and interpolation struct at the end of the iteration */
-            cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data);
         }
     
         /* Free the former forest and Save the adapted forest */
