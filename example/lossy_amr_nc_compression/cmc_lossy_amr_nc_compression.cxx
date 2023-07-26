@@ -47,7 +47,7 @@ main(int argc, char* argv[])
     cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 1);
 
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);

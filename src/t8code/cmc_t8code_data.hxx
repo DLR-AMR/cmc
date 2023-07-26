@@ -11,6 +11,13 @@
 #include "utilities/cmc_geo_util.h"
 #include "utilities/cmc_container.h"
 
+#ifdef CMC_WITH_T8CODE
+#include <t8_schemes/t8_default/t8_default_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default_quad/t8_default_quad_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default_hex/t8_default_hex_cxx.hxx>
+#endif
+
 /**
  * @brief This enum describes the current status of a \struct cmc_t8_data.
  * 
@@ -20,12 +27,18 @@
  */
 enum CMC_T8_STATUS {CMC_STATUS_UNDEFINED = 0, SETUP_MESH, SETUP_VARS, VARS_ORDERED, COMPRESSED, DECOMPRESSED};
 
+/* Define a custom replace function resembling the 'normal' t8_replace_t function but returning the result in case of a coarsening/invaribility step */
+typedef cmc_universal_type_t (*cmc_t8_forest_replace_function_t) (t8_forest_t forest_old, t8_forest_t forest_new,
+                                                                 t8_locidx_t which_tree, t8_eclass_scheme_c *ts,
+                                                                 const int refine, const int num_outgoing,
+                                                                 const t8_locidx_t first_outgoing, const int num_incoming,
+                                                                 const t8_locidx_t first_incoming);
 
 /**
  * @brief The struct 'cmc_t8_geo_data' saves information about the underlying geo-spatial coordinate system on which the variables' data is defined.
  * 
  * The members of this struct (except @var coords) are used in case all variables are defined ob the same geo-spatial domain.
- * For example, if a 'One for All'-compression-mode is choosen @see @var compression_mode in @struct cmc_t8_data.
+ * For example, if a 'One for All'-compression-mode is chosen @see @var compression_mode in @struct cmc_t8_data.
  * 
  */
 struct cmc_t8_geo_data
@@ -207,6 +220,47 @@ public:
     cmc_amr_compression_settings settings{}; //!< A struct holding information about the compression criterion to use
 };
 
+/* Define a functor as the wrapper of the cmc_t8_forest_replace_function_t function in order */
+struct cmc_t8_forest_interpolate
+{
+public:
+    cmc_t8_forest_interpolate(cmc_t8_forest_replace_function_t interpolation_function)
+    : interpolate{interpolation_function} {};
+
+
+    cmc_t8_forest_replace_function_t operator()()
+    {
+        /* Return the actual */
+        return interpolate;
+    };
+private:
+    cmc_t8_forest_replace_function_t interpolate{nullptr};
+};
+
+/**
+ * @brief The struct 'cmc_t8_interpolation_data' is used by t8code's replace function in order to supply information during the interpolation step between two different meshes
+ */
+struct cmc_t8_interpolation_data
+{
+public:
+    cmc_t8_interpolation_data(){};
+    cmc_t8_interpolation_data(cmc_t8_data_t _t8_data)
+    : t8_data{_t8_data}{};
+    cmc_t8_interpolation_data(cmc_t8_data_t _t8_data, cmc_t8_forest_replace_function_t _interpolation_function)
+    : t8_data{_t8_data} {
+        interpolate = _interpolation_function;
+    };
+    ~cmc_t8_interpolation_data(){};
+
+    cmc_t8_data_t t8_data{nullptr}; //!< A pointer to @struct cmc_t8_data holding all information about the variables and their underlying geo-spatial domains
+    cmc_t8_forest_replace_function_t interpolate; //!< A function pointer to the actual interpolation function
+    int current_var_id{-1}; //!< This variable holds the id of the varibale which is currently considered during the interpolation
+
+    size_t coarsening_counter{0}; //!< A counter counting the times element families have been coarsened before (during the same adaptation step) (It is used for accessing the @var adapted_data)
+    var_vector_t* adapted_data{nullptr}; //!< A pointer to the data calculated and saved during an adaptation step (@see @var adapted_data in @struct cmc_t8_adapt_data)
+    bool interpolated_data_has_been_calculated_during_adaptation{false}; //!< A flag indicating whether or not the interpolated data has been calculated before (e.g. in case of the relative error criterion, the data is calculated during the adaptation)
+};
+
 /**
  * @brief The struct 'cmc_t8_adapt_data' is used by t8code's adapt function in order to supply information during the adaptation step
  */
@@ -222,6 +276,7 @@ public:
 
     /* Some general informations */
     cmc_t8_data_t t8_data{nullptr}; //!< A pointer to @struct cmc_t8_data holding all information about the variables and their underlying geo-spatial domains
+    cmc_t8_interpolation_data_t interpolation_data{nullptr}; //!< A pointer to the interpolation data
     int current_var_id{-1}; //!< In case a 'One for One' compression mode is chosen (different meshes are considered for the different variables; this @var current_var_ids helps distinguishing which variable is currently adapted)
     int adapt_step{0}; //!< A counter indicating the amount of adaptation steps that have been applied previously
     
@@ -241,25 +296,8 @@ public:
     uint64_t coarsening_counter{0}; //!< This value counts the number of (process-local) coarsenings
     t8_forest_t forest_begin{nullptr}; //!< A variable for holding a reference forest before the adaption step (at the beginning of the compression step)
     t8_forest_t forest_end{nullptr}; //!< A variable for holding a reference forest after the adaption, interpolation and partition step (at the end of the actual compression step)
-    t8_forest_replace_t interpolation_function; //!< A function pointer to the interpolation function (this is for example important for the relative error critertion)
+    cmc_t8_forest_replace_function_t interpolation_function; //!< A function pointer to the interpolation function (this is for example important for the relative error critertion)
     cmc_amr_compression_settings* settings{nullptr}; //!< A pointer to @struct cmc_amr_compression_settings which saves information about the compression criterium
-};
-
-/**
- * @brief The struct 'cmc_t8_interpolation_data' is used by t8code's replace function in order to supply information during the interpolation step between two different meshes
- */
-struct cmc_t8_interpolation_data
-{
-public:
-    cmc_t8_interpolation_data(){};
-    cmc_t8_interpolation_data(cmc_t8_data_t _t8_data)
-    : t8_data{_t8_data}{};
-    ~cmc_t8_interpolation_data(){};
-
-    cmc_t8_data_t t8_data{nullptr}; //!< A pointer to @struct cmc_t8_data holding all information about the variables and their underlying geo-spatial domains
-    int current_var_id{-1}; //!< In case a 'One for One' compression mode is chosen (different meshes are considered for the different variables; this @var current_var_ids helps distinguishing which variable is currently interpolated)
-    size_t coarsening_counter{0}; //!< A counter counting the times element families have been coarsened before (during the same adaptation step) (It is used for accessing the @var adapted_data)
-    var_vector_t* adapted_data{nullptr}; //!< A pointer to the data calculated and saved during an adaptation step (@see @var adapted_data in @struct cmc_t8_adapt_data)
 };
 
 #endif /* CMC_T8CODE_DATA_HXX */

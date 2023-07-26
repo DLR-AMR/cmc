@@ -400,6 +400,15 @@ cmc_value_equal_to_zero(const cmc_universal_type_t& value)
     }
 }
 
+/**
+ * @brief Calculate an upper bound for a coarsening step. This functions estimates the deviation from the potential next coarsening @var current_mean 
+ *        to the initial data given the parameters below. 
+ * 
+ * @param previous_max_deviation The previous maximum deviation from the former coarsening step
+ * @param previous_mean The value of one of the elements whose value will be (eventually) repalced by the next coarsening by the value @var current_mean 
+ * @param current_mean The calculated value which will replace @var previous_mean and it's siblings' values
+ * @return double The estimate of the deviation 
+ */
 double
 calculate_two_step_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean)
 {

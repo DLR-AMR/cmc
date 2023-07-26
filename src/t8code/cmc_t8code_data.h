@@ -15,23 +15,20 @@
 #include <t8_cmesh.h>
 #include <t8_cmesh/t8_cmesh_examples.h>
 #include <t8_forest.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default_c_interface.h>
 #include <t8_element_c_interface.h>
 #include <t8_forest/t8_forest_iterate.h>
 #include <t8_forest/t8_forest_vtk.h>
 #include <t8_forest/t8_forest_partition.h>
 #include <p4est.h>
 #include <p8est.h>
-#include <t8_schemes/t8_default/t8_default_quad/t8_default_quad_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_hex/t8_default_hex_cxx.hxx>
 #endif
 
 /** The maximum number of children in t8code's standard quad/hex scheme */
 #define CMC_T8_MAX_CHILDREN_HEX_QUAD 8
 
 /** Typedef of @enum CMC_LOSSY_COMPRESSION_MODE (defined in @file cmc_constants_definitions.h) of possible compression mode (i.e. how the adaptation and interpolation functions should be applied) */
-typedef CMC_LOSSY_COMPRESSION_MODE CMC_T8_COMPRESSION_MODE;
+typedef enum CMC_LOSSY_COMPRESSION_MODE CMC_T8_COMPRESSION_MODE;
 
 /** This enum describes all possible compression/coarsening criteria for the AMR lossy compression */
 enum CMC_T8_COMPRESSION_CRITERIUM {CMC_CRITERIUM_UNDEFINED = 0, CMC_REL_ERROR_THRESHOLD, CMC_EXCLUDE_AREA, CMC_COMBINED_CRITERION};
@@ -44,7 +41,11 @@ typedef struct cmc_t8_data* cmc_t8_data_t;
 typedef struct cmc_t8_adapt_data* cmc_t8_adapt_data_t;
 typedef struct cmc_t8_interpolation_data* cmc_t8_interpolation_data_t;
 typedef struct cmc_amr_compression_settings* cmc_amr_compression_settings_t;
+typedef struct cmc_t8_forest_interpolate* cmc_t8_forest_interpolate_t;
 /** End of forward declarations */
+
+/* A typedef for an interpolation function */
+typedef cmc_t8_forest_interpolate_t (*cmc_t8_forest_interpolation_t)(void);
 
 /**
  * @brief This function writes out all variables in @var t8_data on their underlying forests to a VTK file

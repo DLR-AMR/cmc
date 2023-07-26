@@ -127,7 +127,7 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
  * @param interpolation_function A function pointer describing which interpolation will be used in order to map the fine data on a coarser domain (@see @file cmc_t8_replace_callbacks.h for all opportunities)
  */
 void
-cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function = nullptr, const t8_forest_replace_t interpolation_function = nullptr);
+cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function = nullptr, cmc_t8_forest_interpolation_t interpolation_function = nullptr);
 #else
 /**
  * @brief This function performs the lossy AMR compression based on the data which was aquired by a call to one of the 'cmc_create_amr_compression_data...'-functions and the settings which have been previously set via \fn void cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE compression_mode)
@@ -139,7 +139,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
  * @param interpolation_function A function pointer describing which interpolation will be used in order to map the fine data on a coarser domain (@see @file cmc_t8_replace_callbacks.h for all opportunities)
  */
 void
-cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function, const t8_forest_replace_t interpolation_function);
+cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function, cmc_t8_forest_interpolation_t interpolation_function);
 #endif
 
 /**

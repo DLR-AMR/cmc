@@ -178,6 +178,32 @@ bool cmc_t8_elements_coarsened_from_the_beginning_onwards(cmc_t8_adapt_data_t ad
     #endif
 }
 
+/**
+ * @brief This functions preliminary evalutes the interpolation function (e.g. in order to check if a coarsening step would comply with the error threshold)
+ * 
+ * @param adapt_data The adapt_data holding all information of the current adaptation as well as a pointer to the interpolation struct respectively the interpolation function
+ * @param current_forest The forest which is currently constructed during the adaptation 
+ * @param which_tree The current tree in whihc the elements are evaluated
+ * @param lelement_id The first element id of the element which are about to be evaluated
+ * @param ts The element scheme
+ * @param num_elements The size of the family of elements
+ * @param elements The array of pointeers of elements of the considered family
+ * @return cmc_universal_type_t The interpolated value with whom the element' values will be (potentially) replaced
+ *
+ * @note Since this function preliminary evaluates the interpolation, the @var current_forest is not allowed to be used for the computation duirng the interpolation
+ */
+static inline
+cmc_universal_type_t
+cmc_t8_adapt_evaluate_interpolation_function(cmc_t8_adapt_data_t adapt_data, t8_forest_t current_forest, const int which_tree, const int lelement_id, t8_eclass_scheme_c * ts, const int num_elements, t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+    /* We need to set the interpolation data struct to the old_forest in order to access the struct during the interpolation call */
+    t8_forest_set_user_data(adapt_data->forest_begin, adapt_data->interpolation_data);
+
+    /* We calculate the potential value for a coarsening step */
+    return adapt_data->interpolation_data->interpolate(adapt_data->forest_begin, current_forest, which_tree, ts, -1, num_elements, lelement_id, 1, lelement_id - (adapt_data->coarsening_counter) * num_elements);
+    #endif
+}
 
 /**
  * @brief This function's only application is within the serial relative error threshold criterion
@@ -271,7 +297,7 @@ bool cmc_t8_elements_fulfill_rel_error_threshold_serial_with_initial_data_presen
         /* If it complies with the error boundary, coarsening will be performed */
         const size_t num_elems{static_cast<size_t>(pow(t8_element_num_children(ts, elements[0]), (adapt_data->t8_data->vars[adapt_data->current_var_id]->assets->initial_refinement_lvl + 1 - t8_element_level(ts, elements[0]))))};
         const size_t starting_elem_id{static_cast<size_t>((t8_element_level(ts, elements[0]) == adapt_data->t8_data->vars[adapt_data->current_var_id]->assets->initial_refinement_lvl) ?
-                                    lelement_id : (adapt_data->initial_ref_lvl_ids[adapt_data->current_var_id])[adapt_data->_counter])};
+                                      lelement_id : (adapt_data->initial_ref_lvl_ids[adapt_data->current_var_id])[adapt_data->_counter])};
 
         /* Calculate the mean value of all initial data points (in the coarse element's area) except missing_values */
         //TODO: Is it possible to have missing values here? Or is this case excluded by the checks beforehand if all elements are inside the geo mesh (guess depends on the variable - from netCDf or from MESSy for example)
@@ -314,6 +340,7 @@ bool cmc_t8_elements_fulfill_rel_error_threshold_serial_with_initial_data_presen
  * @brief This function calculates (an approximation) of the deviation up to the initial data and decides based on the supplied error threshold whether the element's family shall be coarsened or not
  * 
  * @param adapt_data A pointer to the current @struct cmc_t8_adapt_data holding the status and data of the adaptation
+ * @param current_forest The current forest which is built from the adaptation
  * @param lelement_id the first local element id of it's family members
  * @param num_elements The number of elements within this family
  * @return true The element's family complies with the relative error threshold and shall be coarsened 
@@ -324,7 +351,7 @@ bool cmc_t8_elements_fulfill_rel_error_threshold_serial_with_initial_data_presen
  */
 static inline
 bool
-cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_data, t8_eclass_scheme_c * ts, const int lelement_id, const int num_elements, t8_element_t * elements[])
+cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_data, t8_forest_t current_forest, const int which_tree, const int lelement_id, t8_eclass_scheme_c * ts, const int num_elements, t8_element_t * elements[])
 {
     #ifdef CMC_WITH_T8CODE
 
@@ -337,10 +364,11 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             /* Iterate over all variables */
             for (size_t var_iter = 0; var_iter < adapt_data->t8_data->vars.size(); ++var_iter)
             {
-                // TODO: Do not calculate the mean value, but rather use the interpolation function supplied to calculate this 'reference value'. Therefore the interpoaltion funciton needs to be saved within the adapt_data
-                /* Calculate the current mean value */
-                cmc_universal_type_t mean = adapt_data->t8_data->vars[var_iter]->var->data->mean_value_same_type_wo_missing_vals(lelement_id, lelement_id + num_elements -1, adapt_data->t8_data->vars[var_iter]->var->missing_value);
-            
+                /* We need to store the current variable id for the calculation of the potential interpolation */
+                adapt_data->interpolation_data->current_var_id = var_iter;
+                /* Calculate the value resulting from the coarsening (if we would apply the coarsening) */
+                cmc_universal_type_t interpolation_result = cmc_t8_adapt_evaluate_interpolation_function(adapt_data, current_forest, which_tree, lelement_id, ts, num_elements, elements);
+               
                 /* In this case, we are already up higher in the hierachy and need to take previous deviations into account */
 
                 /* Declare a vector storing the adjusted deviations */
@@ -366,7 +394,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                         return false;
                     }
                     /* Calculate the maximum deviation taking the the previous deviation into account as well */
-                    adjusted_deviations.push_back(calculate_two_step_max_deviation(adapt_data->associated_max_deviations[var_iter][pos], adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + i)), mean));
+                    adjusted_deviations.push_back(calculate_two_step_max_deviation(adapt_data->associated_max_deviations[var_iter][pos], adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + i)), interpolation_result));
 
                     /* Check whether the error threshold is violated */
                     if (adjusted_deviations.back() > adapt_data->t8_data->settings.max_err)
@@ -404,12 +432,12 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             /* Iterate over all variables */
             for (size_t var_iter = 0; var_iter < adapt_data->t8_data->vars.size(); ++var_iter)
             {
-                // TODO: Do not calculate the mean value, but rather use the interpolation function supplied to calculate this 'reference value'. Therefore the interpoaltion funciton needs to be saved within the adapt_data
-                /* Calculate the current mean value */
-                cmc_universal_type_t mean = adapt_data->t8_data->vars[var_iter]->var->data->mean_value_same_type_wo_missing_vals(lelement_id, lelement_id + num_elements -1, adapt_data->t8_data->vars[var_iter]->var->missing_value);
-            
+                /* We need to store the current variable id for the calculation of the potential interpolation */
+                adapt_data->interpolation_data->current_var_id = var_iter;
+                /* Calculate the value resulting from the coarsening (if we would apply the coarsening) */
+                cmc_universal_type_t interpolation_result = cmc_t8_adapt_evaluate_interpolation_function(adapt_data, current_forest, which_tree, lelement_id, ts, num_elements, elements);
                 /* Since this will be (eventually) the first coarsening step, we can just calculate the normal relative deviation */
-                const std::vector<double> single_deviations = adapt_data->t8_data->vars[var_iter]->var->data->calculate_relative_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, mean, adapt_data->t8_data->vars[var_iter]->var->missing_value);
+                const std::vector<double> single_deviations = adapt_data->t8_data->vars[var_iter]->var->data->calculate_relative_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[var_iter]->var->missing_value);
                 
                 /* Get the maximum deviation */
                 auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
@@ -419,10 +447,10 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 if (max_dev <= adapt_data->t8_data->settings.max_err)
                 {
                     /* If the 'interpolated reference value is not equal to zero, we need to adjust the 'perspective of the relative deviation' */
-                    if (!cmc_value_equal_to_zero(mean))
+                    if (!cmc_value_equal_to_zero(interpolation_result))
                     {
                         /* Scale the deviation, such that the calculated value (e.g. mean) is central for the relative deviation */
-                        max_dev *= (cmc_get_universal_data<double>(adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + std::distance(single_deviations.begin(), max_elem)))) / cmc_get_universal_data<double>(mean));
+                        max_dev *= (cmc_get_universal_data<double>(adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + std::distance(single_deviations.begin(), max_elem)))) / cmc_get_universal_data<double>(interpolation_result));
                     }
                 
                     /* We need to store the maximum deviation for further adaptation steps */
@@ -453,9 +481,8 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
     } else {
         /* In case a 'One for One' compression mode is used */
 
-        // TODO: Do not calculate the mean value, but rather use the interpolation function supplied to calculate this 'reference value'. Therefore the interpoaltion funciton needs to be saved within the adapt_data
-        /* Calculate the current mean value */
-        cmc_universal_type_t mean = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->mean_value_same_type_wo_missing_vals(lelement_id, lelement_id + num_elements -1, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+        /* Calculate the inerpolation result if this coarsening would have happen */
+        cmc_universal_type_t interpolation_result = cmc_t8_adapt_evaluate_interpolation_function(adapt_data, current_forest, which_tree, lelement_id, ts, num_elements, elements);
 
         /* On the finest level we can just calculate the relative deviation, but on coarser levels we need to take previous coarsening steps into account */
         if (ts->t8_element_level(elements[0]) != adapt_data->t8_data->vars[adapt_data->current_var_id]->assets->initial_refinement_lvl)
@@ -480,7 +507,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 }
 
                 /* Calculate the maximum deviation taking the the previous deviation into account as well */
-                adjusted_deviations.push_back(calculate_two_step_max_deviation(adapt_data->associated_max_deviations.front()[pos], adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + i)), mean));
+                adjusted_deviations.push_back(calculate_two_step_max_deviation(adapt_data->associated_max_deviations.front()[pos], adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + i)), interpolation_result));
 
                 /* Check whether the error threshold is violated */
                 if (adjusted_deviations.back() > adapt_data->t8_data->settings.max_err)
@@ -508,7 +535,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
         } else
         {
             /* Since this will be (eventually) the first coarsening step, we can just calculate the normal relative deviation */
-            const std::vector<double> single_deviations = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_relative_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, mean, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+            const std::vector<double> single_deviations = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_relative_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
             
             /* Get the maximum deviation */
             auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
@@ -521,10 +548,10 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
 
                 /* If the 'interpolated reference value' is not equal to zero, we need to adjust the 'perspective of the relative deviation' */
-                if (!cmc_value_equal_to_zero(mean))
+                if (!cmc_value_equal_to_zero(interpolation_result))
                 {
                     /* Scale the deviation, such that the calculated value (e.g. mean) is central for the relative deviation */
-                    max_dev *= (cmc_get_universal_data<double>(adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + std::distance(single_deviations.begin(), max_elem)))) / cmc_get_universal_data<double>(mean));
+                    max_dev *= (cmc_get_universal_data<double>(adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + std::distance(single_deviations.begin(), max_elem)))) / cmc_get_universal_data<double>(interpolation_result));
                 }
 
                 /* We need to store the maximum deviation for further adaptation steps */
@@ -848,7 +875,7 @@ cmc_t8_adapt_callback_coarsen_based_on_error_threshold (t8_forest_t forest,
     }
     
     /* Check if the element's family complies with the relative error threshold and therefore, will be coarsened */
-    if (cmc_t8_elements_comply_to_relative_error_threshold(adapt_data, ts, lelement_id, num_elements, elements))
+    if (cmc_t8_elements_comply_to_relative_error_threshold(adapt_data, forest, which_tree, lelement_id, ts, num_elements, elements))
     {
         /* The family will be coarsened */
         return -1;

@@ -1054,7 +1054,7 @@ cmc_geo_data_fetch_2d_data(const cmc_t8_var& var3d, cmc_t8_var& var2d, const siz
  * @param var_id Eventually a var_id (only used within a 'One For One' compression mode)
  */
 static void
-cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, const cmc_t8_data_t t8_data, t8_forest_t forest_start, t8_forest_replace_t interpolation_function, const int var_id = -1)
+cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_t8_adapt_data& adapt_data, cmc_t8_interpolation_data& interpolation_data, const cmc_t8_data_t t8_data, t8_forest_t forest_start, cmc_t8_forest_replace_function_t interpolation_function, const int var_id = -1)
 {
     #ifdef CMC_WITH_T8CODE
     /* Set a pointer to t8_data if it has not happend before */
@@ -1067,6 +1067,9 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
     {
         interpolation_data.t8_data = t8_data;
     }
+
+    /* Save a pointer to the interpolation data within the adapt_data */
+    adapt_data.interpolation_data = &interpolation_data;
 
     /* Set up the data structures based on the compression mode */
     if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
@@ -1097,7 +1100,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 adapt_data.associated_max_deviations.insert(adapt_data.associated_max_deviations.begin(), t8_data->vars.size(), std::vector<double>());
                 adapt_data.associated_max_deviations_new.insert(adapt_data.associated_max_deviations_new.begin(), t8_data->vars.size(), std::vector<double>());
                 /* Save the supplied interpolation function */
-                adapt_data.interpolation_function = interpolation_function;
+                interpolation_data.interpolate = interpolation_function;
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 // In this case nothing has to be set up
@@ -1147,7 +1150,8 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 /* Initialize the deviations vectors */
                 adapt_data.associated_max_deviations.push_back(std::vector<double>());
                 adapt_data.associated_max_deviations_new.push_back(std::vector<double>());
-
+                /* Save the interpolation function */
+                interpolation_data.interpolate = interpolation_function;
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 /* Reset the adapt_data class */
@@ -1200,6 +1204,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 {
                     adapt_data.adapted_data->push_back(new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapt_data.t8_data->assets->forest) / (2 * adapt_data.t8_data->vars[id]->var->num_dimensions) +1), adapt_data.t8_data->vars[id]->get_type()));
                 }
+                adapt_data.forest_begin = forest_begin;
                 /* Save a pointer to the 'adapted_data' in the interpolation struct */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
             break;
@@ -1974,7 +1979,7 @@ cmc_t8_geo_data_repartition_during_decompression(cmc_t8_data_t t8_data, t8_fores
  * @param interpolation_function The interpolation funcion to use
  */
 static void
-cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function)
+cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, cmc_t8_forest_replace_function_t interpolation_function)
 {
     #ifdef CMC_WITH_T8CODE
     cmc_debug_msg("Compression Mode: 'One for All'");
@@ -1988,7 +1993,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
     cmc_t8_adapt_data adapt_data{t8_data};
     
     /* Create an interpolation data struct */
-    cmc_t8_interpolation_data interpolation_data{t8_data};
+    cmc_t8_interpolation_data interpolation_data(t8_data, interpolation_function);
 
     /* Set up the adapt data struct based on the given compression criterium and the compression mode */
     cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(adapt_data, interpolation_data, t8_data, forest, interpolation_function);
@@ -2010,7 +2015,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
     /* Apply the adaptation/coarsening as often as possible */
     while (ref_lvl > 0 && num_elems_former_forest != t8_forest_get_global_num_elements(forest))
     {
-        /* Update the data structurs at the beginning of a iteration */
+        /* Update the data structures at the beginning of a iteration */
         cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(adapt_data, interpolation_data, forest);
 
         /** Adaptation process starts **/
@@ -2032,16 +2037,16 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
             t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
         }
 
-        /* Set the interpolation data accordingly */
-        t8_forest_set_user_data(coarsened_forest, static_cast<void*>(&interpolation_data));
+        /* Set the interpolation data accordingly (we pass it via the forest old, this enables acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
+        t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
         
         /* Interpolate the element data onto the new coarsened forest */
-        t8_forest_iterate_replace(coarsened_forest, forest, interpolation_function);
+        t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
         
         /* Iterate over all variables */
         for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
         {
-            /* Delete the previous (fine/uncrompressed) data (except in the first iteration, if the intitial data ahould be kept) */
+            /* Delete the previous (fine/uncrompressed) data (except in the first iteration, if the intitial data should be kept) */
             if (t8_data->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
             {
                 delete t8_data->vars[var_id]->var->data;
@@ -2085,7 +2090,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
  * @param interpolation_function The interpolation funcion to use
  */
 static void
-cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function)
+cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, cmc_t8_forest_replace_function_t interpolation_function)
 {
     #ifdef CMC_WITH_T8CODE
     cmc_debug_msg("Compression Mode: 'One for One'");
@@ -2106,7 +2111,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
     cmc_t8_adapt_struct_allocate_one_for_one(adapt_data);
 
     /* Create an interpolation data struct */
-    cmc_t8_interpolation_data interpolation_data(t8_data);
+    cmc_t8_interpolation_data interpolation_data(t8_data, interpolation_function);
 
     /* Iterate over all variables */
     for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
@@ -2150,11 +2155,11 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
             /* Allocate memory equal to the new elements */
             t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
 
-            /* Set the interpolation data accordingly */
-            t8_forest_set_user_data(coarsened_forest, static_cast<void*>(&interpolation_data));
+            /* Set the interpolation data accordingly (we pass it via the forest old, this enables us to easily acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
+            t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
             
             /* Interpolate the element data onto the new coarsened forest */
-            t8_forest_iterate_replace(coarsened_forest, forest, interpolation_function);
+            t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
 
             /* Delete and Release the previous (fine/uncrompressed) data (Do not so, if the data should be kept) */
             if (t8_data->vars[var_id]->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
@@ -2200,7 +2205,7 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
  * @param interpolation_function The interpolation_function to use
  */
 static void
-cmc_t8_adapt_interpolate_data_func(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function)
+cmc_t8_adapt_interpolate_data_func(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, cmc_t8_forest_replace_function_t interpolation_function)
 {
     #ifdef CMC_WITH_T8CODE
     cmc_assert(t8_data->compression_mode != CMC_T8_COMPRESSION_MODE::CMC_T8_COMPRESSION_UNDEFINED);
@@ -2608,19 +2613,24 @@ cmc_t8_apply_zcurve_ordering(cmc_t8_data& t8_data, const int var_id)
 }
 
 void
-cmc_t8_coarsen_data(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, t8_forest_replace_t interpolation_function)
+cmc_t8_coarsen_data(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, cmc_t8_forest_interpolation_t interpolation_function)
 {
     #ifdef CMC_WITH_T8CODE
     /** All variable data has to be in z-curve ordering.
      *  If the data is already properly ordered, this functions returns immediately.
     **/
+    /* Create the interpolation struct holding the actual interpolation function */
+    cmc_t8_forest_interpolate_t interpolation = interpolation_function();
+
     cmc_t8_apply_zcurve_ordering(*t8_data, CMC_APPLY_ZCURVE_TO_ALL_VARS);
 
     /** Interpolate and adapt the variables' data corresponding to the
      *  supplied 'adapt'- and 'interpolation'-function
     **/
-    cmc_t8_adapt_interpolate_data_func(t8_data, adapt_function, interpolation_function);
+    cmc_t8_adapt_interpolate_data_func(t8_data, adapt_function, (*interpolation)());
 
+    /* Delete the interpolation function */
+    delete interpolation;
     #endif
 }
 
