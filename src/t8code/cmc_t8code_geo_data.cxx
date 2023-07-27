@@ -1442,10 +1442,10 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
         }
 
         /* Find the end of the partition */
-        auto find_partition_end = std::lower_bound(elem_id_iter, adapt_data.associated_deviations_gelement_id_new.end(), static_cast<uint64_t>((recv_rank != mpisize - 1 ? offsets[recv_rank +1] - 1 : t8_forest_get_global_num_elements(adapt_data.forest_end) - 1)));
+        auto find_partition_end = std::lower_bound(elem_id_iter, adapt_data.associated_deviations_gelement_id_new.end(), static_cast<uint64_t>((recv_rank != mpisize - 1 ? offsets[recv_rank +1] : t8_forest_get_global_num_elements(adapt_data.forest_end))));
         
         /* Determine the maximum length of the message */
-        const int msg_length = std::distance(elem_id_iter, find_partition_end) + (find_partition_end == adapt_data.associated_deviations_gelement_id_new.end() ? 0 : 1);
+        const int msg_length = std::distance(elem_id_iter, find_partition_end);
 
         /* Since at least one element has been found before, this assertion should be fullfilled */
         cmc_assert(msg_length > 0);
