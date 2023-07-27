@@ -405,40 +405,41 @@ cmc_value_equal_to_zero(const cmc_universal_type_t& value)
  *        to the initial data given the parameters below. 
  * 
  * @param previous_max_deviation The previous maximum deviation from the former coarsening step
- * @param previous_mean The value of one of the elements whose value will be (eventually) repalced by the next coarsening by the value @var current_mean 
- * @param current_mean The calculated value which will replace @var previous_mean and it's siblings' values
- * @return double The estimate of the deviation 
+ * @param previous_value The value of one of the elements whose value will be (eventually) repalced by the next coarsening by the value @var current_mean 
+ * @param new_value The calculated value which will replace @var previous_mean and it's siblings' values
+ * @return double The estimate of the relative deviation 
  */
 double
-calculate_two_step_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean)
+calculate_two_step_relative_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_value, const cmc_universal_type_t& new_value)
 {
-    cmc_assert(previous_mean.index() == current_mean.index());
-    cmc_assert(previous_max_deviation < 1.0 && previous_max_deviation >= 0.0);
+    cmc_assert(previous_value.index() == new_value.index());
+    cmc_assert(previous_max_deviation >= 0.0);
 
-    /* Convert the previous mean value to double */
-    const double dprevious_mean = std::visit([](auto& val) -> double {return static_cast<double>(val);}, previous_mean);
+    /* Convert the new value, which is ought be a replacement for the previous element value, to double */
+    const double dnew_value = std::visit([](auto& val) -> double {return static_cast<double>(val);}, new_value);
 
-    /* Convert the mean value to double */
-    const double dmean = std::visit([](auto& val) -> double {return static_cast<double>(val);}, current_mean);
+    /* Convert the previous element value to double */
+    double dprevious_value = std::abs(std::visit([](auto& val) -> double {return static_cast<double>(val);}, previous_value));
 
-    if (!cmc_approx_cmp(dmean, static_cast<double>(0.0))) //maybe use an approx_cmp
+    /* Adjust the previous value (in the range of all possible values) such that the new deviation will be maximized */
+    dprevious_value *= (dnew_value >= dprevious_value ? (1.0 - previous_max_deviation) : (1.0 + previous_max_deviation));
+
+    /* Check if the new_value is unequal to zero */
+    if (!cmc_approx_cmp(dprevious_value, static_cast<double>(0.0)))
     {
-        if (dprevious_mean < dmean && dprevious_mean >= 0.0)
-        {
-            return std::abs((dprevious_mean * (1.0 - previous_max_deviation) - dmean) / ((1.0 - previous_max_deviation) * dprevious_mean)); 
-        } else
-        {
-            return std::abs((dprevious_mean * (1.0 + previous_max_deviation) - dmean) / ((1.0 - previous_max_deviation) * dprevious_mean)); 
-        }
+        /* If so, return the upper bound for the deviation this replacement would introduce */
+        return std::abs(1.0 - dnew_value / dprevious_value);
     } else
     {
-        /* If the current mean value is zero */
-        if (dprevious_mean < dmean && dprevious_mean >= 0.0)
+        /* Check if the previous value is zero */
+        if (cmc_approx_cmp(dnew_value, static_cast<double>(0.0)))
         {
-            return ((std::abs(dprevious_mean * (1.0 - previous_max_deviation)) + std::abs(dmean)) / (0.5 * (std::abs((1.0 - previous_max_deviation) * dprevious_mean) + std::abs(dmean))));
+            /* If so, there is no deviation */
+            return static_cast<double>(0.0);
         } else
         {
-            return ((std::abs(dprevious_mean * (1.0 + previous_max_deviation)) + std::abs(dmean)) / (0.5 * (std::abs((1.0 - previous_max_deviation) * dprevious_mean) + std::abs(dmean))));
+            /* If the new value is unequal to zero, we use a measure of relative difference */
+            return static_cast<double>(2.0);
         }
     }
 }

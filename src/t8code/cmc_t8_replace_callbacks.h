@@ -23,6 +23,24 @@ cmc_t8_general_interpolation_during_compression (t8_forest_t forest_old, t8_fore
 cmc_t8_forest_interpolate_t
 cmc_t8_compression_interpolation_standard_mean();
 
+/**
+ * @brief A wrapper function for that chooses the maximum of all values during the compression step. Calling this function
+ *        returns a functor which provides the maximum function when called
+ * 
+ * @return cmc_t8_forest_interpolate_t Returns a functor which holds the actual maximum function
+ */
+cmc_t8_forest_interpolate_t
+cmc_t8_compression_interpolation_maximum();
+
+/**
+ * @brief A wrapper function for that chooses the minimum of all values during the compression step. Calling this function
+ *        returns a functor which provides the minimum function when called
+ * 
+ * @return cmc_t8_forest_interpolate_t Returns a functor which holds the actual minimum function
+ */
+cmc_t8_forest_interpolate_t
+cmc_t8_compression_interpolation_minimum();
+
 void
 cmc_t8_geo_data_interpolate_std_mean(t8_forest_t forest_old, t8_forest_t forest_new, t8_locidx_t which_tree,
                                      t8_eclass_scheme_c* ts, int refine, int num_outgoing, t8_locidx_t first_outgoing,

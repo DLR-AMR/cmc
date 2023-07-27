@@ -157,7 +157,7 @@ bool
 cmc_value_equal_to_zero(const cmc_universal_type_t& value);
 
 double
-calculate_two_step_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean);
+calculate_two_step_relative_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean);
 
 
 #endif /* CMC_GEO_UTIL_H */

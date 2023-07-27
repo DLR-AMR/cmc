@@ -3210,6 +3210,911 @@ var_array_t::mean_value(const size_t start_index, const size_t end_index) const
     }
 }
 
+/**
+ * @brief Find the maximum within the given interval while considering missing values within the data
+ */
+cmc_universal_type_t
+var_array_t::maximum_w_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const
+{
+    cmc_assert(end_index >= start_index && end_index < data->num_elements);
+    /* It is assumed that the missing value is of the same data type as the data variable itself */
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            const int32_t missing_val{std::get<int32_t>(missing_value)};
+            int32_t* data_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            int32_t current_maximum{std::numeric_limits<int32_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            const float missing_val{std::get<float>(missing_value)};
+            float* data_ptr{static_cast<float*>(data->initial_data_ptr)};
+            float current_maximum{std::numeric_limits<float>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            const double missing_val{std::get<double>(missing_value)};
+            double* data_ptr{static_cast<double*>(data->initial_data_ptr)};
+            double current_maximum{std::numeric_limits<double>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            const int16_t missing_val{std::get<int16_t>(missing_value)};
+            int16_t* data_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            int16_t current_maximum{std::numeric_limits<int16_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            const int64_t missing_val{std::get<int64_t>(missing_value)};
+            int64_t* data_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            int64_t current_maximum{std::numeric_limits<int64_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            const uint64_t missing_val{std::get<uint64_t>(missing_value)};
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            uint64_t current_maximum{std::numeric_limits<uint64_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            const uint32_t missing_val{std::get<uint32_t>(missing_value)};
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            uint32_t current_maximum{std::numeric_limits<uint32_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            const int8_t missing_val{std::get<int8_t>(missing_value)};
+            int8_t* data_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            int8_t current_maximum{std::numeric_limits<int8_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            const uint8_t missing_val{std::get<uint8_t>(missing_value)};
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            uint8_t current_maximum{std::numeric_limits<uint8_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            const uint16_t missing_val{std::get<uint16_t>(missing_value)};
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            uint16_t current_maximum{std::numeric_limits<uint16_t>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_BYTE:
+        {
+            const std::byte missing_val{std::get<std::byte>(missing_value)};
+            std::byte* data_ptr{static_cast<std::byte*>(data->initial_data_ptr)};
+            std::byte current_maximum{std::numeric_limits<std::byte>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (data_ptr[i] != missing_val)
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_CHAR:
+        {
+            const char missing_val{std::get<char>(missing_value)};
+            char* data_ptr{static_cast<char*>(data->initial_data_ptr)};
+            char current_maximum{std::numeric_limits<char>::min()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a greater value than currently saved */
+                    if (current_maximum < data_ptr[i])
+                    {
+                        current_maximum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }   
+}
+
+/**
+ * @brief Find the maximum within the given interval while considering missing values within the data
+ */
+cmc_universal_type_t
+var_array_t::maximum(const size_t start_index, const size_t end_index) const
+{
+    cmc_assert(end_index >= start_index && end_index < data->num_elements);
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* data_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            int32_t current_maximum{std::numeric_limits<int32_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* data_ptr{static_cast<float*>(data->initial_data_ptr)};
+            float current_maximum{std::numeric_limits<float>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* data_ptr{static_cast<double*>(data->initial_data_ptr)};
+            double current_maximum{std::numeric_limits<double>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* data_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            int16_t current_maximum{std::numeric_limits<int16_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* data_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            int64_t current_maximum{std::numeric_limits<int64_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            uint64_t current_maximum{std::numeric_limits<uint64_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            uint32_t current_maximum{std::numeric_limits<uint32_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* data_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            int8_t current_maximum{std::numeric_limits<int8_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            uint8_t current_maximum{std::numeric_limits<uint8_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            uint16_t current_maximum{std::numeric_limits<uint16_t>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_BYTE:
+        {
+            std::byte* data_ptr{static_cast<std::byte*>(data->initial_data_ptr)};
+            std::byte current_maximum{std::numeric_limits<std::byte>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        case CMC_CHAR:
+        {
+            char* data_ptr{static_cast<char*>(data->initial_data_ptr)};
+            char current_maximum{std::numeric_limits<char>::min()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a greater value than currently saved */
+                if (current_maximum < data_ptr[i])
+                {
+                    current_maximum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_maximum);
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+            return cmc_universal_type_t(static_cast<int>(CMC_ERR));
+    }   
+}
+
+
+/**
+ * @brief Find the minimum within the given interval while considering missing values within the data
+ */
+cmc_universal_type_t
+var_array_t::minimum_w_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const
+{
+    cmc_assert(end_index >= start_index && end_index < data->num_elements);
+    /* It is assumed that the missing value is of the same data type as the data variable itself */
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            const int32_t missing_val{std::get<int32_t>(missing_value)};
+            int32_t* data_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            int32_t current_minimum{std::numeric_limits<int32_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            const float missing_val{std::get<float>(missing_value)};
+            float* data_ptr{static_cast<float*>(data->initial_data_ptr)};
+            float current_minimum{std::numeric_limits<float>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            const double missing_val{std::get<double>(missing_value)};
+            double* data_ptr{static_cast<double*>(data->initial_data_ptr)};
+            double current_minimum{std::numeric_limits<double>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            const int16_t missing_val{std::get<int16_t>(missing_value)};
+            int16_t* data_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            int16_t current_minimum{std::numeric_limits<int16_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            const int64_t missing_val{std::get<int64_t>(missing_value)};
+            int64_t* data_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            int64_t current_minimum{std::numeric_limits<int64_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            const uint64_t missing_val{std::get<uint64_t>(missing_value)};
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            uint64_t current_minimum{std::numeric_limits<uint64_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            const uint32_t missing_val{std::get<uint32_t>(missing_value)};
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            uint32_t current_minimum{std::numeric_limits<uint32_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            const int8_t missing_val{std::get<int8_t>(missing_value)};
+            int8_t* data_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            int8_t current_minimum{std::numeric_limits<int8_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            const uint8_t missing_val{std::get<uint8_t>(missing_value)};
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            uint8_t current_minimum{std::numeric_limits<uint8_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            const uint16_t missing_val{std::get<uint16_t>(missing_value)};
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            uint16_t current_minimum{std::numeric_limits<uint16_t>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_BYTE:
+        {
+            const std::byte missing_val{std::get<std::byte>(missing_value)};
+            std::byte* data_ptr{static_cast<std::byte*>(data->initial_data_ptr)};
+            std::byte current_minimum{std::numeric_limits<std::byte>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (data_ptr[i] != missing_val)
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_CHAR:
+        {
+            const char missing_val{std::get<char>(missing_value)};
+            char* data_ptr{static_cast<char*>(data->initial_data_ptr)};
+            char current_minimum{std::numeric_limits<char>::max()};
+            /* Calculate the sum and the number of no missing values */
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                if (!cmc_approx_cmp(data_ptr[i], missing_val))
+                {
+                    /* Check for a smaller value than currently saved */
+                    if (current_minimum > data_ptr[i])
+                    {
+                        current_minimum = data_ptr[i];
+                    }
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+            return cmc_universal_type_t(static_cast<int>(CMC_ERR));
+    }   
+}
+
+/**
+ * @brief Find the minimum within the given interval while considering missing values within the data
+ */
+cmc_universal_type_t
+var_array_t::minimum(const size_t start_index, const size_t end_index) const
+{
+    cmc_assert(end_index >= start_index && end_index < data->num_elements);
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* data_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            int32_t current_minimum{std::numeric_limits<int32_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* data_ptr{static_cast<float*>(data->initial_data_ptr)};
+            float current_minimum{std::numeric_limits<float>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* data_ptr{static_cast<double*>(data->initial_data_ptr)};
+            double current_minimum{std::numeric_limits<double>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* data_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            int16_t current_minimum{std::numeric_limits<int16_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* data_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            int64_t current_minimum{std::numeric_limits<int64_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            uint64_t current_minimum{std::numeric_limits<uint64_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            uint32_t current_minimum{std::numeric_limits<uint32_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* data_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            int8_t current_minimum{std::numeric_limits<int8_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            uint8_t current_minimum{std::numeric_limits<uint8_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            uint16_t current_minimum{std::numeric_limits<uint16_t>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_BYTE:
+        {
+            std::byte* data_ptr{static_cast<std::byte*>(data->initial_data_ptr)};
+            std::byte current_minimum{std::numeric_limits<std::byte>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        case CMC_CHAR:
+        {
+            char* data_ptr{static_cast<char*>(data->initial_data_ptr)};
+            char current_minimum{std::numeric_limits<char>::max()};
+            for (size_t i{start_index}; i <= end_index; ++i)
+            {
+                /* Check for a smaller value than currently saved */
+                if (current_minimum > data_ptr[i])
+                {
+                    current_minimum = data_ptr[i];
+                }
+            }
+            return cmc_universal_type_t(current_minimum);
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+            return cmc_universal_type_t(static_cast<int>(CMC_ERR));
+    }   
+}
+
+/**
+ * @brief Calculate the mean value of the given interval considering the presence of missing values
+ */
 cmc_universal_type_t
 var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const
 {
@@ -3234,7 +4139,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<int32_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3259,7 +4163,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<float>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3284,7 +4187,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3309,7 +4211,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<int16_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3334,7 +4235,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<int64_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3359,7 +4259,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<uint64_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3384,7 +4283,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<uint32_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3409,7 +4307,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<int8_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3434,7 +4331,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<uint8_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3459,7 +4355,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<uint16_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3487,7 +4382,6 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return cmc_universal_type_t(static_cast<char>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
@@ -3525,7 +4419,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3550,7 +4443,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3575,7 +4467,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3600,7 +4491,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3625,7 +4515,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3650,7 +4539,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3675,7 +4563,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3700,7 +4587,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3725,7 +4611,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3750,7 +4635,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3778,7 +4662,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             /* If not all values are missing values, return the mean value */
             if (mean_no_missing_vals.second != 0)
             {
-                //TODO: Check if this works or is integer division (i guess this should be fine in c++)
                 return static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second);
             } else
             {
@@ -3790,9 +4673,6 @@ var_array_t::mean_value_wo_missing_vals(const size_t start_index, const size_t e
             cmc_err_msg("An unknown cmc data type has been supplied.");
     }   
 }
-
-
-
 
 std::vector<double>
 var_array_t::calculate_relative_deviations_w_missing_values(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value, const cmc_universal_type_t& missing_value) const
@@ -5367,31 +6247,12 @@ var_dynamic_array_t::resize(const size_t num_elements)
     }
 }
 
-#if 0
-void 
-var_dynamic_array_t::push_back(const cmc_universal_type_t& value)
-{
-    //cmc_assert(data->size < data->capacity);
-    //TODO: if the assertion is not true, values need to be copied to a larger memory location
-    if (data->size >= data->capacity)
-    {
-        cmc_debug_msg("The dynamic array will be be resized.");
-        /* Resize the array (Double the current memory) */
-        this->resize(2 * data->capacity);
-    }
-    data->array->assign_value(data->size, value);
-    ++(data->size);
-}
-#endif
-
-
 void
 var_dynamic_array_t::push_back(const cmc_universal_type_t& value)
 {
     /* Check if the dynamic array is still large enough */
     if (data->size >= data->capacity)
     {
-        cmc_debug_msg("The dynamic array will be be resized.");
         /* Resize the array (Double the current memory) */
         this->resize(2 * data->capacity);
     }

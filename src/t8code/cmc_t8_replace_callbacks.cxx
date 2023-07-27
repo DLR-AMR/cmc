@@ -5,6 +5,13 @@
 
 #ifdef CMC_WITH_T8CODE
 
+/**
+ * @note A interpolation function which shall be used in combination with a relative error criterion is not allowed to use the @var forest_new
+ * during the computation of the interpolaed value. This is due to the fact that the interpolation function is already called within the adaptation
+ * in order to check for compliance with the the relative error threshold and at that stage the @var forest_new ist not yet committed/fully built.
+ */
+
+
 void
 cmc_t8_general_interpolation_during_compression (t8_forest_t forest_old, t8_forest_t forest_new, t8_locidx_t which_tree,
                                                  t8_eclass_scheme_c* ts, int refine, int num_outgoing, t8_locidx_t first_outgoing,
@@ -109,6 +116,83 @@ cmc_t8_compression_interpolation_standard_mean()
     #ifdef CMC_WITH_T8CODE
     /* Returns a functor holding the actual interpolation function */
     return new cmc_t8_forest_interpolate(cmc_t8_compression_interpolation_std_mean);
+    #endif
+}
+
+/* The actual interpolation function that chooses the maximum value during a coarsening step */
+static
+cmc_universal_type_t
+cmc_t8_compression_interpolation_maximum_function(t8_forest_t forest_old, t8_forest_t t8_forest_new, t8_locidx_t which_tree,
+                                                  t8_eclass_scheme_c* ts, int refine, int num_outgoing, t8_locidx_t first_outgoing,
+                                                  int num_incoming, t8_locidx_t first_incoming)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Get the interpolation data */
+    cmc_t8_interpolation_data_t interpolation_data = static_cast<cmc_t8_interpolation_data_t>(t8_forest_get_user_data(forest_old));
+
+    if (refine == -1)
+    {
+        /* In case a coarsening has happened, we can choose the maximum value of all of the elements */
+        return interpolation_data->t8_data->vars[interpolation_data->current_var_id]->var->data->maximum_w_missing_vals(static_cast<size_t>(first_outgoing),
+                                                                                                          static_cast<size_t>(first_outgoing + num_outgoing -1),
+                                                                                                          interpolation_data->t8_data->vars[interpolation_data->current_var_id]->var->missing_value);
+    } else if (refine == 0)
+    {
+        /* If the element stays the same, we can return the previous value */
+        return interpolation_data->t8_data->vars[interpolation_data->current_var_id]->var->data->operator[](first_outgoing);
+    } else
+    {
+        cmc_err_msg("A refinement during a compression step should have not happened.");
+        return cmc_universal_type_t(static_cast<int>(CMC_ERR));
+    }
+    #endif
+}
+
+cmc_t8_forest_interpolate_t
+cmc_t8_compression_interpolation_maximum()
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Returns a functor holding the actual interpolation function */
+    return new cmc_t8_forest_interpolate(cmc_t8_compression_interpolation_maximum_function);
+    #endif
+}
+
+
+/* The actual interpolation function that chooses the minimum value during a coarsening step */
+static
+cmc_universal_type_t
+cmc_t8_compression_interpolation_minimum_function(t8_forest_t forest_old, t8_forest_t t8_forest_new, t8_locidx_t which_tree,
+                                                  t8_eclass_scheme_c* ts, int refine, int num_outgoing, t8_locidx_t first_outgoing,
+                                                  int num_incoming, t8_locidx_t first_incoming)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Get the interpolation data */
+    cmc_t8_interpolation_data_t interpolation_data = static_cast<cmc_t8_interpolation_data_t>(t8_forest_get_user_data(forest_old));
+
+    if (refine == -1)
+    {
+        /* In case a coarsening has happened, we can choose the maximum value of all of the elements */
+        return interpolation_data->t8_data->vars[interpolation_data->current_var_id]->var->data->minimum_w_missing_vals(static_cast<size_t>(first_outgoing),
+                                                                                                          static_cast<size_t>(first_outgoing + num_outgoing -1),
+                                                                                                          interpolation_data->t8_data->vars[interpolation_data->current_var_id]->var->missing_value);
+    } else if (refine == 0)
+    {
+        /* If the element stays the same, we can return the previous value */
+        return interpolation_data->t8_data->vars[interpolation_data->current_var_id]->var->data->operator[](first_outgoing);
+    } else
+    {
+        cmc_err_msg("A refinement during a compression step should have not happened.");
+        return cmc_universal_type_t(static_cast<int>(CMC_ERR));
+    }
+    #endif
+}
+
+cmc_t8_forest_interpolate_t
+cmc_t8_compression_interpolation_minimum()
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Returns a functor holding the actual interpolation function */
+    return new cmc_t8_forest_interpolate(cmc_t8_compression_interpolation_minimum_function);
     #endif
 }
 

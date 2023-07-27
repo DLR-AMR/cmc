@@ -482,8 +482,8 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
                 /* In case a relative error criterion has been chosen */
                 //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
                 //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_error_threshold, cmc_t8_geo_data_interpolate_std_mean);
+                //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_error_threshold, cmc_t8_compression_interpolation_standard_mean);
                 cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_error_threshold, cmc_t8_compression_interpolation_standard_mean);
-
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 /* In case an exclude area crierion has been chosen */
@@ -579,31 +579,30 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                 approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
                 if (exact_value > 0.0 && approx_value > 0.0)
                 {
-                    current_err = std::abs(approx_value - exact_value) / exact_value;
+                    /* Calculate the new relative error */
+                    current_err = std::abs((approx_value - exact_value) / exact_value);
+                    /* Eventually update the maximim error for this variable */
                     if (max_error[var_id] < current_err)
                     {
                         max_error[var_id] = current_err;
-                    }
-                } else
-                {
-                    if (exact_value == 0.0 && max_error[var_id] < approx_value)
-                    {
-                        max_error[var_id] = approx_value;
                     }
                 }
             }
         }
         for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
         {
-            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_error[var_id] * 100, "%.");
+            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum relative data inaccuracy of ", max_error[var_id] * 100, "%.");
         }
     }
     else
     {
+        /* In a case of a previous 'One for One' compression */
+        /* Iterate over all variables and check their introduced relative data inaccuracy */
         for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
         {
             max_err = 0.0;
             cmc_assert((amr_data->t8_data->initial_data[var_id]).size() == amr_data->t8_data->vars[var_id]->var->data->size());
+
             for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->vars[var_id]->assets->forest)); ++i)
             {
                 /* Check if a missing value would be at the position of the exact value */
@@ -613,33 +612,17 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                     approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
                     if (exact_value > 0.0 && approx_value > 0.0)
                     {
-                        current_err = std::abs(approx_value - exact_value) / exact_value;
+                        /* Calculate the new relative error */
+                        current_err = std::abs((approx_value - exact_value) / exact_value);
+                        /* Eventually update the maximim error for this variable */
                         if (max_err < current_err)
                         {
                             max_err = current_err;
                         }
-                        //cmc_debug_msg(i, " hat Fehlerantewil: ", current_err);
-                        if(current_err > 0.02)
-                        {
-                            //cmc_debug_msg("Hier ist zu viel fehler lelement_id: ", i, " und der fehler ist: ", current_err);
-                        }
-                    } else
-                    {
-                        #if 0
-                        if (exact_value == 0.0 && max_err < approx_value)
-                        {
-                            max_err = approx_value;
-                        }
-                        #endif
-                    }
-                    if (max_err > 10 &&  i < 100)
-                    {
-                        std::cout << "approx value: " << approx_value << " und exact value: " << exact_value << std::endl;
-                        std::cout << "zu hoher fehler " << max_err << " bei var_id: " << var_id << " und i=" << i << std::endl;
                     }
                 }
             }
-            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum data inaccuracy of ", max_err * 100, "%.");
+            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum relative data inaccuracy of ", max_err * 100, "%.");
         }
     }
 

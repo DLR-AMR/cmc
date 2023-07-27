@@ -37,6 +37,12 @@ public:
     
     bool check_range_fullfills_deviation_threshold_from_value(const size_t start_index, const size_t end_index, const double deviation, const cmc_universal_type_t& value, const cmc_universal_type_t& missing_value) const;
     
+    cmc_universal_type_t maximum_w_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const;
+    cmc_universal_type_t maximum(const size_t start_index, const size_t end_index) const;
+
+    cmc_universal_type_t minimum_w_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const;
+    cmc_universal_type_t minimum(const size_t start_index, const size_t end_index) const;
+
     std::vector<double> calculate_relative_deviations(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value) const;
     std::vector<double> calculate_relative_deviations_w_missing_values(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value, const cmc_universal_type_t& missing_value) const;
 
@@ -55,6 +61,7 @@ public:
     void axpy_scalar_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& add_offset, const cmc_universal_type_t& missing_value);
     
     std::vector<double> retrieve_double_vector() const;
+
     // Opaque pointer to the internal data structure
     struct var_array* data{nullptr};
 private:
