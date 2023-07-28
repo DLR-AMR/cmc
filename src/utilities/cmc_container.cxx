@@ -6145,17 +6145,121 @@ var_array_t::print_data() const
     }
 }
 
+void
+var_array_t::copy_from_to(const var_array_t& source_array, const size_t src_start_index, const size_t src_end_index, const size_t dest_start_index)
+{
+    cmc_assert(src_end_index >= src_start_index);
+    cmc_assert(source_array.size() > src_end_index);
+    cmc_assert(data->num_elements - dest_start_index >= src_end_index - src_start_index);
+    cmc_assert(data->type == source_array.get_data_type());
+
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            int32_t* dest_data_ptr{static_cast<int32_t*>(data->initial_data_ptr) + dest_start_index};
+            int32_t* src_data_ptr{static_cast<int32_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            int32_t* src_data_end_ptr{static_cast<int32_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            float* dest_data_ptr{static_cast<float*>(data->initial_data_ptr) + dest_start_index};
+            float* src_data_ptr{static_cast<float*>(source_array.get_initial_data_ptr()) + src_start_index};
+            float* src_data_end_ptr{static_cast<float*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            double* dest_data_ptr{static_cast<double*>(data->initial_data_ptr) + dest_start_index};
+            double* src_data_ptr{static_cast<double*>(source_array.get_initial_data_ptr()) + src_start_index};
+            double* src_data_end_ptr{static_cast<double*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            int16_t* dest_data_ptr{static_cast<int16_t*>(data->initial_data_ptr) + dest_start_index};
+            int16_t* src_data_ptr{static_cast<int16_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            int16_t* src_data_end_ptr{static_cast<int16_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            int64_t* dest_data_ptr{static_cast<int64_t*>(data->initial_data_ptr) + dest_start_index};
+            int64_t* src_data_ptr{static_cast<int64_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            int64_t* src_data_end_ptr{static_cast<int64_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            uint64_t* dest_data_ptr{static_cast<uint64_t*>(data->initial_data_ptr) + dest_start_index};
+            uint64_t* src_data_ptr{static_cast<uint64_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            uint64_t* src_data_end_ptr{static_cast<uint64_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            uint32_t* dest_data_ptr{static_cast<uint32_t*>(data->initial_data_ptr) + dest_start_index};
+            uint32_t* src_data_ptr{static_cast<uint32_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            uint32_t* src_data_end_ptr{static_cast<uint32_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            int8_t* dest_data_ptr{static_cast<int8_t*>(data->initial_data_ptr) + dest_start_index};
+            int8_t* src_data_ptr{static_cast<int8_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            int8_t* src_data_end_ptr{static_cast<int8_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            uint8_t* dest_data_ptr{static_cast<uint8_t*>(data->initial_data_ptr) + dest_start_index};
+            uint8_t* src_data_ptr{static_cast<uint8_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            uint8_t* src_data_end_ptr{static_cast<uint8_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            uint16_t* dest_data_ptr{static_cast<uint16_t*>(data->initial_data_ptr) + dest_start_index};
+            uint16_t* src_data_ptr{static_cast<uint16_t*>(source_array.get_initial_data_ptr()) + src_start_index};
+            uint16_t* src_data_end_ptr{static_cast<uint16_t*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_BYTE:
+        {
+            std::byte* dest_data_ptr{static_cast<std::byte*>(data->initial_data_ptr) + dest_start_index};
+            std::byte* src_data_ptr{static_cast<std::byte*>(source_array.get_initial_data_ptr()) + src_start_index};
+            std::byte* src_data_end_ptr{static_cast<std::byte*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        case CMC_CHAR:
+        {
+            char* dest_data_ptr{static_cast<char*>(data->initial_data_ptr) + dest_start_index};
+            char* src_data_ptr{static_cast<char*>(source_array.get_initial_data_ptr()) + src_start_index};
+            char* src_data_end_ptr{static_cast<char*>(source_array.get_initial_data_ptr()) + src_end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+}
+
 void*
 var_array_t::get_initial_data_ptr() const
 {
     return data->initial_data_ptr;
-}
-
-
-auto
-cmc_eval(void* data_dest, void* data_src, const cmc_type d_type)
-{
-    memcpy(data_dest, data_src, cmc_type_to_bytes[d_type]);
 }
 
 

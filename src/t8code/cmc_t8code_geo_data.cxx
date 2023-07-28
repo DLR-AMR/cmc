@@ -1101,6 +1101,8 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 adapt_data.associated_max_deviations_new.insert(adapt_data.associated_max_deviations_new.begin(), t8_data->vars.size(), std::vector<double>());
                 /* Save the supplied interpolation function */
                 interpolation_data.interpolate = interpolation_function;
+                interpolation_data.interpolated_data.insert(interpolation_data.interpolated_data.begin(), t8_data->vars.size(), std::vector<std::pair<t8_locidx_t, cmc_universal_type_t>>());
+                interpolation_data.interpolated_data_has_been_calculated_during_adaptation = true;
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 // In this case nothing has to be set up
@@ -1152,6 +1154,8 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 adapt_data.associated_max_deviations_new.push_back(std::vector<double>());
                 /* Save the interpolation function */
                 interpolation_data.interpolate = interpolation_function;
+                interpolation_data.interpolated_data.push_back(std::vector<std::pair<t8_locidx_t, cmc_universal_type_t>>());
+                interpolation_data.interpolated_data_has_been_calculated_during_adaptation = true;
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 /* Reset the adapt_data class */
@@ -1207,6 +1211,11 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 adapt_data.forest_begin = forest_begin;
                 /* Save a pointer to the 'adapted_data' in the interpolation struct */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
+                for (size_t id{0}; id < adapt_data.t8_data->vars.size(); ++id)
+                {
+                    /* Clear the vector containing the interpolated data from the previous step */
+                    interpolation_data.interpolated_data[id].clear();
+                }
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1248,6 +1257,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 /* Save a pointer to the 'adapted_data' for the interpolation */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
                 interpolation_data.coarsening_counter = 0;
+                interpolation_data.interpolated_data.front().clear();
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -1261,6 +1271,7 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 /* Save a pointer to the 'adapted_data' for the interpolation */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
                 interpolation_data.coarsening_counter = 0;
+                interpolation_data.interpolated_data.front().clear();
             break;
             default:
                 cmc_err_msg("The supplied lossy compression criterium is not yet implemented.");
@@ -1284,7 +1295,7 @@ cmc_t8_adapt_struct_allocate_one_for_one(cmc_t8_adapt_data& adapt_data)
 struct
 cmc_t8_mpi_recv_max_deviations
 {
-    uint64_t* elem_ids; //!> A vector collecting the received element ids to which the deviaitons corresponds 
+    uint64_t* elem_ids; //!< A vector collecting the received element ids to which the deviaitons corresponds 
     double** deviations; //!< A vector of double vecctor receiving the deviaitons for each variable
     int num_receiving_elems{0}; //!< Number of elements which has been received
 };
@@ -1971,6 +1982,133 @@ cmc_t8_geo_data_repartition_during_decompression(cmc_t8_data_t t8_data, t8_fores
 }
 
 /**
+ * @brief This function performs the interpolation of the data after an adaptation step (alternatively to t8_forest_iterate_replace)
+ * if the interpolated data has been calculated already during the adaptation step (e.g. within the adapt callback of the relative error criterion)
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the variables
+ * @param interpolation_data The interpolation_data struct holding the calculated interpoaltion values from previous coarsenings
+ * @param forest The new forest after the adaptation onto which the data is interpolated
+ * @param start_var_id The first variable id which will be interpolated onto the @var forest
+ * @param end_var_id The last variable id which will be interpolated onto the @var forest
+ */
+static
+void
+cmc_t8_forest_iterate_replace_with_calculated_data(cmc_t8_data_t t8_data, cmc_t8_interpolation_data_t interpolation_data, t8_forest_t forest, int start_var_id, int end_var_id)
+{
+    #ifdef CMC_WITH_T8CODE
+    cmc_assert(interpolation_data->interpolated_data_has_been_calculated_during_adaptation);
+
+    cmc_debug_msg("Start iterate replace with already calculated interpolation values.");
+
+    /* Perform the interpolation for all supplied variable ids within the range [start_var_id; end_var_id] */
+    for (int var_iter{start_var_id}; var_iter <= end_var_id; ++var_iter)
+    {
+        /* Variable for counting the previous coarsenings */
+        t8_locidx_t coarsening_counter = 0;
+
+        /* Variable holding the elem id which is ought to come next */
+        t8_locidx_t next_not_coarsened_lelem_id = 0;
+
+        /* A variable for the current offset within the data_new array */
+        size_t data_new_offset = 0;
+
+        /* Get the eclass scheme of the forest */
+        t8_eclass_scheme_c* eclass_scheme =  t8_forest_get_eclass_scheme(forest, t8_forest_get_eclass(forest, 0));
+
+        /* Get the reduction of elements per coarsening step */
+        const t8_locidx_t num_elements_lost = static_cast<t8_locidx_t>(t8_element_num_children(eclass_scheme, t8_forest_get_element_in_tree(forest, 0, 0))) - 1;
+        
+        for (auto iter = interpolation_data->interpolated_data[var_iter].begin(); iter != interpolation_data->interpolated_data[var_iter].end();)
+        {
+            if(iter->first == next_not_coarsened_lelem_id)
+            {
+                /* Assign the interpolated value at the correct position */
+                t8_data->vars[var_iter]->var->data_new->assign_value(static_cast<size_t>(iter->first - coarsening_counter * num_elements_lost), iter->second);
+
+                /* Increment the coarsening counter since we added a are coarsening to data_new */
+                ++coarsening_counter;
+
+                /* Increment the data_new offset */
+                ++data_new_offset;
+
+                /* Update the next not coarsened elem id */
+                next_not_coarsened_lelem_id += num_elements_lost + 1;
+
+                /* Advance the iterator */
+                ++iter;
+            } else
+            {
+                /* If there are larger gaps between the coarsened elements, we can just copy the unchanged elements */
+                const size_t num_elems_to_copy = static_cast<size_t>(iter->first - next_not_coarsened_lelem_id);
+
+                /* Copy the data to the data_new array of the variable */
+                t8_data->vars[var_iter]->var->data_new->copy_from_to(*(t8_data->vars[var_iter]->var->data), static_cast<size_t>(next_not_coarsened_lelem_id), static_cast<size_t>(iter->first - 1), data_new_offset);
+                
+                /* Update the offset within the data_new array */
+                data_new_offset += num_elems_to_copy;
+
+                /* Update the next not coarsened elem id */
+                next_not_coarsened_lelem_id += num_elems_to_copy;
+            }
+        }
+        /* We need to check if there are elements at the end which have not been coarsened */
+        if (interpolation_data->interpolated_data[var_iter].size() > 0 && interpolation_data->interpolated_data[var_iter].back().first != t8_forest_get_local_num_elements(forest) + (coarsening_counter - 1) * num_elements_lost - 1)
+        {
+            /* In this case, there is some data which needs to be copied */
+            t8_data->vars[var_iter]->var->data_new->copy_from_to(*(t8_data->vars[var_iter]->var->data), static_cast<size_t>(interpolation_data->interpolated_data[var_iter].back().first + num_elements_lost + 1), static_cast<size_t>(t8_forest_get_local_num_elements(forest) + coarsening_counter * num_elements_lost - 1), data_new_offset);
+        }
+
+        /* In case, there did not happen any coarsening at all, the above copy-mechanisms will not apply.
+         * Since no coarsening was introduced, the element values stayed the same. Therefore, instead of copying,
+         * we will just switch the data */
+        if (interpolation_data->interpolated_data[var_iter].size() == 0)
+        {
+            var_array_t* tmp_array = t8_data->vars[var_iter]->var->data;
+            t8_data->vars[var_iter]->var->data = nullptr;
+            t8_data->vars[var_iter]->var->data_new = tmp_array;
+        }
+    }
+    cmc_debug_msg("End of iterate replace with already calculated interpolation values.");
+    #endif
+}
+
+/**
+ * @brief In case of a 'One for One'-compression, this function performs the interpolation of the data after an adaptation step (alternatively to t8_forest_iterate_replace)
+ * if the interpolated data has been calculated already during the adaptation step (e.g. within the adapt callback of the relative error criterion)
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the variables
+ * @param interpolation_data The interpolation_data struct holding the calculated interpoaltion values from previous coarsenings
+ * @param forest The new forest after the adaptation onto which the data is interpolated
+ */
+static
+void
+cmc_t8_forest_iterate_replace_with_calculated_data_one_for_one(cmc_t8_data_t t8_data, cmc_t8_interpolation_data_t interpolation_data, t8_forest_t forest)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Call the actual alternative iterate replace function with the correct values in a 'One for One' case */
+    cmc_t8_forest_iterate_replace_with_calculated_data(t8_data, interpolation_data, forest, interpolation_data->current_var_id, interpolation_data->current_var_id);
+    #endif
+}
+
+/**
+ * @brief In case of a 'One for All'-compression, this function performs the interpolation of the data after an adaptation step (alternatively to t8_forest_iterate_replace)
+ * if the interpolated data has been calculated already during the adaptation step (e.g. within the adapt callback of the relative error criterion)
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding the variables
+ * @param interpolation_data The interpolation_data struct holding the calculated interpoaltion values from previous coarsenings
+ * @param forest The new forest after the adaptation onto which the data is interpolated
+ */
+static
+void
+cmc_t8_forest_iterate_replace_with_calculated_data_one_for_all(cmc_t8_data_t t8_data, cmc_t8_interpolation_data_t interpolation_data, t8_forest_t forest)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Call the actual alternative iterate replace function with the correct values in a 'One for All' case */
+    cmc_t8_forest_iterate_replace_with_calculated_data(t8_data, interpolation_data, forest, 0, static_cast<int>(t8_data->vars.size() - 1));
+    #endif
+}
+
+/**
  * @brief This functions perform the adaptation and interpolation of the forest and the variables in an 'One For All' compression mode.
  *        This means all variables are defined on the same forest and the coarsening/compression happes analogously for all variables.
  * 
@@ -2037,12 +2175,20 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
             t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
         }
 
-        /* Set the interpolation data accordingly (we pass it via the forest old, this enables acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
-        t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
-        
-        /* Interpolate the element data onto the new coarsened forest */
-        t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
-        
+        /* Check if the interpolation data already has been calculated during the adaptation*/
+        if (interpolation_data.interpolated_data_has_been_calculated_during_adaptation)
+        {
+            /* If the data has been calculated during the adaptation */
+            cmc_t8_forest_iterate_replace_with_calculated_data_one_for_all(t8_data, &interpolation_data, coarsened_forest);
+        } else
+        {
+            /* Set the interpolation data accordingly (we pass it via the forest old, this enables acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
+            t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
+
+            /* Interpolate the element data onto the new coarsened forest */
+            t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
+        }
+
         /* Iterate over all variables */
         for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
         {
@@ -2155,11 +2301,20 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
             /* Allocate memory equal to the new elements */
             t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
 
-            /* Set the interpolation data accordingly (we pass it via the forest old, this enables us to easily acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
-            t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
-            
-            /* Interpolate the element data onto the new coarsened forest */
-            t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
+            /* Check if the interpolation data already has been calculated during the adaptation*/
+            if (interpolation_data.interpolated_data_has_been_calculated_during_adaptation)
+            {
+                /* If the data has been calculated during the adaptation */
+                cmc_t8_forest_iterate_replace_with_calculated_data_one_for_one(t8_data, &interpolation_data, coarsened_forest);
+            } else
+            {
+                /* If the interpolated data still has to be calculated */
+                /* Set the interpolation data accordingly (we pass it via the forest old, this enables us to easily acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
+                t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
+                
+                /* Interpolate the element data onto the new coarsened forest */
+                t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
+            }
 
             /* Delete and Release the previous (fine/uncrompressed) data (Do not so, if the data should be kept) */
             if (t8_data->vars[var_id]->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))

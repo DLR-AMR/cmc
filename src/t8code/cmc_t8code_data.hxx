@@ -259,6 +259,7 @@ public:
     size_t coarsening_counter{0}; //!< A counter counting the times element families have been coarsened before (during the same adaptation step) (It is used for accessing the @var adapted_data)
     var_vector_t* adapted_data{nullptr}; //!< A pointer to the data calculated and saved during an adaptation step (@see @var adapted_data in @struct cmc_t8_adapt_data)
     bool interpolated_data_has_been_calculated_during_adaptation{false}; //!< A flag indicating whether or not the interpolated data has been calculated before (e.g. in case of the relative error criterion, the data is calculated during the adaptation)
+    std::vector<std::vector<std::pair<t8_locidx_t, cmc_universal_type_t>>> interpolated_data; //!< This vector saves interpolated data which eventually has been calculated during the adaptation
 };
 
 /**
