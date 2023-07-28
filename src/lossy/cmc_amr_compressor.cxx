@@ -347,7 +347,7 @@ cmc_amr_pre_setup_split_3D_variable(cmc_amr_data_t amr_data, const int var_id, c
 }
 
 void
-cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_data, const double maximum_error_tolerance)
+cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(cmc_amr_data_t amr_data, const double maximum_error_tolerance)
 {
     #ifdef CMC_WITH_T8CODE
     /* Set the error threshold in t8_data */

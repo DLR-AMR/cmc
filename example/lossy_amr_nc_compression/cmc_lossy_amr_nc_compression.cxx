@@ -41,7 +41,7 @@ main(int argc, char* argv[])
     cmc_nc_finish(nc_data);
 
     /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.03);
+    cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.03);
 
     /* Keep the initial data in order to check the actual introduced data inaccurcy after the decompression */
     cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 1);
@@ -115,7 +115,7 @@ main(int argc, char* argv[])
     //cmc_amr_pre_setup_set_compression_criterium_exclude_area(amr_data, CMC_COORD_IDS::CMC_LEV, lev_min, lev_max);
 
     /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_error_threshold(amr_data, 0.09);
+    cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.09);
     
     /* Write out a netCDF File containing the uncompressed data */
     //cmc_amr_write_netcdf_file(amr_data, "example_initial.nc", CMC_AMR_WRITE_ALL_VARS_TO_NETCDF);

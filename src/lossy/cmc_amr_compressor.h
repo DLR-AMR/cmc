@@ -63,10 +63,10 @@ cmc_amr_pre_setup_split_3D_variable(cmc_amr_data_t amr_data, const int var_id, c
  * Precisly, the introduced data loss during the compression will not excced @var maximum_error_tolerance.
  * 
  * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain and information about the coordinate system
- * @param maximum_error_tolerance Sets the maximum data loss for the compression in percent. The value should be a decimal value, e.g. 0.01 (-> equals a maximum data loss of 1%)
+ * @param maximum_rel_error_tolerance Sets the maximum relative data loss for the compression in percent. The value should be a decimal value, e.g. 0.01 (-> equals a maximum data loss of 1%)
  */
 void
-cmc_amr_pre_setup_set_compression_criterium_error_threshold(cmc_amr_data_t amr_data, const double maximum_error_tolerance);
+cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(cmc_amr_data_t amr_data, const double maximum_rel_error_tolerance);
 
 /**
  * @brief This function sets whether or not the initial data is saved or lost during the compression.
