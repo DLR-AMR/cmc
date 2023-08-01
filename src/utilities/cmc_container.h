@@ -51,6 +51,8 @@ public:
     void assign_value(const size_t index, const cmc_universal_type_t& value);
     
     void copy_from_to(const var_array_t& source_array, const size_t src_start_index, const size_t src_end_index, const size_t dest_start_index);
+    void crop_to(const size_t start_index, const size_t end_index);
+
     void scale(const cmc_universal_type_t& scale_factor);
     void scale_with_missing_vals(const cmc_universal_type_t& scale_factor, const cmc_universal_type_t& missing_value);
     

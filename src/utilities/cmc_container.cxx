@@ -6256,6 +6256,151 @@ var_array_t::copy_from_to(const var_array_t& source_array, const size_t src_star
     }
 }
 
+void
+var_array_t::crop_to(const size_t start_index, const size_t end_index)
+{
+    cmc_assert(end_index >= start_index);
+    cmc_assert(data->num_elements > end_index);
+
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            int32_t* dest_data_ptr{static_cast<int32_t*>(data_new->initial_data_ptr)};
+            int32_t* src_data_ptr{static_cast<int32_t*>(data->initial_data_ptr) + start_index};
+            int32_t* src_data_end_ptr{static_cast<int32_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            float* dest_data_ptr{static_cast<float*>(data_new->initial_data_ptr)};
+            float* src_data_ptr{static_cast<float*>(data->initial_data_ptr) + start_index};
+            float* src_data_end_ptr{static_cast<float*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            double* dest_data_ptr{static_cast<double*>(data_new->initial_data_ptr)};
+            double* src_data_ptr{static_cast<double*>(data->initial_data_ptr) + start_index};
+            double* src_data_end_ptr{static_cast<double*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            int16_t* dest_data_ptr{static_cast<int16_t*>(data_new->initial_data_ptr)};
+            int16_t* src_data_ptr{static_cast<int16_t*>(data->initial_data_ptr) + start_index};
+            int16_t* src_data_end_ptr{static_cast<int16_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            int64_t* dest_data_ptr{static_cast<int64_t*>(data_new->initial_data_ptr)};
+            int64_t* src_data_ptr{static_cast<int64_t*>(data->initial_data_ptr) + start_index};
+            int64_t* src_data_end_ptr{static_cast<int64_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            uint64_t* dest_data_ptr{static_cast<uint64_t*>(data_new->initial_data_ptr)};
+            uint64_t* src_data_ptr{static_cast<uint64_t*>(data->initial_data_ptr) + start_index};
+            uint64_t* src_data_end_ptr{static_cast<uint64_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            uint32_t* dest_data_ptr{static_cast<uint32_t*>(data_new->initial_data_ptr)};
+            uint32_t* src_data_ptr{static_cast<uint32_t*>(data->initial_data_ptr) + start_index};
+            uint32_t* src_data_end_ptr{static_cast<uint32_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            int8_t* dest_data_ptr{static_cast<int8_t*>(data_new->initial_data_ptr)};
+            int8_t* src_data_ptr{static_cast<int8_t*>(data->initial_data_ptr) + start_index};
+            int8_t* src_data_end_ptr{static_cast<int8_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            uint8_t* dest_data_ptr{static_cast<uint8_t*>(data_new->initial_data_ptr)};
+            uint8_t* src_data_ptr{static_cast<uint8_t*>(data->initial_data_ptr) + start_index};
+            uint8_t* src_data_end_ptr{static_cast<uint8_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            uint16_t* dest_data_ptr{static_cast<uint16_t*>(data_new->initial_data_ptr)};
+            uint16_t* src_data_ptr{static_cast<uint16_t*>(data->initial_data_ptr) + start_index};
+            uint16_t* src_data_end_ptr{static_cast<uint16_t*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_BYTE:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            std::byte* dest_data_ptr{static_cast<std::byte*>(data_new->initial_data_ptr)};
+            std::byte* src_data_ptr{static_cast<std::byte*>(data->initial_data_ptr) + start_index};
+            std::byte* src_data_end_ptr{static_cast<std::byte*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        case CMC_CHAR:
+        {
+            var_array* data_new = new var_array{end_index - start_index + 1, data->type};
+            char* dest_data_ptr{static_cast<char*>(data_new->initial_data_ptr)};
+            char* src_data_ptr{static_cast<char*>(data->initial_data_ptr) + start_index};
+            char* src_data_end_ptr{static_cast<char*>(data->initial_data_ptr) + end_index + 1};
+            std::copy(src_data_ptr, src_data_end_ptr, dest_data_ptr);
+            delete data;
+            data = data_new;
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+}
+
 void*
 var_array_t::get_initial_data_ptr() const
 {
