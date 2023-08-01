@@ -490,6 +490,74 @@ cmc_inquire_coordinates(cmc_nc_data_t nc_data)
     #endif
 }
 
+static
+void
+cmc_nc_update_global_coords(cmc_nc_data_t nc_data, const size_t* start_ptr, const size_t* count_ptr)
+{
+    #ifdef CMC_WITH_NETCDF
+    cmc_debug_msg("UPDATE GLOBAL DIMS");
+    /* The variables already have been pre-allocated and we take the axis ordering of a variable with the highest dimension */
+    int num_dims = 0;
+    int id_of_highest_var_ids = 0;
+    int var_id = 0;
+
+    /* Find the variable with the most dimensions */
+    for (auto iter = nc_data->vars.begin(); iter != nc_data->vars.end(); ++iter, ++var_id)
+    {
+        int num_considered_dims = 0;
+        for (int dims{0}; dims < (*iter)->num_dimensions; ++dims)
+        {
+            /* Check if the dimension is considered, and if so increment the dimensionality counter */
+            if (count_ptr[dims] > 1)
+            {
+                ++num_considered_dims;
+            }
+        }
+        /* If the considered dimensions are higher than the previous one, we save the amount and the id of the variable */
+        if (num_considered_dims > num_dims)
+        {
+            num_dims = num_considered_dims;
+            id_of_highest_var_ids = var_id;
+        }
+    }
+
+    /* Eventually adjust the global coordinates */
+    for (int dims{0}; dims < nc_data->vars[id_of_highest_var_ids]->num_dimensions; ++dims)
+    {
+        const int current_dim_id = nc_data->vars[id_of_highest_var_ids]->dimension_ids[dims];
+
+        if (current_dim_id == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LAT])
+        {
+            if (count_ptr[dims] < nc_data->coordinates->coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LAT)).size())
+            {
+                /* Only a part of the coordinate dimension is considered */
+                nc_data->coordinates->coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LAT)).crop_to(static_cast<size_t>(start_ptr[dims]), static_cast<size_t>(start_ptr[dims] + count_ptr[dims] - 1));
+            }
+        } else if (current_dim_id == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LON])
+        {
+            if (count_ptr[dims] < nc_data->coordinates->coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LON)).size())
+            {
+                /* Only a part of the coordinate dimension is considered */
+                nc_data->coordinates->coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LON)).crop_to(static_cast<size_t>(start_ptr[dims]), static_cast<size_t>(start_ptr[dims] + count_ptr[dims] - 1));
+            }
+        } else if (current_dim_id == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LEV])
+        {
+            if (count_ptr[dims] < nc_data->coordinates->coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LEV)).size())
+            {
+                /* Only a part of the coordinate dimension is considered */
+                nc_data->coordinates->coords.operator[](static_cast<size_t>(CMC_COORD_IDS::CMC_LEV)).crop_to(static_cast<size_t>(start_ptr[dims]), static_cast<size_t>(start_ptr[dims] + count_ptr[dims] - 1));
+            }
+        } else if (current_dim_id == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_TIME])
+        {
+            //Time-Series data is currently not supported
+            continue;
+        } else
+        {
+            continue;
+        }
+    }
+    #endif
+}
 
 /** Inquire the data for each given variable (either the variable as a whole (start_ptr and count_ptr equal to nullptrs) or a specififed hyperslab) */
 void
@@ -511,6 +579,10 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
 
     /* Read the meta data of the variable (for example 'data_type', 'missing_value', 'offset', 'scale_factor', ...) */
     cmc_nc_inquire_var_meta_data(nc_data);
+
+    /* Beforehand, the whole coordinate dimensions have been read, but it is possible that only a certain view is considered. 
+     * Therefore, we have to update the global coordinate system based on the start and count */
+    cmc_nc_update_global_coords(nc_data, start_ptr, count_ptr);
 
     /* Preallocate data arrays */
     for (size_t i{0}; i < nc_data->vars.size(); ++i)
@@ -913,6 +985,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
     for (size_t i{0}; i < CMC_NUM_COORD_IDS; ++i)
     {
         t8_data->geo_data->global_dim_lengths.push_back(t8_data->geo_data->coordinates->coords.operator[](i).size());
+        cmc_debug_msg("COORD ID: ", i, " hat laenge: ", t8_data->geo_data->global_dim_lengths.back());
     }
 
     //Time series are currently skipped

@@ -133,7 +133,7 @@ public:
 
     /********** NetCDF Specific Data **********/
     /* ID (for example considered for netCDF files) */
-    int var_id{CMC_VAR_NOT_CONSIDERED}; //!> NetCDF varibale id
+    int var_id{CMC_VAR_NOT_CONSIDERED}; //!< NetCDF varibale id
     int var_type{CMC_VAR_NOT_CONSIDERED}; //!< NetCDF variable type
     std::vector<int> dimension_ids; //!< NetCDF dimension ids
 
