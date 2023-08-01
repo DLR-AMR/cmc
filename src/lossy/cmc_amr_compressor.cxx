@@ -321,7 +321,13 @@ cmc_create_amr_compression_data_messy(cmc_messy_data_t messy_data, const MPI_Com
 }
 #endif
 
-/* Set a flag indicating whether or not the initial data should be saved */
+/**
+ * @brief This function sets a flag that the initial dta will be kept until the end of the compression. If it is set and the decompression
+ * is called, the introduced error (from the compression) will be calculated.
+ * 
+ * @param amr_data The amr data struct pointer holding the context of the comrpession
+ * @param flag_keep_initial_data The flag indicating whther tot not to keep the initial data
+ */
 void
 cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(cmc_amr_data_t amr_data, const int flag_keep_initial_data)
 {
@@ -336,13 +342,29 @@ cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(cmc_amr_data_t amr_
     }
 }
 
-/* Perform pre-setup steps: Divide a 3D variable into several 2D variables by spliiting up a given coordinate dimension */
+/**
+ * @brief This functions sets the information that a certain variable (with id @var var_id) will be split before the compression
+ * accordingly to the given @var preferred_layout
+ * 
+ * @param t8_data The pointer to the @struct cmc_t8_data gholding the variables and the information about the compression
+ * @param var_id The variable id corersponding to the variable which is ought to be split
+ * @param preferred_layout The preferred layout into which the variable will be transformed
+ *
+ * @note Passing 'CMC_APPLY_TRANSFORMATION_3D_TO_2D_TO_ALL_VARS' as @var var_id will transform all variables compliant to the given layout
+ */
 void
 cmc_amr_pre_setup_split_3D_variable(cmc_amr_data_t amr_data, const int var_id, const DATA_LAYOUT preferred_data_layout)
 {
     #ifdef CMC_WITH_T8CODE
-    /* Split the variable */
-    cmc_geo_data_transform_3d_var_to_2d(amr_data->t8_data, var_id, preferred_data_layout);
+    if (amr_data->t8_data->use_distributed_data)
+    {
+        /* Indicate that during the initial partitioning the data should be split accordingly */
+        cmc_t8_geo_data_set_split_variable(amr_data->t8_data, var_id, preferred_data_layout);
+    } else
+    {
+        /* In serial configuration, we could (as previously done) split the variable directly */
+        cmc_geo_data_transform_3d_var_to_2d(amr_data->t8_data, var_id, preferred_data_layout);
+    }
     #endif
 }
 
@@ -412,19 +434,26 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
 
     /* Save the diemensionality of the data */
     amr_data->t8_data->dimension_of_compression_mode = amr_data->t8_data->geo_data->dim;
+
+    /* Check if variables are ought to be split at a certain dimension before the mesh is built and the data is redistributed */
+    //cmc_t8_geo_data_split_variables(amr_data->t8_data);
+
     /* Build an enclosing mesh */
     cmc_t8_create_enclosing_geo_mesh(*(amr_data->t8_data));
 
-    /* Check if the data is distributed and we are using a parallel environment */
-    if (amr_data->t8_data->use_distributed_data)
-    {
-        /* In the parallel case, we need to distribute the data first and apply the ordering afterwards */
-        cmc_t8_geo_data_distribute_and_apply_ordering((amr_data->t8_data));
-    } else 
-    {
-        /* In a serial mode, we are able to directly apply the correct z-curve ordering to all variables */
-        cmc_t8_apply_zcurve_ordering(*(amr_data->t8_data), CMC_APPLY_ZCURVE_TO_ALL_VARS);
-    }
+    /* Apply the Morton order to the data and (in a parallel case,) distribute the data accordingly beforehand */
+    cmc_t8_geo_data_distribute_and_apply_ordering((amr_data->t8_data));
+
+    ///* Check if the data is distributed and we are using a parallel environment */
+    //if (amr_data->t8_data->use_distributed_data)
+    //{
+    //    /* In the parallel case, we need to distribute the data first and apply the ordering afterwards */
+    //    cmc_t8_geo_data_distribute_and_apply_ordering((amr_data->t8_data));
+    //} else 
+    //{
+    //    /* In a serial mode, we are able to directly apply the correct z-curve ordering to all variables */
+    //    cmc_t8_apply_zcurve_ordering(*(amr_data->t8_data), CMC_APPLY_ZCURVE_TO_ALL_VARS);
+    //}
 
     #ifdef CMC_ENABLE_DEBUG
     /* In a DEBUG-configuration we are writing the initial data to '.vtu'-files */

@@ -117,6 +117,7 @@ public:
     /* Dimensionality of the data */
     int num_dimensions{0}; //!< Dimensionality of the data
     std::vector<uint64_t> dim_lengths; //!< Local dim lengths (in a 't8_..'-setting)
+    std::vector<uint64_t> dim_starts; //!< Local dim start (in a 't8_..'-setting)
 
     /* The ordering of the data (e.g. lat x lon x lev) */
     std::vector<int> axis_ordering; //!< The ordering of the data (e.g. 1. Longitude, 2. Latitude ... ) (if the data is given in a linear/cartesian representation)
@@ -159,5 +160,10 @@ cmc_value_equal_to_zero(const cmc_universal_type_t& value);
 double
 calculate_two_step_relative_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean);
 
+CMC_COORD_IDS
+cmc_get_split_dim_id(const DATA_LAYOUT initial_layout, const DATA_LAYOUT preferred_layout);
+
+std::vector<int>
+cmc_get_axis_ordering_from_layout(const DATA_LAYOUT layout);
 
 #endif /* CMC_GEO_UTIL_H */

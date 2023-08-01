@@ -444,6 +444,86 @@ calculate_two_step_relative_max_deviation(const double previous_max_deviation, c
     }
 }
 
+CMC_COORD_IDS
+cmc_get_split_dim_id(const DATA_LAYOUT initial_layout, const DATA_LAYOUT preferred_layout)
+{
+    cmc_assert(initial_layout > preferred_layout);
+    
+    switch(static_cast<int>(DATA_LAYOUT::_INTERN_ID_END_2D_START_3D) - static_cast<int>(preferred_layout))
+    {
+        case 1:
+            [[fallthrough]];
+        case 2:
+            return CMC_COORD_IDS::CMC_LAT;
+        break;
+        case 3:
+            [[fallthrough]];
+        case 4:
+            return CMC_COORD_IDS::CMC_LON;
+        break;
+        case 5:
+            [[fallthrough]];
+        case 6:
+            return CMC_COORD_IDS::CMC_LEV;
+        break;
+        default:
+            cmc_err_msg("The split dimension spuld not be determined.");
+            return CMC_LAT; //This return value has to be set only because there is no error value at the moment
+    }
+}
+
+/**
+ * @brief This functions returns the axis ordering given a certain @var layout
+ * 
+ * @param layout The DATA_LAYOUT which should be transformed to a vector
+ * @return std::vector<int> A vector containing the @enum's CMC_COORD_IDS ordered as given by the @var layout
+ */
+std::vector<int>
+cmc_get_axis_ordering_from_layout(const DATA_LAYOUT layout)
+{
+    switch(layout)
+    {
+        case DATA_LAYOUT::CMC_2D_LAT_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LON_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LON_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LON_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LAT_LEV_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LAT_LON:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LEV_LON_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LEV_LAT:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV), static_cast<int>(CMC_COORD_IDS::CMC_LAT)};
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LAT_LEV:
+            return std::vector<int>{static_cast<int>(CMC_COORD_IDS::CMC_LAT), static_cast<int>(CMC_COORD_IDS::CMC_LON), static_cast<int>(CMC_COORD_IDS::CMC_LEV)};
+        break;
+        default:
+            cmc_err_msg("An unknown data layout has been supplied.");
+            return std::vector<int>{static_cast<int>(CMC_ERR)};
+    }
+}
 
 inline
 uint64_t

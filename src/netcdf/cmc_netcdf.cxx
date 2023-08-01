@@ -466,74 +466,6 @@ cmc_nc_inquire_var_meta_data(cmc_nc_data_t nc_data)
     #endif 
 }
 
-//TODO: Make the distribution more general. Currently, a somehow evenly hyperslab is assigned to each rank
-#if 0
-static
-void
-cmc_nc_calc_offsets_for_parallel_reading(cmc_nc_data_t nc_data, const size_t current_var_id)
-{
-    #ifdef CMC_WITH_NETCDF_PAR
-    //TODO: Currently, the data is divided into similar blocks (maybe this is an average approach between the amount of communications needed (in order to reorder the data) and the cache misses during the reading of the file) ?
-    int err, size, rank;
-    /* Get the size of the MPI communicator */
-    err = MPI_Comm_size(nc_data->comm, &size);
-    cmc_mpi_check_err(err);
-    /* Get the rank id */
-    err = MPI_Comm_rank(nc_data->comm, &rank);
-    cmc_mpi_check_err(err);
-    uint32_t leftover_dim_points{0}, evenly_split_dim_points{0};
-    uint32_t global_offset{0};
-    /* Flag indicating that one diemnsion was already not split (in oder to cover the whole domain) */
-    bool non_splitted_dim_applied{false};
-    for (int dims{0}; dims < nc_data->vars[current_var_id]->num_dimensions; ++dims)
-    {
-        /* If a dimension is not considered in the data hyperslab, just skip it */
-        if (nc_data->vars[current_var_id]->count_ptr[dims] <= 1)
-        {
-            continue;
-        } else
-        {
-            cmc_assert(nc_data->vars[current_var_id]->count_ptr[dims] >= static_cast<size_t>(size));
-            if (non_splitted_dim_applied)
-            {
-                /* If the dimension is considered, calculate an offset for this dimension */
-                //The assertion above indicates that at least one dimension point is assigned to each rank
-                /* The leftover dimension points will be distributed */
-                evenly_split_dim_points = static_cast<uint32_t>(nc_data->vars[current_var_id]->count_ptr[dims] / size);
-                /* Calculate the offset for the start vector */
-                global_offset = rank * evenly_split_dim_points;
-                /* Calculate the points which cannot be evenly split between all processses */
-                leftover_dim_points = nc_data->vars[current_var_id]->count_ptr[dims] % size;
-                /* Adjust the offset for the leftover points */
-                /* Rank 0 starts at position zero nevertheless, therefore, the offset cannot change */
-                if (rank != 0)
-                {
-                    if (rank < static_cast<int>(leftover_dim_points))
-                    {
-                        /* The ranks (starting from the lowest to the highest id) obtain another additional dimension point when the diemnsion cannot be split evenly */
-                        ++(evenly_split_dim_points);
-                        /* Adjust the global offset */
-                        global_offset += leftover_dim_points - rank;
-                    } else
-                    {
-                        /* Adjust the global offset */
-                        global_offset += leftover_dim_points;
-                    }
-                }
-                /* Save the start and count values for this dimension */
-                nc_data->vars[current_var_id]->start_ptr[dims] += global_offset;
-                nc_data->vars[current_var_id]->count_ptr[dims] = evenly_split_dim_points;
-            }
-            else
-            {
-                /* The whole dimensions are already saved by default in start and count pointers */
-                non_splitted_dim_applied = true;
-            }
-        }
-    }
-    #endif
-}
-#endif
 #endif
 /******* END STATIC FUNCTIONS *******/
 /************************************/
@@ -590,6 +522,9 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
 
         /* Reserve space for storing the lengths of the data of each data dimension */
         nc_data->vars[i]->dim_lengths.reserve(nc_data->vars[i]->num_dimensions);
+        
+        /* Reserve space for storing the start of the data of each data dimension */
+        nc_data->vars[i]->dim_starts.reserve(nc_data->vars[i]->num_dimensions);
 
         /* Allocate memeory for the start and the count ptr */
         nc_data->vars[i]->start_ptr.reserve(nc_data->vars[i]->num_dimensions);
@@ -683,6 +618,8 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
         {
             /* Save the actual dimension length of the data */
             (nc_data->vars[i]->dim_lengths).push_back(nc_data->vars[i]->count_ptr[dims]);
+            /* Save the dimension start */
+            (nc_data->vars[i]->dim_starts).push_back(nc_data->vars[i]->start_ptr[dims]);
             /* Reduce the data points per dimension in order to obtain the overall amount of data points of the variable */
             num_data_points *= nc_data->vars[i]->count_ptr[dims];
         }
@@ -990,6 +927,8 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
     int update_num_dims;
     /* Create a new dimension length vector for this varibale. This member is used differently in nc_functions than in t8_functions... */
     std::vector<size_t> cmc_t8_dim_lengths(CMC_NUM_COORD_IDS);
+    /* Create a new dimension start vector for this variable. */
+    std::vector<size_t> cmc_t8_dim_starts(CMC_NUM_COORD_IDS);
 
     for (size_t var_id{0}; var_id < nc_data->vars.size(); ++var_id)
     {
@@ -1010,6 +949,9 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         /* 'Nullify' the new dim_lengths vector (fill it up with ones) */
         std::fill(cmc_t8_dim_lengths.begin(), cmc_t8_dim_lengths.end(), 1);
 
+        /* 'Nullify' the new dim_lengths vector (fill it up with ones) */
+        std::fill(cmc_t8_dim_starts.begin(), cmc_t8_dim_starts.end(), 0);
+
         /* Reserve space for the data axis ordering */
         t8_data->vars[var_id]->var->axis_ordering.reserve(t8_data->vars[var_id]->var->num_dimensions);
 
@@ -1022,6 +964,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LON);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LON] = t8_data->vars[var_id]->var->dim_lengths[i];
+                    cmc_t8_dim_starts[CMC_COORD_IDS::CMC_LON] = t8_data->vars[var_id]->var->dim_starts[i];
                 } else
                 {
                     ++update_num_dims;
@@ -1032,6 +975,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LAT);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LAT] = t8_data->vars[var_id]->var->dim_lengths[i];
+                    cmc_t8_dim_starts[CMC_COORD_IDS::CMC_LAT] = t8_data->vars[var_id]->var->dim_starts[i];
                 } else
                 {
                     ++update_num_dims;
@@ -1042,6 +986,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LEV);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LEV] = t8_data->vars[var_id]->var->dim_lengths[i];
+                    cmc_t8_dim_starts[CMC_COORD_IDS::CMC_LEV] = t8_data->vars[var_id]->var->dim_starts[i];
                 } else
                 {
                     ++update_num_dims;
@@ -1076,7 +1021,6 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
             max_dim = t8_data->vars[var_id]->var->num_dimensions;
         }
 
-        //TODO:: Update start and count ptrs, what was meant by it? */
         /* Update the start and count ptrs */
         size_t num_pts = 1;
         for (size_t j{0}; j < t8_data->vars[var_id]->var->count_ptr.size(); ++j)
@@ -1091,13 +1035,16 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 --j;
             } else
             {
-                //just for now -> delete else branch
+                /* Multiply the considered dimension length */
                 num_pts *= t8_data->vars[var_id]->var->count_ptr[j];
             }
         }
 
         /* Set the new dimension lenghts */
         t8_data->vars[var_id]->var->dim_lengths = cmc_t8_dim_lengths;
+
+        /* Set the new dimension starts */
+        t8_data->vars[var_id]->var->dim_starts = cmc_t8_dim_starts;
 
         /* Retrieve the data layout of the variable */
         t8_data->vars[var_id]->var->get_data_layout_from_axis_ordering();
@@ -1109,6 +1056,9 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
     /* Save the flag whether the data is distributed among processes or not */
     t8_data->use_distributed_data = nc_data->use_distributed_data;
 
+    /* Set the information that the data source are netCDF files */
+    t8_data->data_source = CMC_T8_DATA_INPUT::NETCDF_INPUT;
+    
     #endif
 }
 #endif

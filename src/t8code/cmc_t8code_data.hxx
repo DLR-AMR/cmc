@@ -27,6 +27,12 @@
  */
 enum CMC_T8_STATUS {CMC_STATUS_UNDEFINED = 0, SETUP_MESH, SETUP_VARS, VARS_ORDERED, COMPRESSED, DECOMPRESSED};
 
+/**
+ * @brief An enum indicating the data source 
+ * 
+ */
+enum CMC_T8_DATA_INPUT {CMC_T8_INPUT_UNDEFINED = 0, NETCDF_INPUT, MESSY_INPUT};
+
 /* Define a custom replace function resembling the 'normal' t8_replace_t function but returning the result in case of a coarsening/invaribility step */
 typedef cmc_universal_type_t (*cmc_t8_forest_replace_function_t) (t8_forest_t forest_old, t8_forest_t forest_new,
                                                                  t8_locidx_t which_tree, t8_eclass_scheme_c *ts,
@@ -161,6 +167,7 @@ public:
     double max_err{0.0};
     std::array<int, CMC_NUM_COORD_IDS> exclude_area_start_indices{-1,-1,-1,-1};
     std::array<int, CMC_NUM_COORD_IDS> exclude_area_end_indices{INT_MAX, INT_MAX, INT_MAX, INT_MAX};
+    std::vector<std::pair<int, DATA_LAYOUT>> split_variables;
 };
 
 /**
@@ -210,17 +217,22 @@ public:
     MPI_Comm comm; //!< The communicator to use in a parallel environment 
 
     CMC_T8_COMPRESSION_MODE compression_mode{CMC_T8_COMPRESSION_UNDEFINED}; //!< An @enum CMC_T8_COMPRESSION_MODE indicating which compression scheme will be used (@see @enum CMC_T8_COMPRESSION_MODE)
-    int dimension_of_compression_mode{0}; //!< The dimensionaliy of the compression mode (e.g. for 2D data equals 2) 
+    int dimension_of_compression_mode{0}; //!< The dimensionality of the compression mode (e.g. for 2D data equals 2) 
+    
+    CMC_T8_DATA_INPUT data_source{CMC_T8_DATA_INPUT::CMC_T8_INPUT_UNDEFINED}; //!< An @enum CMC_T8_DATA_INPUT indicating where the variables' data is drawn from
+    
     bool is_initial_data_kept{false}; //!< A flag indicating whether or not the initial data (prior to the compression) is saved or not
+    
     bool variables_are_defined_on_the_same_domain{true}; //!< A flag indicating whether the domain of all variables is the same or if the variables are defined on different geo-spatial domains (e.g. var1 is defined on 'lat x lon'; var2 is defined on 'lon x lev')
-
+    
     bool use_distributed_data{false}; //!< A flag indicating whether the variable's data is distributed among processses or not
     data_distribution_t data_dist{data_distribution_t::DISTRIBUTION_UNDEFINED}; //!< An enum defining the current parallel distribution style of the data
+    bool is_data_equally_distributed_per_variable{true}; //!< A flag indicating whther a process holds the same domain for each variable 
     
     cmc_amr_compression_settings settings{}; //!< A struct holding information about the compression criterion to use
 };
 
-/* Define a functor as the wrapper of the cmc_t8_forest_replace_function_t function in order */
+/* Define a functor as the wrapper of the cmc_t8_forest_replace_function_t function */
 struct cmc_t8_forest_interpolate
 {
 public:

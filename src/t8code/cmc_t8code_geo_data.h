@@ -15,6 +15,9 @@ void
 cmc_geo_data_transform_3d_var_to_2d(cmc_t8_data_t t8_data, const int var_id, const DATA_LAYOUT preferred_layout);
 
 void
+cmc_t8_geo_data_set_split_variable(cmc_t8_data_t t8_data, const int var_id, const DATA_LAYOUT preferred_layout);
+
+void
 cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance);
 
 void
@@ -25,6 +28,9 @@ cmc_t8_coarsen_data(cmc_t8_data_t t8_data, t8_forest_adapt_t adapt_function, cmc
 
 void
 cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data);
+
+void
+cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data);
 
 void
 cmc_t8_geo_data_distribute_initially(cmc_t8_data_t t8_data);
