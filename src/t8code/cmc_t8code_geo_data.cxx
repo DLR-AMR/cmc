@@ -1118,7 +1118,7 @@ cmc_t8_get_split_variable_local_elements_concerning_a_data_layout(const cmc_t8_v
             return static_cast<size_t>(0);
         } else
         {
-            /* In case some of the variable's dimension matched */
+            /* In case some of the variable's dimensions matched */
             return num_local_elems;
         }
     }
@@ -1188,7 +1188,11 @@ cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data)
     /* Check if there are variables to split and if so, apply the transformation */
     for (auto iter = t8_data->settings.split_variables.begin(); iter != t8_data->settings.split_variables.end(); ++iter)
     {
-        cmc_assert(t8_data->data_dist == data_distribution_t::CMC_BLOCKED); //Currently, this is only possible for blocked data distributions 
+        if (t8_data->use_distributed_data)
+        {
+            cmc_assert(t8_data->data_dist == data_distribution_t::CMC_BLOCKED); //Currently, this is only possible for blocked data distributions 
+        }
+        
         if (compare_geo_domain_equality_of_data_layouts(t8_data->vars[iter->first]->get_data_layout(), iter->second))
         {
             /* Push back the variable which do not has to changed to the new variable's vector */
@@ -1200,7 +1204,7 @@ cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data)
 
         /* Get the dimension which is ought to be split */
         const CMC_COORD_IDS split_dim_id = cmc_get_split_dim_id(t8_data->vars[iter->first]->get_data_layout(), iter->second);
-    
+
         /* Create new variables equal to the global size of the split dimension */
         for (size_t split_dim{0}; split_dim < t8_data->geo_data->global_dim_lengths[split_dim_id]; ++split_dim)
         {
@@ -1219,7 +1223,9 @@ cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data)
             /* Save the ordering scheme */
             new_vars.back()->var->data_scheme = t8_data->vars[iter->first]->var->data_scheme;
 
-            /* Save and update the dimension lengths */
+            /* Save and update the dimension lengths and starts */
+            new_vars.back()->var->dim_starts = t8_data->vars[iter->first]->var->dim_starts;
+            new_vars.back()->var->dim_starts[split_dim_id] = 0;
             new_vars.back()->var->dim_lengths = t8_data->vars[iter->first]->var->dim_lengths;
             new_vars.back()->var->dim_lengths[split_dim_id] = 1;
 
@@ -1233,7 +1239,7 @@ cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data)
 
             /* Get the number of local elements for this variable */
             const size_t num_elems = cmc_t8_get_split_variable_local_elements_concerning_a_data_layout(t8_data->vars[iter->first], iter->second, split_dim);
-            
+
             /* Allocate memory and obtain the right data slice*/
             if (num_elems > 0)
             {
@@ -1244,16 +1250,40 @@ cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data)
                 cmc_geo_data_fetch_2d_data(*(t8_data->vars[iter->first]), *(new_vars.back()), split_dim);
             } else
             {
-                /* Set the dimension legnths to one */
+                /* Set the dimension legnths and starts to zero */
+                std::fill(new_vars.back()->var->dim_starts.begin(), new_vars.back()->var->dim_starts.end(), 0);
                 std::fill(new_vars.back()->var->dim_lengths.begin(), new_vars.back()->var->dim_lengths.end(), 1);
             }
         }
 
-        /* Set a flag that the data may be unequally distributed due to the splitted variable */
-        t8_data->is_data_equally_distributed_per_variable = false;
-
-
+        /* Deallocate the 3D variable which was split */
+        delete t8_data->vars[iter->first];
     }
+
+    /* Swap the variable's vector we some variables had to be adjusted */
+    if (t8_data->settings.split_variables.size() > 0)
+    {
+        /* Switch the new varibale's vector with the old one */
+        std::swap(t8_data->vars, new_vars);
+    }
+
+    /* Check if now all variables have the same dimensionality */
+    int num_dimensions = t8_data->vars[0]->var->num_dimensions;
+    for (size_t var_iter = 1; var_iter < t8_data->vars.size(); ++var_iter)
+    {
+        if (num_dimensions != t8_data->vars[var_iter]->var->num_dimensions)
+        {
+            cmc_err_msg("The variables do not have the same dimensionality. Therefore, they cannot be compressed simultaneously.");
+        }
+    }
+
+    /* Set the new highest dimension within the geo_data struct */
+    t8_data->geo_data->dim = num_dimensions;
+
+    /* Set a flag that the data may be unequally distributed due to the splitted variable */
+    t8_data->is_data_equally_distributed_per_variable = false;
+
+    cmc_debug_msg("At the end of split var");
     #endif
 }
 
@@ -1384,6 +1414,7 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 adapt_data.associated_max_deviations_new.push_back(std::vector<double>());
                 /* Save the interpolation function */
                 interpolation_data.interpolate = interpolation_function;
+                interpolation_data.interpolated_data.clear();
                 interpolation_data.interpolated_data.push_back(std::vector<std::pair<t8_locidx_t, cmc_universal_type_t>>());
                 interpolation_data.interpolated_data_has_been_calculated_during_adaptation = true;
             break;
@@ -2237,6 +2268,17 @@ cmc_t8_forest_iterate_replace_with_calculated_data(cmc_t8_data_t t8_data, cmc_t8
     /* Perform the interpolation for all supplied variable ids within the range [start_var_id; end_var_id] */
     for (int var_iter{start_var_id}; var_iter <= end_var_id; ++var_iter)
     {
+        int interpolated_data_id;
+
+        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
+        {
+            interpolated_data_id = var_iter;
+        } else
+        {
+            /* In case of a 'One for One' compressiion */
+            interpolated_data_id = 0;
+        }
+
         /* Variable for counting the previous coarsenings */
         t8_locidx_t coarsening_counter = 0;
 
@@ -2252,7 +2294,7 @@ cmc_t8_forest_iterate_replace_with_calculated_data(cmc_t8_data_t t8_data, cmc_t8
         /* Get the reduction of elements per coarsening step */
         const t8_locidx_t num_elements_lost = static_cast<t8_locidx_t>(t8_element_num_children(eclass_scheme, t8_forest_get_element_in_tree(forest, 0, 0))) - 1;
         
-        for (auto iter = interpolation_data->interpolated_data[var_iter].begin(); iter != interpolation_data->interpolated_data[var_iter].end();)
+        for (auto iter = interpolation_data->interpolated_data[interpolated_data_id].begin(); iter != interpolation_data->interpolated_data[interpolated_data_id].end();)
         {
             if(iter->first == next_not_coarsened_lelem_id)
             {
@@ -2286,16 +2328,16 @@ cmc_t8_forest_iterate_replace_with_calculated_data(cmc_t8_data_t t8_data, cmc_t8
             }
         }
         /* We need to check if there are elements at the end which have not been coarsened */
-        if (interpolation_data->interpolated_data[var_iter].size() > 0 && interpolation_data->interpolated_data[var_iter].back().first != t8_forest_get_local_num_elements(forest) + (coarsening_counter - 1) * num_elements_lost - 1)
+        if (interpolation_data->interpolated_data[interpolated_data_id].size() > 0 && interpolation_data->interpolated_data[interpolated_data_id].back().first != t8_forest_get_local_num_elements(forest) + (coarsening_counter - 1) * num_elements_lost - 1)
         {
             /* In this case, there is some data which needs to be copied */
-            t8_data->vars[var_iter]->var->data_new->copy_from_to(*(t8_data->vars[var_iter]->var->data), static_cast<size_t>(interpolation_data->interpolated_data[var_iter].back().first + num_elements_lost + 1), static_cast<size_t>(t8_forest_get_local_num_elements(forest) + coarsening_counter * num_elements_lost - 1), data_new_offset);
+            t8_data->vars[var_iter]->var->data_new->copy_from_to(*(t8_data->vars[var_iter]->var->data), static_cast<size_t>(interpolation_data->interpolated_data[interpolated_data_id].back().first + num_elements_lost + 1), static_cast<size_t>(t8_forest_get_local_num_elements(forest) + coarsening_counter * num_elements_lost - 1), data_new_offset);
         }
 
         /* In case, there did not happen any coarsening at all, the above copy-mechanisms will not apply.
          * Since no coarsening was introduced, the element values stayed the same. Therefore, instead of copying,
          * we will just switch the data */
-        if (interpolation_data->interpolated_data[var_iter].size() == 0)
+        if (interpolation_data->interpolated_data[interpolated_data_id].size() == 0)
         {
             var_array_t* tmp_array = t8_data->vars[var_iter]->var->data;
             t8_data->vars[var_iter]->var->data = nullptr;
@@ -4216,14 +4258,14 @@ cmc_create_ref_coordinates(cmc_global_coordinate_system_t global_system, cmc_var
         case cmc_coordinate_type::CMC_GEO_DOMAIN_DEFINED_BY_BOX:
         {
             // In this case, we assume the data to be sorted corectly compliant to a default ascending ordering scheme in each coordinate diemnsion 
-            cmc_assert(var->start_ptr.size() > 0 && var->count_ptr.size() > 0);
+            cmc_assert(var->dim_starts.size() > 0 && var->dim_lengths.size() > 0);
             //TODO: Maybe check for sorting order of the values?
 
             /* Obtain an offset function for converting the boxed domain layout to cartesian reference coordinates */
             std::function<std::tuple<uint64_t, uint64_t, uint64_t>(const std::vector<size_t>&, size_t)> lin_idx_to_cart_coord = cmc_t8_get_offset_function_lin_idx_to_cart_coord_based_on_data_layout(var->data_layout);
             
             /* We 'linearize' over all dimensions (using a single loop to cover all dimensions) */
-            const size_t total_length = std::reduce(var->count_ptr.begin(), var->count_ptr.end(), 1, std::multiplies<>());
+            const size_t total_length = std::reduce(var->dim_lengths.begin(), var->dim_lengths.end(), 1, std::multiplies<>());
 
             /* Allocate memory for all reference coordinates */
             ref_coords->cartesian_coordinates.reserve(total_length);
@@ -4234,12 +4276,12 @@ cmc_create_ref_coordinates(cmc_global_coordinate_system_t global_system, cmc_var
                 /* Get a (local) cartesian coordinate description of the linear index */
                 std::tuple<uint64_t, uint64_t, uint64_t> cart_coord = lin_idx_to_cart_coord(var->dim_lengths, linear_id);
                 /* Apply the start vector offset for the (local) domain reference coordinates (in order to obtain global reference coordinates) */
-                add_start_offset_to_cart_coord(cart_coord, global_dim_lengths, var->start_ptr, var->dim_lengths, var->data_layout);
+                add_start_offset_to_cart_coord(cart_coord, global_dim_lengths, var->dim_starts, var->dim_lengths, var->data_layout);
                 /* Save the cartesian reference coordinate */
                 ref_coords->cartesian_coordinates.push_back(cart_coord);
             }
 
-            /* Set the flag which coordinate type is represent in the reference coordinates */
+            /* Set the flag which coordinate type is present in the reference coordinates */
             ref_coords->coordinate_representation = cmc_coordinate_type::CMC_CARTESIAN_COORDINATES;
         }
         break;

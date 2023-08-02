@@ -495,7 +495,7 @@ void
 cmc_nc_update_global_coords(cmc_nc_data_t nc_data, const size_t* start_ptr, const size_t* count_ptr)
 {
     #ifdef CMC_WITH_NETCDF
-    cmc_debug_msg("UPDATE GLOBAL DIMS");
+
     /* The variables already have been pre-allocated and we take the axis ordering of a variable with the highest dimension */
     int num_dims = 0;
     int id_of_highest_var_ids = 0;
@@ -985,7 +985,6 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
     for (size_t i{0}; i < CMC_NUM_COORD_IDS; ++i)
     {
         t8_data->geo_data->global_dim_lengths.push_back(t8_data->geo_data->coordinates->coords.operator[](i).size());
-        cmc_debug_msg("COORD ID: ", i, " hat laenge: ", t8_data->geo_data->global_dim_lengths.back());
     }
 
     //Time series are currently skipped

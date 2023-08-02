@@ -356,15 +356,16 @@ void
 cmc_amr_pre_setup_split_3D_variable(cmc_amr_data_t amr_data, const int var_id, const DATA_LAYOUT preferred_data_layout)
 {
     #ifdef CMC_WITH_T8CODE
-    if (amr_data->t8_data->use_distributed_data)
-    {
-        /* Indicate that during the initial partitioning the data should be split accordingly */
-        cmc_t8_geo_data_set_split_variable(amr_data->t8_data, var_id, preferred_data_layout);
-    } else
-    {
-        /* In serial configuration, we could (as previously done) split the variable directly */
-        cmc_geo_data_transform_3d_var_to_2d(amr_data->t8_data, var_id, preferred_data_layout);
-    }
+    cmc_t8_geo_data_set_split_variable(amr_data->t8_data, var_id, preferred_data_layout);
+    //if (amr_data->t8_data->use_distributed_data)
+    //{
+    //    /* Indicate that during the initial partitioning the data should be split accordingly */
+    //    cmc_t8_geo_data_set_split_variable(amr_data->t8_data, var_id, preferred_data_layout);
+    //} else
+    //{
+    //    /* In serial configuration, we could (as previously done) split the variable directly */
+    //    cmc_geo_data_transform_3d_var_to_2d(amr_data->t8_data, var_id, preferred_data_layout);
+    //}
     #endif
 }
 
@@ -436,7 +437,7 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
     amr_data->t8_data->dimension_of_compression_mode = amr_data->t8_data->geo_data->dim;
 
     /* Check if variables are ought to be split at a certain dimension before the mesh is built and the data is redistributed */
-    //cmc_t8_geo_data_split_variables(amr_data->t8_data);
+    cmc_t8_geo_data_split_variables(amr_data->t8_data);
 
     /* Build an enclosing mesh */
     cmc_t8_create_enclosing_geo_mesh(*(amr_data->t8_data));
