@@ -589,6 +589,46 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
     {
         cmc_assert(nc_data->vars[i]->var_id != CMC_NC_VAR_NOT_CONSIDERED);
 
+        /* Get the axis ordering of the data */
+        nc_data->vars[i]->axis_ordering.reserve(nc_data->vars[i]->num_dimensions);
+
+        /* Retrieve the axis ordering of the variable */
+        for (int j{0}; j < nc_data->vars[i]->num_dimensions; ++j)
+        {
+            if (nc_data->vars[i]->dimension_ids[j] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LON])
+            {
+                if (count_ptr[j] > 1)
+                {
+                    nc_data->vars[i]->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LON);
+                    nc_data->vars[i]->dimension_considered[CMC_COORD_IDS::CMC_LON] = true;
+                }
+            } else if (nc_data->vars[i]->dimension_ids[j] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LAT])
+            {
+                if (count_ptr[j] > 1)
+                {
+                    nc_data->vars[i]->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LAT);
+                    nc_data->vars[i]->dimension_considered[CMC_COORD_IDS::CMC_LAT] = true;
+                }
+            } else if (nc_data->vars[i]->dimension_ids[j] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LEV])
+            {
+                if (count_ptr[j] > 1)
+                {
+                    nc_data->vars[i]->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LEV);
+                    nc_data->vars[i]->dimension_considered[CMC_COORD_IDS::CMC_LEV] = true;
+                }
+            } else if (nc_data->vars[i]->dimension_ids[j] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_TIME])
+            {
+                //Time series are currently not supported, therefore the time coordinates are skipped
+                #if 0
+                if (count_ptr[j] > 1)
+                {
+                    nc_data->vars[i]->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_TIME);
+                    nc_data->vars[i]->dimension_considered[CMC_COORD_IDS::CMC_TIME] = true;
+                }
+                #endif
+            }
+        }
+
         /* Reset the number of data points */
         num_data_points = 1;
 
@@ -674,6 +714,9 @@ cmc_nc_inquire_var_data(cmc_nc_data_t nc_data, const size_t* start_ptr, const si
 
                     /* Calculate a blocked data dsitribution */
                     distributed_data = cmc_mpi_calculate_nc_reading_data_distribution_blocked(nc_data->vars[i]->start_ptr, nc_data->vars[i]->count_ptr, nc_data->comm, p_distribution);
+                    
+                    /* Set that we have defaulted to a blcoekd scheme */
+                    nc_data->data_distribution = data_distribution_t::CMC_BLOCKED;
                 }
                 break;
                 default:
@@ -1019,22 +1062,23 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         }
 
         /* 'Nullify' the new dim_lengths vector (fill it up with ones) */
-        std::fill(cmc_t8_dim_lengths.begin(), cmc_t8_dim_lengths.end(), 1);
+        std::fill(cmc_t8_dim_lengths.begin(), cmc_t8_dim_lengths.end(), 0);
 
         /* 'Nullify' the new dim_lengths vector (fill it up with ones) */
         std::fill(cmc_t8_dim_starts.begin(), cmc_t8_dim_starts.end(), 0);
 
+        #if 1
         /* Reserve space for the data axis ordering */
         t8_data->vars[var_id]->var->axis_ordering.reserve(t8_data->vars[var_id]->var->num_dimensions);
 
         /* Retrieve the axis ordering of the variable */
-        for(int i{0}; i < t8_data->vars[var_id]->var->num_dimensions; ++i)
+        for (int i{0}; i < t8_data->vars[var_id]->var->num_dimensions; ++i)
         {
             if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LON])
             {
-                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1)
+                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1 || t8_data->vars[var_id]->var->dimension_considered[CMC_COORD_IDS::CMC_LON])
                 {
-                    t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LON);
+                    //t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LON);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LON] = t8_data->vars[var_id]->var->dim_lengths[i];
                     cmc_t8_dim_starts[CMC_COORD_IDS::CMC_LON] = t8_data->vars[var_id]->var->dim_starts[i];
                 } else
@@ -1043,9 +1087,9 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 }
             } else if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LAT])
             {
-                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1)
+                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1 || t8_data->vars[var_id]->var->dimension_considered[CMC_COORD_IDS::CMC_LAT])
                 {
-                    t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LAT);
+                    //t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LAT);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LAT] = t8_data->vars[var_id]->var->dim_lengths[i];
                     cmc_t8_dim_starts[CMC_COORD_IDS::CMC_LAT] = t8_data->vars[var_id]->var->dim_starts[i];
                 } else
@@ -1054,9 +1098,9 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
                 }
             } else if (t8_data->vars[var_id]->var->dimension_ids[i] == nc_data->coord_dim_ids[CMC_COORD_IDS::CMC_LEV])
             {
-                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1)
+                if (t8_data->vars[var_id]->var->dim_lengths[i] != 1 || t8_data->vars[var_id]->var->dimension_considered[CMC_COORD_IDS::CMC_LEV])
                 {
-                    t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LEV);
+                    //t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_LEV);
                     cmc_t8_dim_lengths[CMC_COORD_IDS::CMC_LEV] = t8_data->vars[var_id]->var->dim_lengths[i];
                     cmc_t8_dim_starts[CMC_COORD_IDS::CMC_LEV] = t8_data->vars[var_id]->var->dim_starts[i];
                 } else
@@ -1067,7 +1111,7 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
             {
                 //Time series are currently not supported, therefore the time coordinates are skipped
                 #if 0
-                if (nc_data->coord_lengths[CMC_COORD_IDS::CMC_TIME] != 1)
+                if (nc_data->coord_lengths[CMC_COORD_IDS::CMC_TIME] != 1 || t8_data->vars[var_id]->var->dimension_considered[CMC_COORD_IDS::CMC_TIME])
                 {
                     t8_data->vars[var_id]->var->axis_ordering.emplace_back(CMC_COORD_IDS::CMC_TIME);
                 }
@@ -1086,7 +1130,8 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
 
         /* Update the dimension dependency of the variables */
         t8_data->vars[var_id]->var->num_dimensions -= update_num_dims;
-
+        t8_data->vars[var_id]->var->num_dimensions = t8_data->vars[var_id]->var->axis_ordering.size();
+        #endif
         /* Save the maximum dimensionality */
         if (t8_data->vars[var_id]->var->num_dimensions > max_dim)
         {
@@ -1118,6 +1163,11 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         /* Set the new dimension starts */
         t8_data->vars[var_id]->var->dim_starts = cmc_t8_dim_starts;
 
+        for (size_t nid = 0; nid < t8_data->vars[var_id]->var->dim_starts.size(); ++nid)
+        {
+            cmc_debug_msg("nc var start (index= ", nid,") ist: ", t8_data->vars[var_id]->var->dim_starts[nid]);
+            cmc_debug_msg("nc var length (index= ", nid,") ist: ", t8_data->vars[var_id]->var->dim_lengths[nid]);
+        }
         /* Retrieve the data layout of the variable */
         t8_data->vars[var_id]->var->get_data_layout_from_axis_ordering();
     }
@@ -1128,9 +1178,13 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
     /* Save the flag whether the data is distributed among processes or not */
     t8_data->use_distributed_data = nc_data->use_distributed_data;
 
+    /* Save distribution scheme of the data */
+    t8_data->data_dist = nc_data->data_distribution;
     /* Set the information that the data source are netCDF files */
     t8_data->data_source = CMC_T8_DATA_INPUT::NETCDF_INPUT;
     
+    //t8_data->vars[0]->var->data->print_data();
+
     #endif
 }
 #endif

@@ -109,6 +109,7 @@ public:
     cmc_universal_type_t scale_factor{static_cast<double>(1.0)}; //!< Indicating the scaling of the data 
     bool missing_value_present{false}; //!< Flag indicating whether or not missing values exists within the data
     bool applied_offset_scaling{false}; //!< Flag indicating whether the offset and scaling has been applied to data or not
+    int global_context_id{0}; //!< An id to describe this varibale in a greater context
 
     /* A pointer to the data array of the variable */
     var_array_t* data{nullptr}; //!< The 'actual' data of the variable
@@ -131,6 +132,8 @@ public:
     /* A pointer to a struct collecting the underlying coordinate*s representation of the data */
     cmc_ref_coordinates* ref_coordinates;
 
+    std::vector<bool> dimension_considered{false, false, false, false}; //!< A vector indicating which of the coordinate dimensions are considered by the variable
+
     /********** NetCDF Specific Data **********/
     /* ID (for example considered for netCDF files) */
     int var_id{CMC_VAR_NOT_CONSIDERED}; //!< NetCDF varibale id
@@ -141,6 +144,7 @@ public:
     std::vector<uint64_t> start_ptr; //!< Coordinate start values of the data
     std::vector<uint64_t> count_ptr; //!< Coordinate length values of the data
 
+    /************ Member Functions ************/
     void switch_data();
     void get_data_layout_from_axis_ordering();
     void assign_an_arbitrary_missing_value();

@@ -616,6 +616,10 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                     {
                         max_error[var_id] = current_err;
                     }
+                    if (current_err > 0.03)
+                    {
+                        cmc_debug_msg("fehler bei var_id: ", var_id, " mit ", current_err);
+                    }
                 }
             }
         }
@@ -649,6 +653,10 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                         {
                             max_err = current_err;
                         }
+                        if (current_err > 0.03)
+                    {
+                        cmc_debug_msg("fehler bei var_id: ", var_id, " an position: ", i, " mit ", current_err);
+                    }
                     }
                 }
             }

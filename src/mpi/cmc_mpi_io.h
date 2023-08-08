@@ -63,72 +63,19 @@ struct cmc_mpi_t8_data
 
 /* Typedefs for sending and receiving data */
 typedef struct cmc_mpi_t8_data cmc_mpi_t8_send_data;
-typedef struct cmc_mpi_t8_data cmc_mpi_t8_recv_data;
+//typedef struct cmc_mpi_t8_data cmc_mpi_t8_recv_data;
 
-
-
-
-
-#if 0
-
-
-// check if these are for use 
-
-struct cmc_coordinate
+struct cmc_mpi_t8_recv_data
 {
-    std::tuple<uint64_t, uint64_t, uint64_t>> cartesian_coordinate;
-    uint64_t morton_index;
-    uint64_t linear_index;
-}
-struct cmc_coordinates
-{
-    std::vector<std::tuple<uint64_t, uint64_t, uint64_t>> cartesian_coordinates;
-    std::vector<uint64_t> morton_indices;
-    std::vector<uint64_t> linear_indices;
+    cmc_mpi_t8_recv_data(){};
+
+    std::vector<std::vector<var_dynamic_array_t*>> data;
+    std::vector<std::vector<int>> received_variable_ids;
+    std::vector<uint64_t*> morton_indices;
+    std::vector<int> received_morton_indices;
+
+    std::vector<int> reference_group_id_sender;
 };
-
-struct cmc_mpi_data
-{
-    cmc_mpi_data(){};
-    cmc_mpi_data(const int rank, const int num_vars)
-    : partner_rank{rank}
-    {
-        data.reserve(num_vars);
-    };
-    ~cmc_mpi_data(){};
-
-    int partner_rank{-1};
-    std::vector<var_dynamic_array_t*> data;
-    std::vector<uint64_t> morton_indices; //Currently, it is only possible to perform parallel computations if all variables are defined on the same domain.
-};
-
-/* Typedefs for sending and receiving data */
-typedef struct cmc_mpi_data cmc_mpi_send_data;
-typedef struct cmc_mpi_data cmc_mpi_recv_data;
-
-typedef struct cmc_mpi_nc_reading_info
-{
-    std::vector<uint64_t> start_values;
-    std::vector<uint64_t> count_values;
-} cmc_mpi_nc_reading_info_t;
-
-struct cmc_mpi_data_distribution_info
-{
-    int initial_refinement_level{0}; //!< Initial uniform refinement level of a mesh wich embeds the geo-spatial variable data
-    int data_dimensionality{0}; //!< The dimensionality of the concerned data (only 2D or 3D data is currently possible)
-    uint32_t local_mesh_elements{0}; //!< The local number of mesh elements
-    uint64_t global_mesh_elements{0}; //!< The global number of mesh elements
-    std::array<uint64_t, 3> start_values{0,0,0}; //!< Global start values of the local data of a 2D or 3D variable
-    std::array<uint64_t, 3> count_values{0,0,0}; //!< Local count values of the local data of a 2D or 3D variable
-    std::vector<cmc_coordinates> offsets;
-    t8_forest_t forest{nullptr}; //!< The forest which describes the morton/zcurve order
-}
-
-
-#endif
-
-
-
 
 
 #ifdef __cplusplus
