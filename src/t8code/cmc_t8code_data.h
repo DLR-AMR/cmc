@@ -31,7 +31,7 @@
 typedef enum CMC_LOSSY_COMPRESSION_MODE CMC_T8_COMPRESSION_MODE;
 
 /** This enum describes all possible compression/coarsening criteria for the AMR lossy compression */
-enum CMC_T8_COMPRESSION_CRITERIUM {CMC_CRITERIUM_UNDEFINED = 0, CMC_REL_ERROR_THRESHOLD, CMC_EXCLUDE_AREA, CMC_COMBINED_CRITERION};
+enum CMC_T8_COMPRESSION_CRITERIUM {CMC_CRITERIUM_UNDEFINED = 0, CMC_REL_ERROR_THRESHOLD, CMC_ABS_ERROR_THRESHOLD, CMC_EXCLUDE_AREA, CMC_COMBINED_CRITERION};
 
 /** Forward declarations of all structs (defined in @file cmc_t8code_data.hxx */
 typedef struct cmc_t8_geo_data* cmc_t8_geo_data_t;

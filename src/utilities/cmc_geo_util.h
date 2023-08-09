@@ -162,7 +162,10 @@ bool
 cmc_value_equal_to_zero(const cmc_universal_type_t& value);
 
 double
-calculate_two_step_relative_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_mean, const cmc_universal_type_t& current_mean);
+calculate_two_step_relative_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_value, const cmc_universal_type_t& new_value);
+
+double
+calculate_two_step_absolute_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_value, const cmc_universal_type_t& new_value);
 
 CMC_COORD_IDS
 cmc_get_split_dim_id(const DATA_LAYOUT initial_layout, const DATA_LAYOUT preferred_layout);

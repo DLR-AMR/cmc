@@ -444,6 +444,21 @@ calculate_two_step_relative_max_deviation(const double previous_max_deviation, c
     }
 }
 
+double
+calculate_two_step_absolute_max_deviation(const double previous_max_deviation, const cmc_universal_type_t& previous_value, const cmc_universal_type_t& new_value)
+{
+    cmc_assert(previous_value.index() == new_value.index());
+    cmc_assert(previous_max_deviation >= 0.0);
+
+    /* Convert the new value, which is ought be a replacement for the previous element value, to double */
+    const double dnew_value = std::visit([](auto& val) -> double {return static_cast<double>(val);}, new_value);
+
+    /* Convert the previous element value to double */
+    double dprevious_value = std::visit([](auto& val) -> double {return static_cast<double>(val);}, previous_value);
+
+    return std::abs(dnew_value - dprevious_value) + previous_max_deviation;
+}
+
 CMC_COORD_IDS
 cmc_get_split_dim_id(const DATA_LAYOUT initial_layout, const DATA_LAYOUT preferred_layout)
 {

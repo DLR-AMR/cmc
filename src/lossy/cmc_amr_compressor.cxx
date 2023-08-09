@@ -357,15 +357,6 @@ cmc_amr_pre_setup_split_3D_variable(cmc_amr_data_t amr_data, const int var_id, c
 {
     #ifdef CMC_WITH_T8CODE
     cmc_t8_geo_data_set_split_variable(amr_data->t8_data, var_id, preferred_data_layout);
-    //if (amr_data->t8_data->use_distributed_data)
-    //{
-    //    /* Indicate that during the initial partitioning the data should be split accordingly */
-    //    cmc_t8_geo_data_set_split_variable(amr_data->t8_data, var_id, preferred_data_layout);
-    //} else
-    //{
-    //    /* In serial configuration, we could (as previously done) split the variable directly */
-    //    cmc_geo_data_transform_3d_var_to_2d(amr_data->t8_data, var_id, preferred_data_layout);
-    //}
     #endif
 }
 
@@ -374,9 +365,19 @@ cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(cmc_amr_dat
 {
     #ifdef CMC_WITH_T8CODE
     /* Set the error threshold in t8_data */
-    cmc_t8_geo_data_set_error_criterium(amr_data->t8_data, maximum_error_tolerance);
+    cmc_t8_geo_data_set_relative_error_criterium(amr_data->t8_data, maximum_error_tolerance);
     #endif
 }
+
+void
+cmc_amr_pre_setup_set_compression_criterium_absolute_error_threshold(cmc_amr_data_t amr_data, const double maximum_abs_error_tolerance)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Set the absolute error criterion */
+    cmc_t8_geo_data_set_absolute_error_criterium(amr_data->t8_data, maximum_abs_error_tolerance);
+    #endif
+}
+
 
 #if __cplusplus
 void
@@ -445,17 +446,6 @@ cmc_amr_setup_compression(cmc_amr_data_t amr_data, CMC_AMR_COMPRESSION_MODE comp
     /* Apply the Morton order to the data and (in a parallel case,) distribute the data accordingly beforehand */
     cmc_t8_geo_data_distribute_and_apply_ordering((amr_data->t8_data));
 
-    ///* Check if the data is distributed and we are using a parallel environment */
-    //if (amr_data->t8_data->use_distributed_data)
-    //{
-    //    /* In the parallel case, we need to distribute the data first and apply the ordering afterwards */
-    //    cmc_t8_geo_data_distribute_and_apply_ordering((amr_data->t8_data));
-    //} else 
-    //{
-    //    /* In a serial mode, we are able to directly apply the correct z-curve ordering to all variables */
-    //    cmc_t8_apply_zcurve_ordering(*(amr_data->t8_data), CMC_APPLY_ZCURVE_TO_ALL_VARS);
-    //}
-
     #ifdef CMC_ENABLE_DEBUG
     /* In a DEBUG-configuration we are writing the initial data to '.vtu'-files */
     char file_prefix[55];
@@ -510,10 +500,11 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* In case a relative error criterion has been chosen */
-                //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_error_threshold, cmc_t8_geo_data_interpolate_error_threshold_adaption);
-                //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_error_threshold, cmc_t8_geo_data_interpolate_std_mean);
-                //cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_error_threshold, cmc_t8_compression_interpolation_standard_mean);
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_error_threshold, cmc_t8_compression_interpolation_standard_mean);
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_relative_error_threshold, cmc_t8_compression_interpolation_standard_mean);
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                /* In case a relative error criterion has been chosen */
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_absolute_error_threshold, cmc_t8_compression_interpolation_standard_mean);
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 /* In case an exclude area crierion has been chosen */
@@ -594,7 +585,18 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
     double approx_value{0.0};
     double exact_value{1.0};
 
-    cmc_debug_msg("The Lossy AMR compressor introduced a maximum point-wise relative error of:");
+
+    ///Continue.......
+    //Check whether an absolute or relative error has been used....
+
+    /* If an absolute error threshold has been used, we will check the absolute error, otherwise we will check the introduced relative error */
+    if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
+    {
+        cmc_debug_msg("The Lossy AMR compressor introduced a maximum point-wise absolute error of:");
+    } else
+    {
+        cmc_debug_msg("The Lossy AMR compressor introduced a maximum point-wise relative error of:");
+    }
 
     /* Check which mode is used */
     if (amr_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
@@ -607,18 +609,28 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
             {
                 exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
                 approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
-                if (exact_value > 0.0 && approx_value > 0.0)
+                /* Calculate the new relative error */
+                if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
                 {
-                    /* Calculate the new relative error */
-                    current_err = std::abs((approx_value - exact_value) / exact_value);
+                    /* Calculate the new absolute error */
+                    current_err = std::abs(approx_value - exact_value);
                     /* Eventually update the maximim error for this variable */
                     if (max_error[var_id] < current_err)
                     {
                         max_error[var_id] = current_err;
                     }
-                    if (current_err > 0.03)
+                } else
+                {
+                    if (exact_value > 0.0 && approx_value > 0.0)
                     {
-                        cmc_debug_msg("fehler bei var_id: ", var_id, " mit ", current_err);
+                        /* Calculate the new relative error */
+                        current_err = std::abs((approx_value - exact_value) / exact_value);
+
+                        /* Eventually update the maximim error for this variable */
+                        if (max_error[var_id] < current_err)
+                        {
+                            max_error[var_id] = current_err;
+                        }
                     }
                 }
             }
@@ -644,23 +656,39 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                 {
                     exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
                     approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
-                    if (exact_value > 0.0 && approx_value > 0.0)
+                    if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
                     {
-                        /* Calculate the new relative error */
-                        current_err = std::abs((approx_value - exact_value) / exact_value);
+                        /* Calculate the new absolute error */
+                        current_err = std::abs(approx_value - exact_value);
+
                         /* Eventually update the maximim error for this variable */
                         if (max_err < current_err)
                         {
                             max_err = current_err;
                         }
-                        if (current_err > 0.03)
+                    } else
                     {
-                        cmc_debug_msg("fehler bei var_id: ", var_id, " an position: ", i, " mit ", current_err);
-                    }
+                        if (exact_value > 0.0 && approx_value > 0.0)
+                        {
+                            /* Calculate the new relative error */
+                            current_err = std::abs((approx_value - exact_value) / exact_value);
+
+                            /* Eventually update the maximim error for this variable */
+                            if (max_err < current_err)
+                            {
+                                max_err = current_err;
+                            }
+                        }
                     }
                 }
             }
-            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum relative data inaccuracy of ", max_err * 100, "%.");
+            if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
+            {
+                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum absolute data inaccuracy of ", max_err, ".");
+            } else
+            {
+                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum relative data inaccuracy of ", max_err * 100, "%.");
+            }
         }
     }
 

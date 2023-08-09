@@ -55,13 +55,14 @@ main(int argc, char* argv[])
     cmc_amr_pre_setup_split_3D_variable(amr_data, 0, DATA_LAYOUT::CMC_2D_LAT_LON);
 
     /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.03);
+    //cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.03);
+    cmc_amr_pre_setup_set_compression_criterium_absolute_error_threshold(amr_data, 0.00000005);
 
     /* Keep the initial data in order to check the actual introduced data inaccurcy after the decompression */
     cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 1);
 
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);

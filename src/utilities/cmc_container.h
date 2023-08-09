@@ -46,6 +46,9 @@ public:
     std::vector<double> calculate_relative_deviations(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value) const;
     std::vector<double> calculate_relative_deviations_w_missing_values(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value, const cmc_universal_type_t& missing_value) const;
 
+    std::vector<double> calculate_absolute_deviations(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value) const;
+    std::vector<double> calculate_absolute_deviations_w_missing_values(const size_t start_index, const size_t end_index, const cmc_universal_type_t& nominal_value, const cmc_universal_type_t& missing_value) const;
+
     void assign(const size_t index, const cmc_universal_type_t& value);
     /* This function performs a type check of the data inside 'value' */
     void assign_value(const size_t index, const cmc_universal_type_t& value);

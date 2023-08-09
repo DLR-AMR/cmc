@@ -1372,6 +1372,21 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 interpolation_data.interpolated_data.insert(interpolation_data.interpolated_data.begin(), t8_data->vars.size(), std::vector<std::pair<t8_locidx_t, cmc_universal_type_t>>());
                 interpolation_data.interpolated_data_has_been_calculated_during_adaptation = true;
             break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                /* Check if the data is distributed */
+                if(t8_data->use_distributed_data)
+                {
+                    /* In case we are using a parallel environment, we store the global element id of the first local element */
+                    adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest_start);
+                }
+                /* Initialize the deviations vectors */
+                adapt_data.associated_max_deviations.insert(adapt_data.associated_max_deviations.begin(), t8_data->vars.size(), std::vector<double>());
+                adapt_data.associated_max_deviations_new.insert(adapt_data.associated_max_deviations_new.begin(), t8_data->vars.size(), std::vector<double>());
+                /* Save the supplied interpolation function */
+                interpolation_data.interpolate = interpolation_function;
+                interpolation_data.interpolated_data.insert(interpolation_data.interpolated_data.begin(), t8_data->vars.size(), std::vector<std::pair<t8_locidx_t, cmc_universal_type_t>>());
+                interpolation_data.interpolated_data_has_been_calculated_during_adaptation = true;
+            break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 // In this case nothing has to be set up
             break;
@@ -1412,6 +1427,32 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                 adapt_data.initial_ref_lvl_ids.emplace_back(std::unordered_map<t8_locidx_t, t8_locidx_t>());
                 adapt_data.initial_ref_lvl_ids.back().reserve(static_cast<size_t>(t8_forest_get_local_num_elements(t8_data->vars[var_id]->assets->forest) / pow(t8_data->vars[var_id]->var->num_dimensions, 2)));
 
+                /* Clear all previous vectors in order to start new for the next variable */
+                adapt_data.associated_max_deviations.clear();
+                adapt_data.associated_max_deviations_new.clear();
+                adapt_data.associated_deviations_gelement_id.clear();
+                adapt_data.associated_deviations_gelement_id_new.clear();
+                /* Initialize the deviations vectors */
+                adapt_data.associated_max_deviations.push_back(std::vector<double>());
+                adapt_data.associated_max_deviations_new.push_back(std::vector<double>());
+                /* Save the interpolation function */
+                interpolation_data.interpolate = interpolation_function;
+                interpolation_data.interpolated_data.clear();
+                interpolation_data.interpolated_data.push_back(std::vector<std::pair<t8_locidx_t, cmc_universal_type_t>>());
+                interpolation_data.interpolated_data_has_been_calculated_during_adaptation = true;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                /* Check if the data is distributed */
+                if(t8_data->use_distributed_data)
+                {
+                    /* In case we are using a parallel environment, we store the global element id of the first local element */
+                    adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest_start);
+                }
+                /* Reset the adapt_data class */
+                adapt_data.adapt_step = 0;
+                /* Save the current variable ID */
+                adapt_data.current_var_id = var_id;
+                interpolation_data.current_var_id = var_id;
                 /* Clear all previous vectors in order to start new for the next variable */
                 adapt_data.associated_max_deviations.clear();
                 adapt_data.associated_max_deviations_new.clear();
@@ -1486,6 +1527,17 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                     interpolation_data.interpolated_data[id].clear();
                 }
             break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                /* Reset the counters */
+                adapt_data.coarsening_counter = 0;
+                interpolation_data.coarsening_counter = 0;
+                adapt_data.forest_begin = forest_begin;
+                for (size_t id{0}; id < adapt_data.t8_data->vars.size(); ++id)
+                {
+                    /* Clear the vector containing the interpolated data from the previous step */
+                    interpolation_data.interpolated_data[id].clear();
+                }
+            break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
             break;
@@ -1525,6 +1577,13 @@ cmc_t8_update_adapt_and_interpolation_data_beginning_of_iteration(cmc_t8_adapt_d
                 adapt_data.adapted_data->push_back(new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(adapt_data.t8_data->vars[var_id]->assets->forest) / (2 * adapt_data.t8_data->vars[var_id]->var->num_dimensions) +1), adapt_data.t8_data->vars[var_id]->get_type()));
                 /* Save a pointer to the 'adapted_data' for the interpolation */
                 interpolation_data.adapted_data = adapt_data.adapted_data;
+                interpolation_data.coarsening_counter = 0;
+                interpolation_data.interpolated_data.front().clear();
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                /* Reset the adapt counters */
+                adapt_data.coarsening_counter = 0;
+                adapt_data.forest_begin = forest_begin;
                 interpolation_data.coarsening_counter = 0;
                 interpolation_data.interpolated_data.front().clear();
             break;
@@ -1608,13 +1667,13 @@ cmc_rel_error_threshold_update_deviations(cmc_t8_adapt_data& adapt_data, int num
 }
 
 /**
- * @brief This function is the serial equivalent to the function 'cmc_rel_error_threshold_update_and_partition_deviations(...)'. The vectors are prepared and switched for the next iteration
+ * @brief This function is the serial equivalent to the function 'cmc_error_threshold_update_and_partition_deviations(...)'. The vectors are prepared and switched for the next iteration
  *        and the element ids are updated such that they comply with the adapted forest.
  * 
  * @param adapt_data The @struct cmc_t8_adapt_data which holds all information about the data, the deviations and the reference forest
  */
 static void
-cmc_rel_error_threshold_update_deviations_serial(cmc_t8_adapt_data& adapt_data)
+cmc_error_threshold_update_deviations_serial(cmc_t8_adapt_data& adapt_data)
 {
     #ifdef CMC_WITH_T8CODE
 
@@ -1646,7 +1705,7 @@ cmc_rel_error_threshold_update_deviations_serial(cmc_t8_adapt_data& adapt_data)
  * @param adapt_data The @struct cmc_t8_adapt_data which holds all information about the data, the deviations and the reference forest (indicating the partition)
  */
 static void
-cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt_data)
+cmc_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt_data)
 {
     #ifdef CMC_WITH_T8CODE
     #ifdef CMC_ENABLE_MPI
@@ -1939,17 +1998,17 @@ cmc_rel_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt
  * @param adapt_data The @struct cmc_t8_adapt_data whose member concerning the relative error criterion will be updated
  */
 static void
-cmc_rel_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& adapt_data)
+cmc_error_threshold_communicate_and_update_deviations(cmc_t8_adapt_data& adapt_data)
 {
     #ifdef CMC_WITH_T8CODE
     if (adapt_data.t8_data->use_distributed_data)
     {
         /* In case of a parallel environment */
-        cmc_rel_error_threshold_update_and_partition_deviations(adapt_data);
+        cmc_error_threshold_update_and_partition_deviations(adapt_data);
     } else
     {
         /* In case of a serial environemnt */
-        cmc_rel_error_threshold_update_deviations_serial(adapt_data);
+        cmc_error_threshold_update_deviations_serial(adapt_data);
     }
     #endif
 }
@@ -1980,7 +2039,13 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 /* Before the communication of the deviations, we need to save a reference to the new (partitioned) forest */
                 adapt_data.forest_end = forest_end;
                 /* Communicate and update the deviations from the previous caorsening step */
-                cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+                cmc_error_threshold_communicate_and_update_deviations(adapt_data);
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                /* Before the communication of the deviations, we need to save a reference to the new (partitioned) forest */
+                adapt_data.forest_end = forest_end;
+                /* Communicate and update the deviations from the previous caorsening step */
+                cmc_error_threshold_communicate_and_update_deviations(adapt_data);
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -2009,7 +2074,13 @@ cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(cmc_t8_adapt_data& a
                 /* Before the communication of the deviations, we need to save a reference to the new (partitioned) forest */
                 adapt_data.forest_end = forest_end;
                 /* Communicate and update the deviations from the previous caorsening step */
-                cmc_rel_error_threshold_communicate_and_update_deviations(adapt_data);
+                cmc_error_threshold_communicate_and_update_deviations(adapt_data);
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                /* Before the communication of the deviations, we need to save a reference to the new (partitioned) forest */
+                adapt_data.forest_end = forest_end;
+                /* Communicate and update the deviations from the previous caorsening step */
+                cmc_error_threshold_communicate_and_update_deviations(adapt_data);
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -2051,6 +2122,9 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
                 /* Delete the allocation of the var_vector */
                 delete adapt_data.adapted_data;
             break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                //Here has nothing to be done
+            break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
             break;
@@ -2073,6 +2147,9 @@ cmc_t8_deconstruct_adapt_and_interpolate_data(cmc_t8_adapt_data& adapt_data, cmc
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* Delete the allocation of the var_vector */
                 delete adapt_data.adapted_data;
+            break;
+            case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
+                //Here has nothing to be done
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_EXCLUDE_AREA:
                 //Here has nothing to be done
@@ -3361,7 +3438,7 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
 }
 
 void
-cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance)
+cmc_t8_geo_data_set_relative_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance)
 {
     #ifdef CMC_WITH_T8CODE
     /* Save the error tolerance */
@@ -3375,6 +3452,27 @@ cmc_t8_geo_data_set_error_criterium(cmc_t8_data_t t8_data, const double maximum_
     } else if (t8_data->settings.compression_criterium != CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD)
     {
         /* If another criterion already has been specified, set the combined flag */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION;
+    }
+    #endif
+}
+
+void
+cmc_t8_geo_data_set_absolute_error_criterium(cmc_t8_data_t t8_data, const double maximum_error_tolerance)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Save the error tolerance */
+    t8_data->settings.max_err = maximum_error_tolerance;
+
+    /* Set a flag that the exclude criterion will be applied */
+    if (t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_CRITERIUM_UNDEFINED ||
+        t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD)
+    {
+        /* If no criterion has been specified or the relative error criterion has been specified, set the absolute error criterion */
+        t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD;
+    } else if (t8_data->settings.compression_criterium != CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
+    {
+        /* If another criterion already has been specified before, set the combined flag */
         t8_data->settings.compression_criterium = CMC_T8_COMPRESSION_CRITERIUM::CMC_COMBINED_CRITERION;
     }
     #endif
