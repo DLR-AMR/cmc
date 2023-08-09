@@ -3478,6 +3478,18 @@ cmc_t8_geo_data_set_absolute_error_criterium(cmc_t8_data_t t8_data, const double
     #endif
 }
 
+void
+cmc_t8_geo_data_reset_compression_settigs(cmc_t8_data_t t8_data)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Reset all compression setting's members */
+    t8_data->settings.max_err = 0.0;
+    t8_data->settings.exclude_area_start_indices.fill(-1);
+    t8_data->settings.exclude_area_end_indices.fill(INT_MAX);
+    t8_data->settings.split_variables.clear();
+    #endif
+}
+
 template<typename T>
 static std::pair<int,int>
 cmc_t8_geo_data_get_area_threshold(const var_array_t& coordinate, T start_val, T end_val)

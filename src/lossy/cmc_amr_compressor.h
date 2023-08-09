@@ -78,6 +78,13 @@ cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(cmc_amr_dat
 void
 cmc_amr_pre_setup_set_compression_criterium_absolute_error_threshold(cmc_amr_data_t amr_data, const double maximum_abs_error_tolerance);
 
+/**
+ * @brief Resets all the previous supplied compression settings which were set via the 'cmc_amr_pre_setup_...()'-functions
+ *
+ * @param amr_data A pointer to a @struct cmc_amr_data holding the variables defined on a geo-spatial domain which will be compressed and information about the coordinate system
+ */
+void
+cmc_amr_pre_setup_reset_compression_settings(cmc_amr_data_t amr_data);
 
 /**
  * @brief This function sets whether or not the initial data is saved or lost during the compression.

@@ -378,6 +378,13 @@ cmc_amr_pre_setup_set_compression_criterium_absolute_error_threshold(cmc_amr_dat
     #endif
 }
 
+void
+cmc_amr_pre_setup_reset_compression_settings(cmc_amr_data_t amr_data)
+{
+    #ifdef CMC_WITH_T8CODE
+    cmc_t8_geo_data_reset_compression_settigs(amr_data->t8_data);
+    #endif
+}
 
 #if __cplusplus
 void
@@ -585,10 +592,6 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
     double approx_value{0.0};
     double exact_value{1.0};
 
-
-    ///Continue.......
-    //Check whether an absolute or relative error has been used....
-
     /* If an absolute error threshold has been used, we will check the absolute error, otherwise we will check the introduced relative error */
     if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
     {
@@ -637,7 +640,13 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
         }
         for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
         {
-            cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum relative data inaccuracy of ", max_error[var_id] * 100, "%.");
+            if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
+            {
+                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum absolute data inaccuracy of ", max_error[var_id], ".");
+            } else
+            {
+                cmc_debug_msg("\tVariable (name: ", amr_data->t8_data->vars[var_id]->var->name, ") has a maximum relative data inaccuracy of ", max_error[var_id] * 100, "%.");
+            }
         }
     }
     else
