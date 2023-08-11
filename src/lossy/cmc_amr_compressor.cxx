@@ -687,6 +687,10 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                             {
                                 max_err = current_err;
                             }
+                            if (current_err > 0.05)
+                            {
+                                cmc_debug_msg("Error too large: ", current_err, " at pos: ", i);
+                            }
                         }
                     }
                 }

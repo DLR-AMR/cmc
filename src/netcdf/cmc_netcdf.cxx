@@ -1163,11 +1163,6 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
         /* Set the new dimension starts */
         t8_data->vars[var_id]->var->dim_starts = cmc_t8_dim_starts;
 
-        for (size_t nid = 0; nid < t8_data->vars[var_id]->var->dim_starts.size(); ++nid)
-        {
-            cmc_debug_msg("nc var start (index= ", nid,") ist: ", t8_data->vars[var_id]->var->dim_starts[nid]);
-            cmc_debug_msg("nc var length (index= ", nid,") ist: ", t8_data->vars[var_id]->var->dim_lengths[nid]);
-        }
         /* Retrieve the data layout of the variable */
         t8_data->vars[var_id]->var->get_data_layout_from_axis_ordering();
     }
@@ -1183,8 +1178,6 @@ _cmc_transform_nc_data_to_t8code_data(cmc_nc_data_t nc_data, cmc_t8_data_t t8_da
     /* Set the information that the data source are netCDF files */
     t8_data->data_source = CMC_T8_DATA_INPUT::NETCDF_INPUT;
     
-    //t8_data->vars[0]->var->data->print_data();
-
     #endif
 }
 #endif

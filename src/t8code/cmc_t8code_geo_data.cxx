@@ -1127,7 +1127,7 @@ cmc_t8_get_split_variable_local_elements_concerning_a_data_layout(const cmc_t8_v
     #endif
 }
 
-//Is it possible to just copy the data locally for each variable and perform the initial partition unequally per variable 
+
 void
 cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data)
 {
@@ -1275,7 +1275,7 @@ cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data)
         /* Switch the new varibale's vector with the old one */
         std::swap(t8_data->vars, new_vars);
     }
-    t8_data->vars[1]->var->data->print_data();
+
     /* Check if now all variables have the same dimensionality */
     int num_dimensions = t8_data->vars[0]->var->num_dimensions;
     for (size_t var_iter = 1; var_iter < t8_data->vars.size(); ++var_iter)
@@ -1380,6 +1380,9 @@ cmc_t8_set_up_adapt_data_and_interpolate_data_based_on_compression_settings(cmc_
                     adapt_data.first_global_elem_id = t8_forest_get_first_local_element_id(forest_start);
                 }
                 /* Initialize the deviations vectors */
+                //adapt_data.associated_max_deviations.clear();
+                //adapt_data.associated_max_deviations_new.clear();
+                //interpolation_data.interpolated_data.clear();
                 adapt_data.associated_max_deviations.insert(adapt_data.associated_max_deviations.begin(), t8_data->vars.size(), std::vector<double>());
                 adapt_data.associated_max_deviations_new.insert(adapt_data.associated_max_deviations_new.begin(), t8_data->vars.size(), std::vector<double>());
                 /* Save the supplied interpolation function */
@@ -1758,8 +1761,7 @@ cmc_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt_dat
     std::pair<int, int> already_process_local_range{std::make_pair(0,0)};
 
     /* Create a vector of MPI requests (SInce no push_back methods are used, the vector is only used as a hull for the dynamic memory allocation for all possible requests) */
-    std::vector<MPI_Request> send_requests;
-    send_requests.reserve((mpisize - 1) * adapt_data.associated_max_deviations_new.size());
+    MPI_Request* send_requests = new MPI_Request[(mpisize - 1) * (adapt_data.associated_max_deviations_new.size() + 1)];
 
     /* A counter for the send requests */
     size_t send_req_idx = 0;
@@ -1955,7 +1957,7 @@ cmc_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt_dat
     }
 
     /* If all messages have been sent, we can clear the array associated_max_deviations_new for the next iteration */
-    err = MPI_Waitall(send_req_idx, send_requests.data(), MPI_STATUS_IGNORE);
+    err = MPI_Waitall(send_req_idx, send_requests, MPI_STATUS_IGNORE);
     cmc_mpi_check_err(err);
 
     /* Clear the arrays and the element indices */
@@ -1971,6 +1973,9 @@ cmc_error_threshold_update_and_partition_deviations(cmc_t8_adapt_data& adapt_dat
     /* Deallocate the array holding the coarsenings per process and the array holding the offsets */
     delete[] amount_of_coarsenings;
     delete[] offsets;
+
+    /* Delete the MPI requests */
+    delete[] send_requests;
 
     /* Delete the allocated array within the recv_list */
     for (auto iter = recv_list.begin(); iter != recv_list.end(); ++iter)  
@@ -2259,7 +2264,7 @@ cmc_t8_geo_data_repartition(cmc_t8_data_t t8_data, t8_forest_t forest, const int
             in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
             in_data.array = static_cast<char*>(t8_data->vars[var_id]->var->data->get_initial_data_ptr());
 
-            /* Allcate a new array in data_new which will hold the partitioned data */
+            /* Allocate a new array in data_new which will hold the partitioned data */
             t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_id]->get_type());
 
             /* Create an sc output array for the partitioned variable's data */
@@ -2412,6 +2417,7 @@ cmc_t8_forest_iterate_replace_with_calculated_data(cmc_t8_data_t t8_data, cmc_t8
                 next_not_coarsened_lelem_id += num_elems_to_copy;
             }
         }
+
         /* We need to check if there are elements at the end which have not been coarsened */
         if (interpolation_data->interpolated_data[interpolated_data_id].size() > 0 && interpolation_data->interpolated_data[interpolated_data_id].back().first != t8_forest_get_local_num_elements(forest) + (coarsening_counter - 1) * num_elements_lost - 1)
         {
@@ -2419,14 +2425,18 @@ cmc_t8_forest_iterate_replace_with_calculated_data(cmc_t8_data_t t8_data, cmc_t8
             t8_data->vars[var_iter]->var->data_new->copy_from_to(*(t8_data->vars[var_iter]->var->data), static_cast<size_t>(interpolation_data->interpolated_data[interpolated_data_id].back().first + num_elements_lost + 1), static_cast<size_t>(t8_forest_get_local_num_elements(forest) + coarsening_counter * num_elements_lost - 1), data_new_offset);
         }
 
-        /* In case, there did not happen any coarsening at all, the above copy-mechanisms will not apply.
+        /* In case, there did not happen any coarsening at all, the above copy-mechanism will not apply.
          * Since no coarsening was introduced, the element values stayed the same. Therefore, instead of copying,
          * we will just switch the data */
         if (interpolation_data->interpolated_data[interpolated_data_id].size() == 0)
         {
-            var_array_t* tmp_array = t8_data->vars[var_iter]->var->data;
+            //delete t8_data->vars[var_iter]->var->data_new;
+            //t8_data->vars[var_iter]->var->data_new = t8_data->vars[var_iter]->var->data;
+            t8_data->vars[var_iter]->var->data_new->copy_from_to(*(t8_data->vars[var_iter]->var->data), 0, t8_data->vars[var_iter]->var->data->size() - 1, 0);
             t8_data->vars[var_iter]->var->data = nullptr;
-            t8_data->vars[var_iter]->var->data_new = tmp_array;
+            //var_array_t* tmp_array = t8_data->vars[var_iter]->var->data;
+            //t8_data->vars[var_iter]->var->data = nullptr;
+            //t8_data->vars[var_iter]->var->data_new = tmp_array;
         }
     }
     cmc_debug_msg("End of iterate replace with already calculated interpolation values.");
@@ -2528,53 +2538,64 @@ cmc_t8_adapt_interpolate_data_func_one_for_all(cmc_t8_data_t t8_data, t8_forest_
         coarsened_forest = t8_forest_new_adapt(forest, adapt_function, 0, 0, static_cast<void*>(&adapt_data));
         /** Adaptation process ends **/
 
-        /** Interpolation process starts **/
-        /* Iterate over all variables */
-        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+        /* In case the adapted forest did not change globally, we can skip the interpolation and partion part completely */
+        if (t8_forest_get_global_num_elements(coarsened_forest) != num_elems_former_forest)
         {
-            /* Allocate memory equal to the new elements */
-            t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
-        }
-
-        /* Check if the interpolation data already has been calculated during the adaptation*/
-        if (interpolation_data.interpolated_data_has_been_calculated_during_adaptation)
-        {
-            /* If the data has been calculated during the adaptation */
-            cmc_t8_forest_iterate_replace_with_calculated_data_one_for_all(t8_data, &interpolation_data, coarsened_forest);
-        } else
-        {
-            /* Set the interpolation data accordingly (we pass it via the forest old, this enables acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
-            t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
-
-            /* Interpolate the element data onto the new coarsened forest */
-            t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
-        }
-
-        /* Iterate over all variables */
-        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
-        {
-            /* Delete the previous (fine/uncrompressed) data (except in the first iteration, if the intitial data should be kept) */
-            if (t8_data->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
+            /** Interpolation process starts **/
+            /* Iterate over all variables */
+            for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
             {
-                delete t8_data->vars[var_id]->var->data;
+                /* Allocate memory equal to the new elements */
+                t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
             }
-            /* Assign the (coarsened/compressed) data */
-            t8_data->vars[var_id]->var->data = t8_data->vars[var_id]->var->data_new;
-            t8_data->vars[var_id]->var->data_new = nullptr;
+
+            /* Check if the interpolation data already has been calculated during the adaptation*/
+            if (interpolation_data.interpolated_data_has_been_calculated_during_adaptation)
+            {
+                /* If the data has been calculated during the adaptation */
+                cmc_t8_forest_iterate_replace_with_calculated_data_one_for_all(t8_data, &interpolation_data, coarsened_forest);
+            } else
+            {
+                /* Set the interpolation data accordingly (we pass it via the forest old, this enables acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
+                t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
+
+                /* Interpolate the element data onto the new coarsened forest */
+                t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
+            }
+
+            /* Iterate over all variables */
+            for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+            {
+                /* Delete the previous (fine/uncrompressed) data (except in the first iteration, if the intitial data should be kept) */
+                if (t8_data->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
+                {
+                    delete t8_data->vars[var_id]->var->data;
+                }
+                /* Assign the (coarsened/compressed) data */
+                t8_data->vars[var_id]->var->data = t8_data->vars[var_id]->var->data_new;
+                t8_data->vars[var_id]->var->data_new = nullptr;
+            }
+            /** Interpolation process ends **/
+
+            /* Free the former forest */
+            t8_forest_unref(&forest);
+
+            /* Repartition the forest as well as the variable's data */
+            forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest);
+
+            /* Update the data structs at the end of a iteration */
+            cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data, forest);
+
+            /* Decrement the refinement level */
+            --ref_lvl;
+        }  else
+        {
+            /* Free the former forest */
+            t8_forest_unref(&forest);
+
+            /* Set the last forest */
+            forest = coarsened_forest;
         }
-        /** Interpolation process ends **/
-
-        /* Free the former forest */
-        t8_forest_unref(&forest);
-
-        /* Repartition the forest as well as the variable's data */
-        forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest);
-
-        /* Update the data structs at the end of a iteration */
-        cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data, forest);
-
-        /* Decrement the refinement level */
-        --ref_lvl;
     }
 
     /* Delete allocations or perform any finalizing steps */
@@ -2659,45 +2680,56 @@ cmc_t8_adapt_interpolate_data_func_one_for_one(cmc_t8_data_t t8_data, t8_forest_
             /* Create the adapted forest */
             coarsened_forest = t8_forest_new_adapt(forest, adapt_function, 0, 0, static_cast<void*>(&adapt_data));
 
-            /* Allocate memory equal to the new elements */
-            t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
-
-            /* Check if the interpolation data already has been calculated during the adaptation*/
-            if (interpolation_data.interpolated_data_has_been_calculated_during_adaptation)
+            /* In case the adapted forest did not change globally, we can skip the interpolation and partion part completely */
+            if (t8_forest_get_global_num_elements(coarsened_forest) != num_elems_former_forest)
             {
-                /* If the data has been calculated during the adaptation */
-                cmc_t8_forest_iterate_replace_with_calculated_data_one_for_one(t8_data, &interpolation_data, coarsened_forest);
+                /* Allocate memory equal to the new elements */
+                t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(coarsened_forest)), t8_data->vars[var_id]->get_type());
+
+                /* Check if the interpolation data already has been calculated during the adaptation*/
+                if (interpolation_data.interpolated_data_has_been_calculated_during_adaptation)
+                {
+                    /* If the data has been calculated during the adaptation */
+                    cmc_t8_forest_iterate_replace_with_calculated_data_one_for_one(t8_data, &interpolation_data, coarsened_forest);
+                } else
+                {
+                    /* If the interpolated data still has to be calculated */
+                    /* Set the interpolation data accordingly (we pass it via the forest old, this enables us to easily acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
+                    t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
+
+                    /* Interpolate the element data onto the new coarsened forest */
+                    t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
+                }
+
+                /* Delete and Release the previous (fine/uncrompressed) data (Do not so, if the data should be kept) */
+                if (t8_data->vars[var_id]->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
+                {
+                    delete t8_data->vars[var_id]->var->data;
+                }
+
+                /* Assign the (coarsened/compressed) data */
+                t8_data->vars[var_id]->var->data = t8_data->vars[var_id]->var->data_new;
+                t8_data->vars[var_id]->var->data_new = nullptr;
+
+                /* Free the former forest */
+                t8_forest_unref(&forest);
+
+                /* Repartition the forest as well as the variable's data */
+                forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest, var_id);
+
+                /* Update the adapt and interpolation struct at the end of the iteration */
+                cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data, forest);
+
+                /* Decrement the refinement level */
+                --ref_lvl;
             } else
             {
-                /* If the interpolated data still has to be calculated */
-                /* Set the interpolation data accordingly (we pass it via the forest old, this enables us to easily acccess to interpolation function from an adapt call (e.g. to calculate relative errors)) */
-                t8_forest_set_user_data(forest, static_cast<void*>(&interpolation_data));
-                
-                /* Interpolate the element data onto the new coarsened forest */
-                t8_forest_iterate_replace(coarsened_forest, forest, cmc_t8_general_interpolation_during_compression);
+                /* Free the former forest */
+                t8_forest_unref(&forest);
+
+                /* Set the last forest */
+                forest = coarsened_forest;
             }
-
-            /* Delete and Release the previous (fine/uncrompressed) data (Do not so, if the data should be kept) */
-            if (t8_data->vars[var_id]->assets->initial_refinement_lvl != ref_lvl || !(t8_data->is_initial_data_kept))
-            {
-                delete t8_data->vars[var_id]->var->data;
-            }
-
-            /* Assign the (coarsened/compressed) data */
-            t8_data->vars[var_id]->var->data = t8_data->vars[var_id]->var->data_new;
-            t8_data->vars[var_id]->var->data_new = nullptr;
-
-            /* Free the former forest */
-            t8_forest_unref(&forest);
-
-            /* Repartition the forest as well as the variable's data */
-            forest = cmc_t8_geo_data_repartition_during_compression(t8_data, coarsened_forest, var_id);
-
-            /* Update the adapt and interpolation struct at the end of the iteration */
-            cmc_t8_update_adapt_and_interpolation_data_end_of_iteration(adapt_data, interpolation_data, forest);
-
-            /* Decrement the refinement level */
-            --ref_lvl;
         }
     
         /* Free the former forest and Save the adapted forest */
@@ -4242,6 +4274,7 @@ cmc_t8_get_offset_function_lin_idx_to_cart_coord_based_on_data_layout(const DATA
     #endif
 }
 
+#if 0
 /**
  * @brief Adds a global offset to a local cartesian coordinate.
  * 
@@ -4318,6 +4351,69 @@ add_start_offset_to_cart_coord(std::tuple<uint64_t, uint64_t, uint64_t>& cart_co
             cmc_err_msg("The variable contains an undefined data layout.");
     }
 }
+#endif
+
+/**
+ * @brief Adds a global offset to a local cartesian coordinate.
+ * 
+ * @param cart_coord The local cartesian coordinate
+ * @param global_dim_lengths The global dimension lengths
+ * @param start_offset The global offset this process has
+ * @param local_dim_lengths The process-local dimension lengths
+ * @param data_layout The data layout 
+ */
+static
+void
+add_start_offset_to_cart_coord(std::tuple<uint64_t, uint64_t, uint64_t>& cart_coord, const std::vector<size_t>& global_dim_lengths, const std::vector<size_t>& start_offset, const std::vector<size_t>& local_dim_lengths, const DATA_LAYOUT data_layout)
+{
+    cmc_assert(start_offset.size() >= 2);
+    /* Obtain references to the elements of the tuple */
+    auto& [x, y, z] = cart_coord;
+    switch (data_layout)
+    {
+        case DATA_LAYOUT::CMC_2D_LON_LAT:
+            x += start_offset[CMC_COORD_IDS::CMC_LON];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[CMC_COORD_IDS::CMC_LAT]);
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LON:
+            x += start_offset[CMC_COORD_IDS::CMC_LON];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[CMC_COORD_IDS::CMC_LAT]);
+        break;
+        case DATA_LAYOUT::CMC_2D_LAT_LEV:
+            x = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - x) + start_offset[CMC_COORD_IDS::CMC_LAT]);
+            y += start_offset[CMC_COORD_IDS::CMC_LEV];
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LAT:
+            x = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - x) + start_offset[CMC_COORD_IDS::CMC_LAT]);
+            y += start_offset[CMC_COORD_IDS::CMC_LEV];
+        break;
+        case DATA_LAYOUT::CMC_2D_LON_LEV:
+            x += start_offset[CMC_COORD_IDS::CMC_LON];
+            y += start_offset[CMC_COORD_IDS::CMC_LEV];
+        break;
+        case DATA_LAYOUT::CMC_2D_LEV_LON:
+            x += start_offset[CMC_COORD_IDS::CMC_LON];
+            y += start_offset[CMC_COORD_IDS::CMC_LEV];
+        break;
+        case DATA_LAYOUT::CMC_3D_LON_LAT_LEV:
+            [[fallthrough]];
+        case DATA_LAYOUT::CMC_3D_LON_LEV_LAT:
+            [[fallthrough]];
+        case DATA_LAYOUT::CMC_3D_LEV_LON_LAT:
+            [[fallthrough]];
+        case DATA_LAYOUT::CMC_3D_LEV_LAT_LON:
+            [[fallthrough]];
+        case DATA_LAYOUT::CMC_3D_LAT_LEV_LON:
+            [[fallthrough]];
+        case DATA_LAYOUT::CMC_3D_LAT_LON_LEV:
+            x += start_offset[CMC_COORD_IDS::CMC_LON];
+            y = global_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - ((local_dim_lengths[CMC_COORD_IDS::CMC_LAT] - 1 - y) + start_offset[CMC_COORD_IDS::CMC_LAT]);
+            z += start_offset[CMC_COORD_IDS::CMC_LEV];
+        break;
+        default :
+            cmc_err_msg("The variable contains an undefined data layout.");
+    }
+}
 
 /**
  * @brief This functions creates linear integer coordinates for the variables regarding a global coordinate system
@@ -4383,7 +4479,10 @@ cmc_create_ref_coordinates(cmc_global_coordinate_system_t global_system, cmc_var
             }
 
             /* Allocate memory for all reference coordinates */
-            ref_coords->cartesian_coordinates.reserve(total_length);
+            if (total_length > 0)
+            {
+                ref_coords->cartesian_coordinates.reserve(total_length);
+            }
 
             /* Iterate linearily over all coordinates of the variable's data */
             for (size_t linear_id{0}; linear_id < total_length; ++linear_id)
@@ -4532,11 +4631,11 @@ cmc_t8_data_mpi_initial_communication(cmc_t8_data_t t8_data, std::vector<std::ma
 
         if (send_list.size() > 0)
         {
-            send_requests = new MPI_Request[send_list.size() * comm_size * t8_data->vars.size()];
+            send_requests = new MPI_Request[send_list.size() * (comm_size - 1) * t8_data->vars.size() * 2];
             send_requests_were_allocated = true;
         }
 
-        cmc_debug_msg("Size of allocated sends: ", send_list.size() * comm_size  * t8_data->vars.size());
+        cmc_debug_msg("Size of allocated sends: ", send_list.size() * (comm_size - 1) * t8_data->vars.size() * 2);
         /* Get the amount of varibales */
         const int num_global_vars = static_cast<int>(t8_data->vars.size());
 
@@ -4552,6 +4651,13 @@ cmc_t8_data_mpi_initial_communication(cmc_t8_data_t t8_data, std::vector<std::ma
             /* Iterate over the send_list from this reference group */
             for (auto iter = send_iter->begin(); iter != send_iter->end(); ++iter)
             {
+                if (rank == 0)
+                {
+                    for (auto zz = iter->second.morton_indices.begin(); zz != iter->second.morton_indices.end(); ++zz)
+                    {
+                        //cmc_debug_msg("An rank ", iter->first, " geht MI: ", *zz);
+                    }
+                }
                 /* Check if there is an actual message to send */
                 if (iter->second.morton_indices.size() > 0)
                 {
@@ -4785,8 +4891,9 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
     morton_indices.reserve(num_local_elems);
 
     /* Since all varibales now have the same layout, we check the Morton indices of the first variable and build based on that a mapping for all variables to use */
-    /* Declare a counter for ther recv_list */
+    /* Declare a counter for the recv_list */
     int ref_counter = 0;
+    
     /* Iterate over the recv_list */
     for (auto iter{recv_list.begin()}; iter != recv_list.end(); ++iter, ++ref_counter)
     {
@@ -4806,7 +4913,6 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
         }
         }
     }
-    cmc_debug_msg("Morton indices is: ", morton_indices.size());
 
     /* Sort all Morton indices */
     std::sort(morton_indices.begin(), morton_indices.end());
@@ -4824,21 +4930,21 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
             /* In this case our first local Morton index is not equal to the first local element. Therefore, we have to insert some missing_values */
 
             int counter_skipped_elems = 0;
-            t8_element_t* element;
-            uint64_t morton_offset_calc = 0;
+            uint64_t morton_offset_calc = offsets[rank];
 
-            while (morton_offset_calc < morton_indices[0] - 1 && static_cast<size_t>(counter_skipped_elems + 1) < static_cast<size_t>(num_local_elems - 1))
+            /* Find the amount of elements residing before the first Morton index of the actual data */
+            while (morton_offset_calc < morton_indices[0] && static_cast<size_t>(counter_skipped_elems + 1) < static_cast<size_t>(num_local_elems - 1))
             {
-                ++counter_skipped_elems;
-                element = t8_forest_get_element_in_tree(forest, 0, counter_skipped_elems);
+                t8_element_t* element = t8_forest_get_element_in_tree(forest, 0, counter_skipped_elems);
                 morton_offset_calc += std::pow(t8_element_num_children(scheme_eclass, element), t8_data->geo_data->initial_refinement_lvl - t8_element_level(scheme_eclass, element));
+                ++counter_skipped_elems;
             }
 
             /* Save the position and length of the gap */
             gaps_to_fill.emplace_back(std::make_pair(0, counter_skipped_elems));
 
             /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gapsof missing values */
-            morton_indices.insert(morton_indices.begin(), counter_skipped_elems, (offsets[rank] - 1 >= 0 ? offsets[rank] - 1 : 0));
+            morton_indices.insert(morton_indices.begin(), counter_skipped_elems, (offsets[rank] != 0 ? offsets[rank] - 1 : 0));
         }
 
         /* We cannot start at morton_indices.begin() if we have added some missing_values before the first (data) Morton index */
@@ -4848,24 +4954,23 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
             /* Get the amount of elements to skip */
             offset_for_iteration = gaps_to_fill.back().second;
         }
-
         /* Check for gaps in the data somewhere in between */
         size_t current_length = morton_indices.size() - 1;
 
         for (size_t iter{static_cast<size_t>(offset_for_iteration)}; iter < current_length; ++iter)
         {
-            /* Check if neighboring Morton_indices do not vary by exactly one */
+            /* Check if neighboring Morton_indices do not vary by exactly one or if the element is not on the initial refinement level */
             if (morton_indices[iter] + 1 < morton_indices[iter + 1])
             {
                 /** If not, we have a hole needed to be filled by missing values **/
                 int counter_skipped_elems = 0;
-                t8_element_t* element;
                 uint64_t morton_offset_calc = morton_indices[iter];
 
-                while (morton_offset_calc < morton_indices[iter + 1] -1 && iter + counter_skipped_elems + 1 < static_cast<size_t>(num_local_elems -1))
+                /* Find the amount of elements residing between the Morton indices of the actual data */
+                while (morton_offset_calc < morton_indices[iter + 1] - 1 && iter + counter_skipped_elems + 1 < static_cast<size_t>(num_local_elems -1))
                 {
                     ++counter_skipped_elems;
-                    element = t8_forest_get_element_in_tree(forest, 0, iter + counter_skipped_elems);
+                    t8_element_t* element = t8_forest_get_element_in_tree(forest, 0, iter + counter_skipped_elems);
                     morton_offset_calc += std::pow(t8_element_num_children(scheme_eclass, element), t8_data->geo_data->initial_refinement_lvl - t8_element_level(scheme_eclass, element));
                 }
 
@@ -4873,7 +4978,7 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
                 gaps_to_fill.emplace_back(std::make_pair(iter + 1, counter_skipped_elems));
 
                 /* Insert 'counter_skipped_elems' at this position, between the Morton indices we have checked. This has to be done in order to skip the prefilled gap sof missing values */
-                morton_indices.insert(std::next(morton_indices.begin(), iter + 1), counter_skipped_elems, morton_indices[iter]);
+                morton_indices.insert(morton_indices.begin() + iter + 1, counter_skipped_elems, morton_indices[iter]);
 
                 /* Advance the iterator to the correct position */
                 iter += counter_skipped_elems;
@@ -4885,9 +4990,6 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
         /* If there are some Morton indices missing at the end, we can just add the missing values equal to the amount of (local forest elements - amount of local Morton indices) */
         if (morton_indices.size() < static_cast<size_t>(t8_forest_get_local_num_elements(forest)))
         {
-            /* If this is case, the last Morton index should not be equal to the partition boundary */
-            cmc_assert(((rank == comm_size -1 ? t8_forest_get_global_num_elements(forest) - 1 : offsets[rank + 1] -1) - morton_indices.back()) > 0);
-
             /* Save the position and length of the gap */
             gaps_to_fill.emplace_back(std::make_pair(morton_indices.size(), num_local_elems - static_cast<int>(morton_indices.size())));
 
@@ -4973,7 +5075,7 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
                 }
             } else
             {
-                /* In this case, we have only received one varibale with the given layout from this rank. Therefore, we will not create a mapping, but assign the data directly */
+                /* In this case, we have only received one variable with the given layout from this rank. Therefore, we will not create a mapping, but assign the data directly */
 
                 /* Get the size of the variable's data */
                 const size_t size_of_data = t8_data->vars[iter->second.received_variable_ids[counter].front()]->get_data_size();
@@ -4982,7 +5084,7 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
                 std::byte* initial_data_ptr = static_cast<std::byte*>(iter->second.data[counter].front()->get_initial_data_ptr());
                 std::byte* initial_data_new_ptr = static_cast<std::byte*>(t8_data->vars[iter->second.received_variable_ids[counter].front()]->get_initial_data_new_ptr());
 
-               /* Iterate over the Morton indices */
+                /* Iterate over the Morton indices */
                 for (int morton_iter{0}; morton_iter < iter->second.received_morton_indices[counter]; ++morton_iter)
                 {
                     /* Perform a binary search for the received Morton indices */
@@ -4997,7 +5099,7 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
             }
         }
     }
-
+    cmc_debug_msg("vor den frees");
     /* Exchange the 'old' unordered data with the newly ordered array (compliant to the Morton curve) */
     for (size_t var_iter{0}; var_iter < t8_data->vars.size(); ++var_iter)
     {
@@ -5006,7 +5108,7 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
         /* Set the Morton Curve ordering flag */
         t8_data->vars[var_iter]->var->data_scheme = CMC_DATA_ORDERING_SCHEME::CMC_GEO_DATA_Z_CURVE;
     }
-
+    cmc_debug_msg("end of sorting ordering");
     #endif
 }
 
@@ -5077,7 +5179,6 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
 
         /* Set the offset for a serial case */
         offsets[0] = 0;
-
     }
     
     /* Create reference coordinates in order to calculate the distribution later */

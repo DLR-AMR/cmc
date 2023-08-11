@@ -1,17 +1,15 @@
 #include "utilities/cmc_geo_util.h"
 #include "utilities/cmc_log_functions.h"
 
-////new try
-
 void
 cmc_var::switch_data()
 {
     if (data != nullptr)
     {
         delete data;
-        data = data_new;
-        data_new = nullptr;
     }
+    data = data_new;
+    data_new = nullptr;
 }
 
 void
