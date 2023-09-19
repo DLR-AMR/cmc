@@ -419,14 +419,11 @@ calculate_two_step_relative_max_deviation(const double previous_max_deviation, c
     /* Convert the previous element value to double */
     double dprevious_value = std::abs(std::visit([](auto& val) -> double {return static_cast<double>(val);}, previous_value));
 
-    /* Adjust the previous value (in the range of all possible values) such that the new deviation will be maximized */
-    dprevious_value *= (dnew_value >= dprevious_value ? (1.0 - previous_max_deviation) : (1.0 + previous_max_deviation));
-
     /* Check if the new_value is unequal to zero */
     if (!cmc_approx_cmp(dprevious_value, static_cast<double>(0.0)))
     {
-        /* If so, return the upper bound for the deviation this replacement would introduce */
-        return std::abs(1.0 - dnew_value / dprevious_value);
+        return std::max(std::abs(dprevious_value + previous_max_deviation - dnew_value) / std::abs(dprevious_value + previous_max_deviation),
+                        std::abs(dprevious_value - previous_max_deviation - dnew_value) / std::abs(dprevious_value - previous_max_deviation));
     } else
     {
         /* Check if the previous value is zero */

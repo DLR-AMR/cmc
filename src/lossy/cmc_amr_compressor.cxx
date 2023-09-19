@@ -507,7 +507,7 @@ cmc_amr_compress(cmc_amr_data_t amr_data, const t8_forest_adapt_t adapt_function
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_REL_ERROR_THRESHOLD:
                 /* In case a relative error criterion has been chosen */
-                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_relative_error_threshold, cmc_t8_compression_interpolation_standard_mean);
+                cmc_t8_coarsen_data(amr_data->t8_data, cmc_t8_adapt_callback_coarsen_based_on_relative_error_threshold, cmc_t8_compression_interpolation_minimum);
             break;
             case CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD:
                 /* In case a relative error criterion has been chosen */
@@ -686,10 +686,6 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                             if (max_err < current_err)
                             {
                                 max_err = current_err;
-                            }
-                            if (current_err > 0.05)
-                            {
-                                cmc_debug_msg("Error too large: ", current_err, " at pos: ", i);
                             }
                         }
                     }

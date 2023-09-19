@@ -5099,7 +5099,7 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
             }
         }
     }
-    cmc_debug_msg("vor den frees");
+
     /* Exchange the 'old' unordered data with the newly ordered array (compliant to the Morton curve) */
     for (size_t var_iter{0}; var_iter < t8_data->vars.size(); ++var_iter)
     {

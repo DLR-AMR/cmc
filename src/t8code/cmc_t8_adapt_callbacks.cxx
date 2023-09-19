@@ -374,6 +374,8 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 /* Declare a vector storing the adjusted deviations */
                 std::vector<double> adjusted_deviations;
                 adjusted_deviations.reserve(num_elements);
+                std::vector<double> previous_max_range;
+                previous_max_range.reserve(num_elements);
 
                 /* Check if the error threshold is fulfilled for each element of this family */
                 for (int i = 0; i < num_elements; ++i)
@@ -394,6 +396,10 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                         /* Do not coarsen the family */
                         return false;
                     }
+
+                    /* Save the previous maximum range */
+                    previous_max_range.push_back(adapt_data->associated_max_deviations[var_iter][pos]);
+
                     /* Calculate the maximum deviation taking the previous deviations into account as well */
                     adjusted_deviations.push_back(calculate_two_step_relative_max_deviation(adapt_data->associated_max_deviations[var_iter][pos], adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + i)), interpolation_result));
 
@@ -412,13 +418,19 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                     }
                 }
 
-                /* Get the maximum value of the deviations */
-                auto max_elem_adjusted = std::max_element(adjusted_deviations.begin(), adjusted_deviations.end());
-                double max_dev_new_adjusted = (max_elem_adjusted != adjusted_deviations.end() ? *max_elem_adjusted : 0.0);
+                /* Calculate the maximal difference range for the values */
+                std::vector<double> abs_deviation = adapt_data->t8_data->vars[var_iter]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[var_iter]->var->missing_value);
+                /* Add the maximum range from previous coarsening steps */
+                for (int i = 0; i < num_elements; ++i)
+                {
+                    abs_deviation[i] += previous_max_range[i];
+                }
 
-                /* If we reach this line, the error threshold has not been violated and we can indeed coarsen the element's family */
-                /* We need to store the maximum deviation for further adaptation steps */
-                adapt_data->associated_max_deviations_new[var_iter].push_back(max_dev_new_adjusted);
+                /* Calculate the maximal value range within this element's family central to the interpolated value */
+                auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+                double max_dev_abs = (max_elem_abs_dev != abs_deviation.end() ? *max_elem_abs_dev : 0.0);
+
+                adapt_data->associated_max_deviations_new[var_iter].push_back(max_dev_abs);
 
                 /* We are going to save the already interpolated value when the coarsening is likely to be applied */
                 adapt_data->interpolation_data->interpolated_data[var_iter].push_back(std::make_pair(lelement_id, interpolation_result));
@@ -446,21 +458,18 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 
                 /* Get the maximum deviation */
                 auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
-                double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
+                const double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
 
                 /* Check if the deviation complies with the error threshold */
                 if (max_dev <= adapt_data->t8_data->settings.max_err)
                 {
-                    /* If the 'interpolated reference value is not equal to zero, we need to adjust the 'perspective of the relative deviation' */
-                    if (!cmc_value_equal_to_zero(interpolation_result))
-                    {
-                        /* Scale the deviation, such that the calculated value (e.g. mean) is central for the relative deviation */
-                        max_dev *= (cmc_get_universal_data<double>(adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + std::distance(single_deviations.begin(), max_elem)))) / cmc_get_universal_data<double>(interpolation_result));
-                    }
-                
-                    /* We need to store the maximum deviation for further adaptation steps */
-                    adapt_data->associated_max_deviations_new[var_iter].push_back(max_dev);
+                    /* Calculate the maximal difference range for the values */
+                    const std::vector<double> abs_deviation = adapt_data->t8_data->vars[var_iter]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[var_iter]->var->missing_value);
+                    auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+                    double max_dev_abs = (max_elem_abs_dev != single_deviations.end() ? *max_elem_abs_dev : 0.0);
 
+                    adapt_data->associated_max_deviations_new[var_iter].push_back(max_dev_abs);
+                    
                     /* We are going to save the already interpolated value when the coarsening is likely to be applied */
                     adapt_data->interpolation_data->interpolated_data[var_iter].push_back(std::make_pair(lelement_id, interpolation_result));
                 } else
@@ -501,6 +510,8 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             /* Declare a vector storing the adjusted deviations */
             std::vector<double> adjusted_deviations;
             adjusted_deviations.reserve(num_elements);
+            std::vector<double> previous_max_range;
+            previous_max_range.reserve(num_elements);
 
             /* Check if the error threshold is fulfilled for each element of this family */
             for (int i = 0; i < num_elements; ++i)
@@ -514,6 +525,9 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 {
                     return false;
                 }
+
+                /* Save the previous maximum range */
+                previous_max_range.push_back(adapt_data->associated_max_deviations.front()[pos]);
 
                 /* Calculate the maximum deviation taking the the previous deviation into account as well */
                 adjusted_deviations.push_back(calculate_two_step_relative_max_deviation(adapt_data->associated_max_deviations.front()[pos], adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + i)), interpolation_result));
@@ -529,13 +543,20 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
             /* If we reach this line, the error threshold has not been violated and we can indeed coarsen the element's family */
             /* Save the global element id of the first element */
             adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
-            
-            /* Get the maximum value of the deviations */
-            auto max_elem_adjusted = std::max_element(adjusted_deviations.begin(), adjusted_deviations.end());
-            double max_dev_new_adjusted = (max_elem_adjusted != adjusted_deviations.end() ? *max_elem_adjusted : 0.0);
 
-            /* We need to store the maximum deviation for further adaptation steps */
-            adapt_data->associated_max_deviations_new.front().push_back(max_dev_new_adjusted);
+            /* Calculate the maximal difference range for the values */
+            std::vector<double> abs_deviation = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+            /* Add the maximum range from previous coarsening steps */
+            for (int i = 0; i < num_elements; ++i)
+            {
+                abs_deviation[i] += previous_max_range[i];
+            }
+
+            /* Calculate the maximal value range within this element's family central to the interpolated value */
+            auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+            double max_dev_abs = (max_elem_abs_dev != abs_deviation.end() ? *max_elem_abs_dev : 0.0);
+
+            adapt_data->associated_max_deviations_new.front().push_back(max_dev_abs);
 
             /* Increment the coarsening counter */
             ++(adapt_data->coarsening_counter);
@@ -551,7 +572,7 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
 
             /* Get the maximum deviation */
             auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
-            double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
+            const double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
 
             /* Check if the deviation complies with the error threshold */
             if (max_dev <= adapt_data->t8_data->settings.max_err)
@@ -559,15 +580,12 @@ cmc_t8_elements_comply_to_relative_error_threshold(cmc_t8_adapt_data_t adapt_dat
                 /* Store the global element id of the first element */
                 adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
 
-                /* If the 'interpolated reference value' is not equal to zero, we need to adjust the 'perspective of the relative deviation' */
-                if (!cmc_value_equal_to_zero(interpolation_result))
-                {
-                    /* Scale the deviation, such that the calculated value (e.g. mean) is central for the relative deviation */
-                    max_dev *= (cmc_get_universal_data<double>(adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + std::distance(single_deviations.begin(), max_elem)))) / cmc_get_universal_data<double>(interpolation_result));
-                }
+                /* Calculate the maximal difference range for the values */
+                const std::vector<double> abs_deviation = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+                auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+                double max_dev_abs = (max_elem_abs_dev != single_deviations.end() ? *max_elem_abs_dev : 0.0);
 
-                /* We need to store the maximum deviation for further adaptation steps */
-                adapt_data->associated_max_deviations_new.front().push_back(max_dev);
+                adapt_data->associated_max_deviations_new.front().push_back(max_dev_abs);
 
                 /* Increment the coarsening counter */
                 ++(adapt_data->coarsening_counter);

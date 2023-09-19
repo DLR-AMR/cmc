@@ -29,7 +29,7 @@ main(int argc, char* argv[])
     std::vector<int> p_dist{1,2,1};
     cmc_nc_set_blocked_reading(nc_data, p_dist);
     
-    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t", "tco3");
+    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "tco3");
     
     
     //cmc_nc_data_t nc_data = cmc_nc_start("../../data/MESSy_DATA/MESSy2/raw/tracer/RC1-base-07_0028_restart_0001_tracer_gp.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL);
@@ -63,7 +63,7 @@ main(int argc, char* argv[])
     cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 1);
 
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);

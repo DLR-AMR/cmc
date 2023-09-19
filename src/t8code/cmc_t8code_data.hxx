@@ -211,7 +211,7 @@ public:
     cmc_t8_assets_t assets{nullptr}; //!< A pointer to a @struct cmc_t8_assets. These general assets are used in case all varibales are defined on the same geo-spatial domain (@see @struct cmc_t8_assets)
     bool assets_allocated{false}; //!< A flag indicating whether these general assets have been allocated (or not if for example some variables are not defined on the same geo-spatial domain)
 
-    t8_forest_t initial_forest{nullptr}; //!< The initial forest enclosing the geo-spatial domain on which ALL variables are defined (only if this is the case, e.g. 'One for All'-compression otherwise it stays a 'nullptr')
+    t8_forest_t initial_forest{nullptr}; //!< The initial forest enclosing the geo-spatial domain on which ALL variables are defined initially (before the compression)
     var_vector_t initial_data;  //!< A @struct var_vector_t storing the initial (the uncompressed) data of each variable (this may be used in order to determine an aposteriori error which was introduced by the lossy compression)
 
     MPI_Comm comm; //!< The communicator to use in a parallel environment 
