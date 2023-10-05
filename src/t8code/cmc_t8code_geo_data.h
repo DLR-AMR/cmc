@@ -36,6 +36,9 @@ void
 cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data);
 
 void
+cmc_t8_interpolate_to_initial_level_plain_copies(cmc_t8_data_t t8_data);
+
+void
 cmc_t8_geo_data_split_variables(cmc_t8_data_t t8_data);
 
 void

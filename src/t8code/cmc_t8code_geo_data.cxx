@@ -2299,6 +2299,96 @@ cmc_t8_geo_data_repartition(cmc_t8_data_t t8_data, t8_forest_t forest, const int
     #endif
 }
 
+
+/**
+ * @brief This function performs the repartitioning of the forest and the data of all variables during a compression/coarsening step
+ * 
+ * @param t8_data A pointer to the @struct cmc_t8_data holding all variables and data
+ * @param forest The forest which will be partitioned
+ * @param partition_for_coarsening This value indicates whether or not the partitioning shall be made for a coarsening step
+ * @note The onwership of the forest is taken, if it is not references directly before calling this funciton (@see t8_forest_ref(...))
+ * @return t8_forest_t The partitioned forest (The @var t8_data holds now the partitioned data corresponding to this retunred forest)
+ */
+static
+t8_forest_t
+cmc_t8_geo_data_repartition_all_vars(cmc_t8_data_t t8_data, t8_forest_t forest, const int partition_for_coarsening = 0)
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Check if the data needs to repartitioned */
+    if (t8_data->use_distributed_data)
+    {
+        cmc_debug_msg("Repartitioning of the forest and the data starts.");
+
+        /* Declare a new forest variable */
+        t8_forest_t forest_partitioned;
+        /* Initialize the forest */
+        t8_forest_init(&forest_partitioned);
+
+        /* We need to distinguish between the compression modes */
+        if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
+        {
+            /* If a 'One For All' compression is used, this function call is similar to the normal partition function, since all variables are inherently defined on the same forest */
+            return cmc_t8_geo_data_repartition(t8_data, forest, partition_for_coarsening);
+        }
+        else
+        {
+            /* If a 'One for One' compression mode is used */
+            /* Reference the forest */
+            t8_forest_ref(forest);
+            /* Set the forest from which the partition will be derived */
+            t8_forest_set_partition(forest_partitioned, forest, partition_for_coarsening);
+            /* Commit the forest */
+            t8_forest_commit(forest_partitioned);
+
+            /* Partition all variables */
+            for (size_t var_id = 0; var_id < t8_data->vars.size(); ++var_id)
+            {
+                /* Create an sc input array from the variable's data */
+                sc_array_t in_data;
+
+                /* Set up the sc_array of the input */
+                in_data.elem_size = t8_data->vars[var_id]->get_data_size();
+                in_data.elem_count = t8_data->vars[var_id]->var->data->size();
+                in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
+                in_data.array = static_cast<char*>(t8_data->vars[var_id]->var->data->get_initial_data_ptr());
+
+                /* Allocate a new array in data_new which will hold the partitioned data */
+                t8_data->vars[var_id]->var->data_new = new var_array_t(static_cast<size_t>(t8_forest_get_local_num_elements(forest_partitioned)), t8_data->vars[var_id]->get_type());
+
+                /* Create an sc output array for the partitioned variable's data */
+                sc_array_t out_data;
+
+                /* Setup the output sc array */
+                out_data.elem_size = t8_data->vars[var_id]->get_data_size();
+                out_data.elem_count = t8_forest_get_local_num_elements(forest_partitioned);
+                out_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * t8_forest_get_local_num_elements(forest_partitioned));
+                out_data.array = static_cast<char*>(t8_data->vars[var_id]->get_initial_data_new_ptr());
+
+                /* The data has to be partitioned as well according to new partitioning scheme of the forest */
+                t8_forest_partition_data(t8_data->vars[var_id]->assets->forest, forest_partitioned, &in_data, &out_data);
+
+                /* Switch the old with the partitioned data */
+                t8_data->vars[var_id]->var->switch_data();
+
+            }
+
+            /* Dereference the old partitioned forest */
+            t8_forest_unref(&forest);
+
+            cmc_debug_msg("The forest and the data have been re-partitioned.");
+
+            /* Return the newly partitioned forest */
+            return forest_partitioned;
+
+        }
+    } else
+    {
+        /* In case the data is not distributed, we do not need to repartition it */
+        return forest;
+    }
+    #endif
+}
+
 /**
  * @brief This function performs the repartitioning of the forest and the data during a compression/coarsening step
  * 
@@ -3465,6 +3555,295 @@ cmc_t8_refine_to_initial_level(cmc_t8_data_t t8_data)
     {
         cmc_err_msg("cmc_t8_data holds an unsupported compression mode");
     }
+
+    #endif
+}
+
+void
+cmc_t8_interpolate_to_initial_level_plain_copies(cmc_t8_data_t t8_data)
+{
+    #ifdef CMC_WITH_T8CODE
+
+    t8_forest_t forest;
+    t8_forest_t adapted_forest;
+
+    cmc_t8_adapt_data adapt_data{t8_data};
+    cmc_t8_interpolation_data interpolation_data{t8_data};
+
+    if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
+    {
+        /* Get the forest on which all variables are defined */
+        forest = t8_data->assets->forest;
+
+        /* Number of (compressed/coarsened) local elements */
+        const t8_locidx_t num_compressed_elems = t8_forest_get_local_num_elements(forest);
+
+        /* Get the eclass scheme of the forest */
+        t8_eclass_scheme_c* eclass_scheme =  t8_forest_get_eclass_scheme(forest, t8_forest_get_eclass(forest, 0));
+
+        /* Get the number of children (due to a single refinement of an element) */
+        const int num_children = t8_element_num_children(eclass_scheme, t8_forest_get_element_in_tree(forest, 0, 0));
+
+        /* Track the allocated memory */
+        size_t num_allocated_elems = static_cast<size_t>(t8_forest_get_local_num_elements(forest)) * num_children;
+
+        /* Since every variable define its own mesh, we iterate over all variables */
+        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+        {
+            /* Allocate memory for the array holding the interpolated value */
+            t8_data->vars[var_id]->var->data_new = new var_array_t(num_allocated_elems, t8_data->vars[var_id]->get_type());
+        }
+
+        /* A counter for accessing the array holding the interpolated values */
+        size_t access_interpolated_array = 0;
+
+        /* Iterate over all 'compressed' elements */
+        for (t8_locidx_t elem_id = 0; elem_id < num_compressed_elems; ++elem_id)
+        {
+            /* Get the current element */
+            t8_element_t* elem = t8_forest_get_element_in_tree(forest, 0, elem_id);
+
+            /* Check the refinement level of the current element.
+             * If the element's level is coarser than the initial refinement level, multiple copies have to be made.
+             * Otherwise, just a single one. */
+            if (cmc_t8_elem_inside_geo_mesh(elem, eclass_scheme, *t8_data, 0) != 0 && 
+                t8_element_level(eclass_scheme, elem) < t8_data->assets->initial_refinement_lvl)
+            {
+                /* Get the level difference */
+                const int level_diff = t8_data->assets->initial_refinement_lvl - t8_element_level(eclass_scheme, t8_forest_get_element_in_tree(forest, 0, elem_id));
+
+                /* Calculate the amount of copies which has to be made */
+                const int amount_of_copies = std::pow(num_children, level_diff);
+
+                /* Check whether enough memeory is allocated for the decompressed elements */
+                if (access_interpolated_array + amount_of_copies > num_allocated_elems)
+                {
+                    /* Adjust the allocated memeory */
+                    num_allocated_elems *= 2;
+                    for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+                    {
+                        /* Resize the decompressed data array */
+                        t8_data->vars[var_id]->var->data_new->resize(num_allocated_elems);
+                    }
+                }
+                
+                /* Assign the values */
+                for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+                {
+                    /* Insert the copies in the interpolated array */
+                    t8_data->vars[var_id]->var->data_new->multiple_assign(access_interpolated_array, access_interpolated_array + amount_of_copies - 1, t8_data->vars[var_id]->var->data->operator[](static_cast<size_t>(elem_id)));
+                }
+
+                /* Update the access counter for the interpolated array */
+                access_interpolated_array += amount_of_copies;
+            } else
+            {
+                /* In this case, the element has not been coarsened, therefore, a single copy to the interpolated array is sufficient */
+                /* Check whether enough memeory is allocated for the decompressed elements */
+                if (access_interpolated_array + 1 > num_allocated_elems)
+                {
+                    /* Adjust the allocated memeory */
+                    num_allocated_elems *= 2;
+                    for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+                    {
+                        /* Resize the decompressed data array */
+                        t8_data->vars[var_id]->var->data_new->resize(num_allocated_elems);
+                    }
+                }
+
+                /* Assign the value */
+                for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+                {
+                    /* Copy the value of the element */
+                    t8_data->vars[var_id]->var->data_new->assign_value(access_interpolated_array, t8_data->vars[var_id]->var->data->operator[](static_cast<size_t>(elem_id)));
+                }
+
+                /* Increment the access id */
+                ++access_interpolated_array;
+            }
+        }
+
+        /* Switch the variables' data arrays */
+        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+        {
+            /* Since the allocation may be too large, we crop the array to the content */
+            t8_data->vars[var_id]->var->data_new->crop_to(access_interpolated_array - 1);
+
+            cmc_debug_msg("Array entries: ", access_interpolated_array);
+            cmc_debug_msg("data_new hat size(): ", t8_data->vars[var_id]->var->data_new->size());
+
+            /* Switch the decompressed with the compressed data */
+            t8_data->vars[var_id]->var->switch_data();
+        }
+        
+        cmc_debug_msg("data hat size(): ", t8_data->vars[0]->var->data->size());
+        /* The refined/decompressed forest can be built seperately from the data decompression via a single recursive refinement call */
+        /* In a parallel/partitioned case, we are refining the forest of each variable in order to perform the partitioning of the decompressed data.
+         * However, this is not necessary and may be optimized, by building the refined forest once, and just built the offset-array for each variable. Then it is possible to
+         * implent the partitioning only based on these information, and the refinement of all other variables could be skipped */
+        if (t8_data->use_distributed_data)
+        {
+            /* Build the adapted/decompressed forest */
+            adapted_forest = t8_forest_new_adapt(t8_data->assets->forest, cmc_t8_adapt_callback_refine_to_initial_lvl, 1, 0, static_cast<void*>(&adapt_data));
+
+            /* Repartition the variable's data, based on the forest of the first variable */
+            forest = cmc_t8_geo_data_repartition_all_vars(t8_data, adapted_forest);
+        } else
+        {
+            /* In a serial case */
+            /* Build the adapted/decompressed forest */
+            forest = t8_forest_new_adapt(t8_data->assets->forest, cmc_t8_adapt_callback_refine_to_initial_lvl, 1, 0, static_cast<void*>(&adapt_data));
+        }
+
+        cmc_debug_msg("Der Forsest hat elements: ", t8_forest_get_local_num_elements(forest));
+        
+        /* Free the former forest and Save the adapted forest */
+        t8_data->assets->forest = forest;
+
+        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+        {
+            cmc_debug_msg("Adaptation/De-Compression of variable ", t8_data->vars[var_id]->var->name, " is finished.");
+        }
+    }
+    else if (t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE)
+    {
+        /* Since every variable define its own mesh, we iterate over all variables */
+        for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+        {
+            /* Save the current variable ID */
+            adapt_data.current_var_id = var_id;
+            interpolation_data.current_var_id = var_id;
+
+            /* Get a pointer to the forest of the variable */
+            forest = t8_data->vars[var_id]->assets->forest;
+
+            /* Number of (compressed/coarsened) local elements */
+            const t8_locidx_t num_compressed_elems = t8_forest_get_local_num_elements(forest);
+
+            /* Get the eclass scheme of the forest */
+            t8_eclass_scheme_c* eclass_scheme =  t8_forest_get_eclass_scheme(forest, t8_forest_get_eclass(forest, 0));
+
+            /* Get the number of children (due to a single refinement of an element) */
+            const int num_children = t8_element_num_children(eclass_scheme, t8_forest_get_element_in_tree(forest, 0, 0));
+
+            /* Allocate memory for the array holding the interpolated value */
+            size_t num_allocated_elems = static_cast<size_t>(t8_forest_get_local_num_elements(forest)) * num_children;
+            t8_data->vars[var_id]->var->data_new = new var_array_t(num_allocated_elems, t8_data->vars[var_id]->get_type());
+
+            /* A counter for accessing the array holding the interpolated values */
+            size_t access_interpolated_array = 0;
+
+            /* Iterate over all 'compressed' elements */
+            for (t8_locidx_t elem_id = 0; elem_id < num_compressed_elems; ++elem_id)
+            {
+                /* Get the current element */
+                t8_element_t* elem = t8_forest_get_element_in_tree(forest, 0, elem_id);
+
+                /* Check the refinement level of the current element.
+                 * If the element's level is coarser than the initial refinement level, multiple copies have to be made.
+                 * Otherwise, just a single one. */
+                if (cmc_t8_elem_inside_geo_mesh(elem, eclass_scheme, *t8_data, 0) != 0 && 
+                    t8_element_level(eclass_scheme, elem) < t8_data->vars[var_id]->assets->initial_refinement_lvl)
+                {
+                    /* Get the level difference */
+                    const int level_diff = t8_data->vars[var_id]->assets->initial_refinement_lvl - t8_element_level(eclass_scheme, t8_forest_get_element_in_tree(forest, 0, elem_id));
+
+                    /* Calculate the amount of copies which has to be made */
+                    const int amount_of_copies = std::pow(num_children, level_diff);
+
+                    /* Check whether enough memeory is allocated for the decompressed elements */
+                    if (access_interpolated_array + amount_of_copies > num_allocated_elems)
+                    {
+                        /* Adjust the allocated memeory */
+                        num_allocated_elems *= 2;
+                        /* Resize the decompressed data array */
+                        t8_data->vars[var_id]->var->data_new->resize(num_allocated_elems);
+                    }
+
+                    /* Insert the copies in the interpolated array */
+                    t8_data->vars[var_id]->var->data_new->multiple_assign(access_interpolated_array, access_interpolated_array + amount_of_copies - 1, t8_data->vars[var_id]->var->data->operator[](static_cast<size_t>(elem_id)));
+
+                    /* Update the access counter for the interpolated array */
+                    access_interpolated_array += amount_of_copies;
+                } else
+                {
+                    /* In this case, the element has not been coarsened, therefore, a single copy to the interpolated array is sufficient */
+                    /* Check whether enough memeory is allocated for the decompressed elements */
+                    if (access_interpolated_array + 1 > num_allocated_elems)
+                    {
+                        /* Adjust the allocated memeory */
+                        num_allocated_elems *= 2;
+                        /* Resize the decompressed data array */
+                        t8_data->vars[var_id]->var->data_new->resize(num_allocated_elems);
+                    }
+
+                    /* Copy the value of the element */
+                    t8_data->vars[var_id]->var->data_new->assign_value(access_interpolated_array, t8_data->vars[var_id]->var->data->operator[](static_cast<size_t>(elem_id)));
+
+                    /* Increment the access id */
+                    ++access_interpolated_array;
+                }
+            }
+            /* Since the allocation may be too large, we crop the array to the content */
+            t8_data->vars[var_id]->var->data_new->crop_to(access_interpolated_array - 1);
+
+            cmc_debug_msg("Array entries: ", access_interpolated_array);
+            cmc_debug_msg("data_new hat size(): ", t8_data->vars[var_id]->var->data_new->size());
+
+            /* Switch the decompressed with the compressed data */
+            t8_data->vars[var_id]->var->switch_data();
+        }
+        cmc_debug_msg("data hat size(): ", t8_data->vars[0]->var->data->size());
+        /* The refined/decompressed forest can be built seperately from the data decompression via a single recursive refinement call */
+        /* In a parallel/partitioned case, we are refining the forest of each variable in order to perform the partitioning of the decompressed data.
+         * However, this is not necessary and may be optimized, by building the refined forest once, and just built the offset-array for each variable. Then it is possible to
+         * implent the partitioning only based on these information, and the refinement of all other variables could be skipped */
+        if (t8_data->use_distributed_data)
+        {
+            /* Save the new/decompressed forest for each variable */
+            for (size_t var_id{0}; var_id < t8_data->vars.size(); ++var_id)
+            {
+                /* Build the adapted/decompressed forest */
+                adapted_forest = t8_forest_new_adapt(t8_data->vars[0]->assets->forest, cmc_t8_adapt_callback_refine_to_initial_lvl, 1, 0, static_cast<void*>(&adapt_data));
+
+                /* Free the former forest and Save the adapted forest */
+                t8_data->vars[var_id]->assets->forest = adapted_forest;
+            }
+
+            /* Repartition the variable's data, based on the forest of the first variable */
+            forest = cmc_t8_geo_data_repartition_all_vars(t8_data, t8_data->vars[0]->assets->forest);
+        } else
+        {
+            /* In a serial case */
+            /* Build the adapted/decompressed forest */
+            forest = t8_forest_new_adapt(t8_data->vars[0]->assets->forest, cmc_t8_adapt_callback_refine_to_initial_lvl, 1, 0, static_cast<void*>(&adapt_data));
+        }
+        cmc_debug_msg("Der Forsest hat elements: ", t8_forest_get_local_num_elements(forest));
+        /* Save the partitioned forest of the first variable */
+        t8_data->vars[0]->assets->forest = forest;
+
+        cmc_debug_msg("Adaptation/De-Compression of variable ", t8_data->vars[0]->var->name, " is finished.");
+
+        /* Save the new/decompressed forest for each variable */
+        for (size_t var_id{1}; var_id < t8_data->vars.size(); ++var_id)
+        {
+            /* All other variables have the same layout now, therefore, we do not need to repartition them, but reference the forest of the first variable */
+            /* Unreference the unpartitoned forest */
+            t8_forest_unref(&t8_data->vars[var_id]->assets->forest);
+
+            /* Set the partitioned forest */
+            t8_data->vars[var_id]->assets->forest = forest;
+
+            /* Reference the forest once for this variable */
+            t8_forest_ref(forest);
+
+            cmc_debug_msg("Adaptation/De-Compression of variable ", t8_data->vars[var_id]->var->name, " is finished.");
+        }
+        cmc_debug_msg("data hat size(): ", t8_data->vars[0]->var->data->size());
+    } else
+    {
+        cmc_err_msg("cmc_t8_data holds an unsupported compression mode");
+    }    
 
     #endif
 }
@@ -5108,7 +5487,6 @@ cmc_t8_data_apply_morton_order_initially(cmc_t8_data_t t8_data, t8_eclass_scheme
         /* Set the Morton Curve ordering flag */
         t8_data->vars[var_iter]->var->data_scheme = CMC_DATA_ORDERING_SCHEME::CMC_GEO_DATA_Z_CURVE;
     }
-    cmc_debug_msg("end of sorting ordering");
     #endif
 }
 
@@ -5211,6 +5589,15 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
     #endif
 }
 
+#if 0
+void
+cmc_t8_data_extract_geo_domain_data()
+{
+    #ifdef CMC_WITH_T8CODE
+
+    #endif
+}
+#endif
 #if 0
 static
 cmc_var_vector_t

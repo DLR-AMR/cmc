@@ -21,16 +21,18 @@ main(int argc, char* argv[])
   
   #if 1
     //New test for parallel netCDF input
-    cmc_nc_data_t nc_data = cmc_nc_start("../../data/test_nc4_file.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL, MPI_COMM_WORLD);
-    
+    //cmc_nc_data_t nc_data = cmc_nc_start("../../data/test_nc4_file.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL, MPI_COMM_WORLD);
+    //const size_t start_ptr[3] = {0,0,0};  //Example netCDF File
+    //const size_t count_ptr[3] = {1,73,144}; //Example netCDF File
+    cmc_nc_data_t nc_data = cmc_nc_start("../../data/tas_decreg_europe_v20140120_20010101_20010131.nc", cmc_nc_opening_mode::CMC_NC_SERIAL);
     const size_t start_ptr[3] = {0,0,0};  //Example netCDF File
-    const size_t count_ptr[3] = {1,73,144}; //Example netCDF File
+    const size_t count_ptr[3] = {1,1026,1056}; //Example netCDF File
     
     std::vector<int> p_dist{1,2,1};
     cmc_nc_set_blocked_reading(nc_data, p_dist);
     
-    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "tco3");
-    
+    cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "tas");
+    //cmc_nc_inquire_vars(nc_data, start_ptr, count_ptr, "p2t");
     
     //cmc_nc_data_t nc_data = cmc_nc_start("../../data/MESSy_DATA/MESSy2/raw/tracer/RC1-base-07_0028_restart_0001_tracer_gp.nc", cmc_nc_opening_mode::CMC_NC_PARALLEL);
     
@@ -56,14 +58,14 @@ main(int argc, char* argv[])
     //cmc_amr_pre_setup_split_3D_variable(amr_data, 0, DATA_LAYOUT::CMC_2D_LAT_LON);
 
     /* Set a compression criterium - e.g. error threshold with a predefined tolerance */
-    cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.05);
+    cmc_amr_pre_setup_set_compression_criterium_relative_error_threshold(amr_data, 0.005);
     //cmc_amr_pre_setup_set_compression_criterium_absolute_error_threshold(amr_data, 0.00000005);
 
     /* Keep the initial data in order to check the actual introduced data inaccurcy after the decompression */
     cmc_amr_pre_setup_set_flag_in_order_to_keep_the_initial_data(amr_data, 1);
 
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
 
     /* Execute the adaptation/compression */
     cmc_amr_compress(amr_data);
@@ -137,7 +139,7 @@ main(int argc, char* argv[])
     //cmc_amr_write_netcdf_file(amr_data, "example_initial.nc", CMC_AMR_WRITE_ALL_VARS_TO_NETCDF);
     
     /* Setup the compression for a given 'compression mode' */
-    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ONE);
+    cmc_amr_setup_compression(amr_data, CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL);
 
     /* Write a vtk file of the decompressed data */
     cmc_amr_write_vtk_file(amr_data, "cmc_initial_data");

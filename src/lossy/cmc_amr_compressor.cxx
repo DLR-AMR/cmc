@@ -610,29 +610,32 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
         {
             for (size_t var_id{0}; var_id < amr_data->t8_data->vars.size(); ++var_id)
             {
-                exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
-                approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
-                /* Calculate the new relative error */
-                if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
+                if(!cmc_value_equal_to_missing_value(amr_data->t8_data->initial_data[var_id].operator[](i), amr_data->t8_data->vars[var_id]->var->missing_value))
                 {
+                    exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
+                    approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
                     /* Calculate the new absolute error */
-                    current_err = std::abs(approx_value - exact_value);
-                    /* Eventually update the maximim error for this variable */
-                    if (max_error[var_id] < current_err)
+                    if (amr_data->t8_data->settings.compression_criterium == CMC_T8_COMPRESSION_CRITERIUM::CMC_ABS_ERROR_THRESHOLD)
                     {
-                        max_error[var_id] = current_err;
-                    }
-                } else
-                {
-                    if (exact_value > 0.0 && approx_value > 0.0)
-                    {
-                        /* Calculate the new relative error */
-                        current_err = std::abs((approx_value - exact_value) / exact_value);
-
+                        /* Calculate the new absolute error */
+                        current_err = std::abs(approx_value - exact_value);
                         /* Eventually update the maximim error for this variable */
                         if (max_error[var_id] < current_err)
                         {
                             max_error[var_id] = current_err;
+                        }
+                    } else
+                    {
+                        if (exact_value > 0.0 && approx_value > 0.0)
+                        {
+                            /* Calculate the new relative error */
+                            current_err = std::abs((approx_value - exact_value) / exact_value);
+
+                            /* Eventually update the maximim error for this variable */
+                            if (max_error[var_id] < current_err)
+                            {
+                                max_error[var_id] = current_err;
+                            }
                         }
                     }
                 }
@@ -661,7 +664,7 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
             for (size_t i{0}; i < static_cast<size_t>(t8_forest_get_local_num_elements(amr_data->t8_data->vars[var_id]->assets->forest)); ++i)
             {
                 /* Check if a missing value would be at the position of the exact value */
-                if (!(amr_data->t8_data->vars[var_id]->var->is_equal_to_missing_value(i)))
+                if(!cmc_value_equal_to_missing_value(amr_data->t8_data->initial_data[var_id].operator[](i), amr_data->t8_data->vars[var_id]->var->missing_value))
                 {
                     exact_value = std::abs(cmc_get_universal_data<double>((amr_data->t8_data->initial_data[var_id]).operator[](i)));
                     approx_value = std::abs(cmc_get_universal_data<double>(amr_data->t8_data->vars[var_id]->var->data->operator[](i)));
@@ -670,7 +673,7 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                         /* Calculate the new absolute error */
                         current_err = std::abs(approx_value - exact_value);
 
-                        /* Eventually update the maximim error for this variable */
+                        /* Eventually update the maximum error for this variable */
                         if (max_err < current_err)
                         {
                             max_err = current_err;
@@ -681,8 +684,7 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
                         {
                             /* Calculate the new relative error */
                             current_err = std::abs((approx_value - exact_value) / exact_value);
-
-                            /* Eventually update the maximim error for this variable */
+                            /* Eventually update the maximum error for this variable */
                             if (max_err < current_err)
                             {
                                 max_err = current_err;
@@ -700,7 +702,6 @@ cmc_amr_check_inaccuracy_after_decompression(cmc_amr_data_t amr_data)
             }
         }
     }
-
 }
 
 void
@@ -712,8 +713,9 @@ cmc_amr_decompress(cmc_amr_data_t amr_data)
     cmc_debug_msg("Decompression of data starts...");
 
     /* Refine the data of all variables to corresponding intial mesh */
-    cmc_t8_refine_to_initial_level(amr_data->t8_data);
-
+    //cmc_t8_refine_to_initial_level(amr_data->t8_data);
+    cmc_t8_interpolate_to_initial_level_plain_copies(amr_data->t8_data);
+    
     cmc_debug_msg("Decompression has been finished.");
     
     /* Set the (de-)comrpession flag */
