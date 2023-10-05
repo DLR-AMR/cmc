@@ -275,7 +275,120 @@ bool cmc_var::is_equal_to_missing_value(const size_t index) const
 bool
 cmc_value_equal_to_missing_value(const cmc_universal_type_t& value, const cmc_universal_type_t& missing_value)
 {
-    //TODO: not implemented yet
+    /* Get the current type of the universal_type */
+    switch (static_cast<cmc_type>(value.index()))
+    {
+        case CMC_INT32_T:
+            if (std::get<int32_t>(value) == std::get<int32_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_FLOAT:
+            if(cmc_approx_cmp(std::get<float>(value), std::get<float>(missing_value), static_cast<float>(1.0)))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_DOUBLE:
+            if(cmc_approx_cmp(std::get<double>(value), std::get<double>(missing_value), static_cast<double>(1.0)))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_INT16_T:
+            if(std::get<int16_t>(value) == std::get<int16_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_INT64_T:
+            if(std::get<int64_t>(value) == std::get<int64_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT64_T:
+            if(std::get<uint64_t>(value) == std::get<uint64_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT32_T:
+            if(std::get<uint32_t>(value) == std::get<uint32_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_INT8_T:
+            if(std::get<int8_t>(value) == std::get<int8_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT8_T:
+            if(std::get<uint8_t>(value) == std::get<uint8_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_UINT16_T:
+            if(std::get<uint16_t>(value) == std::get<uint16_t>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_BYTE:
+            if(std::get<std::byte>(value) == std::get<std::byte>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        case CMC_CHAR:
+            if(std::get<char>(value) == std::get<char>(missing_value))
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
     return false;
 }
 
