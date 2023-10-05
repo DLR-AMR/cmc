@@ -8,6 +8,13 @@ public:
     : num_elements{_num_elems}, type{_type}{
         initial_data_ptr = malloc(_num_elems * cmc_type_to_bytes[_type]);
     };
+    var_array(const size_t _num_elems, const cmc_type _type, void* data_ptr)
+    : num_elements{_num_elems}, type{_type}, initial_data_ptr{data_ptr} {
+        if (data_ptr == nullptr)
+        {
+            initial_data_ptr = malloc(_num_elems * cmc_type_to_bytes[_type]);
+        }
+    };
     ~var_array(){
         if (initial_data_ptr != nullptr)
         {
@@ -66,6 +73,37 @@ var_array_t::operator=(const var_array_t& array)
     return (*this);
 }
 
+void
+var_array_t::resize(const size_t num_elements)
+{
+    if (num_elements > data->num_elements)
+    {
+        /* Create a new array with the given number of elements */
+        var_array* resized_data = new var_array(num_elements, data->type);
+        /* Copy the current array entries over */
+        memcpy(resized_data->initial_data_ptr, data->initial_data_ptr, data->num_elements * cmc_type_to_bytes[data->type]);
+        /* Delete the old data */
+        data->~var_array();
+        /* Save the new resized array */
+        data = resized_data;
+    }
+}
+
+void
+var_array_t::crop_to(const size_t end_index)
+{
+    if (end_index < data->num_elements)
+    {
+        /* Create a new var_array struct with the same underlying memory, but less 'portrayed elements' */
+        var_array* resized_data = new var_array(end_index + 1, data->type, data->initial_data_ptr);
+        /* Nullify the former array */
+        data->initial_data_ptr = nullptr;
+        /* Delete the old data */
+        data->~var_array();
+        /* Save the new resized array */
+        data = resized_data;
+    }
+}
 
 #if 0
 switch (data->type)
@@ -3140,6 +3178,137 @@ var_array_t::assign_value(const size_t index, const cmc_universal_type_t& value)
     }
 }
 
+void
+var_array_t::multiple_assign(const size_t start_index, const size_t end_index, const cmc_universal_type_t& value)
+{
+    cmc_assert(start_index >= 0 && start_index <= end_index && end_index < data->num_elements);
+    switch (data->type)
+    {
+        case CMC_INT32_T:
+        {
+            const int32_t insert_value = std::get<int32_t>(value);
+            int32_t* data_ptr{static_cast<int32_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_FLOAT:
+        {
+            const float insert_value = std::get<float>(value);
+            float* data_ptr{static_cast<float*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_DOUBLE:
+        {
+            const double insert_value = std::get<double>(value);
+            double* data_ptr{static_cast<double*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_INT16_T:
+        {
+            const int16_t insert_value = std::get<int16_t>(value);
+            int16_t* data_ptr{static_cast<int16_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_INT64_T:
+        {
+            const int64_t insert_value = std::get<int64_t>(value);
+            int64_t* data_ptr{static_cast<int64_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_UINT64_T:
+        {
+            const uint64_t insert_value = std::get<uint64_t>(value);
+            uint64_t* data_ptr{static_cast<uint64_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_UINT32_T:
+        {
+            const uint32_t insert_value = std::get<uint32_t>(value);
+            uint32_t* data_ptr{static_cast<uint32_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_INT8_T:
+        {
+            const int8_t insert_value = std::get<int8_t>(value);
+            int8_t* data_ptr{static_cast<int8_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_UINT8_T:
+        {
+           const uint8_t insert_value = std::get<uint8_t>(value);
+            uint8_t* data_ptr{static_cast<uint8_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_UINT16_T:
+        {
+            const uint16_t insert_value = std::get<uint16_t>(value);
+            uint16_t* data_ptr{static_cast<uint16_t*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_BYTE:
+        {
+            const std::byte insert_value = std::get<std::byte>(value);
+            std::byte* data_ptr{static_cast<std::byte*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        case CMC_CHAR:
+        {
+            const char insert_value = std::get<char>(value);
+            char* data_ptr{static_cast<char*>(data->initial_data_ptr)};
+            for(size_t i = start_index; i <= end_index; ++i)
+            {
+                data_ptr[i] = insert_value;
+            }
+        }
+        break;
+        default:
+            cmc_err_msg("An unknown cmc data type has been supplied.");
+    }
+}
+
 cmc_universal_type_t 
 var_array_t::mean_value(const size_t start_index, const size_t end_index) const
 {
@@ -4142,7 +4311,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<int32_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<int32_t>(0));
+                //return cmc_universal_type_t(static_cast<int32_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4166,7 +4336,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<float>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<float>(0));
+                //return cmc_universal_type_t(static_cast<float>(0));
+                return missing_value;
             }
         }
         break;
@@ -4190,7 +4361,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<double>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<double>(0));
+                //return cmc_universal_type_t(static_cast<double>(0));
+                return missing_value;
             }
         }
         break;
@@ -4214,7 +4386,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<int16_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<int16_t>(0));
+                //return cmc_universal_type_t(static_cast<int16_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4238,7 +4411,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<int64_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<int64_t>(0));
+                //return cmc_universal_type_t(static_cast<int64_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4262,7 +4436,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<uint64_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<uint64_t>(0));
+                //return cmc_universal_type_t(static_cast<uint64_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4286,7 +4461,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<uint32_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<uint32_t>(0));
+                //return cmc_universal_type_t(static_cast<uint32_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4310,7 +4486,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<int8_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<int8_t>(0));
+                //return cmc_universal_type_t(static_cast<int8_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4334,7 +4511,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<uint8_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<uint8_t>(0));
+                //return cmc_universal_type_t(static_cast<uint8_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4358,7 +4536,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<uint16_t>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<uint16_t>(0));
+                //return cmc_universal_type_t(static_cast<uint16_t>(0));
+                return missing_value;
             }
         }
         break;
@@ -4385,7 +4564,8 @@ var_array_t::mean_value_same_type_wo_missing_vals(const size_t start_index, cons
                 return cmc_universal_type_t(static_cast<char>(mean_no_missing_vals.first / mean_no_missing_vals.second));
             } else
             {
-                return cmc_universal_type_t(static_cast<char>(0));
+                //return cmc_universal_type_t(static_cast<char>(0));
+                return missing_value;
             }
         }
         break;

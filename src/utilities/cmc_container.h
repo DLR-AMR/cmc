@@ -29,7 +29,8 @@ public:
     cmc_type get_data_type() const;
     void print_data() const;
     void* get_initial_data_ptr() const;
-    
+    void resize(const size_t num_elements);
+
     cmc_universal_type_t sum_over_range(const size_t start_index, const size_t end_index) const;
     cmc_universal_type_t mean_value(const size_t start_index, const size_t end_index) const;
     cmc_universal_type_t mean_value_same_type_wo_missing_vals(const size_t start_index, const size_t end_index, const cmc_universal_type_t& missing_value) const;
@@ -53,7 +54,11 @@ public:
     /* This function performs a type check of the data inside 'value' */
     void assign_value(const size_t index, const cmc_universal_type_t& value);
     
+    /* Insert a value multiple times (from start to end index) */
+    void multiple_assign(const size_t start_index, const size_t end_index, const cmc_universal_type_t& value);
+
     void copy_from_to(const var_array_t& source_array, const size_t src_start_index, const size_t src_end_index, const size_t dest_start_index);
+    void crop_to(const size_t end_index);
     void crop_to(const size_t start_index, const size_t end_index);
 
     void scale(const cmc_universal_type_t& scale_factor);
