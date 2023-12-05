@@ -5,7 +5,6 @@
  */
 #include "utilities/cmc_utilities.hxx"
 
-#include <array>
 #include <vector>
 
 namespace cmc {
