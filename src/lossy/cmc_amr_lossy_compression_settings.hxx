@@ -61,12 +61,12 @@ public:
     void SetAbsoluteErrorCriterion(const double max_error, const int variable_id = kErrorCriterionHoldsForAllVariables);
     
     /* Set an exclusive error for a specified domain, an error of 0.0 excludes the domain from the compression */
-    void SetCertainErrorForDomain(const double error, const std::vector<DimensionInterval>& domain);
-    void SetCertainErrorForDomain(const double error, std::vector<DimensionInterval>&& domain);
+    void SetCertainErrorForDomain(const double error, const GeoDomain& domain);
+    void SetCertainErrorForDomain(const double error, GeoDomain&& domain);
     void SetCertainErrorForDomain(const CertainErrorDomain& error_domain);
     void SetCertainErrorForDomain(CertainErrorDomain&& error_domain);
 
-    /* Split variable at a specifiec dimension (e.g. 3D variable "Lat x Lon x Height" may be split to #Height 2D variables on the domain "Lat x Lon")*/
+    /* Split a variable at a specific dimension (e.g. 3D variable "Lat x Lon x Height" may be split into #Height 2D variables defined on the domain "Lat x Lon") */
     void SplitVariableByDimension(const SplitVariable& variable_to_split);
     void SplitVariableByDimension(SplitVariable&& variable_to_split);
 
