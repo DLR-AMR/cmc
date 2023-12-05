@@ -6,7 +6,7 @@
 
 namespace cmc {
 
-enum Dimension {DimensionUndefined = -1, Lat = 0, Lon = 1, Lev = 2, Time = 3, NumCoordinates};
+enum Dimension {DimensionUndefined = -1, Lon = 0, Lat = 1, Lev = 2, Time = 3, NumCoordinates};
 
 enum DataLayout {LayoutUndefined, Lat_Lon, Lon_Lat, Lat_Lev, Lev_Lat, Lon_Lev, Lev_Lon, _InternEnd2DLayouts,
                   Lat_Lon_Lev, Lat_Lev_Lon, Lev_Lat_Lon, Lev_Lon_Lat, Lon_Lev_Lat, Lon_Lat_Lev};
@@ -29,7 +29,45 @@ size_t CmcTypeToBytes(const CmcType type)
     return type_to_bytes[type];
 }
 
-}
+struct DimensionInterval
+{
+    constexpr DimensionInterval(Dimension dimension, int start_idx, int end_idx)
+    : dim{dimension}, start_index{start_idx}, end_index{end_idx}{};
+    Dimension dim{Dimension::DimensionUndefined};
+    int start_index{0};
+    int end_index{0};
+};
+
+class GeoDomain
+{
+public:
+    /* 1D Constructor */
+    constexpr GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1);
+    /* 2D Constructor */
+    constexpr GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1,
+              const Dimension dimension2, const int start_idx_dim2, const int end_idx_dim2);
+    /* 3D Constructor */
+    constexpr GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1,
+              const Dimension dimension2, const int start_idx_dim2, const int end_idx_dim2,
+              const Dimension dimension3, const int start_idx_dim3, const int end_idx_dim3);
+    /* 4D constructor */
+    constexpr GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1,
+              const Dimension dimension2, const int start_idx_dim2, const int end_idx_dim2,
+              const Dimension dimension3, const int start_idx_dim3, const int end_idx_dim3,
+              const Dimension dimension4, const int start_idx_dim4, const int end_idx_dim4);
+
+    GeoDomain(const GeoDomain& other) = default;
+    GeoDomain& operator=(const GeoDomain& other) = default;
+    GeoDomain(GeoDomain&& other) = default;
+    GeoDomain& operator=(GeoDomain&& other) = default;
+
+    ~GeoDomain() = default;
+
+    constexpr int GetDimensionality() const;
+    void AddDimension(const Dimension dimension, const int start_idx, const int end_idx);
+private:
+    std::vector<DimensionInterval> domain_;
+};
 
 template <typename T>
 class CoordinateArray
@@ -76,4 +114,5 @@ struct GlobalDomain
     int dimensionality{0};
 };
 
+}
 #endif /* !CMC_UTILITIES_HXX */

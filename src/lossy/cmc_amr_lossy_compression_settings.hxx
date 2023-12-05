@@ -1,7 +1,7 @@
 #ifndef CMC_AMR_LOSSY_COMPRESSION_SETTINGS_HXX
 #define CMC_AMR_LOSSY_COMPRESSION_SETTINGS_HXX
 
-/** @file cmc_amr_lossy_compressor.hxx
+/** @file cmc_amr_lossy_compression_settings.hxx
  */
 #include "utilities/cmc_utilities.hxx"
 
@@ -18,51 +18,62 @@ constexpr int kErrorCriterionHoldsForAllVariables = INT_MIN;
 
 struct CompressionSpecifications
 {
+    constexpr CompressionSpecifications(const CompressionCriterion criterion, int var_id, double allowed_max_error)
+    : compression_criterion{criterion}, variable_id{var_id}, max_error{allowed_max_error}{};
     CompressionCriterion compression_criterion;
     int variable_id{kErrorCriterionHoldsForAllVariables};
     double max_error{0.0};
 };
 
-struct DimensionInterval
-{
-    int start_index{0};
-    int end_index{0};
-    Dimension dim{Dimension::DimensionUndefined};
-};
-
 struct CertainErrorDomain
 {
-    std::vector<DimensionInterval> domain;
+    constexpr CertainErrorDomain(double error, const GeoDomain& domain_specs)
+    : allowed_error{error}, domain{domain_specs}{};
+    CertainErrorDomain(double error, GeoDomain&& domain_specs)
+    : allowed_error{error}, domain{std::move(domain_specs)}{};
+
     double allowed_error{0.0};
+    GeoDomain domain;
 };
 
 struct SplitVariable
 {
-    int variable_id;
+    constexpr SplitVariable(int var_id, DataLayout preferred_layout)
+    : variable_id{var_id}, preferred_data_layout{preferred_layout}{};
+    int variable_id{-1};
     DataLayout preferred_data_layout{DataLayout::LayoutUndefined};
 };
 
 class CompressionSettings
 {
 public:
-    CompressionSettings(){};
-    ~CompressionSettings(){};
+    CompressionSettings() = default;
     
     CompressionSettings(const CompressionSettings& other) = default;
     CompressionSettings& operator=(const CompressionSettings& other) = default;
     CompressionSettings(CompressionSettings&& other) = default;
     CompressionSettings& operator=(CompressionSettings&& other) = default;
 
+    ~CompressionSettings() = default;
+
+    /* Set an error criterion (either a relative or absolute criterion) for a single or all variables */
     void SetRelativeErrorCriterion(const double max_error, const int variable_id = kErrorCriterionHoldsForAllVariables);
     void SetAbsoluteErrorCriterion(const double max_error, const int variable_id = kErrorCriterionHoldsForAllVariables);
-    void SetDomainExclusionCriterion(std::vector<DimensionInterval> domain_to_exclude_from_compression);
+    
+    /* Set an exclusive error for a specified domain, an error of 0.0 excludes the domain from the compression */
+    void SetCertainErrorForDomain(const double error, const std::vector<DimensionInterval>& domain);
+    void SetCertainErrorForDomain(const double error, std::vector<DimensionInterval>&& domain);
+    void SetCertainErrorForDomain(const CertainErrorDomain& error_domain);
+    void SetCertainErrorForDomain(CertainErrorDomain&& error_domain);
 
-    void SplitVariableByDimension(SplitVariable variable_to_split);
+    /* Split variable at a specifiec dimension (e.g. 3D variable "Lat x Lon x Height" may be split to #Height 2D variables on the domain "Lat x Lon")*/
+    void SplitVariableByDimension(const SplitVariable& variable_to_split);
+    void SplitVariableByDimension(SplitVariable&& variable_to_split);
 
 private:
-    std::vector<CompressionSpecifications> compression_criteria_per_variable;
-    std::vector<CertainErrorDomain> error_domains;
-    std::vector<SplitVariable> variables_to_split;
+    std::vector<CompressionSpecifications> criterion_per_variable_;
+    std::vector<CertainErrorDomain> error_domains_;
+    std::vector<SplitVariable> variables_to_split_;
 };
 
 }
