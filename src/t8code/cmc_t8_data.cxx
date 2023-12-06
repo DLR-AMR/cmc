@@ -83,8 +83,37 @@ AmrData::CreateAdaptationData(const AmrMesh& adaptation_sample) const
     return AdaptData(compression_settings, adaptation_sample.variable_id, variables);
 }
 
+inline std::vector<CoarseningSample>
+AmrData::RetrieveMeshesToBeCoarsened(const CompressionMode compression_mode) const
+{
+    cmc_assert(!variables->empty());
+
+    std::vector<CoarseningSample> mesh_samples_to_be_coarsened;
+
+    switch (compression_mode)
+    {
+        case CompressionMode::OneForAll:
+            /* In case of an One For All compression, all variables are defined and coarsend on the same mesh */
+            mesh_samples_to_be_coarsened.emplace_back(CoarseningSample(kMeshCorrespondsToAllVariables));
+        break;
+        case CompressionMode::OneForOne:
+            /* In case of a One For One compression, every variable is coarsened on it's own mesh */
+            mesh_samples_to_be_coarsened.reserve(variables->size());
+            for (auto iter = variables->begin(); iter != variables->end(); ++iter)
+            {
+                /* We push back the 'id' of each variable (i.e. 0, 1, 2,...,#num_variables - 1), since each variable has it's own mesh which needs to be coarsened */
+                mesh_samples_to_be_coarsened.emplace_back(CoarseningSample(std::distance(variables->begin(), iter)));
+            }
+        break;
+        default:
+            cmc_err_msg("The compression mode has not been specified.");
+    }
+
+    return mesh_samples_to_be_coarsened;
+}
+
 void
-AmrData::CompressByAdaptiveCoarsening()
+AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
 {
     #ifdef CMC_WITH_T8CODE
     //If Debug
@@ -93,31 +122,27 @@ AmrData::CompressByAdaptiveCoarsening()
     /* Retrieve all forests which are going to be coarsened. In case of a 'One For All'-compression we will just
      * receive a single forest on which all variables are defined. However, in case of a 'One for One'-compression,
      * we will receive multiple forests which need to be coarsened, in particular a single forest for each variable */
-    std::vector<AmrMesh> meshs_to_be_coarsened = AmrData.RetrieveMeshsToBeCoarsened();
+    std::vector<CoarseningSample> meshes_to_be_coarsened = AmrData.RetrieveMeshesToBeCoarsened(compression_mode);
 
-    for (auto iter = meshs_to_be_coarsened.begin(); iter != meshs_to_be_coarsened.end(); ++iter)
+    for (auto current_sample = meshes_to_be_coarsened.begin(); current_sample != meshes_to_be_coarsened.end(); ++current_sample)
     {
-        AmrMesh current_sample = *iter;
-
-        /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening*/
-        AdaptData adapt_data = CreateAdaptationData(current_sample);
+        /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
+        AdaptData adapt_data = CreateAdaptationData(*current_sample);
 
         /* Get the adaptation function for the coarsening step (which is based on the compression settings) */
-        adapt_function = adapt_data.GetAdaptationFunction();
-
-        t8_gloidx_t number_elements_of_previous_forest = 0;
+        t8_forest_adapt_t adaptive_coarsening_function = adapt_data.GetAdaptationFunction();
 
         /* Iterate until none further coarsening is possible */
-        while (number_elements_of_previous_forest != current_sample.GetNumberGlobalElements())
+        while (adapt_data.IsCompressionProgressing())
         {
             /* Get the forest before the coarsening step */
-            t8_forest_t previous_forest = current_sample.GetMesh();
+            t8_forest_t previous_forest = adapt_data.GetCurrentMesh();
 
             /* Keep the 'previous forest' after the adaptation step */
             t8_forest_ref(previous_forest);
 
             /* Perform a coarsening iteration */
-            t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, adapt_function, 0, 0, static_cast<void*>(&adapt_data));
+            t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, adaptive_coarsening_function, 0, 0, static_cast<void*>(&adapt_data));
 
             /* Interpolate the data from the previous forest to the (new) coarsened forest */
             adapt_data.InterpolateData(adapted_forest);
@@ -125,16 +150,11 @@ AmrData::CompressByAdaptiveCoarsening()
             /* Repartition the mesh as well as the data */
             adapted_forest = adapt_data.RepartitionData(adapted_forest);
 
-            /* Update the number of elements of the previous forest */
-            number_elements_of_previous_forest = current_sample.GetNumberGlobalElements();
-
             /* Free the former forest */
             t8_forest_unref(&previous_forest);
 
             /* Store the (new) coarsened forest */
-            current_sample.SetMesh(adapted_forest);
-
-            //Eventuell update adapt_data
+            adapt_data.SetCurrentMesh(adapted_forest);
         }
     }
 

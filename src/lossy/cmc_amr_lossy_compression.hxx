@@ -22,25 +22,31 @@ public:
     CompressionData() = delete;
     CompressionData(const std::vector<Variable>& variables_to_compress, const CompressionSettings& settings);
     {
-        compression_settings = std::make_shared<CompressionSettings>(CompressionSettings(settings));
-        compression_data = std::make_unique(new AmrData(variables_to_compress, compression_settings));
+        compression_settings_ = std::make_shared<CompressionSettings>(CompressionSettings(settings));
+        compression_data_ = std::make_unique(new AmrData(variables_to_compress, compression_settings));
     };
     CompressionData(std::vector<Variable>&& variables_to_compress, const CompressionSettings& settings);
     {
-        compression_settings = std::make_shared<CompressionSettings>(CompressionSettings(settings));
-        compression_data = std::make_unique(new AmrData(std::move(variables_to_compress), compression_settings));
+        compression_settings_ = std::make_shared<CompressionSettings>(CompressionSettings(settings));
+        compression_data_ = std::make_unique(new AmrData(std::move(variables_to_compress), compression_settings));
     };
     CompressionData(const std::vector<Variable>& variables_to_compress, CompressionSettings&& settings);
     {
-        compression_settings = std::make_shared<CompressionSettings>(CompressionSettings(std::move(settings)));
-        compression_data = std::make_unique(new AmrData(variables_to_compress, compression_settings));
+        compression_settings_ = std::make_shared<CompressionSettings>(CompressionSettings(std::move(settings)));
+        compression_data_ = std::make_unique(new AmrData(variables_to_compress, compression_settings));
     };
     CompressionData(std::vector<Variable>&& variables_to_compress, CompressionSettings&& settings);
     {
-        compression_settings = std::make_shared<CompressionSettings>(CompressionSettings(std::move(settings)));
-        compression_data = std::make_unique(new AmrData(std::move(variables_to_compress), compression_settings));
+        compression_settings_ = std::make_shared<CompressionSettings>(CompressionSettings(std::move(settings)));
+        compression_data_ = std::make_unique(new AmrData(std::move(variables_to_compress), compression_settings));
     };
-    ~CompressionData(){};
+
+    CompressionData(const CompressionData& other) = default;
+    CompressionData& operator=(const CompressionData& other) = default;
+    CompressionData(CompressionData&& other) = default;
+    CompressionData& operator=(CompressionData&& other) = default;
+
+    ~CompressionData() = default;
 
     void Setup();
     void Compress();
@@ -53,10 +59,11 @@ private:
     void CompressionHasBeenApplied();
     void DecompressionHasBeenApplied();
 
-    MPI_Comm comm{MPI_COMM_WORLD};
-    std::unique_ptr<AmrData> compression_data;
-    std::shared_ptr<CompressionSettings> compression_settings;
-    bool is_compression_applied{false};
+    MPI_Comm comm_{MPI_COMM_WORLD};
+    std::unique_ptr<AmrData> compression_data_;
+    std::shared_ptr<CompressionSettings> compression_settings_;
+    CompressionMode compression_mode_{CompressionMode::CompressionModeUndefined};
+    bool is_compression_applied_{false};
 };
 
 

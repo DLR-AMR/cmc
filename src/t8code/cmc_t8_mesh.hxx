@@ -20,29 +20,29 @@ class AmrMesh
 public:
     AmrMesh(){};
     ~AmrMesh(){
-        if (mesh != nullptr)
+        if (mesh_ != nullptr)
         {
             /* Deallocate the mesh (if there is one) */
-            t8_forest_unref(&mesh);
+            t8_forest_unref(&mesh_);
         }
     };
 
     AmrMesh(const AmrMesh& other)
-    : mesh{other.mesh},
-      initial_refinement_level_of_mesh{other.initial_refinement_level_of_mesh},
-      corresponding_variable_id{other.corresponding_variable_id}
+    : mesh{other.mesh_},
+      initial_refinement_level_{other.initial_refinement_level_},
+      corresponding_variable_id{other.corresponding_variable_id_}
     {
-        if (other.mesh != nullptr)
+        if (other.mesh_ != nullptr)
         {
-            t8_forest_ref(other.mesh);
+            t8_forest_ref(other.mesh_);
         }
     }
 
     AmrMesh& operator=(const AmrMesh& other)
     {
-        if (mesh != nullptr)
+        if (mesh_ != nullptr)
         {
-            t8_forest_unref(mesh);
+            t8_forest_unref(mesh_);
         }
         return *this = AmrMesh(other);
     }
@@ -56,13 +56,19 @@ public:
     t8_gloidx_t GetNumberGlobalElements() const;
     t8_locidx_t GetNumberLocalElements() const;
 
-    void SetMesh(t8_forest_t forest);
     t8_forest_t GetMesh() const;
+    void SetMesh(t8_forest_t mesh);
     
 private:
-    t8_forest_t mesh{nullptr};
-    int initial_refinement_level_of_mesh{kInitialRefinementLevelIsUnknown};
-    int corresponding_variable_id{kMeshCorrespondsToNoneVariables};
+    t8_forest_t mesh_{nullptr};
+    int initial_refinement_level_{kInitialRefinementLevelIsUnknown};
+};
+
+struct CoarseningSample
+{
+    CoarseningSample(const int variable_id)
+    : corresponding_variable_id{variable_id}{};
+    const int corresponding_variable_id{kMeshCorrespondsToNoneVariables};
 };
 
 }

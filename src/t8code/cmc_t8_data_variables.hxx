@@ -93,16 +93,16 @@ public:
     ~Variable(){};
 
     std::string GetName() const;
-    bool isValidForCompression() const;
-
+    bool IsValidForCompression() const;
+    AmrMesh GetAmrMesh() const;
 private:
 
-    std::string name{}; //!< The name of the variable
-    std::unique_ptr<DataArray> data; //!< The actual data of the variable
-    AmrMesh mesh; //!< The mesh on which the variable is defined
-    VariableAttributes attributes; //!< Application specific attributes for the variable
-    VariableDomain local_domain; //!< The domain on which the data is defined
-    GlobalDomain global_domain; //!< The specifications about the global domain
+    std::string name_; //!< The name of the variable
+    std::unique_ptr<DataArray> data_{nullptr}; //!< The actual data of the variable
+    AmrMesh mesh_; //!< The mesh on which the variable is defined
+    VariableAttributes attributes_; //!< Application specific attributes for the variable
+    VariableDomain local_domain_; //!< The domain on which the data is defined
+    GlobalDomain global_domain_; //!< The specifications about the global domain
 };
 
 

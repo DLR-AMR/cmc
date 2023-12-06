@@ -30,23 +30,25 @@ public:
     : compression_settings{settings} {
         variables = std::make_shared(std::vector<Variable>(std::move(compression_variables)));
     };
-    ~AmrData(){};
 
     AmrData(const AmrData& other) = default;
     AmrData& operator=(const AmrData& other) = default;
     AmrData(AmrData&& other) = default;
     AmrData& operator=(AmrData&& other) = default;
 
+    ~AmrData() = default;
+
     void BuildInitialMesh();
     void DistributeDataOnInitialMesh();
-    void CompressByAdaptiveCoarsening();
-    
-    void ApplyVariableAttributes();
+    void CompressByAdaptiveCoarsening(const CompressionMode compression_mode);
 
 private:
     void SplitVariables();
+    void ApplyVariableAttributes();
+    bool ValidateSetup();
+
     AdaptData CreateAdaptationData(const AmrMesh& adaptation_sample) const;
-    std::vector<AmrMesh> RetrieveMeshsToBeCoarsened() const;
+    std::vector<AmrMesh> RetrieveMeshesToBeCoarsened(const CompressionMode compression_mode) const;
 
     MPI_Comm comm;
     AmrMesh initial_mesh;
