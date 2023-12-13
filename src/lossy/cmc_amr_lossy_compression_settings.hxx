@@ -70,6 +70,7 @@ public:
     void SplitVariableByDimension(SplitVariable&& variable_to_split);
 
 private:
+    //TODO: Maybe make a ew struct "VariableComrpessionSpecifications" which holds the excluded domains and the criterion per variable
     std::vector<CompressionSpecifications> criterion_per_variable_;
     std::vector<CertainErrorDomain> error_domains_;
     std::vector<SplitVariable> variables_to_split_;

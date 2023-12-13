@@ -3,6 +3,532 @@
 #include "cmc_t8code_geo_mesh.h"
 
 #ifdef CMC_WITH_T8CODE
+namespace cmc
+{
+
+
+
+
+/**
+ * @brief Function determining whether the element (respectively the family of elements) complies with the supplied relative error threshold
+ * 
+ * @param adapt_data The adapt_data from the forest which will be adapted
+ * @param num_elements The amount of elements passed to the current call of the adapt fuction
+ * @param elements Pointer to the corresponding element(s of the family) 
+ * @return true If the elements fulfill the relative error threshold and could be coarsened
+ * @return false If the elements does not fulfill the error threshold and therefore cannot be coarsened 
+ */
+t8_locidx_t
+cmc_compress_by_adaptive_coarsening (t8_forest_t forest,
+                                     t8_forest_t forest_from,
+                                     int which_tree,
+                                     int lelement_id,
+                                     t8_eclass_scheme_c * ts,
+                                     const int is_family,
+                                     const int num_elements,
+                                     t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+
+    /** Only a family of elements can be coarsened.
+     * If only a single element is passed to the callback, the callback function can be returned immediately. 
+    */
+    if (is_family == 0)
+    {
+        /* The element stays the same, it will not be refined and it cannot be coarsened */
+        return 0;
+    }
+
+    /* Get the adapt data from the forest */
+    cmc_t8_adapt_data_t adapt_data = static_cast<cmc_t8_adapt_data_t>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    //Check geo-location
+
+    //
+    /* Check whether the error tolerance is still satisfied by the potential coarsening */
+    const bool perform_coarsening = adapt_data->deviations_.CheckInaccuracy();
+
+    if (perform_coarsening)
+    {
+        /* Coarsen the family of elements */
+        return -1;
+    } else
+    {
+        /* The element('s family) stays the same - no adaptation is performed */
+        return 0;
+    }
+    #endif
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Static function building blocks */
+/**
+ * @brief This function calculates (an approximation) of the deviation up to the initial data and decides based on the supplied error threshold whether the element's family shall be coarsened or not
+ * 
+ * @param adapt_data A pointer to the current @struct cmc_t8_adapt_data holding the status and data of the adaptation
+ * @param current_forest The current forest which is built from the adaptation
+ * @param lelement_id the first local element id of it's family members
+ * @param num_elements The number of elements within this family
+ * @return true The element's family complies with the relative error threshold and shall be coarsened 
+ * @return false The element's family does not comply with the relative error threshold and therefore is not allowed to be coarsened
+ *
+ * @note In order to keep track of the deviations it is necessary that if this function returns true, the family strictly has to be coarsened.
+ *       In case this functions returns false, the element's family is not allowed to be coarsened. Otherwise this criterion will break!
+ */
+static bool
+cmc_t8_elements_comply_to_relative_error_threshold(AdaptData& adapt_data, t8_forest_t current_forest, const int which_tree, const int lelement_id, t8_eclass_scheme_c * ts, const int num_elements, t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+
+    /* Iterate over all variables which need to be considered */
+    for (auto var)
+    {
+        /* Calculate the inerpolation result if this coarsening would have happen */
+        cmc_universal_type_t interpolation_result = cmc_t8_adapt_evaluate_interpolation_function(adapt_data, current_forest, which_tree, lelement_id, ts, num_elements, elements);
+
+        /* Since this will be (eventually) the first coarsening step, we can just calculate the normal relative deviation */
+        const std::vector<double> single_deviations = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_relative_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+
+        /* Get the maximum deviation */
+        auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
+        const double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
+
+        /* Check if the deviation complies with the error threshold */
+        if (max_dev <= adapt_data->t8_data->settings.max_err)
+        {
+            /* Store the global element id of the first element */
+            adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
+
+            /* Calculate the maximal difference range for the values */
+            const std::vector<double> abs_deviation = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+            auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+            double max_dev_abs = (max_elem_abs_dev != single_deviations.end() ? *max_elem_abs_dev : 0.0);
+
+            adapt_data->associated_max_deviations_new.front().push_back(max_dev_abs);
+
+            /* Increment the coarsening counter */
+            ++(adapt_data->coarsening_counter);
+
+            /* We are going to save the already interpolated value when the coarsening is indeed applied */
+            adapt_data->interpolation_data->interpolated_data.front().push_back(std::make_pair(lelement_id, interpolation_result));
+
+            /* If so, we are able to coarsen the element's family */
+            return true;
+        } else
+        {
+            /* Since the threshold is not fullfilled, we cannot coarsen the family */
+            return false;
+        }
+
+        /////////////////////////////////
+
+        /* Declare a vector storing the adjusted deviations */
+            std::vector<double> adjusted_deviations;
+            adjusted_deviations.reserve(num_elements);
+            std::vector<double> previous_max_range;
+            previous_max_range.reserve(num_elements);
+
+            /* Check if the error threshold is fulfilled for each element of this family */
+            for (int i = 0; i < num_elements; ++i)
+            {
+                /* Get the previous maximum deviation */
+                auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
+                int pos = std::distance(adapt_data->associated_deviations_gelement_id.begin(), iter_last_max_dev_elem_id);
+
+                /* If the element was not found (it was maybe a missing_value dummy element) and therefore, we do not coarsen at the moment */
+                if (iter_last_max_dev_elem_id == adapt_data->associated_deviations_gelement_id.end())
+                {
+                    return false;
+                }
+
+                /* Save the previous maximum range */
+                previous_max_range.push_back(adapt_data->associated_max_deviations.front()[pos]);
+
+                /* Calculate the maximum deviation taking the the previous deviation into account as well */
+                adjusted_deviations.push_back(calculate_two_step_relative_max_deviation(adapt_data->associated_max_deviations.front()[pos], adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + i)), interpolation_result));
+
+                /* Check whether the error threshold is violated */
+                if (adjusted_deviations.back() > adapt_data->t8_data->settings.max_err)
+                {
+                    /* In this case, we can stop and cannot coarsen the element's family */
+                    return false;
+                }
+            }
+
+            /* If we reach this line, the error threshold has not been violated and we can indeed coarsen the element's family */
+            /* Save the global element id of the first element */
+            adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
+
+            /* Calculate the maximal difference range for the values */
+            std::vector<double> abs_deviation = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+            /* Add the maximum range from previous coarsening steps */
+            for (int i = 0; i < num_elements; ++i)
+            {
+                abs_deviation[i] += previous_max_range[i];
+            }
+
+            /* Calculate the maximal value range within this element's family central to the interpolated value */
+            auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+            double max_dev_abs = (max_elem_abs_dev != abs_deviation.end() ? *max_elem_abs_dev : 0.0);
+
+            adapt_data->associated_max_deviations_new.front().push_back(max_dev_abs);
+
+            /* Increment the coarsening counter */
+            ++(adapt_data->coarsening_counter);
+
+            /* We are going to save the already interpolated value when the coarsening is indeed applied */
+            adapt_data->interpolation_data->interpolated_data.front().push_back(std::make_pair(lelement_id, interpolation_result));
+
+            return true;
+
+
+
+    }
+
+
+
+
+
+
+
+    /* We distinguish between the compression mode, because dependent on it, we check has to be perfomed for all variables or just for a single variable */
+    if (adapt_data->t8_data->compression_mode == CMC_T8_COMPRESSION_MODE::ONE_FOR_ALL)
+    {
+        /* On the finest level we can just calculate the relative deviation, but on coarser levels we need to take previous coarsening steps into account */
+        if (ts->t8_element_level(elements[0]) != adapt_data->t8_data->assets->initial_refinement_lvl)
+        {
+            /* Iterate over all variables */
+            for (size_t var_iter = 0; var_iter < adapt_data->t8_data->vars.size(); ++var_iter)
+            {
+                /* We need to store the current variable id for the calculation of the potential interpolation */
+                adapt_data->interpolation_data->current_var_id = var_iter;
+                /* Calculate the value resulting from the coarsening (if we would apply the coarsening) */
+                cmc_universal_type_t interpolation_result = cmc_t8_adapt_evaluate_interpolation_function(adapt_data, current_forest, which_tree, lelement_id, ts, num_elements, elements);
+               
+                /* In this case, we are already up higher in the hierachy and need to take previous deviations into account */
+
+                /* Declare a vector storing the adjusted deviations */
+                std::vector<double> adjusted_deviations;
+                adjusted_deviations.reserve(num_elements);
+                std::vector<double> previous_max_range;
+                previous_max_range.reserve(num_elements);
+
+                /* Check if the error threshold is fulfilled for each element of this family */
+                for (int i = 0; i < num_elements; ++i)
+                {
+                    /* Get the previous maximum deviation */
+                    auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
+                    int pos = std::distance(adapt_data->associated_deviations_gelement_id.begin(), iter_last_max_dev_elem_id);
+
+                    /* If the element was not found (it was maybe a missing_value dummy element) and therefore, we do not coarsen at the moment */
+                    if (iter_last_max_dev_elem_id == adapt_data->associated_deviations_gelement_id.end())
+                    {
+                        /* If we have to stop early, we need to pop back the last deviations and interpolated values */
+                        for (size_t rm_var_iter = 0; rm_var_iter < var_iter; ++rm_var_iter)
+                        {
+                            adapt_data->associated_max_deviations_new[rm_var_iter].pop_back();
+                            adapt_data->interpolation_data->interpolated_data[rm_var_iter].pop_back();
+                        }
+                        /* Do not coarsen the family */
+                        return false;
+                    }
+
+                    /* Save the previous maximum range */
+                    previous_max_range.push_back(adapt_data->associated_max_deviations[var_iter][pos]);
+
+                    /* Calculate the maximum deviation taking the previous deviations into account as well */
+                    adjusted_deviations.push_back(calculate_two_step_relative_max_deviation(adapt_data->associated_max_deviations[var_iter][pos], adapt_data->t8_data->vars[var_iter]->var->data->operator[](static_cast<size_t>(lelement_id + i)), interpolation_result));
+
+                    /* Check whether the error threshold is violated */
+                    if (adjusted_deviations.back() > adapt_data->t8_data->settings.max_err)
+                    {
+                        /* If we have to stop early, we need to pop back the last deviations and interpolated values */
+                        for (size_t rm_var_iter = 0; rm_var_iter < var_iter; ++rm_var_iter)
+                        {
+                            adapt_data->associated_max_deviations_new[rm_var_iter].pop_back();
+                            adapt_data->interpolation_data->interpolated_data[rm_var_iter].pop_back();
+                        }
+
+                        /* In this case, we can stop and cannot coarsen the element's family */
+                        return false;
+                    }
+                }
+
+                /* Calculate the maximal difference range for the values */
+                std::vector<double> abs_deviation = adapt_data->t8_data->vars[var_iter]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[var_iter]->var->missing_value);
+                /* Add the maximum range from previous coarsening steps */
+                for (int i = 0; i < num_elements; ++i)
+                {
+                    abs_deviation[i] += previous_max_range[i];
+                }
+
+                /* Calculate the maximal value range within this element's family central to the interpolated value */
+                auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+                double max_dev_abs = (max_elem_abs_dev != abs_deviation.end() ? *max_elem_abs_dev : 0.0);
+
+                adapt_data->associated_max_deviations_new[var_iter].push_back(max_dev_abs);
+
+                /* We are going to save the already interpolated value when the coarsening is likely to be applied */
+                adapt_data->interpolation_data->interpolated_data[var_iter].push_back(std::make_pair(lelement_id, interpolation_result));
+            }
+
+            /* Save the first global element id for this coarsening process */
+            adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
+
+            /* Increment the coarsening counter */
+            ++(adapt_data->coarsening_counter);
+
+            /* Coarsen the element's family */
+            return true;
+        } else
+        {
+            /* Iterate over all variables */
+            for (size_t var_iter = 0; var_iter < adapt_data->t8_data->vars.size(); ++var_iter)
+            {
+                /* We need to store the current variable id for the calculation of the potential interpolation */
+                adapt_data->interpolation_data->current_var_id = var_iter;
+                /* Calculate the value resulting from the coarsening (if we would apply the coarsening) */
+                cmc_universal_type_t interpolation_result = cmc_t8_adapt_evaluate_interpolation_function(adapt_data, current_forest, which_tree, lelement_id, ts, num_elements, elements);
+                /* Since this will be (eventually) the first coarsening step, we can just calculate the normal relative deviation */
+                const std::vector<double> single_deviations = adapt_data->t8_data->vars[var_iter]->var->data->calculate_relative_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[var_iter]->var->missing_value);
+                
+                /* Get the maximum deviation */
+                auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
+                const double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
+
+                /* Check if the deviation complies with the error threshold */
+                if (max_dev <= adapt_data->t8_data->settings.max_err)
+                {
+                    /* Calculate the maximal difference range for the values */
+                    const std::vector<double> abs_deviation = adapt_data->t8_data->vars[var_iter]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[var_iter]->var->missing_value);
+                    auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+                    double max_dev_abs = (max_elem_abs_dev != single_deviations.end() ? *max_elem_abs_dev : 0.0);
+
+                    adapt_data->associated_max_deviations_new[var_iter].push_back(max_dev_abs);
+                    
+                    /* We are going to save the already interpolated value when the coarsening is likely to be applied */
+                    adapt_data->interpolation_data->interpolated_data[var_iter].push_back(std::make_pair(lelement_id, interpolation_result));
+                } else
+                {
+                    /* If we have to stop early, we need to pop back the last deviations */
+                    for (size_t rm_var_iter = 0; rm_var_iter < var_iter; ++rm_var_iter)
+                    {
+                        adapt_data->associated_max_deviations_new[rm_var_iter].pop_back();
+                        adapt_data->interpolation_data->interpolated_data[rm_var_iter].pop_back();
+                    }
+
+                    /* Since the threshold is not fullfilled, we cannot coarsen the family */
+                    return false;
+                }
+            }
+
+            /* Save the first global element id for this coarsening process */
+            adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
+
+            /* When we have reached this point, the threshold is fullfilled for each varibale */
+            /* Increment the coarsening counter */
+            ++(adapt_data->coarsening_counter);
+
+            /* If so, we are able to coarsen the element's family */
+            return true;
+        }
+    } else {
+        /* In case a 'One for One' compression mode is used */
+
+        /* Calculate the inerpolation result if this coarsening would have happen */
+        cmc_universal_type_t interpolation_result = cmc_t8_adapt_evaluate_interpolation_function(adapt_data, current_forest, which_tree, lelement_id, ts, num_elements, elements);
+
+        /* On the finest level we can just calculate the relative deviation, but on coarser levels we need to take previous coarsening steps into account */
+        if (ts->t8_element_level(elements[0]) != adapt_data->t8_data->vars[adapt_data->current_var_id]->assets->initial_refinement_lvl)
+        {
+            /* In this case, we are already up higher in the hierachy and need to take previous deviations into account as well */
+
+            /* Declare a vector storing the adjusted deviations */
+            std::vector<double> adjusted_deviations;
+            adjusted_deviations.reserve(num_elements);
+            std::vector<double> previous_max_range;
+            previous_max_range.reserve(num_elements);
+
+            /* Check if the error threshold is fulfilled for each element of this family */
+            for (int i = 0; i < num_elements; ++i)
+            {
+                /* Get the previous maximum deviation */
+                auto iter_last_max_dev_elem_id = std::lower_bound(adapt_data->associated_deviations_gelement_id.begin(), adapt_data->associated_deviations_gelement_id.end(), static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id + i));
+                int pos = std::distance(adapt_data->associated_deviations_gelement_id.begin(), iter_last_max_dev_elem_id);
+
+                /* If the element was not found (it was maybe a missing_value dummy element) and therefore, we do not coarsen at the moment */
+                if (iter_last_max_dev_elem_id == adapt_data->associated_deviations_gelement_id.end())
+                {
+                    return false;
+                }
+
+                /* Save the previous maximum range */
+                previous_max_range.push_back(adapt_data->associated_max_deviations.front()[pos]);
+
+                /* Calculate the maximum deviation taking the the previous deviation into account as well */
+                adjusted_deviations.push_back(calculate_two_step_relative_max_deviation(adapt_data->associated_max_deviations.front()[pos], adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->operator[](static_cast<size_t>(lelement_id + i)), interpolation_result));
+
+                /* Check whether the error threshold is violated */
+                if (adjusted_deviations.back() > adapt_data->t8_data->settings.max_err)
+                {
+                    /* In this case, we can stop and cannot coarsen the element's family */
+                    return false;
+                }
+            }
+
+            /* If we reach this line, the error threshold has not been violated and we can indeed coarsen the element's family */
+            /* Save the global element id of the first element */
+            adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
+
+            /* Calculate the maximal difference range for the values */
+            std::vector<double> abs_deviation = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+            /* Add the maximum range from previous coarsening steps */
+            for (int i = 0; i < num_elements; ++i)
+            {
+                abs_deviation[i] += previous_max_range[i];
+            }
+
+            /* Calculate the maximal value range within this element's family central to the interpolated value */
+            auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+            double max_dev_abs = (max_elem_abs_dev != abs_deviation.end() ? *max_elem_abs_dev : 0.0);
+
+            adapt_data->associated_max_deviations_new.front().push_back(max_dev_abs);
+
+            /* Increment the coarsening counter */
+            ++(adapt_data->coarsening_counter);
+
+            /* We are going to save the already interpolated value when the coarsening is indeed applied */
+            adapt_data->interpolation_data->interpolated_data.front().push_back(std::make_pair(lelement_id, interpolation_result));
+
+            return true;
+        } else
+        {
+            /* Since this will be (eventually) the first coarsening step, we can just calculate the normal relative deviation */
+            const std::vector<double> single_deviations = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_relative_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+
+            /* Get the maximum deviation */
+            auto max_elem = std::max_element(single_deviations.begin(), single_deviations.end());
+            const double max_dev = (max_elem != single_deviations.end() ? *max_elem : 0.0);
+
+            /* Check if the deviation complies with the error threshold */
+            if (max_dev <= adapt_data->t8_data->settings.max_err)
+            {
+                /* Store the global element id of the first element */
+                adapt_data->associated_deviations_gelement_id_new.push_back(static_cast<uint64_t>(adapt_data->first_global_elem_id + lelement_id));
+
+                /* Calculate the maximal difference range for the values */
+                const std::vector<double> abs_deviation = adapt_data->t8_data->vars[adapt_data->current_var_id]->var->data->calculate_absolute_deviations_w_missing_values(lelement_id, lelement_id + num_elements -1, interpolation_result, adapt_data->t8_data->vars[adapt_data->current_var_id]->var->missing_value);
+                auto max_elem_abs_dev = std::max_element(abs_deviation.begin(), abs_deviation.end());
+                double max_dev_abs = (max_elem_abs_dev != single_deviations.end() ? *max_elem_abs_dev : 0.0);
+
+                adapt_data->associated_max_deviations_new.front().push_back(max_dev_abs);
+
+                /* Increment the coarsening counter */
+                ++(adapt_data->coarsening_counter);
+
+                /* We are going to save the already interpolated value when the coarsening is indeed applied */
+                adapt_data->interpolation_data->interpolated_data.front().push_back(std::make_pair(lelement_id, interpolation_result));
+
+                /* If so, we are able to coarsen the element's family */
+                return true;
+            } else
+            {
+                /* Since the threshold is not fullfilled, we cannot coarsen the family */
+                return false;
+            }
+        }
+    }
+    #endif
+}
+
+
+
+
+
+/* Coarsening Criteria */
+/**
+ * @brief Function determining whether the element (respectively the family of elements) complies with the supplied relative error threshold
+ * 
+ * @param adapt_data The adapt_data from the forest which will be adapted
+ * @param num_elements The amount of elements passed to the current call of the adapt fuction
+ * @param elements Pointer to the corresponding element(s of the family) 
+ * @return true If the elements fulfill the relative error threshold and could be coarsened
+ * @return false If the elements does not fulfill the error threshold and therefore cannot be coarsened 
+ */
+t8_locidx_t
+cmc_t8_adapt_callback_coarsen_based_on_relative_error_threshold (t8_forest_t forest,
+                                                                 t8_forest_t forest_from,
+                                                                 int which_tree,
+                                                                 int lelement_id,
+                                                                 t8_eclass_scheme_c * ts,
+                                                                 const int is_family,
+                                                                 const int num_elements,
+                                                                 t8_element_t * elements[]) 
+{
+    /* Get the adapt data from the forest */
+    AdaptData* adapt_data = static_cast<AdaptData*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    /** Only a family of elements can be coarsened.
+     * If only a single element is passed to the callback, the callback function can be returned immediately. 
+    */
+    if (is_family == 0)
+    {
+        /* The element stays the same, it will not be refined and it cannot be coarsened */
+        return 0;
+    }
+
+     /** Furthermore, if the elements are not inside the geo mesh, we cannot coarsen them. 
+     * And elements (resp. family of elements) that have not been coarsened before (resp. from the start of coarsening onwards) cannot be coarsened
+     * since this would discard artefacts/high variability of the data in a small scale (which were initially present). So once we have decided to no coarsen the elements, the decision is absolute
+     * (This keeps 'details' in the data)
+     */
+    if (!cmc_t8_elements_coarsened_from_the_beginning_onwards(adapt_data, ts, elements[0]) ||
+        !cmc_t8_elements_all_inside_geo_mesh(adapt_data, ts, num_elements, elements))
+    {
+        /* The element stays the same, it will not be refined and it cannot be coarsened */
+        return 0;
+    }
+
+}
+
+
+
+
+}
+#endif
+
+
+
+
+
+
+
+
+
+
+////////////////////////
+////////////////////////
+////// Old functions
+#ifdef CMC_WITH_T8CODE
 
 /** Static function blocks which may be used for the creation of adaptation criteria **/
 
