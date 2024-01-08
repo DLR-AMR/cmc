@@ -64,11 +64,16 @@ public:
     ~GeoDomain() = default;
 
     constexpr int GetDimensionality() const;
+    constexpr DataLayout GetDataLayout() const; //TODO: implement
     void AddDimension(const Dimension dimension, const int start_idx, const int end_idx);
+    //We do not insert! When a dimension is added we order them directly in the preferred internally dimensionality
+    void InsertDimension(const int position, const Dimension dimension, const int start_idx, const int end_idx); //TODO: implement
 private:
+    DataLayout initial_data_layout{LayoutUndefined};
     std::vector<DimensionInterval> domain_;
 };
 
+//check if needed
 template <typename T>
 class CoordinateArray
 {

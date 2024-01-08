@@ -71,15 +71,6 @@ InaccuracyTracker::InaccuracyTracker (const TrackingOption tracking_option, int 
 };
 
 
-void
-InaccuracyTracker::CheckInaccuracy()
-{
-    std::cout << "check inacc from inaccurcy tracker is called" << std::endl;
-    bool ret = deviations->CheckInaccuracy();
-    std::cout << "ret val is: " << ret << std::endl;
-};
-
-
 /**
  * @brief This function calculates (an approximation) of the deviation up to the initial data and decides based on the supplied error threshold whether the element's family shall be coarsened or not
  * 
@@ -101,16 +92,16 @@ InaccuracyTracker::CheckInaccuracy(std::vector<Variable>& variables_to_check, st
     for (auto var_iter = variables_to_check.begin(); var_iter != variables_to_check.end(); ++var_iter)
     {
         /* Calculate the interpolation result if this coarsening would happen */
-        cmc_universal_type_t interpolation_result = interpolation_data.Interpolate(*var_iter, current_forest, which_tree, lelement_id, ts, num_elements, elements);
+        const cmc_universal_type_t interpolation_result = interpolation_data.Interpolate(*var_iter, current_forest, which_tree, lelement_id, ts, num_elements, elements);
 
         /* Compute the inaccuracy resulting from the potential coarsening */
-        double resulting_inaccuracy = deviations_.ComputeInaccuracy(...);
+        const double resulting_inaccuracy = deviations_.ComputeInaccuracy(...);
 
         /* Iterate over all error domains and check whether the deviations complies with the permitted deviation */
         for (auto err_domain_iter = error_domains.begin(); err_domain_iter != error_domains.end(); ++err_domain_iter)
         {
             /* Check whether the element lies geo-spatial domain */
-            const bool is_inside_error_domain = ...;
+            const bool is_inside_error_domain = IsMeshElementWithinGeoDomain(var_iter->GetAmrMesh(), ..., ts, err_domain_iter->GetGeoDomain());
 
             /* If so, check whether the inaccuracy complies with the permitted error tolerance */
             if (is_inside_error_domain)

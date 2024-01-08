@@ -68,6 +68,7 @@ public:
     
 private:
     DataRepresentation current_domain_representation{RepresentationUndefined};
+    DataLayout initial_data_layout{LayoutUndefined};
     std::vector<CartesianCoordinate> cartesian_coordinates;
     std::vector<int64_t> linear_indices;
     std::vector<Hyperslab> hyperslab_coordinates;
@@ -82,7 +83,7 @@ private:
     CmcUniversalType add_offset{static_cast<double>(0.0)};
     CmcUniversalType scale_factor{static_cast<double>(1.0)};
     bool is_scaling_and_offset_applied{true};
-    int global_context_information{0}; //!< A variable for describing an optional additional relation (the meaning of this varibale may vary)
+    int global_context_information{0}; //!< A variable for describing an optional additional relation (the meaning of this varibale may dependent on the context)
 };
 
 
@@ -102,6 +103,8 @@ private:
     AmrMesh mesh_; //!< The mesh on which the variable is defined
     VariableAttributes attributes_; //!< Application specific attributes for the variable
     VariableDomain local_domain_; //!< The domain on which the data is defined
+    GeoDomain global_domain_;
+    //Check if needed
     GlobalDomain global_domain_; //!< The specifications about the global domain
 };
 

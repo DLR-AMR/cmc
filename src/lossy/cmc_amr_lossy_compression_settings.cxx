@@ -18,7 +18,7 @@ inline void
 CompressionSettings::SetAbsoluteErrorCriterion(const double max_error, const int variable_id)
 {
     criterion_per_variable_.emplace_back(CompressionSpecifications(
-        CompressionCriterion::RelativeErrorThreshold,
+        CompressionCriterion::AbsoluteErrorThreshold,
         variable_id,
         max_error
     ));

@@ -62,6 +62,7 @@ public:
 private:
     t8_forest_t mesh_{nullptr};
     int initial_refinement_level_{kInitialRefinementLevelIsUnknown};
+    //maybe an enum indicating whether it is a congruent or embedded mesh
 };
 
 struct CoarseningSample
@@ -72,5 +73,11 @@ struct CoarseningSample
 };
 
 }
+
+bool
+IsMeshElementWithinGeoDomain(const GeoDomain& reference_domain, const AmrMesh& mesh, const t8_element_t* element, t8_eclass_scheme_c* ts);
+
+bool
+IsAnyElementWithinGeoDomain(const GeoDomain& reference_domain, const AmrMesh& mesh, const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c* ts);
 
 #endif /* !CMC_T8_MESH_HXX */
