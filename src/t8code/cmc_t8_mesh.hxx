@@ -4,9 +4,16 @@
  * @file cmc_t8_mesh.hxx
  */
 
+#include "utilities/cmc_utilities.hxx"
+#include "utilities/cmc_geo_domain.hxx"
+#include "utilities/cmc_hyperslab.hxx"
+#include "utilities/cmc_span.hxx"
+
+#include <climits>
 
 #ifdef CMC_WITH_T8CODE
-#include "forest/t8_forest_general.h"
+#include <t8.h>
+#include "t8_forest.h"
 #endif
 
 namespace cmc {
@@ -28,31 +35,41 @@ public:
     };
 
     AmrMesh(const AmrMesh& other)
-    : mesh{other.mesh_},
-      initial_refinement_level_{other.initial_refinement_level_},
-      corresponding_variable_id{other.corresponding_variable_id_}
+    : mesh_{other.mesh_},
+      initial_refinement_level_{other.initial_refinement_level_}
     {
         if (other.mesh_ != nullptr)
         {
             t8_forest_ref(other.mesh_);
         }
-    }
+    };
 
     AmrMesh& operator=(const AmrMesh& other)
     {
         if (mesh_ != nullptr)
         {
-            t8_forest_unref(mesh_);
+            t8_forest_unref(&mesh_);
         }
+        std::cout << std::endl;
         return *this = AmrMesh(other);
-    }
+    };
 
-    AmrMesh(AmrMesh&& other) = default;
-    AmrMesh& operator=(AmrMesh&& other) = default;
+    AmrMesh(AmrMesh&& other)
+    : mesh_{std::move(other.mesh_)}, initial_refinement_level_{other.initial_refinement_level_}
+    {
+        other.mesh_ = nullptr;
+    };
+    AmrMesh& operator=(AmrMesh&& other)
+    {
+        this->mesh_ = std::move(other.mesh_);
+        other.mesh_ = nullptr;
+        this->initial_refinement_level_ = other.initial_refinement_level_;
+        return *this;
+    };
 
     bool IsValid() const;
     int GetInitialRefinementLevel() const;
-    int SetInitialRefinementLevel(const int initial_refinement_level);
+    void SetInitialRefinementLevel(const int initial_refinement_level);
     t8_gloidx_t GetNumberGlobalElements() const;
     t8_locidx_t GetNumberLocalElements() const;
 
@@ -62,7 +79,6 @@ public:
 private:
     t8_forest_t mesh_{nullptr};
     int initial_refinement_level_{kInitialRefinementLevelIsUnknown};
-    //maybe an enum indicating whether it is a congruent or embedded mesh
 };
 
 struct CoarseningSample
@@ -72,12 +88,35 @@ struct CoarseningSample
     const int corresponding_variable_id{kMeshCorrespondsToNoneVariables};
 };
 
+t8_eclass_t
+DimensionToElementClass(const int dimensionality);
+
+bool
+IsMeshElementWithinGeoDomain(const t8_element_t* element, t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout);
+
+bool
+IsAnyElementWithinGeoDomain(const int num_elements, t8_element_t* elements[], t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout);
+
+int
+DetermineNumberOfElementsOnReferenceLevel(const t8_element_t* element, t8_eclass_scheme_c* ts, const int num_children, const int reference_level);
+
+int
+DetermineNumberOfDecompressedElements(const bool restrict_to_domain, const t8_element_t* element, t8_eclass_scheme_c* ts, const int num_children, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout);
+
+Hyperslab
+DetermineHyperslabOfDecompressedElements(const t8_element_t* element, t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout);
+
+MortonIndex GetMortonIndexOnLevel(const t8_element_t* elem, t8_eclass_scheme_c* ts, const int dimensioanlity, const int level);
+
+t8_forest_t
+ReconstructMeshFromRefinementBits(const VectorView<uint8_t>& refinement_bits, const int dimensionality, const MPI_Comm comm);
+
+t8_forest_t
+ReconstructBaseMesh(const int dimensionality, const MPI_Comm comm);
+
+std::pair<t8_forest_t, int>
+BuildInitialMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_Comm comm);
+
 }
-
-bool
-IsMeshElementWithinGeoDomain(const GeoDomain& reference_domain, const AmrMesh& mesh, const t8_element_t* element, t8_eclass_scheme_c* ts);
-
-bool
-IsAnyElementWithinGeoDomain(const GeoDomain& reference_domain, const AmrMesh& mesh, const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c* ts);
 
 #endif /* !CMC_T8_MESH_HXX */

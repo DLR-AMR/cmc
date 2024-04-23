@@ -12,20 +12,42 @@ src/utilities/cmc_fallbacks.h \
 src/utilities/cmc_container.h \
 src/mpi/cmc_mpi.h \
 src/mpi/cmc_mpi_io.h \
-src/netcdf/cmc_netcdf.h \
 src/netcdf/cmc_netcdf.hxx \
-src/t8code/cmc_t8code.h \
-src/t8code/cmc_t8code_data.h \
-src/t8code/cmc_t8code_data.hxx \
-src/t8code/cmc_t8code_geo_mesh.h \
-src/t8code/cmc_t8code_geo_data.h \
+src/utilities/cmc_utilities.hxx \
+src/mpi/cmc_mpi.hxx \
+src/t8code/cmc_t8_data_variables_forward.hxx \
+src/t8code/cmc_t8_data_variables.hxx \
+src/t8code/cmc_t8_mesh.hxx \
+src/t8code/cmc_t8_interpolation.hxx \
+src/utilities/cmc_span.hxx \
+src/t8code/cmc_t8_adapt_track_inaccuracy.hxx \
+src/t8code/cmc_t8_adapt.hxx \
+src/lossy/cmc_amr_lossy_compression_settings.hxx \
+src/t8code/cmc_t8_data.hxx \
+src/utilities/cmc_dimension_interval.hxx \
+src/utilities/cmc_geo_domain.hxx \
+src/utilities/cmc_hyperslab.hxx \
+src/utilities/cmc_cart_coordinate.hxx \
+src/utilities/cmc_input_variable_forward.hxx  \
+src/utilities/cmc_input_variable.hxx  \
+src/t8code/cmc_t8_morton.hxx \
+src/t8code/cmc_t8_mpi.hxx \
+src/mpi/cmc_mpi_data.hxx \
+src/lossy/cmc_amr_lossy_compression.hxx \
 src/t8code/cmc_t8_adapt_callbacks.h \
-src/t8code/cmc_t8_replace_callbacks.h \
-src/component_interfaces/cmc_t8_nc.h \
-src/component_interfaces/cmc_t8_messy.h \
-src/lossy/cmc_amr_compressor.h \
-src/messy/cmc_messy.h \
-src/lossless/cmc_lzss.h
+src/utilities/cmc_variable_transformer_forward.hxx \
+src/utilities/cmc_variable_transformer.hxx \
+src/t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx \
+src/utilities/cmc_output_variable_forward.hxx \
+src/utilities/cmc_output_variable.hxx \
+src/utilities/cmc_geo_utilities.hxx \
+src/lossy/cmc_sz_like_compression.hxx \
+src/utilities/cmc_prefix.hxx \
+src/lossy/cmc_prefix_lossy_compression.hxx \
+src/t8code/cmc_t8_byte_variable.hxx \
+src/t8code/cmc_t8_variables.hxx \
+src/t8code/cmc_t8_prefix_encoding.hxx 
+
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -39,17 +61,30 @@ src/utilities/cmc_container.cxx \
 src/mpi/cmc_mpi.cxx \
 src/mpi/cmc_mpi_io.cxx \
 src/netcdf/cmc_netcdf.cxx \
-src/t8code/cmc_t8code.cxx \
-src/t8code/cmc_t8code_data.cxx \
-src/t8code/cmc_t8code_geo_mesh.cxx \
-src/t8code/cmc_t8code_geo_data.cxx \
+src/utilities/cmc_utilities.cxx \
+src/t8code/cmc_t8_mesh.cxx \
+src/t8code/cmc_t8_data_variables.cxx \
+src/t8code/cmc_t8_interpolation.cxx \
+src/t8code/cmc_t8_adapt_track_inaccuracy.cxx \
+src/t8code/cmc_t8_adapt.cxx \
+src/lossy/cmc_amr_lossy_compression_settings.cxx \
+src/t8code/cmc_t8_data.cxx \
+src/utilities/cmc_geo_domain.cxx \
+src/utilities/cmc_hyperslab.cxx \
+src/utilities/cmc_input_variable.cxx \
+src/t8code/cmc_t8_morton.cxx \
+src/t8code/cmc_t8_mpi.cxx \
+src/mpi/cmc_mpi_data.cxx \
+src/lossy/cmc_amr_lossy_compression.cxx \
 src/t8code/cmc_t8_adapt_callbacks.cxx \
-src/t8code/cmc_t8_replace_callbacks.cxx \
-src/component_interfaces/cmc_t8_nc.cxx \
-src/component_interfaces/cmc_t8_messy.cxx \
-src/lossy/cmc_amr_compressor.cxx \
-src/messy/cmc_messy.cxx \
-src/lossless/cmc_lzss.cxx
+src/utilities/cmc_variable_transformer.cxx \
+src/utilities/cmc_output_variable.cxx \
+src/utilities/cmc_cart_coordinate.cxx \
+src/utilities/cmc_geo_utilities.cxx \
+src/lossy/cmc_sz_like_compression.cxx \
+src/lossy/cmc_prefix_lossy_compression.cxx \
+src/t8code/cmc_t8_byte_variable.cxx
+
 
 if ENABLE_FORTRAN
 cmc_module_sources = src/fortran_interfaces/cmc_fortran.f90 \

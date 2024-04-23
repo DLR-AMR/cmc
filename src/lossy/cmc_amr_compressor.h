@@ -7,7 +7,7 @@
 #include "cmc.h"
 #include "utilities/cmc_constants_definitions.h"
 #include "mpi/cmc_mpi.h"
-#include "netcdf/cmc_netcdf.h"
+//#include "netcdf/cmc_netcdf.h"
 #include "messy/cmc_messy.h"
 #include "t8code/cmc_t8_adapt_callbacks.h"
 #include "t8code/cmc_t8_replace_callbacks.h"

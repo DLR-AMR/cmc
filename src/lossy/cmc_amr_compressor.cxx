@@ -4,7 +4,7 @@
 #include "utilities/cmc_container.h"
 #include "component_interfaces/cmc_t8_nc.h"
 #include "component_interfaces/cmc_t8_messy.h"
-#include "netcdf/cmc_netcdf.h"
+//#include "netcdf/cmc_netcdf.h"
 #include "messy/cmc_messy.h"
 #include "t8code/cmc_t8code.h"
 #include "t8code/cmc_t8code_geo_data.h"

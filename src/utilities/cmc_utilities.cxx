@@ -1,45 +1,206 @@
 #include "utilities/cmc_utilities.hxx"
+#include "utilities/cmc_log_functions.h"
 
-
-inline int
-GeoDomain::GetDimensionality() const
+namespace cmc
 {
-    return static_cast<int>(domain_.size());
+
+[[noreturn]] void cmc_exit(const char* _err_msg, const char* _location)
+{
+    std::cout << "CMC_EXIT is invoked..." << std::endl << _err_msg << std::endl << "Error Occurence:"  << _location << std::endl;
+    std::exit(EXIT_FAILURE);
 }
 
-inline void
-GeoDomain::AddDimension(const Dimension dimension, const int start_idx, const int end_idx)
+[[noreturn]] void cmc_abort(const char* _err_msg, const char* _location)
 {
-    if (GetDimensionality() < Dimension::NumCoordinates)
+    std::cout << "CMC_ABORT is invoked..." << std::endl << _err_msg << std::endl << "Error Occurence:"  << _location << std::endl;
+    std::abort();
+}
+
+
+int
+GetDimensionalityOfDataLayout(const DataLayout layout)
+{
+    if (layout > DataLayout::LayoutUndefined &&
+        layout < DataLayout::_InternEnd2DLayouts)
     {
-        domain_.emplace_back(DimensionInterval(dimension, start_idx, end_idx));
+        /* If two-dimensional */
+        return 2;
+    } else if (layout > DataLayout::_InternEnd2DLayouts &&
+               layout < DataLayout::_InternEnd3DLayouts)
+    {
+        /* If three-dimensional */
+        return 3;
     } else
     {
-        cmc_err_msg("The GeoDomain is already fully defined in every dimension.");
+        /* Return an error if a unsupported DataLayout has been supplied */
+        cmc_err_msg("The dimensionality of the supplied layout could not be retrieved.");
+        return -1;
     }
 }
 
-constexpr GeoDomain::GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1)
-: domain_{DimensionInterval(dimension1, start_idx_dim1, end_idx_dim1)}
-{};
-constexpr GeoDomain::GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1,
-                      const Dimension dimension2, const int start_idx_dim2, const int end_idx_dim2)
-: domain_{DimensionInterval(dimension1, start_idx_dim1, end_idx_dim1),
-          DimensionInterval(dimension2, start_idx_dim2, end_idx_dim2)}
-{};
-constexpr GeoDomain::GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1,
-                     const Dimension dimension2, const int start_idx_dim2, const int end_idx_dim2,
-                     const Dimension dimension3, const int start_idx_dim3, const int end_idx_dim3)
-: domain_{DimensionInterval(dimension1, start_idx_dim1, end_idx_dim1),
-          DimensionInterval(dimension2, start_idx_dim2, end_idx_dim2),
-          DimensionInterval(dimension3, start_idx_dim3, end_idx_dim3)}
-{};
-constexpr GeoDomain::GeoDomain(const Dimension dimension1, const int start_idx_dim1, const int end_idx_dim1,
-                     const Dimension dimension2, const int start_idx_dim2, const int end_idx_dim2,
-                     const Dimension dimension3, const int start_idx_dim3, const int end_idx_dim3,
-                     const Dimension dimension4, const int start_idx_dim4, const int end_idx_dim4)
-: domain_{DimensionInterval(dimension1, start_idx_dim1, end_idx_dim1),
-          DimensionInterval(dimension2, start_idx_dim2, end_idx_dim2),
-          DimensionInterval(dimension3, start_idx_dim3, end_idx_dim3),
-          DimensionInterval(dimension4, start_idx_dim4, end_idx_dim4)}
-{};
+
+std::vector<Dimension>
+GetDimensionVectorFromLayout(const DataLayout layout)
+{
+    switch (layout)
+    {
+        case DataLayout::Lat_Lon:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lon};
+        break;
+        case DataLayout::Lon_Lat:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lat};
+        break;
+        case DataLayout::Lat_Lev:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lev};
+        break;
+        case DataLayout::Lev_Lat:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lat};
+        break;
+        case DataLayout::Lon_Lev:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lev};
+        break;
+        case DataLayout::Lev_Lon:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lon};
+        break;
+        case DataLayout::Lat_Lon_Lev:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lon, Dimension::Lev};
+        break;
+        case DataLayout::Lat_Lev_Lon:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lev, Dimension::Lon};
+        break;
+        case DataLayout::Lev_Lat_Lon:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lat, Dimension::Lon};
+        break;
+        case DataLayout::Lev_Lon_Lat:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lon, Dimension::Lat};
+        break;
+        case DataLayout::Lon_Lev_Lat:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lev, Dimension::Lat};
+        break;
+        case DataLayout::Lon_Lat_Lev:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lat, Dimension::Lev};
+        break;
+        default:
+            return std::vector<Dimension>();
+    }
+}
+
+DataLayout
+GetDataLayoutAfterRemoval(const DataLayout initial_layout, const Dimension removed_dimension)
+{
+    /* Currently, it is only possible to remove a dimension from a three dimensional layout
+     * since two is the minimum dimenison of data to be compressed */
+    cmc_assert(initial_layout > DataLayout::_InternEnd2DLayouts && initial_layout < DataLayout::_InternEnd3DLayouts);
+
+    switch (initial_layout)
+    {
+        case DataLayout::Lat_Lon_Lev:
+            switch (removed_dimension)
+            {
+                case Dimension::Lev:
+                    return DataLayout::Lat_Lon;
+                break;
+                case Dimension::Lat:
+                    return DataLayout::Lon_Lev;
+                break;
+                case Dimension::Lon:
+                    return DataLayout::Lat_Lev;
+                break;
+                default:
+                    cmc_err_msg("An undefined dimension has been supplied.");
+                    return DataLayout::LayoutUndefined;
+            }
+        break;
+        case DataLayout::Lat_Lev_Lon:
+            switch (removed_dimension)
+            {
+                case Dimension::Lev:
+                    return DataLayout::Lat_Lon;
+                break;
+                case Dimension::Lat:
+                    return DataLayout::Lev_Lon;
+                break;
+                case Dimension::Lon:
+                    return DataLayout::Lat_Lev;
+                break;
+                default:
+                    cmc_err_msg("An undefined dimension has been supplied.");
+                    return DataLayout::LayoutUndefined;
+            }
+        break;
+        case DataLayout::Lev_Lat_Lon:
+            switch (removed_dimension)
+            {
+                case Dimension::Lev:
+                    return DataLayout::Lat_Lon;
+                break;
+                case Dimension::Lat:
+                    return DataLayout::Lev_Lon;
+                break;
+                case Dimension::Lon:
+                    return DataLayout::Lev_Lat;
+                break;
+                default:
+                    cmc_err_msg("An undefined dimension has been supplied.");
+                    return DataLayout::LayoutUndefined;
+            }
+        break;
+        case DataLayout::Lev_Lon_Lat:
+            switch (removed_dimension)
+            {
+                case Dimension::Lev:
+                    return DataLayout::Lon_Lat;
+                break;
+                case Dimension::Lat:
+                    return DataLayout::Lev_Lon;
+                break;
+                case Dimension::Lon:
+                    return DataLayout::Lev_Lat;
+                break;
+                default:
+                    cmc_err_msg("An undefined dimension has been supplied.");
+                    return DataLayout::LayoutUndefined;
+            }
+        break;
+        case DataLayout::Lon_Lev_Lat:
+            switch (removed_dimension)
+            {
+                case Dimension::Lev:
+                    return DataLayout::Lon_Lat;
+                break;
+                case Dimension::Lat:
+                    return DataLayout::Lon_Lev;
+                break;
+                case Dimension::Lon:
+                    return DataLayout::Lev_Lat;
+                break;
+                default:
+                    cmc_err_msg("An undefined dimension has been supplied.");
+                    return DataLayout::LayoutUndefined;
+            }
+        break;
+        case DataLayout::Lon_Lat_Lev:
+            switch (removed_dimension)
+            {
+                case Dimension::Lev:
+                    return DataLayout::Lon_Lat;
+                break;
+                case Dimension::Lat:
+                    return DataLayout::Lon_Lev;
+                break;
+                case Dimension::Lon:
+                    return DataLayout::Lat_Lev;
+                break;
+                default:
+                    cmc_err_msg("An undefined dimension has been supplied.");
+                    return DataLayout::LayoutUndefined;
+            }
+        break;
+        default:
+            cmc_err_msg("The supplied layout is not supported for removal of a dimension.");
+            return DataLayout::LayoutUndefined;
+    }
+}
+
+
+}

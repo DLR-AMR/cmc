@@ -648,7 +648,6 @@ cmc_get_axis_ordering_from_layout(const DATA_LAYOUT layout)
     }
 }
 
-inline
 uint64_t
 cmc_coordinate::cmc_get_cart_coord_by_id(const cmc_coordinate_id _id) const
 {
@@ -669,7 +668,6 @@ cmc_coordinate::cmc_get_cart_coord_by_id(const cmc_coordinate_id _id) const
     }
 }
 
-inline
 uint64_t
 cmc_coordinate::cmc_get_ref_coord(const cmc_coordinate_id _coord_id) const
 {

@@ -6,10 +6,46 @@
 
 namespace cmc {
 
+
+
+
+
+
+
+
+
+
+
+#if 0
+
+
+InaccuracyTracker::InaccuracyTracker (const TrackingOption tracking_option, int i)
+: tracking_option_{tracking_option}{
+    switch (tracking_option)
+    {
+        case TrackingOption::TrackFullInaccuracy:
+            deviations = std::make_unique<FullInaccuracyTracker>();
+            break;
+        case TrackingOption::TrackMinimalWorkingInaccuracy:
+            eviations = std::make_unique<MinimalInaccuracyTracker>();
+            break;
+        default:
+            cmc_err_msg("A not supported tracking option for the inaccuracy has been supplied.");
+    }
+};
+
+#endif
+
+
+
+#if 0
+
 double
-AbsoluteInaccuracyTracker::ComputeInaccuracy()
+AbsoluteInaccuracyTracker::ComputeInaccuracy(t8_forest_t current_forest, const int which_tree, const int lelement_id, t8_eclass_scheme_c * ts, const int num_elements, t8_element_t * elements[])
 {
     std::cout << "Compute absolute inacc" << std::endl;
+
+    
     return 0.0;
 };
 
@@ -26,6 +62,11 @@ FullInaccuracyTracker::CheckInaccuracy()
     std::cout << "Full inacc calls" << std::endl;
     return (inaccuracy_computer_->ComputeInaccuracy() != 0.0 ? true : false);
 };
+
+
+
+
+
 
 bool
 MinimalInaccuracyTracker::CheckInaccuracy()
@@ -130,6 +171,6 @@ InaccuracyTracker::CheckInaccuracy(std::vector<Variable>& variables_to_check, st
     #endif
 }
 
-
+#endif
 
 }

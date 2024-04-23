@@ -6,6 +6,11 @@
 #include "utilities/cmc_log_functions.h"
 #include "utilities/cmc_container.h"
 
+
+#define CMC_WITH_T8CODE 1
+#define CMC_ENABLE_DEBUG 1
+#define CMC_ENABLE_MPI 1
+
 /** Begin STATIC Functions **/
 /****************************/
 
@@ -5525,6 +5530,7 @@ cmc_t8_geo_data_distribute_and_apply_ordering(cmc_t8_data_t t8_data)
     /* Only redistribute the data initially if the flag is set */
     if (t8_data->use_distributed_data)
     {
+
         int err;
 
         /* Get the size of the communicator */

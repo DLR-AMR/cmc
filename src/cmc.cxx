@@ -11,7 +11,8 @@ cmc_initialize()
   /* Initialize MPI */
   cmc_mpi_initialize();
   /* Initialize t8code */
-  cmc_t8code_initialize(MPI_COMM_WORLD);
+  //TODO:
+  //cmc_t8code_initialize(MPI_COMM_WORLD);
   #ifdef CMC_ENABLE_MPI
   int err, rank;
   /* Get the rank of the process */
@@ -34,7 +35,8 @@ cmc_initialize_mpi_comm(MPI_Comm comm)
   /* Initialize MPI */
   cmc_mpi_initialize();
   /* Initialize t8code */
-  cmc_t8code_initialize(comm);
+  //TODO:
+  //ccmc_t8code_initialize(comm);
   #ifdef CMC_ENABLE_MPI
   int err, rank;
   /* Get the rank of the process */
@@ -62,7 +64,8 @@ cmc_finalize()
   #endif
 
   /* Finalize t8code */
-  cmc_t8code_finalize(0);
+  //TODO:
+  //ccmc_t8code_finalize(0);
   /* Finalize MPI */
   cmc_mpi_finalize();
   #ifdef CMC_ENABLE_MPI
@@ -82,7 +85,8 @@ void
 cmc_finalize_without_mpi()
 {
   /* Finalize t8code */
-  cmc_t8code_finalize(0);
+  //TODO:
+  //ccmc_t8code_finalize(0);
   #ifdef CMC_ENABLE_MPI
   int err, rank; 
   err = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
