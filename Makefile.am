@@ -15,6 +15,8 @@ include_HEADERS =
 noinst_HEADERS = 
 lib_LTLIBRARIES =  
 MODSOURCES = 
+check_PROGRAMS = 
+TESTS = 
 
 DISTCLEANFILES += src/cmc_ac_config.h 
 

@@ -2,7 +2,7 @@
 #flags_cpp_testing = $(AM_CPPFLAGS)
 #flags_cxx_testing = $(AM_CXXFLAGS)
 
-bin_PROGRAMS += test/cmc_create_compression_settings \
+cmc_test_programs = test/cmc_create_compression_settings \
 test/cmc_create_input_variables \
 test/cmc_transform_input_var_coordinates \
 test/cmc_create_error_domains \
@@ -24,9 +24,9 @@ test_cmc_split_variables_SOURCES = test/cmc_split_variables.cxx
 test_cmc_lossy_amr_compression_SOURCES = test/cmc_lossy_amr_compression.cxx
 test_cmc_prefix_SOURCES = test/cmc_prefix.cxx
 
-
-
 #test_cmc_create_comrpession_settings_LDFLAGS = $(flags_ld_testing)
 #test_cmc_create_comrpession_settings_CXXFLAGS = $(flags_cxx_testing)
 #test_cmc_create_comrpession_settings_CPPFLAGS = $(flags_cpp_testing)
 
+check_PROGRAMS += $(cmc_test_programs)
+TESTS += $(cmc_test_programs)
