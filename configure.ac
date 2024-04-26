@@ -73,18 +73,6 @@ AM_CONDITIONAL([WITH_MODDIR], [test "x$withval" != xno])
 CMC_WITH_MODDIR="$withval"
 
 # ==========================================================
-# Check if option with-t8code is given =====================
-AC_ARG_WITH([t8code],
-    [AS_HELP_STRING([--with-t8code], [compile with t8code support])],,
-    [withval=no])
-
-if test "x$withval" != xno ; then
-    AC_DEFINE([WITH_T8CODE], 1, [Define if t8code-linkage is enabled.])
-fi
-AM_CONDITIONAL([WITH_T8CODE], [test "x$withval" != xno])
-CMC_WITH_T8CODE="$withval"
-
-# ==========================================================
 # Check if option with-netcdf is given =====================
 AC_ARG_WITH([netcdf],
     [AS_HELP_STRING([--with-netcdf], [compile with netCDF support])],,
@@ -96,6 +84,39 @@ fi
 AM_CONDITIONAL([WITH_NETCDF], [test "x$withval" != xno])
 CMC_WITH_NETCDF="$withval"
 
+# ==========================================================
+# Check if option with-t8code is given =====================
+AC_ARG_WITH([t8code],
+    [AS_HELP_STRING([--with-t8code], [compile with external t8code support])],,
+    [withval=no])
+
+CMC_LIB_ADD_T8_SUBMODULE=
+CMC_T8_CONFIG_AMFLAGS=
+CMC_T8_SC_P4EST_CPP_FLAGS=
+if test "x$withval" != xno ; then
+    AC_DEFINE([WITH_T8CODE], 1, [Define if external t8code-linkage is enabled.])
+else
+    # If the option is not given, we will use t8code as a submodule
+    AX_SUBDIRS_CONFIGURE([t8code],
+        [],[],[[--with-netcdf=no],[--enable-fortran=no],[--with-moddir=no]],[])
+    AC_DEFINE([WITH_T8CODE], 1, [Define if internal t8code-linkage is enabled.])
+
+    CMC_T8_SC_P4EST_CPP_FLAGS+=" -I\$(top_srcdir)/t8code/src -It8code/config -It8code/src"
+    CMC_T8_SC_P4EST_CPP_FLAGS+=" -I\$(top_srcdir)/t8code/sc/src -It8code/sc/config -It8code/sc/src"
+    CMC_T8_SC_P4EST_CPP_FLAGS+=" -I\$(top_srcdir)/t8code/p4est/src -It8code/p4est/config -It8code/p4est/src"
+    CMC_LIB_ADD_T8_SUBMODULE="\$(top_builddir)/t8code/src/libt8.la \$(top_builddir)/t8code/sc/src/libsc.la \$(top_builddir)/t8code/p4est/src/libp4est.la"
+    CMC_T8_CONFIG_AMFLAGS="-I \$(top_srcdir)/t8code/config -I \$(top_srcdir)/t8code/sc/config -I \$(top_srcdir)/t8code/p4est/config"
+fi
+AC_SUBST(CMC_LDADD_T8_SUBMODULE, $CMC_LIB_ADD_T8_SUBMODULE)
+AC_SUBST(CMC_T8_AMFLAGS, $CMC_T8_CONFIG_AMFLAGS)
+AC_SUBST(CMC_T8_CPPFLAGS, $CMC_T8_SC_P4EST_CPP_FLAGS)
+
+# In either case, we will have an available t8code
+AM_CONDITIONAL([WITH_T8CODE], [TRUE])
+
+# We store the value seperately, because in case of an external t8code linkage,
+# its access has to be checked.
+CMC_WITH_T8CODE="$withval"
 
 # ==========================================================
 # Check whether compilers have been set as environment
@@ -326,7 +347,7 @@ if test "x$CMC_WITH_T8CODE" != xno ; then
     AC_LANG_PUSH([C])
     AC_LINK_IFELSE([AC_LANG_PROGRAM(
         [[
-        #include <t8_forest.h>
+        #include <t8_forest/t8_forest.h>
         ]],[[
         t8_forest_t forest;
         ]])],
@@ -362,7 +383,7 @@ AC_DEFINE_UNQUOTED(LIBS,        ["${LIBS}"],        [Libraries])
 AC_PROG_INSTALL
 
 # Initialize automake after all compilers and preprocessors have been found
-AM_INIT_AUTOMAKE([subdir-objects])
+AM_INIT_AUTOMAKE([parallel-tests subdir-objects])
 
 # Initialize Libtool
 LT_INIT

@@ -101,14 +101,16 @@ endif
 
 src_libcmc_la_CPPFLAGS = $(AM_CPPFLAGS)
 src_libcmc_la_LDFLAGS = $(AM_LDFLAGS)
-src_libcmc_la_LIBFLAGS = $(NETCDF_LIBFLAGS) $(T8CODE_LIBFLAGS)
 src_libcmc_la_CXXFLAGS = $(AM_CXXFLAGS)
 src_libcmc_la_CFLAGS = $(CMC_CFLAGS)
 if ENABLE_FORTRAN
 src_libcmc_la_FCFLAGS = $(AM_FCFLAGS)
 src_libcmc_la_FFLAGS = $(CMC_FFLAGS)
 endif
+src_libcmc_la_LIBFLAGS = $(NETCDF_LIBFLAGS) $(T8CODE_LIBFLAGS) @CMC_LDADD_T8_SUBMODULE@
+src_libcmc_la_LIBADD = @CMC_LDADD_T8_SUBMODULE@
+EXTRA_src_libcmc_la_DEPENDENCIES = @CMC_LDADD_T8_SUBMODULE@
 
-LDADD += @top_builddir@/src/libcmc.la $(NETCDF_LIBFLAGS) $(T8CODE_LIBFLAGS)
+LDADD += @top_builddir@/src/libcmc.la @CMC_LDADD_T8_SUBMODULE@
 
-AM_CPPFLAGS += -I@top_srcdir@/src
+AM_CPPFLAGS += -I@top_srcdir@/src @CMC_T8_CPPFLAGS@

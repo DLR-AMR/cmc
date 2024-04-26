@@ -1,5 +1,13 @@
 #! /bin/sh
 
+# Run the t8code bootstrap script if it has been initialized as a submodule
+if test -x "t8code/bootstrap" ; then
+    echo "Running bootstrap in the t8code submodule"
+    (cd t8code && ./bootstrap)
+fi
+
+rm -rf autom4te.cache
+
 LIBTOOLIZE=`which glibtoolize 2>/dev/null`
 if test ! -x "$LIBTOOLIZE" ; then LIBTOOLIZE=`which libtoolize` ; fi
 if test ! -x "$LIBTOOLIZE" ; then echo "bootstrap requires libtoolize" ; exit 1 ; fi
