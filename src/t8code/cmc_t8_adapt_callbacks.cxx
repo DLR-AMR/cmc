@@ -11,7 +11,7 @@ namespace cmc
 constexpr bool kCoarsenOutsideOfDomainBoundary = true;
 
 static bool
-IsCoarsenedFromTheBeginningOnwards(t8_eclass_scheme_c * ts, t8_element_t * element, const int initial_refinement_level, const int count_adaptation_step)
+IsCoarsenedFromTheBeginningOnwards(t8_eclass_scheme_c * ts, const t8_element_t * element, const int initial_refinement_level, const int count_adaptation_step)
 {
     /* Check if the current element level resembles a coarsening process that started at the beginning of the compression */
     if (t8_element_level(ts, element) != initial_refinement_level - count_adaptation_step)
@@ -72,8 +72,11 @@ PerformAdaptiveCoarseningOneForOne (t8_forest_t forest,
             }
         }
     }
+    std::vector<const t8_element_t*> const_elements;
+    const_elements.reserve(num_elements);
+    std::copy_n(elements, num_elements, std::back_inserter(const_elements));
 
-    const std::vector<PermittedError> permitted_errors = compression_variable.GetPermittedError(num_elements, elements, ts);
+    const std::vector<PermittedError> permitted_errors = compression_variable.GetPermittedError(num_elements, const_elements.data(), ts);
     
     const ErrorCompliance evaluation = compression_variable.EvaluateCoarsening(permitted_errors, forest, lelement_id, num_elements);
 

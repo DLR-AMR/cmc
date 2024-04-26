@@ -13,7 +13,7 @@
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
-#include "t8_forest.h"
+#include <t8_forest/t8_forest.h>
 #endif
 
 namespace cmc {
@@ -95,7 +95,7 @@ bool
 IsMeshElementWithinGeoDomain(const t8_element_t* element, t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout);
 
 bool
-IsAnyElementWithinGeoDomain(const int num_elements, t8_element_t* elements[], t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout);
+IsAnyElementWithinGeoDomain(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout);
 
 int
 DetermineNumberOfElementsOnReferenceLevel(const t8_element_t* element, t8_eclass_scheme_c* ts, const int num_children, const int reference_level);

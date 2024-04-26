@@ -6,7 +6,7 @@
 /* Include some t8code dependent header files */
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
-#include <t8_forest.h>
+#include <t8_forest/t8_forest.h>
 #endif
 
 

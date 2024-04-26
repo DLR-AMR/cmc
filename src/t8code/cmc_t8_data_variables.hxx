@@ -87,7 +87,7 @@ public:
     DataLayout GetPreCompressionLayout() const {return attributes_.GetPreCompressionLayout();};
     int GetGlobalContextInformation() const {return attributes_.GetGlobalContextInformation();};
 
-    std::vector<PermittedError> GetPermittedError(const int num_elements, t8_element_t* elements[], t8_eclass_scheme_c * ts) const;
+    std::vector<PermittedError> GetPermittedError(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c * ts) const;
 
     CmcUniversalType GetValueAt(const int index) const;
     std::vector<double> GetDataAsDoubleVector() const;
@@ -151,7 +151,7 @@ public:
     void SetUpCompressionCriteria(const CompressionSpecifications& variable_specifications);
     void SetUpInaccuracyStorage(const size_t size_hint = kInvalidSizeHintForInaccuracyContainer);
 
-    std::vector<PermittedError> GetPermittedError(const int num_elements, t8_element_t* elements[], t8_eclass_scheme_c * ts) const;
+    std::vector<PermittedError> GetPermittedError(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c * ts) const;
     ErrorCompliance EvaluateCoarsening(const std::vector<PermittedError>& permitted_errors, const t8_forest_t previous_mesh, const t8_locidx_t start_index, const int num_elements);
 
     void ApplyInterpolation(const int lelement_id, const ErrorCompliance& evaluation);
@@ -216,7 +216,7 @@ Variable<T>::IsValidForCompression() const
 
 template<typename T>
 std::vector<PermittedError>
-Variable<T>::GetPermittedError(const int num_elements, t8_element_t* elements[], t8_eclass_scheme_c * ts) const
+Variable<T>::GetPermittedError(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c * ts) const
 {
     /* Iterate over all error domains for all elements and find the minimum error */
     bool is_abs_error_present{false};
@@ -406,7 +406,7 @@ Variable<T>::CheckErrorBoundsForValues(const std::vector<T>& alternative_values,
 {
     const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
 
-    t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
+    const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
     
     t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (mesh_.GetMesh(), eclass);
 
@@ -423,7 +423,7 @@ Variable<T>::GetRemainingMaxAllowedAbsoluteError(const int index) const
 {
     const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
 
-    t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
+    const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
     
     t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (mesh_.GetMesh(), eclass);
 
@@ -557,7 +557,7 @@ Var::IsValidForCompression() const
 
 inline
 std::vector<PermittedError>
-Var::GetPermittedError(const int num_elements, t8_element_t* elements[], t8_eclass_scheme_c * ts) const
+Var::GetPermittedError(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c * ts) const
 {
     return std::visit([=](auto&& var) -> std::vector<PermittedError> {
         return var.GetPermittedError(num_elements, elements, ts);

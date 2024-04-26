@@ -2,7 +2,7 @@
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
-#include <t8_forest.h>
+#include <t8_forest/t8_forest.h>
 #include <t8_schemes/t8_default/t8_default_c_interface.h>
 #include <t8_element_c_interface.h>
 #endif

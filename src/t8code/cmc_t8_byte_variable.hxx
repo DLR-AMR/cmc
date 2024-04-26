@@ -609,7 +609,7 @@ ByteVariable<T>::GetPermittedError(const int index) const
 {
     const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
 
-    t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
+    const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
     
     t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (mesh_.GetMesh(), eclass);
 

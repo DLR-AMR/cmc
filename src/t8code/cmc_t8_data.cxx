@@ -14,7 +14,7 @@
 #include <t8.h>
 #include <t8_cmesh.h>
 #include <t8_cmesh/t8_cmesh_examples.h>
-#include <t8_forest.h>
+#include <t8_forest/t8_forest.h>
 #include <t8_schemes/t8_default/t8_default_c_interface.h>
 #include <t8_element_c_interface.h>
 #include <t8_forest/t8_forest_iterate.h>
@@ -177,7 +177,7 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
 
     for (auto iter = 0; iter < num_local_elements; ++iter)
     {
-        t8_element_t* elem = t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, iter);
+        const t8_element_t* elem = t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, iter);
 
         if (t8_element_level(ts, elem) != initial_refinement_level)
         {
@@ -585,7 +585,7 @@ AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain
 
         for (t8_locidx_t elem_id = 0; elem_id < num_local_elements; ++elem_id)
         {
-            t8_element_t* element = t8_forest_get_element_in_tree(compressed_forest, 0, elem_id);
+            const t8_element_t* element = t8_forest_get_element_in_tree(compressed_forest, 0, elem_id);
 
             /* In case that the dummy elements are excluded from the decompression, we need to ensure that only the amount of elements within the domain 
              * are inserted in the decompressed vector (especially for relatively coarse elements). Therefore, we need a correction.
@@ -617,7 +617,7 @@ AmrData::TransferToDecompressionData(OutputVar& output_variable, const Var& comp
 
     for (t8_locidx_t elem_id = 0; elem_id < num_local_elements; ++elem_id)
     {
-        t8_element_t* element = t8_forest_get_element_in_tree(compressed_forest, 0, elem_id);
+        const t8_element_t* element = t8_forest_get_element_in_tree(compressed_forest, 0, elem_id);
 
         const Hyperslab element_hyperslab = DetermineHyperslabOfDecompressedElements(element, ts, var_domain, initial_refinement_level, initial_data_layout);
 

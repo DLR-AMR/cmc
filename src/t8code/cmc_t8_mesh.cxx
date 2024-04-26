@@ -125,7 +125,7 @@ IsMeshElementWithinGeoDomain(const t8_element_t* element, t8_eclass_scheme_c* ts
 }
 
 bool
-IsAnyElementWithinGeoDomain(const int num_elements, t8_element_t* elements[], t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout)
+IsAnyElementWithinGeoDomain(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c* ts, const GeoDomain& reference_domain, const int initial_refinement_level, const DataLayout initial_layout)
 {
     cmc_assert(reference_domain.GetDimensionality() == 2 || reference_domain.GetDimensionality() == 3);
 
