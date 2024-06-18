@@ -48,6 +48,7 @@ public:
     void CompressByAdaptiveCoarsening(const CompressionMode compression_mode);
     void ApplyScalingAndOffset();
     void SetupVariablesForCompression();
+    void SetInitialMesh(const AmrMesh& mesh);
     std::vector<ByteVar> GetByteVariablesForCompression();
 
     void DecompressToInitialRefinementLevel(const bool restrict_to_global_domain = true);

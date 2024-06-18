@@ -46,7 +46,8 @@ src/utilities/cmc_prefix.hxx \
 src/lossy/cmc_prefix_lossy_compression.hxx \
 src/t8code/cmc_t8_byte_variable.hxx \
 src/t8code/cmc_t8_variables.hxx \
-src/t8code/cmc_t8_prefix_encoding.hxx 
+src/t8code/cmc_t8_prefix_encoding.hxx \
+src/netcdf/cmc_nc_decompress.hxx
 
 
 if ENABLE_FORTRAN
@@ -83,7 +84,8 @@ src/utilities/cmc_cart_coordinate.cxx \
 src/utilities/cmc_geo_utilities.cxx \
 src/lossy/cmc_sz_like_compression.cxx \
 src/lossy/cmc_prefix_lossy_compression.cxx \
-src/t8code/cmc_t8_byte_variable.cxx
+src/t8code/cmc_t8_byte_variable.cxx \
+src/netcdf/cmc_nc_decompress.cxx
 
 
 if ENABLE_FORTRAN

@@ -54,14 +54,17 @@ T InterpoalteToArithmeticMean(const VectorView<T>& values, [[maybe_unused]] cons
     cmc_assert(std::is_arithmetic_v<T>);
     cmc_assert(!values.empty());
 
-    T number_non_missing_values = 0;
-    T sum = 0;
+    //T number_non_missing_values = 0;
+    //T sum = 0;
+
+    double number_non_missing_values = 0;
+    double sum = 0;
 
     for (auto iter = values.begin(); iter != values.end(); ++iter)
     {
         if (!ApproxCompare(*iter, missing_value))
         {
-            sum += *iter;
+            sum += static_cast<double>(*iter);
             ++number_non_missing_values;
         }
     }
@@ -70,7 +73,7 @@ T InterpoalteToArithmeticMean(const VectorView<T>& values, [[maybe_unused]] cons
 
     if (perform_interpolation)
     {
-        return sum / number_non_missing_values;
+        return static_cast<T>(sum / number_non_missing_values);
     } else
     {
         return missing_value;

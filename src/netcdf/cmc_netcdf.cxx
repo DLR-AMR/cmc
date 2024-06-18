@@ -19,7 +19,6 @@ NcExit(const int _err_code, const char* _location)
     std::exit(EXIT_FAILURE);
 }
 
-static
 int
 NcOpenSerial(const char* path_to_file)
 {
@@ -38,7 +37,6 @@ NcOpenSerial(const char* path_to_file)
     #endif
 }
 
-static
 int
 NcOpenParallel(const char* path_to_file, MPI_Comm comm)
 {

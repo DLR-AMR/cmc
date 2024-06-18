@@ -37,6 +37,94 @@ TransformerInputToCompressionVariable::MoveData(Variable<T>& destination, InputV
     destination.utilities_.interpolate_ = source.interpolation_;
     destination.utilities_.tracking_option_ = source.inaccuracy_tracking_;
     destination.data_ = std::move(source.data_);
+
+    //Test:save the data
+    //if (std::is_same_v<T, char>)
+    #if 0
+    const int num_elems = destination.data_.size();
+    std::vector<short> converted_data;
+    converted_data.reserve(destination.data_.size());
+    const short missin_val = -32767;
+    for (auto data_iter = destination.data_.begin(); data_iter != destination.data_.end(); ++data_iter)
+    {
+        if (!ApproxCompare(static_cast<short>(*data_iter), missin_val))
+        {
+            converted_data.push_back(static_cast<short>(*data_iter));
+        }
+    }
+    std::string fname = "era5_initial_t_sfc_ordered_" + std::to_string(destination.attributes_.global_context_information_);
+    FILE* file = fopen(fname.c_str(), "wb");
+    fwrite(converted_data.data(), sizeof(T), converted_data.size(), file);
+    fclose(file);
+    #if 0
+    const int num_elems = destination.data_.size();
+    std::vector<float> converted_data;
+    converted_data.reserve(destination.data_.size());
+    const float missin_val = -32767.0;
+    for (auto data_iter = destination.data_.begin(); data_iter != destination.data_.end(); ++data_iter)
+    {
+        if (!ApproxCompare(static_cast<float>(*data_iter), missin_val))
+        {
+            converted_data.push_back(static_cast<float>(*data_iter));
+        }
+    }
+    std::string fname = "era5_initial_t_sfc_ordered_" + std::to_string(destination.attributes_.global_context_information_);
+    FILE* file = fopen(fname.c_str(), "wb");
+    fwrite(converted_data.data(), sizeof(T), converted_data.size(), file);
+    fclose(file);
+    #endif
+    //converted_data.reserve(num_elems);
+    //const float add_offset = 0.0970683052537568;
+    //const float scale_factor = 2.96247040388686e-06;
+    //for (int j = 0; j < num_elems; ++j)
+    //{
+    //    converted_data.push_back(scale_factor * static_cast<float>(local_data[j]) + add_offset);
+    //}
+    //FILE* file = fopen("era5_land_tp_lon_lat.bin", "wb");
+    //fwrite(converted_data.data(), sizeof(float), num_elems, file);
+    //fclose(file);
+    //std::exit(1);
+    #endif
+
+    #if 0
+    const float prevmval = -9.0E+33;
+    const float mval = 65536.0;
+    destination.attributes_.missing_value_ = mval;
+    for (auto data_iter = destination.data_.begin(); data_iter != destination.data_.end(); ++data_iter)
+    {
+        if (static_cast<float>(*data_iter) <= -66000)
+        {
+            *data_iter = mval;
+        }
+    }
+
+    #endif
+    #if 0
+    //Test for now, move all values into negative domain
+    const float missin_val = -32767.0;
+    //for (auto data_iter = destination.data_.begin(); data_iter != destination.data_.end(); ++data_iter)
+    //{
+    //    if (!ApproxCompare(static_cast<float>(*data_iter), missin_val, static_cast<float>(1.0)))
+    //    {
+    //        *data_iter *= -1.0;
+    //    }
+    //}
+    const int num_elems = destination.data_.size();
+    std::vector<float> converted_data;
+    converted_data.reserve(destination.data_.size());
+    //const float missin_val = -32767.0;
+    for (auto data_iter = destination.data_.begin(); data_iter != destination.data_.end(); ++data_iter)
+    {
+        if (!ApproxCompare(static_cast<float>(*data_iter), missin_val, static_cast<float>(1.0)))
+        {
+            converted_data.push_back(static_cast<float>(*data_iter));
+        }
+    }
+    std::string fname = "era5_initial_t_sfc_ordered_" + std::to_string(destination.attributes_.global_context_information_);
+    FILE* file = fopen(fname.c_str(), "wb");
+    fwrite(converted_data.data(), sizeof(T), converted_data.size(), file);
+    fclose(file);
+    #endif
 }
 
 

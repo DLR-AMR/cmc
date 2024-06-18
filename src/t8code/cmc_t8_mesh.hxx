@@ -25,7 +25,11 @@ constexpr int kMeshCorrespondsToAllVariables = INT_MIN + 1;
 class AmrMesh
 {
 public:
-    AmrMesh(){};
+    AmrMesh() = default;
+    AmrMesh(t8_forest_t mesh)
+    : mesh_{mesh} {};
+    AmrMesh(t8_forest_t mesh, const int initial_refinement_level)
+    : mesh_{mesh}, initial_refinement_level_{initial_refinement_level} {};
     ~AmrMesh(){
         if (mesh_ != nullptr)
         {
@@ -55,7 +59,7 @@ public:
     };
 
     AmrMesh(AmrMesh&& other)
-    : mesh_{std::move(other.mesh_)}, initial_refinement_level_{other.initial_refinement_level_}
+    : mesh_{std::move(other.mesh_)}, initial_refinement_level_{other.initial_refinement_level_}, are_dummy_elements_present_{other.are_dummy_elements_present_}
     {
         other.mesh_ = nullptr;
     };
@@ -64,6 +68,7 @@ public:
         this->mesh_ = std::move(other.mesh_);
         other.mesh_ = nullptr;
         this->initial_refinement_level_ = other.initial_refinement_level_;
+        this->are_dummy_elements_present_ = other.are_dummy_elements_present_;
         return *this;
     };
 
@@ -72,13 +77,15 @@ public:
     void SetInitialRefinementLevel(const int initial_refinement_level);
     t8_gloidx_t GetNumberGlobalElements() const;
     t8_locidx_t GetNumberLocalElements() const;
-
+    void IndicateWhetherDummyElementsArePresent(const bool are_dummy_elements_present);
+    bool AreDummyElementsPresent() const;
     t8_forest_t GetMesh() const;
     void SetMesh(t8_forest_t mesh);
     
 private:
     t8_forest_t mesh_{nullptr};
     int initial_refinement_level_{kInitialRefinementLevelIsUnknown};
+    bool are_dummy_elements_present_{true};
 };
 
 struct CoarseningSample

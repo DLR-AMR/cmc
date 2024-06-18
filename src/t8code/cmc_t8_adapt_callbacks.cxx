@@ -39,14 +39,14 @@ t8_locidx_t
 PerformAdaptiveCoarseningOneForOne (t8_forest_t forest,
                                     [[maybe_unused]] t8_forest_t forest_from,
                                     [[maybe_unused]] int which_tree,
-                                    int lelement_id,
+                                    int lelement_id_,
                                     t8_eclass_scheme_c * ts,
                                     const int is_family,
                                     const int num_elements,
                                     t8_element_t * elements[])
 {
     #ifdef CMC_WITH_T8CODE
-
+    const int lelement_id = t8_forest_get_tree_element_offset(forest_from, which_tree) + lelement_id_;
     /* Get the adapt data from the forest */
     AdaptData* adapt_data = static_cast<AdaptData*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
