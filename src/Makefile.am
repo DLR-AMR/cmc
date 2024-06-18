@@ -47,7 +47,8 @@ src/lossy/cmc_prefix_lossy_compression.hxx \
 src/t8code/cmc_t8_byte_variable.hxx \
 src/t8code/cmc_t8_variables.hxx \
 src/t8code/cmc_t8_prefix_encoding.hxx \
-src/netcdf/cmc_nc_decompress.hxx
+src/netcdf/cmc_nc_decompress.hxx \
+src/netcdf/cmc_nc_io.hxx
 
 
 if ENABLE_FORTRAN
