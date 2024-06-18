@@ -73,10 +73,10 @@ public:
     NcVariable() = default;
     ~NcVariable() = default;
 
-    NcVariable(const NcSpecificVariable& other) = default;
-    NcVariable& operator=(const NcSpecificVariable& other) = default;
-    NcVariable(NcSpecificVariable&& other) = default;
-    NcVariable& operator=(NcSpecificVariable&& other) = default;
+    NcVariable(const NcVariable& other) = default;
+    NcVariable& operator=(const NcVariable& other) = default;
+    NcVariable(NcVariable&& other) = default;
+    NcVariable& operator=(NcVariable&& other) = default;
     
 private:
     NcGeneralVariable variable_;
