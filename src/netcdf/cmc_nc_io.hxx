@@ -5,6 +5,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_hyperslab.hxx"
 #include "utilities/cmc_geo_domain.hxx"
+#include "utilities/cmc_log_functions.h"
 
 #ifdef CMC_WITH_NETCDF
 #include <netcdf.h>
@@ -91,6 +92,7 @@ public:
     std::vector<NcDimension> GetDimensionsFromVariable() const;
     CmcType GetCmcType() const;
     int GetID() const;
+    void WriteVariableData(const int ncid, const int var_id) const;
 private:
     std::string name_;
     int id_;
@@ -123,6 +125,7 @@ public:
     CmcType GetCmcType() const;
     void CreateIDAttribute();
     const std::vector<NcAttribute>& GetAttributes() const;
+    void WriteVariableData(const int ncid, const int var_id) const;
 private:
     NcGeneralVariable variable_;
     std::vector<NcAttribute> attributes_;
@@ -173,6 +176,28 @@ CmcType
 NcSpecificVariable<T>::GetCmcType() const
 {
     return ConvertToCmcType<T>();
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
+{
+    switch(format_)
+    {
+        case DataFormat::LinearFormat:
+            /* For example SFC indices */
+            //TODO: Write the linearized data out, continue...
+        break;
+        case DataFormat::CartesianFormat:
+            cmc_err_msg("The CartesianFormat is not yet supported.");
+        break;
+        case DataFormat::HyperslabFormat:
+            /* Iterate over all hyperslabs and emplace the data */
+            //TODO: continue...
+        break;
+        default:
+            cmc_err_msg("An unspecified or unknown DataFormat is stored within the variable.");
+    }
 }
 
 constexpr nc_type

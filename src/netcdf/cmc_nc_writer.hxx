@@ -15,8 +15,9 @@ namespace cmc
 class NcWriter
 {
 public:
-    NcWriter(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
-    : file_name_{file_name}, comm_{comm} {};
+    NcWriter() = delete;
+    NcWriter(const std::string& file_name, const int netcdf_format, const MPI_Comm comm = MPI_COMM_SELF)
+    : file_name_{file_name}, netcdf_format_{netcdf_format}, comm_{comm} {};
     ~NcWriter() = default;
 
     NcWriter(const NcWriter& other) = default;
@@ -33,18 +34,21 @@ public:
     void Write();
 
 private:
-    int NcOpen() const;
+    int NcOpen();
+    int NcCreate();
     void NcClose(const int ncid) const;
     std::vector<int> DefineVariableDimensions(const int ncid, const std::vector<NcDimension>& dimensions);
     void DefineAttributes(const int ncid, const int var_id, const std::vector<NcAttribute>& attributes);
-    void DefineVariables(const int ncid);
+    std::vector<int> DefineVariables(const int ncid);
     void DefineGlobalAttributes(const int ncid);
-    void WriteData(const int ncid);
+    void WriteData(const int ncid, const std::vector<int>& var_ids);
 
     const std::string file_name_;
+    const int netcdf_format_;
     const MPI_Comm comm_;
     std::vector<NcVariable> variables_;
     std::vector<NcAttribute> global_attributes_;
+    bool file_has_been_created_{false};
 };
 
 }

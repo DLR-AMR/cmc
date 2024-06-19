@@ -4,10 +4,16 @@ namespace cmc
 {
 
 int
-NcWriter::NcOpen() const
+NcWriter::NcOpen() 
 {
+    if (!file_has_been_created_)
+    {
+        return NcCreate();
+    }
+
     int ncid{-1};
 
+#ifdef CMC_WITH_NETCDF_PAR
     if (comm_ != MPI_COMM_SELF)
     {
         /* Open for parallel access */
@@ -15,6 +21,7 @@ NcWriter::NcOpen() const
         const int err = nc_open_par(file_name_.c_str(), NC_WRITE, comm_, info, &ncid);
         NcCheckError(err);
     } else
+#endif
     {
         /* Otherwise open for serial access */
         const int err = nc__open(file_name_.c_str(), NC_WRITE, NULL, &ncid);
@@ -23,6 +30,39 @@ NcWriter::NcOpen() const
 
     return ncid;
 }
+
+int
+NcWriter::NcCreate()
+{
+    int ncid{-1};
+
+    if (netcdf_format_ != NC_64BIT_OFFSET && netcdf_format_ != NC_64BIT_DATA && netcdf_format_ != NC_NETCDF4 &&
+        netcdf_format_ != NC_CLASSIC_MODEL && netcdf_format_ != NC_DISKLESS)
+    {
+        cmc_err_msg("The netCDF file could not be created since the suppleid netcdf_format is invalid.");
+    }
+
+#ifdef CMC_WITH_NETCDF_PAR
+    if (comm_ != MPI_COMM_SELF)
+    {
+        /* Open for parallel access */
+        const MPI_Info info = MPI_INFO_NULL;
+        const int err = nc_create_par(file_name_.c_str(), NC_CLOBBER | NC_WRITE | netcdf_format_, comm_, info, &ncid);
+        NcCheckError(err);
+    } else
+#endif
+    {
+        /* Otherwise open for serial access */
+        const int err = nc_create(file_name_.c_str(), NC_CLOBBER | NC_WRITE | netcdf_format_, &ncid);
+        NcCheckError(err);
+    }
+
+    file_has_been_created_ = true;
+
+    return ncid;
+}
+
+
 
 void
 NcWriter::NcClose(const int ncid) const
@@ -141,7 +181,7 @@ NcWriter::DefineAttributes(const int ncid, const int var_id, const std::vector<N
     }
 }
 
-void
+std::vector<int>
 NcWriter::DefineVariables(const int ncid)
 {
     std::vector<int> var_ids(variables_.size(), -1);
@@ -165,6 +205,8 @@ NcWriter::DefineVariables(const int ncid)
         /* Define its attributes */
         DefineAttributes(ncid, var_ids[var_count], var_iter->GetAttributes());
     }
+
+    return var_ids;
 }
 
 void
@@ -177,9 +219,13 @@ NcWriter::DefineGlobalAttributes(const int ncid)
 }
 
 void 
-NcWriter::WriteData(const int ncid)
+NcWriter::WriteData(const int ncid, const std::vector<int>& variable_ids)
 {
-
+    int var_count = 0;
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter, ++var_count)
+    {
+        var_iter->WriteVariableData(ncid, variable_ids[var_count]);
+    }
 }
 
 void
@@ -187,11 +233,15 @@ NcWriter::Write()
 {
     const int ncid = NcOpen();
 
-    DefineVariables(ncid);
+    const std::vector<int> var_ids = DefineVariables(ncid);
 
     DefineGlobalAttributes(ncid);
 
-    WriteData(ncid);
+    /* Switch from define to data mode */
+    const int err = nc_enddef(ncid);
+    NcCheckError(err);
+
+    WriteData(ncid, var_ids);
 
     NcClose(ncid);
 }

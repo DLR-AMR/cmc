@@ -1,5 +1,4 @@
 #include "netcdf/cmc_nc_io.hxx"
-#include "utilities/cmc_log_functions.h"
 
 namespace cmc
 {
@@ -65,6 +64,14 @@ NcVariable::CreateIDAttribute()
                         return var.GetID();
                     }, variable_);
     attributes_.emplace_back("id", id);
+}
+
+void
+NcVariable::WriteVariableData(const int ncid, const int var_id) const
+{
+    std::visit([&](auto&& var){
+        var.WriteVariableData(ncid, var_id);
+    }, variable_);
 }
 
 constexpr nc_type
