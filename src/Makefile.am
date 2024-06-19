@@ -88,7 +88,8 @@ src/lossy/cmc_sz_like_compression.cxx \
 src/lossy/cmc_prefix_lossy_compression.cxx \
 src/t8code/cmc_t8_byte_variable.cxx \
 src/netcdf/cmc_nc_decompress.cxx \
-src/netcdf/cmc_nc_writer.cxx
+src/netcdf/cmc_nc_writer.cxx \
+src/netcdf/cmc_nc_io.cxx 
 
 
 if ENABLE_FORTRAN
