@@ -30,6 +30,10 @@ public:
 
     void AddVariable(const NcVariable& variable);
     void AddVariable(NcVariable&& variable);
+    template<typename T> void AddVariable(const NcSpecificVariable<T>& variable, const std::vector<NcAttribute>& attributes);
+    template<typename T> void AddVariable(const NcSpecificVariable<T>& variable, std::vector<NcAttribute>&&  attributes);
+    template<typename T> void AddVariable(NcSpecificVariable<T>&& variable, const std::vector<NcAttribute>& attributes);
+    template<typename T> void AddVariable(NcSpecificVariable<T>&& variable, std::vector<NcAttribute>&& attributes);
 
     void Write();
 
@@ -50,6 +54,34 @@ private:
     std::vector<NcAttribute> global_attributes_;
     bool file_has_been_created_{false};
 };
+
+template<typename T>
+void
+NcWriter::AddVariable(const NcSpecificVariable<T>& variable, const std::vector<NcAttribute>& attributes)
+{
+    AddVariable(NcVariable(variable, attributes));
+}
+
+template<typename T>
+void
+NcWriter::AddVariable(const NcSpecificVariable<T>& variable, std::vector<NcAttribute>&&  attributes)
+{
+    AddVariable(NcVariable(variable, std::move(attributes)));
+}
+
+template<typename T>
+void
+NcWriter::AddVariable(NcSpecificVariable<T>&& variable, const std::vector<NcAttribute>& attributes)
+{
+    AddVariable(NcVariable(std::move(variable), attributes));
+}
+
+template<typename T>
+void
+NcWriter::AddVariable(NcSpecificVariable<T>&& variable, std::vector<NcAttribute>&& attributes)
+{
+    AddVariable(NcVariable(std::move(variable), std::move(attributes)));
+}
 
 }
 

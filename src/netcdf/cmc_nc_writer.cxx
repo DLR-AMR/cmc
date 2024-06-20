@@ -84,6 +84,17 @@ NcWriter::AddGlobalAttribute(NcAttribute&& attribute)
     global_attributes_.push_back(std::move(attribute));
 }
 
+void
+NcWriter::AddVariable(const NcVariable& variable)
+{
+    variables_.push_back(variable);
+}
+
+void
+NcWriter::AddVariable(NcVariable&& variable)
+{
+    variables_.push_back(std::move(variable));
+}   
 
 std::vector<int>
 NcWriter::DefineVariableDimensions(const int ncid, const std::vector<NcDimension>& dimensions)
