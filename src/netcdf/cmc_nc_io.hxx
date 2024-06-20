@@ -6,13 +6,7 @@
 #include "utilities/cmc_hyperslab.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_log_functions.h"
-
-#ifdef CMC_WITH_NETCDF
-#include <netcdf.h>
-#endif
-#ifdef CMC_WIT_NETCDF_PAR
-#include "netcdf_par.h"
-#endif
+#include "netcdf/cmc_netcdf.hxx"
 
 #include <string>
 #include <vector>
@@ -192,8 +186,35 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
             cmc_err_msg("The CartesianFormat is not yet supported.");
         break;
         case DataFormat::HyperslabFormat:
+        {
             /* Iterate over all hyperslabs and emplace the data */
-            //TODO: continue...
+            const std::vector<Dimension> hs_dims = GetDimensionVectorFromLayout(layout_);
+            const int dim = GetDimensionalityOfDataLayout(layout_);
+            std::vector<size_t> start_ptr(dim, 0);
+            std::vector<size_t> count_ptr(dim, 1);
+
+            /* Keep track of the values that hav ealready been written by previous hyperslabs */
+            HyperslabIndex values_written = 0;
+
+            /* Iterate over all local hyperslabs */
+            for (auto hs_iter = hyperslabs_.begin(); hs_iter != hyperslabs_.end(); ++hs_iter)
+            {
+                /* Iterate over all diemnsions and fill the corresponding start and count ptr for writing the hyperslab data */
+                int index = 0;
+                for (auto hs_dim_iter = hs_dims.begin(); hs_dim_iter != hs_dims.end(); ++hs_dim_iter, ++index)
+                {
+                    start_ptr[index] = static_cast<size_t>(hs_iter->GetDimensionStart(*hs_dim_iter));
+                    count_ptr[index] = static_cast<size_t>(hs_iter->GetDimensionLength(*hs_dim_iter));
+                }
+
+                /* Write the data corresponding to the hyperslab to the netCDF file */
+                const int err = nc_put_vara(ncid, var_id, start_ptr.data(), count_ptr.data(), &data_[values_written]);
+                NcCheckError(err);
+
+                /* Add the number of written values to the offset variable */
+                values_written += hs_iter->GetNumberCoordinates();
+            }
+        }
         break;
         default:
             cmc_err_msg("An unspecified or unknown DataFormat is stored within the variable.");
