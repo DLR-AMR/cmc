@@ -95,7 +95,7 @@ private:
     DataLayout layout_;
     DataFormat format_;
     std::vector<Hyperslab> hyperslabs_;
-    std::vector<LinearIndex> linear_indices_;
+    LinearIndex global_sfc_offset_;
     GeoDomain global_domain_;
 };
 
@@ -179,8 +179,13 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
     switch(format_)
     {
         case DataFormat::LinearFormat:
-            /* For example SFC indices */
-            //TODO: Write the linearized data out, continue...
+            /* Emplace the Linear/SFC data */
+            {
+                const size_t start_val = global_sfc_offset_;
+                const size_t count_val = data_.size();
+                const int err = nc_put_vara(ncid, var_id, &start_val, & count_val, data_.data());
+                NcCheckError(err);
+            }
         break;
         case DataFormat::CartesianFormat:
             cmc_err_msg("The CartesianFormat is not yet supported.");
