@@ -75,6 +75,8 @@ public:
     NcSpecificVariable() = default;
     NcSpecificVariable(const int id)
     : id_{id} {};
+    NcSpecificVariable(const std::string& name, const int id)
+    : name_{name}, id_{id} {};
     ~NcSpecificVariable() = default;
 
     NcSpecificVariable(const NcSpecificVariable& other) = default;
@@ -86,6 +88,24 @@ public:
     std::vector<NcDimension> GetDimensionsFromVariable() const;
     CmcType GetCmcType() const;
     int GetID() const;
+
+    const GeoDomain& GetGlobalDomain() const;
+    void SetGlobalDomain(const GeoDomain& domain);
+    void SetGlobalDomain(GeoDomain&& domain);
+
+    void SetDataLayout(const DataLayout layout);
+
+    void PushBack(const std::vector<T>& values, const Hyperslab& hyperslab);
+    void PushBack(const std::vector<T>& values, Hyperslab&& hyperslab);
+    void PushBack(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs);
+    void PushBack(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs);
+    void PushBack(const std::vector<T>& values, const int global_sfc_offset);
+    void PushBack(std::vector<T>&& values, const int global_sfc_offset);
+
+    T GetMissingValue() const;
+    void SetMissingValue(const CmcUniversalType& missing_value);
+    void SetMissingValue(const T missing_value);
+
     void WriteVariableData(const int ncid, const int var_id) const;
 private:
     std::string name_;
@@ -97,6 +117,7 @@ private:
     std::vector<Hyperslab> hyperslabs_;
     LinearIndex global_sfc_offset_;
     GeoDomain global_domain_;
+    bool is_data_stack_full_{false};
 };
 
 using NcGeneralVariable = std::variant<NcSpecificVariable<int8_t>, NcSpecificVariable<char>, NcSpecificVariable<int16_t>, NcSpecificVariable<int32_t>, NcSpecificVariable<float>, NcSpecificVariable<double>,
@@ -108,6 +129,35 @@ class NcVariable
 public:
     NcVariable() = default;
     ~NcVariable() = default;
+
+    template<class T> NcVariable(const NcSpecificVariable<T>& variable)
+    : variable_{variable} {};
+    template<class T> NcVariable(NcSpecificVariable<T>&& variable)
+    : variable_{std::move(variable)} {};
+    template<class T> NcVariable(const NcSpecificVariable<T>& variable, const std::vector<NcAttribute>& attributes)
+    : variable_{variable}, attributes_{attributes} {};
+    template<class T> NcVariable(const NcSpecificVariable<T>& variable, std::vector<NcAttribute>&& attributes)
+    : variable_{variable}, attributes_{std::move(attributes)} {};
+    template<class T> NcVariable(NcSpecificVariable<T>&& variable, const std::vector<NcAttribute>& attributes)
+    : variable_{std::move(variable)}, attributes_{attributes} {};
+    template<class T> NcVariable(NcSpecificVariable<T>&& variable, std::vector<NcAttribute>&& attributes)
+    : variable_{std::move(variable)}, attributes_{std::move(attributes)} {};
+    template<class T> NcVariable(const NcSpecificVariable<T>& variable, const NcAttribute& attribute)
+    : variable_{variable} {
+        attributes_.push_back(attribute);
+    };
+    template<class T> NcVariable(const NcSpecificVariable<T>& variable, NcAttribute&& attribute)
+    : variable_{variable} {
+        attributes_.push_back(attribute);
+    };
+    template<class T> NcVariable(NcSpecificVariable<T>&& variable, const NcAttribute& attribute)
+    : variable_{std::move(variable)} {
+        attributes_.push_back(attribute);
+    };
+    template<class T> NcVariable(NcSpecificVariable<T>&& variable, NcAttribute&& attribute)
+    : variable_{std::move(variable)} {
+        attributes_.push_back(attribute);
+    };
 
     NcVariable(const NcVariable& other) = default;
     NcVariable& operator=(const NcVariable& other) = default;
@@ -170,6 +220,155 @@ CmcType
 NcSpecificVariable<T>::GetCmcType() const
 {
     return ConvertToCmcType<T>();
+}
+
+template<class T>
+const GeoDomain& 
+NcSpecificVariable<T>::GetGlobalDomain() const
+{
+    return global_domain_;
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::SetGlobalDomain(const GeoDomain& domain)
+{
+    global_domain_ = domain;
+};
+
+template<class T>
+void
+NcSpecificVariable<T>::SetGlobalDomain(GeoDomain&& domain)
+{
+    global_domain_ = std::move(domain);
+};
+
+template<class T>
+void
+NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const Hyperslab& hyperslab)
+{
+    if (is_data_stack_full_)
+    {
+        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
+        return;
+    }
+    std::copy(values.begin(), values.end(), std::back_inserter(data_));
+    hyperslabs_.push_back(hyperslab);
+
+    format_ = DataFormat::HyperslabFormat;
+};
+
+template<class T>
+void
+NcSpecificVariable<T>::PushBack(const std::vector<T>& values, Hyperslab&& hyperslab)
+{
+    if (is_data_stack_full_)
+    {
+        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
+        return;
+    }
+    std::copy(values.begin(), values.end(), std::back_inserter(data_));
+    hyperslabs_.push_back(std::move(hyperslab));
+
+    format_ = DataFormat::HyperslabFormat;
+};
+
+template<class T>
+void
+NcSpecificVariable<T>::PushBack(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs)
+{
+    if (is_data_stack_full_)
+    {
+        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
+        return;
+    }
+
+    data_ = std::move(values);
+    hyperslabs_ = std::move(hyperslabs);
+
+    format_ = DataFormat::HyperslabFormat;
+
+    is_data_stack_full_ = true;
+}
+
+
+template<class T>
+void
+NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs)
+{
+    if (is_data_stack_full_)
+    {
+        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
+        return;
+    }
+
+    data_ = values;
+    hyperslabs_ = hyperslabs;
+
+    format_ = DataFormat::HyperslabFormat;
+
+    is_data_stack_full_ = true;
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::PushBack(std::vector<T>&& values, const int global_sfc_offset)
+{
+    if (is_data_stack_full_)
+    {
+        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
+        return;
+    }
+
+    data_ = std::move(values);
+    global_sfc_offset_ = global_sfc_offset;
+    format_ = DataFormat::LinearFormat;
+    is_data_stack_full_ = true;   
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const int global_sfc_offset)
+{
+    if (is_data_stack_full_)
+    {
+        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
+        return;
+    }
+
+    data_ = values;
+    global_sfc_offset_ = global_sfc_offset;
+    format_ = DataFormat::LinearFormat;
+    is_data_stack_full_ = true;   
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::SetDataLayout(const DataLayout layout)
+{
+    layout_ = layout;
+}
+
+template<class T>
+T
+NcSpecificVariable<T>::GetMissingValue() const
+{
+    return missing_value_;
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::SetMissingValue(const CmcUniversalType& missing_value)
+{
+    cmc_assert(std::holds_alternative<T>(missing_value));
+    missing_value_ = std::get<T>(missing_value);
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::SetMissingValue(const T missing_value)
+{
+    missing_value_ = missing_value;
 }
 
 template<class T>
