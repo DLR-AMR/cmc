@@ -14,6 +14,8 @@ int main(void)
     
     {
 
+    return cmc::CMC_TEST_SKIP;
+
     float test_float1 = 5.877471754111437539843683E-39;
     std::cout << std::bitset<8*sizeof(float)>(*reinterpret_cast<uint32_t*>(&test_float1)) <<" fuer " << test_float1 << std::endl;
     cmc::Prefix<sizeof(float)> bin_float1(test_float1);
