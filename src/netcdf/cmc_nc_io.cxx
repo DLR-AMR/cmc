@@ -74,10 +74,9 @@ NcVariable::WriteVariableData(const int ncid, const int var_id) const
     }, variable_);
 }
 
-constexpr nc_type
+nc_type
 ConvertCmcTypeToNcType(const CmcType type)
 {
-    enum CmcType {TypeUndefined = -1, Int8_t, Char, Int16_t, Int32_t, Float, Double, Uint8_t, Uint16_t, Uint32_t, Int64_t, Uint64_t, NumTypes};
     switch (type)
     {
         case CmcType::Int8_t:

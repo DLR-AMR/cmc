@@ -425,7 +425,7 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
     }
 }
 
-constexpr nc_type
+nc_type
 ConvertCmcTypeToNcType(const CmcType type);
 
 }
