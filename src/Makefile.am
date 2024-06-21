@@ -49,7 +49,8 @@ src/t8code/cmc_t8_variables.hxx \
 src/t8code/cmc_t8_prefix_encoding.hxx \
 src/netcdf/cmc_nc_decompress.hxx \
 src/netcdf/cmc_nc_io.hxx \
-src/netcdf/cmc_nc_writer.hxx
+src/netcdf/cmc_nc_writer.hxx \
+src/netcdf/cmc_nc_reader.hxx
 
 
 if ENABLE_FORTRAN
@@ -89,7 +90,8 @@ src/lossy/cmc_prefix_lossy_compression.cxx \
 src/t8code/cmc_t8_byte_variable.cxx \
 src/netcdf/cmc_nc_decompress.cxx \
 src/netcdf/cmc_nc_writer.cxx \
-src/netcdf/cmc_nc_io.cxx 
+src/netcdf/cmc_nc_io.cxx \
+src/netcdf/cmc_nc_reader.cxx
 
 
 if ENABLE_FORTRAN
