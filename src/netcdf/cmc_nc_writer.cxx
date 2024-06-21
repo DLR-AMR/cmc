@@ -96,6 +96,13 @@ NcWriter::AddVariable(NcVariable&& variable)
     variables_.push_back(std::move(variable));
 }   
 
+void
+NcWriter::ClearVariablesAndGlobalAttributes()
+{
+    variables_.clear();
+    global_attributes_.clear();
+}
+
 std::vector<int>
 NcWriter::DefineVariableDimensions(const int ncid, const std::vector<NcDimension>& dimensions)
 {

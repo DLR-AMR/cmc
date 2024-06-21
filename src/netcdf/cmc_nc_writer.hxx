@@ -35,6 +35,8 @@ public:
     template<typename T> void AddVariable(NcSpecificVariable<T>&& variable, const std::vector<NcAttribute>& attributes);
     template<typename T> void AddVariable(NcSpecificVariable<T>&& variable, std::vector<NcAttribute>&& attributes);
 
+    void ClearVariablesAndGlobalAttributes();
+
     void Write();
 
 private:
