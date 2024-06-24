@@ -36,6 +36,7 @@ public:
 private:
     std::string name_;
     size_t length_;
+    int nc_dim_id{-1};
 }; 
 
 class NcAttribute
@@ -173,6 +174,7 @@ public:
 private:
     NcGeneralVariable variable_;
     std::vector<NcAttribute> attributes_;
+    int nc_var_id{-1};
 };
 
 template<class T>
