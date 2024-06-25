@@ -84,6 +84,10 @@ public:
     : id_{id} {};
     NcSpecificVariable(const std::string& name, const int id)
     : name_{name}, id_{id} {};
+    NcSpecificVariable(const std::string& name, const int id, const size_t size_hint)
+    : name_{name}, id_{id} {
+        data_ = std::vector<T>(size_hint);
+    };
     ~NcSpecificVariable() = default;
 
     NcSpecificVariable(const NcSpecificVariable& other) = default;
@@ -442,6 +446,9 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
 
 nc_type
 ConvertCmcTypeToNcType(const CmcType type);
+
+NcGeneralVariable
+CreateSpecificVariable(const nc_type type, const std::string& name, const int var_id, const size_t size_hint = 8);
 
 template<class T>
 void

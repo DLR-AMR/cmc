@@ -119,4 +119,48 @@ ConvertCmcTypeToNcType(const CmcType type)
     }
 }
 
+NcGeneralVariable
+CreateSpecificVariable(const nc_type type, const std::string& name, const int var_id, const size_t size_hint)
+{
+    switch (type)
+    {
+        case NC_BYTE:
+            return NcGeneralVariable{NcSpecificVariable<int8_t>(name, var_id, size_hint)};
+        break;
+        case NC_CHAR:
+            return NcGeneralVariable{NcSpecificVariable<char>(name, var_id, size_hint)};
+        break;
+        case NC_SHORT:
+            return NcGeneralVariable{NcSpecificVariable<int16_t>(name, var_id, size_hint)};
+        break;
+        case NC_INT:
+            return NcGeneralVariable{NcSpecificVariable<int32_t>(name, var_id, size_hint)};
+        break;
+        case NC_FLOAT:
+            return NcGeneralVariable{NcSpecificVariable<float>(name, var_id, size_hint)};
+        break;
+        case NC_DOUBLE:
+            return NcGeneralVariable{NcSpecificVariable<double>(name, var_id, size_hint)};
+        break;
+        case NC_UBYTE:
+            return NcGeneralVariable{NcSpecificVariable<uint8_t>(name, var_id, size_hint)};
+        break;
+        case NC_USHORT:
+            return NcGeneralVariable{NcSpecificVariable<uint16_t>(name, var_id, size_hint)};
+        break;
+        case NC_UINT:
+            return NcGeneralVariable{NcSpecificVariable<uint32_t>(name, var_id, size_hint)};
+        break;
+        case NC_INT64:
+            return NcGeneralVariable{NcSpecificVariable<int64_t>(name, var_id, size_hint)};
+        break;
+        case NC_UINT64:
+            return NcGeneralVariable{NcSpecificVariable<uint64_t>(name, var_id, size_hint)};
+        break;
+        default:
+            cmc_err_msg("An unknown nc_type has been supplied.");
+            return NcGeneralVariable{NcSpecificVariable<int32_t>(name, var_id, size_hint)};
+    }
+}
+
 }
