@@ -12,6 +12,13 @@
 namespace cmc
 {
 
+class GeneralHyperslab
+{
+    std::vector<size_t> start_values;
+    std::vector<size_t> count_values;
+};
+
+
 class NcReader
 {
 public:
@@ -26,10 +33,10 @@ public:
     NcReader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
     : file_name_{file_name}, comm_{comm} {};
 
-    void StashVariableForReading(const std::string& variable_name, const std::vector<Hyperslab>& hyperslabs);
-    void StashVariableForReading(const std::string& variable_name, std::vector<Hyperslab>&& hyperslabs);
-    void StashVariableForReading(const std::string& variable_name, const Hyperslab& hyperslab);
-    void StashVariableForReading(const std::string& variable_name, Hyperslab&& hyperslab);
+    void StashVariableForReading(const std::string& variable_name, const std::vector<GeneralHyperslab>& hyperslabs);
+    void StashVariableForReading(const std::string& variable_name, std::vector<GeneralHyperslab>&& hyperslabs);
+    void StashVariableForReading(const std::string& variable_name, const GeneralHyperslab& hyperslab);
+    void StashVariableForReading(const std::string& variable_name, GeneralHyperslab&& hyperslab);
 
     void ClearStashedVariables();
 
@@ -83,18 +90,18 @@ struct NcReader::StashedVariable
 {
     StashedVariable() = delete;
 
-    StashedVariable(const std::string& variable_name, const std::vector<Hyperslab>& variable_hyperslabs)
+    StashedVariable(const std::string& variable_name, const std::vector<GeneralHyperslab>& variable_hyperslabs)
     : name{variable_name}, hyperslabs{variable_hyperslabs} {};
-    StashedVariable(const std::string& variable_name, std::vector<Hyperslab>&& variable_hyperslabs)
+    StashedVariable(const std::string& variable_name, std::vector<GeneralHyperslab>&& variable_hyperslabs)
     : name{variable_name}, hyperslabs{std::move(variable_hyperslabs)} {};
-    StashedVariable(const std::string& variable_name, const Hyperslab& variable_hyperslab)
+    StashedVariable(const std::string& variable_name, const GeneralHyperslab& variable_hyperslab)
     : name{variable_name}, hyperslabs{variable_hyperslab} {};
-    StashedVariable(const std::string& variable_name, Hyperslab&& variable_hyperslab)
+    StashedVariable(const std::string& variable_name, GeneralHyperslab&& variable_hyperslab)
     : name{variable_name}, hyperslabs{std::move(variable_hyperslab)} {};
 
 
     const std::string name;
-    const std::vector<Hyperslab> hyperslabs;
+    const std::vector<GeneralHyperslab> hyperslabs;
 };
 
 }
