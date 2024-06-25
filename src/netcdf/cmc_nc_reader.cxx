@@ -302,7 +302,6 @@ NcReader::ReadGlobalAttrtibutes()
     return global_attributes;
 }
 
-
 std::vector<NcVariable>
 NcReader::ReadVariableMetaData()
 {
@@ -312,12 +311,34 @@ NcReader::ReadVariableMetaData()
     /* Inquire some basic/meta information about the file and it's contents */
     InquireGeneralFileInformation(ncid);
 
+    /* Inquire the meta data of all variables */
     const std::vector<NcVariable> variables = InquireVariableMetaData(ncid);
 
     /* Close the file after the reading process is finished */
     NcClose(ncid);
 
     return variables;
+}
+
+std::pair<std::vector<NcVariable>, std::vector<NcAttribute>>
+NcReader::ReadVariableMetaDataAndGlobalAttributes()
+{
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    /* Inquire some basic/meta information about the file and it's contents */
+    InquireGeneralFileInformation(ncid);
+
+    /* Inquire the meta data of all variables */
+    const std::vector<NcVariable> variables = InquireVariableMetaData(ncid);
+
+    /* Inquire global attributes */
+    const std::vector<NcAttribute> global_attributes = InquireAttributes(ncid, NC_GLOBAL);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    return std::make_pair(std::move(variables), std::move(global_attributes));
 }
 
 }

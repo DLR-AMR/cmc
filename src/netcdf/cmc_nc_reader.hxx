@@ -37,7 +37,7 @@ public:
 
     std::vector<NcAttribute> ReadGlobalAttrtibutes();
     std::vector<NcVariable> ReadVariableMetaData();
-
+    std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariableMetaDataAndGlobalAttributes();
 
     std::string GetFileName() const;
     int GetNetcdfFormat() const;
