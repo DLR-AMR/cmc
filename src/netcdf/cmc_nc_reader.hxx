@@ -33,9 +33,11 @@ public:
 
     void ClearStashedVariables();
 
-    void Read();
+    //void Read();
 
-    //NcVariable ReadVariable(const std::string& variable_name);
+    std::vector<NcAttribute> ReadGlobalAttrtibutes();
+    std::vector<NcVariable> ReadVariableMetaData();
+
 
     std::string GetFileName() const;
     int GetNetcdfFormat() const;
@@ -56,6 +58,8 @@ private:
     void NcClose(const int ncid);
     void InquireGeneralFileInformation(const int ncid);
     std::vector<NcAttribute> InquireAttributes(const int ncid, const int var_id);
+    std::vector<NcVariable> InquireVariableMetaData(const int ncid);
+    std::vector<NcDimension> ConvertDimensionIDs(const int ncid, const std::vector<int>& dim_ids);
 
     const std::string file_name_;
     const MPI_Comm comm_;

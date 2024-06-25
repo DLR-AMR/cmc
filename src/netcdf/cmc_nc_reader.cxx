@@ -196,7 +196,7 @@ NcReader::InquireAttributes(const int ncid, const int var_id)
         NcCheckError(err);
 
         /* Get the data type of the attribute */
-        nc_type type{0}; 
+        nc_type type{0};
         err = nc_inq_atttype(ncid, var_id, attribute_name, &type);
         NcCheckError(err);
 
@@ -219,8 +219,73 @@ NcReader::InquireAttributes(const int ncid, const int var_id)
     return attributes;
 }
 
-void
-NcReader::Read()
+std::vector<NcDimension>
+NcReader::ConvertDimensionIDs(const int ncid, const std::vector<int>& dim_ids)
+{
+    cmc_assert(is_file_opened_);
+
+    char dim_name[NC_MAX_NAME];
+
+    std::vector<NcDimension> dimensions;
+    dimensions.reserve(dim_ids.size());
+
+    for (auto dim_iter = dim_ids.begin(); dim_iter != dim_ids.end(); ++dim_iter)
+    {
+        /* Get the name of the dimension */
+        int err = nc_inq_dimname(ncid, *dim_iter, dim_name);
+        NcCheckError(err);
+
+        /* Get the length of the dimension */
+        size_t dim_length{0};
+        err = nc_inq_dimlen(ncid, *dim_iter, &dim_length);
+        NcCheckError(err);
+
+        /* Make an NcDimension out of the inquired information */
+        dimensions.emplace_back(std::string(dim_name), dim_length, *dim_iter);
+    }
+
+    return dimensions;
+}
+
+std::vector<NcVariable>
+NcReader::InquireVariableMetaData(const int ncid)
+{
+    char var_name[NC_MAX_NAME];
+
+    std::vector<NcVariable> variables;
+    variables.reserve(num_variables_);
+
+    /* Iterate over all variables (their IDs, correspond to 0, ..., num_variables -1) */
+    for (int var_id = 0; var_id < num_variables_; ++var_id)
+    {
+        /* Inquire the name of the variable */
+        int err = nc_inq_varname(ncid, var_id, var_name);
+        NcCheckError(err);
+
+        /* Inquire the number of dimensions */
+        int num_dims{0};
+        err = nc_inq_varndims(ncid, var_id, &num_dims);
+        NcCheckError(err);
+
+        /* Inquire the data type of the variable */
+        nc_type type{NC_NAT};
+        err = nc_inq_vartype(ncid, var_id, &type);
+        NcCheckError(err);
+
+        /* Inquire the dimension ids */
+        std::vector<int> dim_ids(num_dims, 0);
+        err = nc_inq_vardimid(ncid, var_id, dim_ids.data());
+        NcCheckError(err);
+
+        /* Create an NcVariable out of the information */
+        variables.emplace_back(InquireAttributes(ncid, var_id), ConvertDimensionIDs(ncid, dim_ids));
+    }
+
+    return variables;
+}
+
+std::vector<NcAttribute>
+NcReader::ReadGlobalAttrtibutes()
 {
     /* Open the file to be read */
     const int ncid = NcOpen();
@@ -228,11 +293,31 @@ NcReader::Read()
     /* Inquire some basic/meta information about the file and it's contents */
     InquireGeneralFileInformation(ncid);
 
-
+    /* Inquire global attributes */
+    const std::vector<NcAttribute> global_attributes = InquireAttributes(ncid, NC_GLOBAL);
 
     /* Close the file after the reading process is finished */
     NcClose(ncid);
 
+    return global_attributes;
+}
+
+
+std::vector<NcVariable>
+NcReader::ReadVariableMetaData()
+{
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    /* Inquire some basic/meta information about the file and it's contents */
+    InquireGeneralFileInformation(ncid);
+
+    const std::vector<NcVariable> variables = InquireVariableMetaData(ncid);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    return variables;
 }
 
 }

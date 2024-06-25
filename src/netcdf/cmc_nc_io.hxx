@@ -26,6 +26,12 @@ class NcDimension
 public:
     NcDimension(const std::string& name, const size_t length)
     : name_{name}, length_{length} {};
+    NcDimension(std::string&& name, const size_t length)
+    : name_{std::move(name)}, length_{length} {};
+    NcDimension(const std::string& name, const size_t length, const int dim_id)
+    : name_{name}, length_{length}, nc_dim_id{dim_id} {};
+    NcDimension(std::string&& name, const size_t length, const int dim_id)
+    : name_{std::move(name)}, length_{length}, nc_dim_id{dim_id} {};
 
     std::string GetName(){return name_;};
     const std::string& GetName() const {return name_;};
@@ -160,11 +166,17 @@ public:
         attributes_.push_back(attribute);
     };
 
+    NcVariable(std::vector<NcAttribute>&& attributes, std::vector<NcDimension>&& dimensions)
+    : attributes_{std::move(attributes)}, dimensions_{std::move(dimensions)} {};
+
     NcVariable(const NcVariable& other) = default;
     NcVariable& operator=(const NcVariable& other) = default;
     NcVariable(NcVariable&& other) = default;
     NcVariable& operator=(NcVariable&& other) = default;
     
+    template<class T> void SetSpecificVariable(const NcSpecificVariable<T>& variable);
+    template<class T> void SetSpecificVariable(NcSpecificVariable<T>&& variable);
+
     std::vector<NcDimension> GetDimensionsFromVariable() const;
     const std::string& GetName() const;
     CmcType GetCmcType() const;
@@ -174,6 +186,7 @@ public:
 private:
     NcGeneralVariable variable_;
     std::vector<NcAttribute> attributes_;
+    std::vector<NcDimension> dimensions_;
     int nc_var_id{-1};
 };
 
@@ -429,6 +442,19 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
 
 nc_type
 ConvertCmcTypeToNcType(const CmcType type);
+
+template<class T>
+void
+NcVariable::SetSpecificVariable(const NcSpecificVariable<T>& variable)
+{
+    variable_ = variable;
+}
+
+template<class T> void
+NcVariable::SetSpecificVariable(NcSpecificVariable<T>&& variable)
+{
+    variable_ = std::move(variable);
+}
 
 }
 
