@@ -12,8 +12,19 @@
 namespace cmc
 {
 
-class GeneralHyperslab
+struct GeneralHyperslab
 {
+public:
+    size_t GetNumberOfCoveredCoordinates() const
+    {
+        size_t num_coords{1};
+        for (auto cv_iter = count_values.begin(); cv_iter != count_values.end(); ++cv_iter)
+        {
+            num_coords *= *cv_iter;
+        }
+        return num_coords;
+    }
+
     std::vector<size_t> start_values;
     std::vector<size_t> count_values;
 };
@@ -45,6 +56,7 @@ public:
     std::vector<NcAttribute> ReadGlobalAttrtibutes();
     std::vector<NcVariable> ReadVariableMetaData();
     std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariableMetaDataAndGlobalAttributes();
+    std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariables();
 
     std::string GetFileName() const;
     int GetNetcdfFormat() const;
@@ -67,7 +79,7 @@ private:
     std::vector<NcAttribute> InquireAttributes(const int ncid, const int var_id);
     std::vector<NcVariable> InquireVariableMetaData(const int ncid);
     std::vector<NcDimension> ConvertDimensionIDs(const int ncid, const std::vector<int>& dim_ids);
-
+    void ReadVariableData(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, NcVariable& variable);
     const std::string file_name_;
     const MPI_Comm comm_;
 

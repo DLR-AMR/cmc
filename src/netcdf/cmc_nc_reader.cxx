@@ -262,14 +262,14 @@ NcReader::InquireVariableMetaData(const int ncid)
         int err = nc_inq_varname(ncid, var_id, var_name);
         NcCheckError(err);
 
-        /* Inquire the number of dimensions */
-        int num_dims{0};
-        err = nc_inq_varndims(ncid, var_id, &num_dims);
-        NcCheckError(err);
-
         /* Inquire the data type of the variable */
         nc_type type{NC_NAT};
         err = nc_inq_vartype(ncid, var_id, &type);
+        NcCheckError(err);
+
+        /* Inquire the number of dimensions */
+        int num_dims{0};
+        err = nc_inq_varndims(ncid, var_id, &num_dims);
         NcCheckError(err);
 
         /* Inquire the dimension ids */
@@ -331,6 +331,89 @@ NcReader::ReadVariableMetaDataAndGlobalAttributes()
 
     /* Inquire the meta data of all variables */
     const std::vector<NcVariable> variables = InquireVariableMetaData(ncid);
+
+    /* Inquire global attributes */
+    const std::vector<NcAttribute> global_attributes = InquireAttributes(ncid, NC_GLOBAL);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    return std::make_pair(std::move(variables), std::move(global_attributes));
+}
+
+void
+NcReader::ReadVariableData(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, NcVariable& variable)
+{
+    /* Iterate over all hyperslabs and count the amount of data which will be read */
+    size_t num_data_values{0};
+
+    for (auto hs_iter = hyperslabs.begin(); hs_iter != hyperslabs.end(); ++hs_iter)
+    {
+        num_data_values += hs_iter->GetNumberOfCoveredCoordinates();
+    }
+
+    /* Create a general variable capable of holding the data of the specified type */
+    NcGeneralVariable general_variable = CreateSpecificVariable(var_type, var_name, var_id, num_data_values);
+
+    /* Read in the data from the file */
+    size_t values_read{0};
+
+    for (auto hs_iter = hyperslabs.begin(); hs_iter != hyperslabs.end(); ++hs_iter)
+    {
+
+        //Continue...
+        
+        /* Add the read values to the offset variable */
+        values_read += hs_iter->GetNumberOfCoveredCoordinates();
+    }
+}
+
+std::pair<std::vector<NcVariable>, std::vector<NcAttribute>>
+NcReader::ReadVariables()
+{
+    if (variable_stash_.empty())
+    {
+        cmc_warn_msg("No variables have been specified for reading.");
+    }
+
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    /* Inquire some basic/meta information about the file and it's contents */
+    InquireGeneralFileInformation(ncid);
+
+    std::vector<NcVariable> variables;
+    variables.reserve(variable_stash_.size());
+
+    /* Iterate over all stashed variables */
+    for (auto stashed_var_iter = variable_stash_.begin(); stashed_var_iter != variable_stash_.end(); ++stashed_var_iter)
+    {
+        /* Inquire the ID of the variable */
+        int var_id{-1};
+        int err = nc_inq_varid(ncid, stashed_var_iter->name.c_str(), &var_id);
+        NcCheckError(err);
+
+        /* Inquire the data type of the variable */
+        nc_type type{NC_NAT};
+        err = nc_inq_vartype(ncid, var_id, &type);
+        NcCheckError(err);
+
+        /* Inquire the number of dimensions */
+        int num_dims{0};
+        err = nc_inq_varndims(ncid, var_id, &num_dims);
+        NcCheckError(err);
+
+        /* Inquire the dimension ids */
+        std::vector<int> dim_ids(num_dims, 0);
+        err = nc_inq_vardimid(ncid, var_id, dim_ids.data());
+        NcCheckError(err);
+
+        /* Create an NcVariable out of the information */
+        variables.emplace_back(InquireAttributes(ncid, var_id), ConvertDimensionIDs(ncid, dim_ids));
+
+        /* Inquire the data of the variable */
+        
+    }
 
     /* Inquire global attributes */
     const std::vector<NcAttribute> global_attributes = InquireAttributes(ncid, NC_GLOBAL);
