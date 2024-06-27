@@ -415,7 +415,7 @@ NcReader::ReadVariables()
         variables.emplace_back(InquireAttributes(ncid, var_id), ConvertDimensionIDs(ncid, dim_ids));
 
         /* Inquire the data of the variable */
-        
+        ReadVariableData(ncid, type, stashed_var_iter->name, var_id, stashed_var_iter->hyperslabs, variables.back());
     }
 
     /* Inquire global attributes */
