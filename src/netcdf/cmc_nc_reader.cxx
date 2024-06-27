@@ -346,7 +346,6 @@ NcReader::ReadVariableData(const int ncid, const nc_type var_type, const std::st
 {
     /* Iterate over all hyperslabs and count the amount of data which will be read */
     size_t num_data_values{0};
-
     for (auto hs_iter = hyperslabs.begin(); hs_iter != hyperslabs.end(); ++hs_iter)
     {
         num_data_values += hs_iter->GetNumberOfCoveredCoordinates();
@@ -357,11 +356,12 @@ NcReader::ReadVariableData(const int ncid, const nc_type var_type, const std::st
 
     /* Read in the data from the file */
     size_t values_read{0};
-
     for (auto hs_iter = hyperslabs.begin(); hs_iter != hyperslabs.end(); ++hs_iter)
     {
-
-        //Continue...
+        /* Read the hyperslab data into the variable */
+        std::visit([&](auto&& var){
+            var.OverwriteDataFromFile(ncid, var_id, *hs_iter, values_read);
+        }, general_variable);
         
         /* Add the read values to the offset variable */
         values_read += hs_iter->GetNumberOfCoveredCoordinates();

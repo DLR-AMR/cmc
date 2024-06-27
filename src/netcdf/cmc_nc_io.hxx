@@ -75,6 +75,25 @@ private:
     CmcUniversalType value_;
 };
 
+
+struct GeneralHyperslab
+{
+public:
+    size_t GetNumberOfCoveredCoordinates() const
+    {
+        size_t num_coords{1};
+        for (auto cv_iter = count_values.begin(); cv_iter != count_values.end(); ++cv_iter)
+        {
+            num_coords *= *cv_iter;
+        }
+        return num_coords;
+    }
+
+    std::vector<size_t> start_values;
+    std::vector<size_t> count_values;
+};
+
+
 template<typename T>
 class NcSpecificVariable
 {
@@ -112,6 +131,8 @@ public:
     void PushBack(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs);
     void PushBack(const std::vector<T>& values, const int global_sfc_offset);
     void PushBack(std::vector<T>&& values, const int global_sfc_offset);
+
+    void OverwriteDataFromFile(const int ncid, const int var_id, const GeneralHyperslab& hyperslab, const size_t start_offset = 0);
 
     T GetMissingValue() const;
     void SetMissingValue(const CmcUniversalType& missing_value);
@@ -416,7 +437,7 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
             std::vector<size_t> start_ptr(dim, 0);
             std::vector<size_t> count_ptr(dim, 1);
 
-            /* Keep track of the values that hav ealready been written by previous hyperslabs */
+            /* Keep track of the values that have already been written by previous hyperslabs */
             HyperslabIndex values_written = 0;
 
             /* Iterate over all local hyperslabs */
@@ -442,6 +463,18 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
         default:
             cmc_err_msg("An unspecified or unknown DataFormat is stored within the variable.");
     }
+}
+
+template<class T>
+void
+NcSpecificVariable<T>::OverwriteDataFromFile(const int ncid, const int var_id, const GeneralHyperslab& hyperslab, const size_t start_offset)
+{
+    /* The size is already maxed out, since the data is not going to be push_backed, but just plain copied int the already present memory */
+    cmc_assert(data_.size() >= hyperslab.GetNumberOfCoveredCoordinates() + start_offset);
+
+    /* Overwrite the data with the variable_s data from the netCDF file */
+    const int err = nc_get_vara(ncid, var_id, hyperslab.start_values.data(), hyperslab.count_values.data(), &data_[start_offset]);
+    NcCheckError(err);
 }
 
 nc_type

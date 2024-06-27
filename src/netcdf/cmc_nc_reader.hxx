@@ -12,24 +12,6 @@
 namespace cmc
 {
 
-struct GeneralHyperslab
-{
-public:
-    size_t GetNumberOfCoveredCoordinates() const
-    {
-        size_t num_coords{1};
-        for (auto cv_iter = count_values.begin(); cv_iter != count_values.end(); ++cv_iter)
-        {
-            num_coords *= *cv_iter;
-        }
-        return num_coords;
-    }
-
-    std::vector<size_t> start_values;
-    std::vector<size_t> count_values;
-};
-
-
 class NcReader
 {
 public:
