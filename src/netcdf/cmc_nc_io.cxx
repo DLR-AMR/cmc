@@ -74,6 +74,18 @@ NcVariable::WriteVariableData(const int ncid, const int var_id) const
     }, variable_);
 }
 
+void
+NcVariable::SetSpecificVariable(const NcGeneralVariable& variable)
+{
+    variable_ = variable;
+}
+
+void
+NcVariable::SetSpecificVariable(NcGeneralVariable&& variable)
+{
+    variable_ = std::move(variable);
+}
+
 nc_type
 ConvertCmcTypeToNcType(const CmcType type)
 {

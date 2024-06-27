@@ -201,6 +201,8 @@ public:
     
     template<class T> void SetSpecificVariable(const NcSpecificVariable<T>& variable);
     template<class T> void SetSpecificVariable(NcSpecificVariable<T>&& variable);
+    void SetSpecificVariable(const NcGeneralVariable& variable);
+    void SetSpecificVariable(NcGeneralVariable&& variable);
 
     std::vector<NcDimension> GetDimensionsFromVariable() const;
     const std::string& GetName() const;

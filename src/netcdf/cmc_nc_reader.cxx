@@ -366,6 +366,9 @@ NcReader::ReadVariableData(const int ncid, const nc_type var_type, const std::st
         /* Add the read values to the offset variable */
         values_read += hs_iter->GetNumberOfCoveredCoordinates();
     }
+
+    /* Set the variable data within the passed NcVariable which is ought to be filled */
+    variable.SetSpecificVariable(std::move(general_variable));
 }
 
 std::pair<std::vector<NcVariable>, std::vector<NcAttribute>>
