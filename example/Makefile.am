@@ -1,10 +1,7 @@
-bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression \
-example/netcdf/cmc_gather_nc_data \
+bin_PROGRAMS += example/netcdf/cmc_gather_nc_data \
 example/lossy/cmc_amr_lossy_compression \
 example/lossy/cmc_prefix_lossy_compression \
 example/lossy/cmc_amr_lossy_different_mesh
-
-example_lossy_amr_nc_compression_cmc_lossy_amr_nc_compression_SOURCES = example/lossy_amr_nc_compression/cmc_lossy_amr_nc_compression.cxx
 
 example_netcdf_cmc_gather_nc_data_SOURCES =  example/netcdf/cmc_gather_nc_data.cxx
 
