@@ -1,8 +1,6 @@
 /** This is cmc - a compression tool for climate data sets */
 
 #include "cmc.h"
-#include "mpi/cmc_mpi.h"
-#include "t8code/cmc_t8code.h"
 
 /** Initialize cmc and it's sub-modules */
 void

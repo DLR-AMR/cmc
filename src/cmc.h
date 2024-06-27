@@ -3,7 +3,7 @@
 
 /* Include the configuration macros describing the linkage status to other libraries */
 #include "cmc_config.h"
-#include "mpi/cmc_mpi.h"
+#include "mpi/cmc_mpi.hxx"
 
 #ifdef __cplusplus
 #ifdef CMC_ENABLE_FORTRAN
