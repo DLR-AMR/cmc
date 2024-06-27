@@ -52,7 +52,7 @@ main(void)
         65,67,73,75,97
     };
 
-    cmc::ExpectEQ(std::equal(morton_indices.begin(), morton_indices.end(), correct_morton_indices.begin()));
+    cmc::ExpectTrue(std::equal(morton_indices.begin(), morton_indices.end(), correct_morton_indices.begin()));
 
     }
     

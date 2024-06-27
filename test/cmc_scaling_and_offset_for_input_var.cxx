@@ -38,7 +38,7 @@ main(void)
 
     initial_var.ApplyScalingAndOffset();
 
-    cmc::ExpectEQ(initial_var.GetType() == cmc::GetDefaultCmcType());
+    cmc::ExpectTrue(initial_var.GetType() == cmc::GetDefaultCmcType());
 
     /* Use copy constructor */
     cmc::CmcInputVariable copied_initial_variant = initial_var.GetInternalVariant();
@@ -64,7 +64,7 @@ main(void)
         300.0,302.0,304.0,306.0,308.0
     };
 
-    cmc::ExpectEQ(std::equal(copied_initial_var_data.begin(), copied_initial_var_data.end(), correctly_transformed_data.begin()));
+    cmc::ExpectTrue(std::equal(copied_initial_var_data.begin(), copied_initial_var_data.end(), correctly_transformed_data.begin()));
 
     //TODO: Check only scaling and only offset
     

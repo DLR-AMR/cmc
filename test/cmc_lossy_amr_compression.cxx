@@ -88,7 +88,7 @@ main(void)
     /* Setup the example data for the compression */
     compression_data.Setup();
 
-    cmc::ExpectEQ(compression_data.IsValidForCompression());
+    cmc::ExpectTrue(compression_data.IsValidForCompression());
 
     /* Compress the supplied variables */
     compression_data.Compress(cmc::CompressionMode::OneForOne);
@@ -106,7 +106,7 @@ main(void)
     int index = 0;
     for (auto data_iter = decompressed_double_data.begin(); data_iter != decompressed_double_data.end(); ++data_iter, ++index)
     {
-        cmc::ExpectEQ(std::abs(*data_iter - copy_of_initial_double_data[index]) <= abs_max_err);
+        cmc::ExpectTrue(std::abs(*data_iter - copy_of_initial_double_data[index]) <= abs_max_err);
     }
 
     /** DECOMPRESS THE FLOAT VARIABLE **/
@@ -121,7 +121,7 @@ main(void)
     index = 0;
     for (auto data_iter = decompressed_float_data.begin(); data_iter != decompressed_float_data.end(); ++data_iter, ++index)
     {
-        cmc::ExpectEQ(std::abs(copy_of_initial_float_data[index] - *data_iter) / std::abs(copy_of_initial_float_data[index]) <= rel_max_err);
+        cmc::ExpectTrue(std::abs(copy_of_initial_float_data[index] - *data_iter) / std::abs(copy_of_initial_float_data[index]) <= rel_max_err);
     }
 
     

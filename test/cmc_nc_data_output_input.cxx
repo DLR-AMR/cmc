@@ -82,16 +82,16 @@ main(void)
 
     /* Check the dimensions of the variable */
     const std::vector<cmc::NcDimension> test_var_dims = read_variables.front().GetDimensions();
-    cmc::ExpectEQ(!test_var_dims[0].GetName().compare("lat1"));
-    cmc::ExpectEQ(!test_var_dims[1].GetName().compare("lon1"));
+    cmc::ExpectTrue(!test_var_dims[0].GetName().compare("lat1"));
+    cmc::ExpectTrue(!test_var_dims[1].GetName().compare("lon1"));
     cmc::ExpectEQ(test_var_dims[0].GetLength(), static_cast<size_t>(lat_length));
     cmc::ExpectEQ(test_var_dims[1].GetLength(), static_cast<size_t>(lon_length));
     
     /* Check the variable's attributes */
     const std::vector<cmc::NcAttribute> test_var_atts = read_variables.front().GetAttributes();
     cmc::ExpectEQ(test_var_atts.size(), static_cast<size_t>(2));
-    cmc::ExpectEQ(!test_var_atts[0].GetName().compare("attr"));
-    cmc::ExpectEQ(!test_var_atts[1].GetName().compare("id"));
+    cmc::ExpectTrue(!test_var_atts[0].GetName().compare("attr"));
+    cmc::ExpectTrue(!test_var_atts[1].GetName().compare("id"));
 
     cmc::CmcUniversalType attr_val = test_var_atts[0].GetValue();
     cmc::ExpectEQ(std::get<float>(attr_val), static_cast<float>(1.5));
@@ -110,7 +110,7 @@ main(void)
 
     /* Check the global attribute */
     cmc::ExpectEQ(read_global_attributes.size(), static_cast<size_t>(1));
-    cmc::ExpectEQ(!read_global_attributes.front().GetName().compare("global_attr"));
+    cmc::ExpectTrue(!read_global_attributes.front().GetName().compare("global_attr"));
     cmc::CmcUniversalType global_attribute = read_global_attributes.front().GetValue();
     cmc::ExpectEQ(std::get<int16_t>(global_attribute), static_cast<int16_t>(255));
 

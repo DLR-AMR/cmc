@@ -25,9 +25,9 @@ main(void)
     split.variable_id = 1;
     settings.SplitVariableByDimension(std::move(split));
 
-    cmc::ExpectEQ(settings.AreThereVariablesToSplit());
+    cmc::ExpectTrue(settings.AreThereVariablesToSplit());
 
-    cmc::ExpectEQ(settings.AreTheSettingsValid());
+    cmc::ExpectTrue(settings.AreTheSettingsValid());
 
     /* Finalize cmc */
     cmc_finalize();
