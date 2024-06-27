@@ -40,12 +40,13 @@ public:
     std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariableMetaDataAndGlobalAttributes();
     std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariables();
 
-    std::string GetFileName() const;
+    const std::string& GetFileName() const;
     int GetNetcdfFormat() const;
     int GetNumberOfDimensions() const;
     int GetNumberOfVariables() const;
     int GetNumberOfGlobalAttributes() const;
     int GetNumberOfUnlimitedDimensions() const;
+    std::vector<int> GetUnlimitedDimensionIDs() const;
 
     NcVariable&& GetVariable(const std::string& variable_name);
 
@@ -66,7 +67,7 @@ private:
     const std::string file_name_;
     const MPI_Comm comm_;
 
-    int netcdf_format_;
+    int netcdf_format_{-1};
     int num_dimensions_{0};
     int num_variables_{0};
     int num_global_attributes_{0};

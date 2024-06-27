@@ -43,6 +43,12 @@ NcVariable::GetDimensionsFromVariable() const
     }, variable_);
 }
 
+const NcGeneralVariable&
+NcVariable::GetVariable() const
+{
+    return variable_;
+}
+
 CmcType
 NcVariable::GetCmcType() const
 {
@@ -84,6 +90,12 @@ void
 NcVariable::SetSpecificVariable(NcGeneralVariable&& variable)
 {
     variable_ = std::move(variable);
+}
+
+std::vector<NcDimension>
+NcVariable::GetDimensions() const
+{
+    return dimensions_;
 }
 
 nc_type

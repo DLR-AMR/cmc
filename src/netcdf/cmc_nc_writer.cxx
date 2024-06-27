@@ -39,7 +39,7 @@ NcWriter::NcCreate()
     if (netcdf_format_ != NC_64BIT_OFFSET && netcdf_format_ != NC_64BIT_DATA && netcdf_format_ != NC_NETCDF4 &&
         netcdf_format_ != NC_CLASSIC_MODEL && netcdf_format_ != NC_DISKLESS)
     {
-        cmc_err_msg("The netCDF file could not be created since the suppleid netcdf_format is invalid.");
+        cmc_err_msg("The netCDF file could not be created since the supplied netcdf_format is invalid.");
     }
 
 #ifdef CMC_WITH_NETCDF_PAR

@@ -427,4 +427,102 @@ NcReader::ReadVariables()
     return std::make_pair(std::move(variables), std::move(global_attributes));
 }
 
+const std::string&
+NcReader::GetFileName() const
+{
+    return file_name_;
+}
+
+int
+NcReader::GetNetcdfFormat() const
+{
+    cmc_assert(has_general_information_been_inquired_);
+    return netcdf_format_;
+}
+
+int
+NcReader::GetNumberOfDimensions() const
+{
+    cmc_assert(has_general_information_been_inquired_);
+    return num_dimensions_;
+}
+
+int
+NcReader::GetNumberOfVariables() const
+{
+    cmc_assert(has_general_information_been_inquired_);
+    return num_variables_;
+}
+
+int
+NcReader::GetNumberOfGlobalAttributes() const
+{
+    cmc_assert(has_general_information_been_inquired_);
+    return num_global_attributes_;
+}
+
+int
+NcReader::GetNumberOfUnlimitedDimensions() const
+{
+    cmc_assert(has_general_information_been_inquired_);
+    return unlimited_dimension_ids_.size();
+}   
+
+std::vector<int>
+NcReader::GetUnlimitedDimensionIDs() const
+{
+    cmc_assert(has_general_information_been_inquired_);
+    return unlimited_dimension_ids_;
+}
+
+std::vector<NcDimension>
+NcReader::GetVariableDimensions(const std::string& variable_name)
+{
+    cmc_assert(has_general_information_been_inquired_);
+    cmc_debug_msg("Number of variables: ", variables_.size());
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        cmc_debug_msg("VAriable name is: ",var_iter->GetName());
+        if (!variable_name.compare(var_iter->GetName()))
+        {
+            return var_iter->GetDimensions();
+        }
+    }
+
+    /* If no variable with the given name has been found, a warning is issued */
+    cmc_warn_msg("No variable correpsonds to the name ", variable_name, ". Therefore, no dimensions could be retrieved.");
+
+    return std::vector<NcDimension>();
+}
+
+void
+NcReader::StashVariableForReading(const std::string& variable_name, const std::vector<GeneralHyperslab>& hyperslabs)
+{
+    variable_stash_.emplace_back(variable_name, hyperslabs);
+}
+
+void
+NcReader::StashVariableForReading(const std::string& variable_name, std::vector<GeneralHyperslab>&& hyperslabs)
+{
+    variable_stash_.emplace_back(variable_name, std::move(hyperslabs));
+}
+
+void
+NcReader::StashVariableForReading(const std::string& variable_name, const GeneralHyperslab& hyperslab)
+{
+    variable_stash_.emplace_back(variable_name, hyperslab);
+}   
+
+void
+NcReader::StashVariableForReading(const std::string& variable_name, GeneralHyperslab&& hyperslab)
+{
+    variable_stash_.emplace_back(variable_name, std::move(hyperslab));
+}
+
+void
+NcReader::ClearStashedVariables()
+{
+    variable_stash_.clear();
+}
+
 }

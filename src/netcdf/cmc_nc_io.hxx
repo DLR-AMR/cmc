@@ -134,6 +134,7 @@ public:
 
     void OverwriteDataFromFile(const int ncid, const int var_id, const GeneralHyperslab& hyperslab, const size_t start_offset = 0);
 
+    const std::vector<T>& GetData() const;
     T GetMissingValue() const;
     void SetMissingValue(const CmcUniversalType& missing_value);
     void SetMissingValue(const T missing_value);
@@ -210,6 +211,11 @@ public:
     void CreateIDAttribute();
     const std::vector<NcAttribute>& GetAttributes() const;
     void WriteVariableData(const int ncid, const int var_id) const;
+
+    std::vector<NcDimension> GetDimensions() const;
+    const NcGeneralVariable& GetVariable() const;
+    template<typename T> NcSpecificVariable<T> DetachVariable();
+
 private:
     NcGeneralVariable variable_;
     std::vector<NcAttribute> attributes_;
@@ -479,6 +485,13 @@ NcSpecificVariable<T>::OverwriteDataFromFile(const int ncid, const int var_id, c
     NcCheckError(err);
 }
 
+template<class T>
+const std::vector<T>&
+NcSpecificVariable<T>::GetData() const
+{
+    return data_;
+}
+
 nc_type
 ConvertCmcTypeToNcType(const CmcType type);
 
@@ -498,6 +511,16 @@ NcVariable::SetSpecificVariable(NcSpecificVariable<T>&& variable)
     variable_ = std::move(variable);
 }
 
+template<typename T>
+NcSpecificVariable<T>
+NcVariable::DetachVariable()
+{
+    NcSpecificVariable<T> var = std::get<NcSpecificVariable<T>>(std::move(variable_));
+
+    variable_ = NcSpecificVariable<T>();
+
+    return var;
+}
 }
 
 #endif /* !CMC_NC_IO_HXX */
