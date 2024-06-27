@@ -1,4 +1,7 @@
 #include "cmc_mpi_io.h"
+
+#if 0
+
 #include "utilities/cmc_util.h"
 #include "utilities/cmc_log_functions.h"
 
@@ -120,4 +123,7 @@ cmc_mpi_calculate_nc_reading_data_distribution_zcurve(const std::vector<uint64_t
 {
     ...
 }
+#endif
+
+
 #endif

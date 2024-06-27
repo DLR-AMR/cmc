@@ -1,6 +1,8 @@
 #ifndef CMC_MPI_IO_H
 #define CMC_MPI_IO_H
 
+#if 0
+
 #include "cmc_config.h"
 #include "utilities/cmc_constants_definitions.h"
 #include "cmc_mpi.h"
@@ -82,6 +84,9 @@ struct cmc_mpi_t8_recv_data
 #ifdef CMC_ENABLE_FORTRAN
 }
 #endif
+#endif
+
+
 #endif
 
 #endif /* CMC_MPI_IO_H */
