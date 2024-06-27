@@ -9,7 +9,6 @@ src/utilities/cmc_util.h \
 src/utilities/cmc_log_functions.h \
 src/utilities/cmc_geo_util.h \
 src/utilities/cmc_fallbacks.h \
-src/utilities/cmc_container.h \
 src/mpi/cmc_mpi.h \
 src/mpi/cmc_mpi_io.h \
 src/netcdf/cmc_netcdf.hxx \
@@ -52,7 +51,6 @@ src/netcdf/cmc_nc_io.hxx \
 src/netcdf/cmc_nc_writer.hxx \
 src/netcdf/cmc_nc_reader.hxx
 
-
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
 src/fortran_interfaces/cmcc_wrapper.h 
@@ -61,7 +59,6 @@ endif
 src_libcmc_la_SOURCES = src/cmc.cxx \
 src/utilities/cmc_util.cxx \
 src/utilities/cmc_geo_util.cxx \
-src/utilities/cmc_container.cxx \
 src/mpi/cmc_mpi.cxx \
 src/mpi/cmc_mpi_io.cxx \
 src/netcdf/cmc_netcdf.cxx \
