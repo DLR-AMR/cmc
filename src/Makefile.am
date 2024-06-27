@@ -7,7 +7,6 @@ src/cmc_config.h \
 src/utilities/cmc_constants_definitions.h \
 src/utilities/cmc_util.h \
 src/utilities/cmc_log_functions.h \
-src/utilities/cmc_geo_util.h \
 src/utilities/cmc_fallbacks.h \
 src/mpi/cmc_mpi.h \
 src/mpi/cmc_mpi_io.h \
@@ -58,7 +57,6 @@ endif
 
 src_libcmc_la_SOURCES = src/cmc.cxx \
 src/utilities/cmc_util.cxx \
-src/utilities/cmc_geo_util.cxx \
 src/mpi/cmc_mpi.cxx \
 src/mpi/cmc_mpi_io.cxx \
 src/netcdf/cmc_netcdf.cxx \
