@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_hyperslab.hxx"
 #include "netcdf/cmc_netcdf.hxx"

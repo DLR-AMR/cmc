@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "netcdf/cmc_nc_io.hxx"
 #include "netcdf/cmc_nc_writer.hxx"

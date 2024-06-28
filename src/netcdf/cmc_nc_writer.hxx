@@ -1,7 +1,7 @@
 #ifndef CMC_NC_WRITER_HXX
 #define CMC_NC_WRITER_HXX
 
-#include "cmc.h"
+#include "cmc.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "netcdf/cmc_nc_io.hxx"
 #include "netcdf/cmc_netcdf.hxx"

@@ -5,7 +5,7 @@
  * @brief This file collects all functions used for accessing netCDF files and storing the data of the netCDF variables as well as the geo-spatial domain on which the variables are defined
  */
 
-#include "cmc.h"
+#include "cmc.hxx"
 #include "mpi/cmc_mpi.h"
 
 #ifdef CMC_WITH_NETCDF

@@ -1,7 +1,7 @@
 #ifndef CMC_NC_IO_HXX
 #define CMC_NC_IO_HXX
 
-#include "cmc.h"
+#include "cmc.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_hyperslab.hxx"
 #include "utilities/cmc_geo_domain.hxx"

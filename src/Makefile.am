@@ -2,7 +2,7 @@ lib_LTLIBRARIES += src/libcmc.la
 
 nodist_include_HEADERS += src/cmc_ac_config.h
 
-include_HEADERS += src/cmc.h \
+include_HEADERS += src/cmc.hxx \
 src/cmc_config.h \
 src/utilities/cmc_constants_definitions.h \
 src/utilities/cmc_log_functions.h \

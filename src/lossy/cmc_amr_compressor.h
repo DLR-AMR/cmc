@@ -4,7 +4,7 @@
  * All functions in order to perform the compression/decompression of the AMR lossy compressor lie within this file
  */
 
-#include "cmc.h"
+#include "cmc.hxx"
 #include "utilities/cmc_constants_definitions.h"
 #include "mpi/cmc_mpi.h"
 //#include "netcdf/cmc_netcdf.h"

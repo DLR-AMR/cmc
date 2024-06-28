@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_prefix.hxx"
 #include "t8code/cmc_t8_prefix_encoding.hxx"

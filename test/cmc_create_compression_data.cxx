@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"

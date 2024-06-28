@@ -1,6 +1,6 @@
 /** This is cmc - a compression tool for climate data sets */
 
-#include "cmc.h"
+#include "cmc.hxx"
 
 #include <iostream>
 

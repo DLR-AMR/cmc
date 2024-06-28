@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"

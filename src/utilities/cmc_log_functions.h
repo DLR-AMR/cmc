@@ -1,6 +1,6 @@
 #ifndef CMC_LOG_FUNCTIONS_H
 #define CMC_LOG_FUNCTIONS_H
-#include "cmc.h"
+#include "cmc.hxx"
 #include "mpi/cmc_mpi.hxx"
 
 namespace cmc
