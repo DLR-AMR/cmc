@@ -25,7 +25,7 @@ DIST_SUBDIRS = $(SUBDIRS)
 DISTCLEANFILES += src/cmc_ac_config.h 
 
 EXTRA_DIST += bootstrap \
-  INSTALL.md
+  INSTALL.md README.md
 
 include src/Makefile.am
 include example/Makefile.am
