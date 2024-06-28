@@ -1,6 +1,6 @@
 AC_INIT([cmc], [0.1.0], [niklas.boeing@dlr.de])
 AC_PREREQ(2.61)
-AC_CONFIG_SRCDIR([src/cmc.h])
+AC_CONFIG_SRCDIR([src/cmc.hxx])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([config])
 AC_PREFIX_DEFAULT([$PWD/local])
