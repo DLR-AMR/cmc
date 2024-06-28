@@ -5,6 +5,16 @@
 #include "cmc_config.h"
 #include "mpi/cmc_mpi.hxx"
 
+namespace cmc
+{
+
+void CmcInitialize();
+
+void CmcFinalize();
+
+}
+#if 0
+
 #ifdef __cplusplus
 #ifdef CMC_ENABLE_FORTRAN
 /* In case the Fortran interface is built, these function needs to be callable from C-wrapper scripts.
@@ -46,5 +56,9 @@ cmc_finalize_without_mpi();
 }
 #endif
 #endif
+
+
+#endif
+
 
 #endif /* CMC_H */
