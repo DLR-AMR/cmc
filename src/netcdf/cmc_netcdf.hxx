@@ -128,6 +128,12 @@ NcData::InquireVariables(const Hyperslab& hyperslab, Ts&&... variable_names)
     #endif
 };
 
+int NcOpenSerial(const char* path_to_file);
+
+int
+NcOpenParallel(const char* path_to_file, MPI_Comm comm);
+
+
 }
 
 #endif /* CMC_NETCDF_HXX */

@@ -2,7 +2,7 @@
 #define CMC_PREFIX_HXX
 
 #include "utilities/cmc_utilities.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 #include <array>
 #include <climits>

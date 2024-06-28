@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
@@ -29,7 +29,7 @@ main(void)
     /* Per default the settings are always all set for 'all variables' if no specific variable_id has been specified */
     settings.SetCertainErrorForDomain(std::move(error_domain));
 
-    cmc::ExpectEQ(settings.AreTheSettingsValid());
+    cmc::ExpectTrue(settings.AreTheSettingsValid());
 
     /* Finalize cmc */
     cmc_finalize();

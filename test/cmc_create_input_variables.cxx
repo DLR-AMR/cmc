@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_input_variable.hxx"
 
@@ -30,9 +30,9 @@ main(void)
 
     test_var.PushBack(double_data, std::move(hyperslab));
 
-    cmc::ExpectEQ(test_var.GetActiveFormat() == cmc::DataFormat::HyperslabFormat);
-    cmc::ExpectEQ(test_var.GetNumberCoordinates() == static_cast<size_t>(lon_length * lat_length));
-    cmc::ExpectEQ(test_var.IsValid());
+    cmc::ExpectTrue(test_var.GetActiveFormat() == cmc::DataFormat::HyperslabFormat);
+    cmc::ExpectTrue(test_var.GetNumberCoordinates() == static_cast<size_t>(lon_length * lat_length));
+    cmc::ExpectTrue(test_var.IsValid());
 
     //TODO: Test invalid variable
 

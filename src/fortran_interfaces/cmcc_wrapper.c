@@ -1,5 +1,5 @@
 #include "cmcc_wrapper.h"
-#include "cmc.h"
+#include "cmc.hxx"
 
 /** This functions opens a netCDF-File */
 int

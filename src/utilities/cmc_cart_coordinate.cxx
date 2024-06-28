@@ -1,6 +1,6 @@
 #include "utilities/cmc_cart_coordinate.hxx"
 #include "utilities/cmc_utilities.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 namespace cmc
 {

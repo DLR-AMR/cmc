@@ -20,7 +20,7 @@ void ExpectEQ(T val1, T val2)
 }
 
 inline
-void  ExpectEQ(const bool expr)
+void ExpectTrue(const bool expr)
 {
     (expr ? void(0) : std::exit(CMC_TEST_FAILURE));
 }

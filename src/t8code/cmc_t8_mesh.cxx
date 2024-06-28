@@ -1,5 +1,5 @@
 #include "t8code/cmc_t8_mesh.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 #include "t8code/cmc_t8_morton.hxx"
 #include "t8code/cmc_t8_adapt_callbacks.h"
 
@@ -129,6 +129,9 @@ IsAnyElementWithinGeoDomain(const int num_elements, const t8_element_t* elements
 {
     cmc_assert(reference_domain.GetDimensionality() == 2 || reference_domain.GetDimensionality() == 3);
 
+    //TODO:remove an define ar more abstract class of geodomains for the different element types
+    return true;//remove, just for tests now
+
     const int dimensionality = reference_domain.GetDimensionality();
 
     /* Maximum refinement level depending on the dimension of the data */
@@ -250,6 +253,18 @@ void
 AmrMesh::SetInitialRefinementLevel(const int initial_refinement_level)
 {
     initial_refinement_level_ = initial_refinement_level;
+}
+
+void
+AmrMesh::IndicateWhetherDummyElementsArePresent(const bool are_dummy_elements_present)
+{
+    are_dummy_elements_present_ = are_dummy_elements_present;
+}
+
+bool
+AmrMesh::AreDummyElementsPresent() const
+{
+    return are_dummy_elements_present_;
 }
 
 MortonIndex

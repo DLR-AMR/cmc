@@ -7,6 +7,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx" 
 #include "t8code/cmc_t8_data.hxx"
+#include "t8code/cmc_t8_mesh.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "t8code/cmc_t8_data_variables_forward.hxx"
 #include "utilities/cmc_output_variable_forward.hxx"
@@ -54,6 +55,7 @@ public:
     ~CompressionData() = default;
 
     void Setup();
+    void Setup(const AmrMesh& mesh);
     void Compress(const CompressionMode compression_mode = CompressionMode::OneForOne);
     void SupplementarySZLikeCompression();
     //void Compress(const char* path_to_file);

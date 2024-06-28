@@ -11,6 +11,7 @@
 #include <array>
 #include <cassert>
 #include <limits>
+#include <string>
 
 #define CMC_MACRO_EXPANSION(x) #x
 #define CMC_MACRO_EXPANSION2(x) CMC_MACRO_EXPANSION(x)
@@ -98,6 +99,54 @@ GetDimensionVectorFromLayout(const DataLayout layout);
 
 int
 GetDimensionalityOfDataLayout(const DataLayout layout);
+
+std::string
+GetDimensionName(const Dimension dimension);
+
+template<typename T>
+constexpr CmcType
+ConvertToCmcType()
+{
+    if constexpr (std::is_same_v<T, int8_t>)
+    {
+        return CmcType::Int8_t;
+    } else if constexpr (std::is_same_v<T, char>)
+    {
+        return CmcType::Char;
+    } else if constexpr (std::is_same_v<T, int16_t>)
+    {   
+        return CmcType::Int16_t;
+    } else if constexpr (std::is_same_v<T, int32_t>)
+    {
+        return CmcType::Int32_t;
+    } else if constexpr (std::is_same_v<T, float>)
+    {
+        return CmcType::Float;
+    } else if constexpr (std::is_same_v<T, double>)
+    {
+        return CmcType::Double;
+    } else if constexpr (std::is_same_v<T, uint8_t>)
+    {
+        return CmcType::Uint8_t;
+    } else if constexpr (std::is_same_v<T, uint16_t>)
+    {
+        return CmcType::Uint16_t;
+    } else if constexpr (std::is_same_v<T, uint32_t>)
+    {
+        return CmcType::Uint32_t;
+    } else if constexpr (std::is_same_v<T, int64_t>)
+    {
+        return CmcType::Int64_t;
+    } else if constexpr (std::is_same_v<T, uint64_t>)
+    {
+        return CmcType::Uint64_t;
+    } else
+    {
+        std::cout << "[cmc] ERROR: The template parameter could not be converted to a CmcType." << std::endl;
+        std::exit(EXIT_FAILURE);
+        return CmcType::TypeUndefined;
+    }
+}
 
 }
 

@@ -40,18 +40,11 @@ MPIFinalize();
 [[noreturn]] void
 MPIAbort(const int _err_code, const char* _location);
 
-
-//#define cmc_mpi_check_err(err) ((err) == MPI_SUCCESS ? (void) 0 : cmc_mpi_abort(err, CMC_FILE_LOCATION))
-
-inline
-void
-MPICheckError(const int return_value)
-{
-    if (return_value != MPI_SUCCESS)
-    {
-        MPIAbort(return_value, CMC_FILE_LOCATION);
-    }
-}
+/**
+ * @brief An MPI error function checking the return value of MPI functions and 
+ * issues an error if the MPI operation was not successfull.
+ */
+#define MPICheckError(err) ((err) == MPI_SUCCESS ? (void) 0 : MPIAbort(err, CMC_FILE_LOCATION))
 
 }
 

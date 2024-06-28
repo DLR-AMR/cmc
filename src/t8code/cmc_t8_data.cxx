@@ -146,6 +146,22 @@ AmrData::BuildInitialMesh()
 
     initial_mesh_.SetMesh(initial_forest);
     initial_mesh_.SetInitialRefinementLevel(initial_refinement_level);
+
+    /* In most cases, there will be dummy elements present within the mesh */
+    initial_mesh_.IndicateWhetherDummyElementsArePresent(true);
+
+}
+
+void
+AmrData::SetInitialMesh(const AmrMesh& mesh)
+{
+    cmc_assert(mesh.AreDummyElementsPresent() == false);
+
+    /* Set the initial mesh */
+    initial_mesh_ = mesh;
+
+    /* Since we receive a mesh, we expect that there are no dummy elements present */
+    initial_mesh_.IndicateWhetherDummyElementsArePresent(false);
 }
 
 std::vector<IndexReduction>
@@ -404,6 +420,14 @@ AmrData::SetupVariablesForCompression()
         /* Set the intial mesh */
         var_iter->SetAmrMesh(initial_mesh_);
     }
+
+    t8_vtk_data_field_t vtk_data;
+    std::vector<double> arr = variables_.front().GetDataAsDoubleVector();
+    vtk_data.data = arr.data();
+    strcpy (vtk_data.description, "Temp");
+    vtk_data.type = T8_VTK_SCALAR;
+
+    t8_forest_write_vtk_ext(initial_mesh_.GetMesh(), "initial_forest_with_data_diff_elems", 1,0,1,1,0,0,0,1, &vtk_data);
 }
 
 size_t AmrData::GetNumberOfInputVariables() const
@@ -597,6 +621,88 @@ AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain
 
         var_iter->UpdateDecompressionData();
     }
+    #if 0
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        std::vector<double> decompressed_data = var_iter->GetDataAsDoubleVector();
+        cmc_debug_msg("Size of decompressed data vector: ", decompressed_data.size());
+        std::vector<short> finit_data(decompressed_data.size(), 0);
+        std::string fname = "era5_initial_t_sfc_ordered_" + std::to_string(var_iter->GetGlobalContextInformation());
+        const int num_elems_initial_mesh = 1440*721;
+        FILE* file = fopen(fname.c_str(), "rb");
+        fread(finit_data.data(), sizeof(short), num_elems_initial_mesh, file);
+        fclose(file);
+        cmc_debug_msg("Size decompressed data var: ", decompressed_data.size(), " und Soll_wert: 1440*721 = ", 1440*721);
+        int larger_errs = 0;
+        double max_err = 0.0;
+        double dmax_err = 0.0;
+        double scale_factor = 0.00200295932540368;
+        double add_offset = 250.108564255201;
+        for  (size_t init_acces = 0; init_acces < decompressed_data.size(); ++init_acces)
+        {
+
+            double ferr = std::abs(static_cast<double>(finit_data[init_acces]) - decompressed_data[init_acces]);
+            double dferr = std::abs((scale_factor * static_cast<double>(finit_data[init_acces]) + add_offset) - (scale_factor * decompressed_data[init_acces] + add_offset));
+
+            #if 0
+            if (ferr > 30000.0)
+            {
+                ++larger_errs;
+            }
+            else 
+            #endif
+
+            if (ferr > max_err)
+            {
+                max_err = ferr;
+            }
+            if (dferr > dmax_err)
+            {
+                dmax_err = dferr;
+            }
+        }
+
+        cmc_debug_msg("For variable ", var_iter->GetGlobalContextInformation(), " the CHAR max error is: ", max_err);
+        cmc_debug_msg("For variable ", var_iter->GetGlobalContextInformation(), " the DOUBLE max error is: ", dmax_err);
+        //cmc_debug_msg("It had larger erroros: ", larger_errs);
+    }
+    #endif
+
+    #if 0
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        std::vector<double> decompressed_data = var_iter->GetDataAsDoubleVector();
+        cmc_debug_msg("Size of decompressed data vector: ", decompressed_data.size());
+
+        std::vector<float> finit_data(decompressed_data.size(), 0);
+        std::string fname = "era5_initial_t_sfc_ordered_" + std::to_string(var_iter->GetGlobalContextInformation());
+        const int num_elems_initial_mesh = 1440*721;
+        FILE* file = fopen(fname.c_str(), "rb");
+        fread(finit_data.data(), sizeof(float), num_elems_initial_mesh, file);
+        fclose(file);
+
+        double max_err = 0.0;
+        //const double scale = 9.25404335362387E-08;
+        //const double offset = 0.00790779508439177;
+
+        
+        for (size_t i = 0; i < decompressed_data.size(); ++i)
+        {
+            double fdata = static_cast<double>(finit_data[i]);
+
+            float rel_err = std::abs(fdata - decompressed_data[i]) / std::abs(fdata);
+            //if (rel_err > 2.0)
+            //{
+            //    cmc_debug_msg("Error für Index ", i, " greater than limit: ", rel_err);
+            //}
+            if (rel_err > max_err)
+            {
+                max_err = rel_err;
+            }
+        }
+        cmc_debug_msg("For variable ", var_iter->GetGlobalContextInformation(), " the relative max error is: ", max_err);
+    }
+    #endif
 }
 
 void
@@ -645,6 +751,10 @@ AmrData::DecompressVariable(const int variable_id)
 
     const int corresponding_variables = CheckNumberOfCorrespondingVariables(variables_, variable_id);
 
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        cmc_debug_msg("Id of variable: ", var_iter->GetID());
+    }
     auto first_var_iter = std::find_if(variables_.begin(), variables_.end(), [&variable_id](const Var& var){return var.GetID() == variable_id;});
     
     if (first_var_iter == variables_.end())

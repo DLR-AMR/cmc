@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"
@@ -11,7 +11,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     
     {
     
@@ -19,8 +19,9 @@ main(void)
     //const std::string file = "../../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
     //const std::string file = "../../data/tas_decreg_europe_v20140120_20010101_20010131.nc";
     //const std::string file = "../../data/era5_reanalysis_data_16_11_23.nc";
-    const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
-
+    //const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
+    const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
+    
     /* Create an object which interatcs with the file and opens it */
     cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
 
@@ -30,11 +31,17 @@ main(void)
     ///* Inquire the hyperslab of data for the given variables */
     //nc_data.InquireVariables(hyperslab, "t2m");
 
-    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
-                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
-                             cmc::DimensionInterval(cmc::Dimension::Lev, 0, 37)
-                             );
+    //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
+    //                         cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
+    //                         cmc::DimensionInterval(cmc::Dimension::Lev, 0, 37)
+    //                         );
 
+    nc_data.SetHintHeightDimension(6); //Set plev as height dimension
+
+    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1200),
+                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 601),
+                             cmc::DimensionInterval(cmc::Dimension::Lev, 0, 1)
+                             );
     //Test domain
     //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 8),
     //                         cmc::DimensionInterval(cmc::Dimension::Lat, 0, 8)
@@ -53,14 +60,14 @@ main(void)
     /* Create compression settings */
     cmc::CompressionSettings settings;
 
-    const double abs_max_err = 3.0;
+    const double abs_max_err = 0.0;
     settings.SetAbsoluteErrorCriterion(abs_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
     //const double rel_max_err = 0.0005;
     //settings.SetRelativeErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
-    cmc::SplitVariable split(cmc::kSplitAllVariables, cmc::Dimension::Lev);
-    settings.SplitVariableByDimension(split);
+    //cmc::SplitVariable split(cmc::kSplitAllVariables, cmc::Dimension::Lev);
+    //settings.SplitVariableByDimension(split);
 
     #endif
 
@@ -102,7 +109,7 @@ main(void)
     }
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return 0;
 }

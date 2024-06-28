@@ -2,15 +2,11 @@ lib_LTLIBRARIES += src/libcmc.la
 
 nodist_include_HEADERS += src/cmc_ac_config.h
 
-include_HEADERS += src/cmc.h \
+include_HEADERS += src/cmc.hxx \
 src/cmc_config.h \
 src/utilities/cmc_constants_definitions.h \
-src/utilities/cmc_util.h \
-src/utilities/cmc_log_functions.h \
-src/utilities/cmc_geo_util.h \
+src/utilities/cmc_log_functions.hxx \
 src/utilities/cmc_fallbacks.h \
-src/utilities/cmc_container.h \
-src/mpi/cmc_mpi.h \
 src/mpi/cmc_mpi_io.h \
 src/netcdf/cmc_netcdf.hxx \
 src/utilities/cmc_utilities.hxx \
@@ -46,8 +42,11 @@ src/utilities/cmc_prefix.hxx \
 src/lossy/cmc_prefix_lossy_compression.hxx \
 src/t8code/cmc_t8_byte_variable.hxx \
 src/t8code/cmc_t8_variables.hxx \
-src/t8code/cmc_t8_prefix_encoding.hxx 
-
+src/t8code/cmc_t8_prefix_encoding.hxx \
+src/netcdf/cmc_nc_decompress.hxx \
+src/netcdf/cmc_nc_io.hxx \
+src/netcdf/cmc_nc_writer.hxx \
+src/netcdf/cmc_nc_reader.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -55,9 +54,6 @@ src/fortran_interfaces/cmcc_wrapper.h
 endif
 
 src_libcmc_la_SOURCES = src/cmc.cxx \
-src/utilities/cmc_util.cxx \
-src/utilities/cmc_geo_util.cxx \
-src/utilities/cmc_container.cxx \
 src/mpi/cmc_mpi.cxx \
 src/mpi/cmc_mpi_io.cxx \
 src/netcdf/cmc_netcdf.cxx \
@@ -83,7 +79,11 @@ src/utilities/cmc_cart_coordinate.cxx \
 src/utilities/cmc_geo_utilities.cxx \
 src/lossy/cmc_sz_like_compression.cxx \
 src/lossy/cmc_prefix_lossy_compression.cxx \
-src/t8code/cmc_t8_byte_variable.cxx
+src/t8code/cmc_t8_byte_variable.cxx \
+src/netcdf/cmc_nc_decompress.cxx \
+src/netcdf/cmc_nc_writer.cxx \
+src/netcdf/cmc_nc_io.cxx \
+src/netcdf/cmc_nc_reader.cxx
 
 
 if ENABLE_FORTRAN

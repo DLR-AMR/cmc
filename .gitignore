@@ -35,3 +35,5 @@ src/config.h.in
 *.pvtu
 *.mod
 *~
+.*
+!/.gitignore

@@ -4,7 +4,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable_forward.hxx"
 #include "utilities/cmc_variable_transformer_forward.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_dimension_interval.hxx"
 #include "utilities/cmc_hyperslab.hxx"
 #include "t8code/cmc_t8_morton.hxx"

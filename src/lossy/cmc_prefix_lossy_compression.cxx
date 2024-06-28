@@ -206,8 +206,9 @@ PrefixCompressionData::DecompressVariableEGU(std::vector<PrefixDecompressionData
             std::memcpy(&inval, &initial_data2[ii], 4);
             uint32_t deval{0};
             std::memcpy(&deval, &decompressed_data_new[ii], 4);
-            //cmc_debug_msg("Initial Value: ", std::bitset<8*4>(inval));
-            //cmc_debug_msg("Decompr Value: ",std::bitset<8*4>(deval));
+            cmc_debug_msg("Initial Value: ", std::bitset<8*4>(inval), " als value: ", initial_data2[ii]);
+            cmc_debug_msg("Decompr Value: ",std::bitset<8*4>(deval), " als value: ", decompressed_data_new[ii]);
+            cmc_debug_msg("Error Decompression: ", std::abs(decompressed_data_new[ii] - initial_data2[ii]));
             if (std::abs(decompressed_data_new[ii] - initial_data2[ii]) > max_err2)
             {
                 max_err2 = std::abs(decompressed_data_new[ii] - initial_data2[ii]);
@@ -469,8 +470,10 @@ PrefixCompressionData::WriteCompressedDataEGU(const std::string& file_name) cons
     pd_data.domain = compression_variables_.begin()->GetGlobalDomain();
     pd_data.current_layout = static_cast<DataLayout>(1); 
     pd_data.missing_value = static_cast<float>(-32767.0);
+    //pd_data.missing_value = static_cast<float>(-9.0E+33); //MPTRAC missing value
     pd_data.type = CmcType::Float;
     pd_data.precompression_layout = static_cast<DataLayout>(1); 
+    //pd_data.id = 10;//MPTRAC t
     pd_data.id = 5;
     std::vector<PrefixDecompressionData> pd_vec;
     pd_vec.push_back(std::move(pd_data));

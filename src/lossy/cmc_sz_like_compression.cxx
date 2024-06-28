@@ -1,5 +1,5 @@
 #include "lossy/cmc_sz_like_compression.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 #include <tuple>
 #include <vector>

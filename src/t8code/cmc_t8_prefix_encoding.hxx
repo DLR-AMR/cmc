@@ -1020,6 +1020,8 @@ EncodeAndAppendSuffixesEGU(std::vector<uint8_t>& serialized_variable, const std:
                 int pref_index = 0;
                 // 01110001 1110101 |0 Start: byte 1, bit 7, Significant Bits: 15 (0xxx xxxx) (111000)
                 ////// Old try for tests
+                #if 1
+                //Preserve this variation
                 while (num_bits_encoded < num_significant_bits)
                 {
                     const int num_considered_bits = (num_significant_bits - num_bits_encoded > CHAR_BIT ? CHAR_BIT : num_significant_bits - num_bits_encoded);
@@ -1073,7 +1075,51 @@ EncodeAndAppendSuffixesEGU(std::vector<uint8_t>& serialized_variable, const std:
                     num_bits_encoded += num_considered_bits;
                     ++pref_index;
                 }
+                #endif
                 /***** New TRY *********************/
+                #if 0
+                while (num_bits_encoded < num_significant_bits)
+                {
+                    const int num_considered_bits = (num_significant_bits - num_bits_encoded > CHAR_BIT ? CHAR_BIT : num_significant_bits - num_bits_encoded);
+                    const uint8_t significant_byte = significant_bits[pref_index];
+
+                    const bool is_next_byte_full = ((num_significant_bits - num_bits_encoded) >= (CHAR_BIT - start_offset_encodings + CHAR_BIT));
+
+                    if (start_offset_encodings >= CHAR_BIT)
+                    {
+                        suffix_encodings.push_back(significant_byte >> (CHAR_BIT - num_considered_bits));
+                        start_offset_encodings = num_considered_bits;
+                    } else if (num_considered_bits < CHAR_BIT - start_offset_encodings)
+                    {
+                        cmc_assert(is_next_byte_full == false);
+                        suffix_encodings.back() |= (significant_byte >> ((CHAR_BIT - start_offset_encodings) - num_considered_bits));
+                        start_offset_encodings += num_considered_bits;
+                    } else if (num_considered_bits == CHAR_BIT - start_offset_encodings)
+                    {
+
+                    } else
+                    {
+                        //The problem: if the the prefix/suffx strechtes over three or more bytes, al "middle" needs to be reversly filled
+                        /* Needs to be split */
+                        
+
+                        if (is_next_byte_full)
+                        {
+
+                        } else
+                        {
+                            const uint8_t inter_pref_encoding = significant_byte >> start_offset_encodings;
+                            suffix_encodings.back() |= inter_pref_encoding << start_offset_encodings;
+
+                            const uint8_t inter_pref_encoding1 = significant_byte << (CHAR_BIT - start_offset_encodings);
+                            suffix_encodings.push_back(inter_pref_encoding1 >> (CHAR_BIT - (num_considered_bits - (CHAR_BIT - start_offset_encodings))));
+                            start_offset_encodings = num_considered_bits - (CHAR_BIT - start_offset_encodings);
+                        }
+                    }
+                    num_bits_encoded += num_considered_bits;
+                    ++pref_index;
+                }
+                #endif
                 #if 0
                 //Looks better but not completely correct
                 if (start_offset_encodings >= CHAR_BIT)

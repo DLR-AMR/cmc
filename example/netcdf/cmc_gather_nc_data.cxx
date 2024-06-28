@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_hyperslab.hxx"
 #include "netcdf/cmc_netcdf.hxx"
@@ -6,7 +6,7 @@
 int main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     {
         /* Specify the path of the netCDF file */
         const std::string file = "../../data/era5_reanalysis_data_16_11_23.nc";
@@ -25,7 +25,7 @@ int main(void)
         nc_data.CloseFileHandle();
     }
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return 0;
 }

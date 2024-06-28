@@ -1,5 +1,5 @@
 #include "utilities/cmc_utilities.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 namespace cmc
 {
@@ -202,5 +202,27 @@ GetDataLayoutAfterRemoval(const DataLayout initial_layout, const Dimension remov
     }
 }
 
+std::string
+GetDimensionName(const Dimension dimension)
+{
+    switch (dimension)
+    {
+        case Dimension::Lon:
+            return std::string{"lon"};
+        break;
+        case Dimension::Lat:
+            return std::string{"lat"};
+        break;
+        case Dimension::Lev:
+            return std::string{"lev"};
+        break;
+        case Dimension::Time:
+            return std::string{"time"};
+        break;
+        default:
+            cmc_err_msg("A not supported dimension has been supplied.");
+            return std::string{"dim_err"};
+    }
+}
 
 }

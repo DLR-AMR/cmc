@@ -481,7 +481,7 @@ DecodePrefixEGU (t8_forest_t forest,
     DecompressionPrefixAdaptDataEGU<N>* adapt_data = static_cast<DecompressionPrefixAdaptDataEGU<N>*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
 
-    const int initial_refinement_level = 3;
+    const int initial_refinement_level = 3;//
 
     /* Possibly, adapt the position indicators */
     if (adapt_data->prefix_indication_bit_position == CHAR_BIT)
@@ -562,7 +562,7 @@ DecodeSuffixEGU (t8_forest_t forest,
     DecompressionPrefixAdaptDataEGU<N>* adapt_data = static_cast<DecompressionPrefixAdaptDataEGU<N>*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
 
-    const int initial_refinement_level = 3;
+    const int initial_refinement_level = 3;//
 
     /* Possibly, adapt the position indicators */
     if (adapt_data->prefix_indication_bit_position == CHAR_BIT)

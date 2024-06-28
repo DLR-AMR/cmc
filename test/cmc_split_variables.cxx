@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
@@ -58,16 +58,16 @@ main(void)
 
     for (auto iter = amr_compression_data.GetInputVariablesBegin(); iter != amr_compression_data.GetInputVariablesEnd(); ++iter)
     {
-        cmc::ExpectEQ(iter->GetInitialDataLayout() == cmc::DataLayout::Lon_Lat);
+        cmc::ExpectTrue(iter->GetInitialDataLayout() == cmc::DataLayout::Lon_Lat);
         
         const cmc::GeoDomain& var_global_domain = iter->GetGlobalDomain();
-        cmc::ExpectEQ(var_global_domain.GetDimensionality() == 2);
-        cmc::ExpectEQ(var_global_domain.GetDimensionStartIndex(cmc::Dimension::Lon) == 0 &&
-                      var_global_domain.GetDimensionEndIndex(cmc::Dimension::Lon) == lon_length);
-        cmc::ExpectEQ(var_global_domain.GetDimensionStartIndex(cmc::Dimension::Lat) == 0 &&
-                      var_global_domain.GetDimensionEndIndex(cmc::Dimension::Lat) == lat_length);
-        cmc::ExpectEQ(var_global_domain.GetDimensionStartIndex(cmc::Dimension::Lev) == 0 &&
-                      var_global_domain.GetDimensionEndIndex(cmc::Dimension::Lev) == 0);
+        cmc::ExpectTrue(var_global_domain.GetDimensionality() == 2);
+        cmc::ExpectTrue(var_global_domain.GetDimensionStartIndex(cmc::Dimension::Lon) == 0 &&
+                        var_global_domain.GetDimensionEndIndex(cmc::Dimension::Lon) == lon_length);
+        cmc::ExpectTrue(var_global_domain.GetDimensionStartIndex(cmc::Dimension::Lat) == 0 &&
+                        var_global_domain.GetDimensionEndIndex(cmc::Dimension::Lat) == lat_length);
+        cmc::ExpectTrue(var_global_domain.GetDimensionStartIndex(cmc::Dimension::Lev) == 0 &&
+                        var_global_domain.GetDimensionEndIndex(cmc::Dimension::Lev) == 0);
 
     }
 

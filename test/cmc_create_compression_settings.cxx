@@ -1,6 +1,6 @@
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
 #include "test/cmc_test.hxx"
-#include "cmc.h"
+#include "cmc.hxx"
 
 int
 main(void)
@@ -25,9 +25,9 @@ main(void)
     split.variable_id = 1;
     settings.SplitVariableByDimension(std::move(split));
 
-    cmc::ExpectEQ(settings.AreThereVariablesToSplit());
+    cmc::ExpectTrue(settings.AreThereVariablesToSplit());
 
-    cmc::ExpectEQ(settings.AreTheSettingsValid());
+    cmc::ExpectTrue(settings.AreTheSettingsValid());
 
     /* Finalize cmc */
     cmc_finalize();

@@ -3,7 +3,17 @@
 
 /* Include the configuration macros describing the linkage status to other libraries */
 #include "cmc_config.h"
-#include "mpi/cmc_mpi.h"
+#include "mpi/cmc_mpi.hxx"
+
+namespace cmc
+{
+
+void CmcInitialize();
+
+void CmcFinalize();
+
+}
+#if 0
 
 #ifdef __cplusplus
 #ifdef CMC_ENABLE_FORTRAN
@@ -46,5 +56,9 @@ cmc_finalize_without_mpi();
 }
 #endif
 #endif
+
+
+#endif
+
 
 #endif /* CMC_H */

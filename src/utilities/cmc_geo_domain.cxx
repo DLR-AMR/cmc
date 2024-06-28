@@ -1,5 +1,5 @@
 #include "utilities/cmc_geo_domain.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 namespace cmc
 {

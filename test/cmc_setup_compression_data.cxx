@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
@@ -62,9 +62,9 @@ main(void)
 
     const size_t num_compression_vars = compression_data.GetNumberOfCompressionVariables();
 
-    cmc::ExpectEQ(num_input_vars == num_compression_vars);
+    cmc::ExpectTrue(num_input_vars == num_compression_vars);
 
-    cmc::ExpectEQ(compression_data.IsValidForCompression());
+    cmc::ExpectTrue(compression_data.IsValidForCompression());
 
     }
 

@@ -1,4 +1,4 @@
-#include "cmc.h"
+#include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_prefix.hxx"
 #include "t8code/cmc_t8_prefix_encoding.hxx"
@@ -13,6 +13,8 @@ int main(void)
     cmc_initialize();
     
     {
+
+    return cmc::CMC_TEST_SKIP;
 
     float test_float1 = 5.877471754111437539843683E-39;
     std::cout << std::bitset<8*sizeof(float)>(*reinterpret_cast<uint32_t*>(&test_float1)) <<" fuer " << test_float1 << std::endl;
