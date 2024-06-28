@@ -13,7 +13,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     
     {
     
@@ -128,7 +128,7 @@ main(void)
     }
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }

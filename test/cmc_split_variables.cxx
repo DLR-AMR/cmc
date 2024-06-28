@@ -10,7 +10,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     
     /* Create some examplary variable with data */
     const int var_id = 0;
@@ -72,7 +72,7 @@ main(void)
     }
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }

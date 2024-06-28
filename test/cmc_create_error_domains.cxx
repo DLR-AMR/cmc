@@ -7,7 +7,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     
     cmc::CompressionSettings settings;
 
@@ -32,7 +32,7 @@ main(void)
     cmc::ExpectTrue(settings.AreTheSettingsValid());
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }

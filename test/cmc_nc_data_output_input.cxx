@@ -10,7 +10,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
 
     /* Initialize a variable for the netcdf output */
     std::vector<cmc::NcVariable> variables;
@@ -115,7 +115,7 @@ main(void)
     cmc::ExpectEQ(std::get<int16_t>(global_attribute), static_cast<int16_t>(255));
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }

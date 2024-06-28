@@ -10,7 +10,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     
     /* Create some exemlpary variable with data */
     cmc::InputVariable<double> test_var("ex_double_data", 0, cmc::DataLayout::Lon_Lat);
@@ -39,7 +39,7 @@ main(void)
     [[maybe_unused]] cmc::CompressionData compression_data(variables_to_compress, settings);
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }

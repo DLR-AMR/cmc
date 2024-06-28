@@ -8,7 +8,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     
     cmc::InputVariable<int32_t> default_var;
 
@@ -37,7 +37,7 @@ main(void)
     //TODO: Test invalid variable
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }

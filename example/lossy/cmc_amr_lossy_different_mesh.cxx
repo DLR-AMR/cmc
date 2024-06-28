@@ -7,8 +7,7 @@
 #include "netcdf/cmc_netcdf.hxx"
 
 #include "t8_cmesh.h"
-#include "t8_cmesh_vtk.h"
-#include "t8_forest.h"
+#include "t8_forest/t8_forest.h"
 #include "t8_geometry/t8_geometry.h"
 #if CMC_WITH_T8CODE
 #include <t8_eclass.h>
@@ -50,7 +49,7 @@ main(void)
         t8_cmesh_set_tree_class (cmesh, 0, T8_ECLASS_QUAD);
         t8_cmesh_set_tree_class (cmesh, 1, T8_ECLASS_TRIANGLE);
         
-        t8_cmesh_register_geometry (cmesh, linear_geom);
+        t8_cmesh_register_geometry (cmesh, &linear_geom);
 
         t8_cmesh_set_tree_vertices (cmesh, 0, vertices_quad, 4);
         t8_cmesh_set_tree_vertices (cmesh, 1, vertices_triangle, 3);

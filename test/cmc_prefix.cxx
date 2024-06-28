@@ -10,7 +10,7 @@
 int main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
     
     {
 
@@ -372,7 +372,7 @@ int main(void)
     cmc::VectorView<uint8_t> vvrle(rle_encoding.data(), rle_encoding.size());
     auto[decoded_rle, num_bits] = cmc::DecodeRunLengthEncoding(vvrle);
 
-    cmc_debug_msg("Size of decoded rle: ", decoded_rle.size(), " and num Bits: ", (unsigned)num_bits);
+    //cmc::cmc_debug_msg("Size of decoded rle: ", decoded_rle.size(), " and num Bits: ", (unsigned)num_bits);
     uint16_t dddddd = 0;
     std::memcpy(&dddddd, decoded_rle.data(), decoded_rle.size());
     std::cout << std::bitset<8*sizeof(uint16_t)>(dddddd) << std::endl;
@@ -380,7 +380,7 @@ int main(void)
     }
 
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }

@@ -8,7 +8,7 @@ int
 main(void)
 {
     /* Initialize cmc */
-    cmc_initialize();
+    cmc::CmcInitialize();
 
     cmc::InputVariable<int32_t> test_var("data_to_be_transformed", 0, cmc::DataLayout::Lon_Lat);
 
@@ -69,7 +69,7 @@ main(void)
     //TODO: Check only scaling and only offset
     
     /* Finalize cmc */
-    cmc_finalize();
+    cmc::CmcFinalize();
 
     return cmc::CMC_TEST_SUCCESS;
 }
