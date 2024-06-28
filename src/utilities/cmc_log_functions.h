@@ -1,7 +1,10 @@
 #ifndef CMC_LOG_FUNCTIONS_H
 #define CMC_LOG_FUNCTIONS_H
 #include "cmc.h"
-#include "mpi/cmc_mpi.h"
+#include "mpi/cmc_mpi.hxx"
+
+namespace cmc
+{
 
 template<typename T>
 void
@@ -26,7 +29,7 @@ cmc_global_msg(MPI_Comm comm, Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(comm, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (rank == 0)
         {
             std::cout << "[cmc] ";
@@ -46,7 +49,7 @@ cmc_global_msg(Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (rank == 0)
         {
             std::cout << "[cmc] ";
@@ -65,9 +68,9 @@ cmc_debug_msg(MPI_Comm comm, Ts... msgs)
      #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(comm, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         err = MPI_Comm_size(comm, &size);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (size > 1)
         {
             std::cout << "[cmc] [rank " << rank << "] DEBUG: ";
@@ -88,9 +91,9 @@ cmc_debug_msg(Ts... msgs)
      #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         err = MPI_Comm_size(MPI_COMM_WORLD, &size);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (size > 1)
         {
             std::cout << "[cmc] [rank " << rank << "] DEBUG: ";
@@ -111,9 +114,9 @@ cmc_msg(MPI_Comm comm, Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(comm, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         err = MPI_Comm_size(comm, &size);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (size > 1)
         {
             std::cout << "[cmc] [rank " << rank << "] ";
@@ -134,9 +137,9 @@ cmc_msg(Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         err = MPI_Comm_size(MPI_COMM_WORLD, &size);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (size > 1)
         {
             std::cout << "[cmc] [rank " << rank << "] ";
@@ -157,11 +160,11 @@ cmc_err_msg(MPI_Comm comm, Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(comm, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         std::cout << "[cmc] [rank " << rank << "] ERROR: ";
         cmc_print_args(msgs...);
         err = MPI_Abort(comm, MPI_ERR_OTHER);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         exit(EXIT_FAILURE);
     #else
         std::cout << "[cmc] ERROR: ";
@@ -177,11 +180,11 @@ cmc_err_msg(Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         std::cout << "[cmc] [rank " << rank << "] ERROR: ";
         cmc_print_args(msgs...);
         err = MPI_Abort(MPI_COMM_WORLD, MPI_ERR_OTHER);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         exit(EXIT_FAILURE);
     #else
         std::cout << "[cmc] ERROR: ";
@@ -199,9 +202,9 @@ cmc_warn_msg(MPI_Comm comm, Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(comm, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         err = MPI_Comm_size(comm, &size);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (size > 1)
         {
             std::cout << "[cmc] [rank " << rank << "] WARNING: ";
@@ -222,9 +225,9 @@ cmc_warn_msg(Ts... msgs)
     #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         err = MPI_Comm_size(MPI_COMM_WORLD, &size);
-        cmc_mpi_check_err(err);
+        MPICheckError(err);
         if (size > 1)
         {
             std::cout << "[cmc] [rank " << rank << "] WARNING: ";
@@ -237,4 +240,7 @@ cmc_warn_msg(Ts... msgs)
         cmc_print_args(msgs...);
     #endif
 }
+
+}
+
 #endif /* CMC_LOG_FUNCTIONS_H */
