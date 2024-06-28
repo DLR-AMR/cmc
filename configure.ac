@@ -383,7 +383,7 @@ AC_DEFINE_UNQUOTED(LIBS,        ["${LIBS}"],        [Libraries])
 AC_PROG_INSTALL
 
 # Initialize automake after all compilers and preprocessors have been found
-AM_INIT_AUTOMAKE([parallel-tests subdir-objects])
+AM_INIT_AUTOMAKE([foreign parallel-tests subdir-objects])
 
 # Initialize Libtool
 LT_INIT
