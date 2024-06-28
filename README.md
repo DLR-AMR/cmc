@@ -8,7 +8,7 @@ CMC can be used either as a post-processing tool in order to read and compress d
 
 Interfaces for C and Fortran codes as well as several further compression approaches are underway.  
 
-The capabilities of CMC encompass compression based on point-wise absolute and relative error critera. Moreover, splitting of higher dimensional data into several lower dimensional data slices is provided alongside the opportunity to formulate region-wie varying error thresholds for the compression to comply to - that includes in particular nested error domains.  
+The capabilities of CMC encompass compression based on point-wise absolute and relative error critera. Moreover, splitting of higher dimensional data into several lower dimensional data slices is provided alongside the opportunity to formulate region-wise varying error thresholds for the compression to comply to - that includes in particular nested error domains.  
 
 Besides the opportunity to perform lossy compression, a lossless compression mode is available as well.  
 
