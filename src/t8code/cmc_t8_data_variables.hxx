@@ -5,7 +5,7 @@
  */
 #include "t8code/cmc_t8_data_variables_forward.hxx"
 #include "utilities/cmc_variable_transformer_forward.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "t8code/cmc_t8_mesh.hxx"

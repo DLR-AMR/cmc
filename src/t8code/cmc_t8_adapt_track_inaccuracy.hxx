@@ -11,7 +11,7 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 namespace cmc
 {
 

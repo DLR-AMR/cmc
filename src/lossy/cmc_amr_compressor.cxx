@@ -1,6 +1,6 @@
 #include "cmc_amr_compressor.h"
 #include "t8code/cmc_t8code_data.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_container.h"
 #include "component_interfaces/cmc_t8_nc.h"
 #include "component_interfaces/cmc_t8_messy.h"

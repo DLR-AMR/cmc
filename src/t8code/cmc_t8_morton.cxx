@@ -1,5 +1,5 @@
 #include "t8code/cmc_t8_morton.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 namespace cmc
 {

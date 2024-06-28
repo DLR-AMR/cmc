@@ -5,7 +5,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_hyperslab.hxx"
 #include "utilities/cmc_geo_domain.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 #include "netcdf/cmc_netcdf.hxx"
 
 #include <string>

@@ -1,7 +1,7 @@
 #include "t8code/cmc_t8_replace_callbacks.h"
 #include "t8code/cmc_t8code_data.hxx"
 #include "utilities/cmc_container.h"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 #ifdef CMC_WITH_T8CODE
 

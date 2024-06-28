@@ -1,5 +1,5 @@
 #include "netcdf/cmc_nc_decompress.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 namespace cmc
 {

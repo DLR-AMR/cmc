@@ -5,7 +5,7 @@ nodist_include_HEADERS += src/cmc_ac_config.h
 include_HEADERS += src/cmc.hxx \
 src/cmc_config.h \
 src/utilities/cmc_constants_definitions.h \
-src/utilities/cmc_log_functions.h \
+src/utilities/cmc_log_functions.hxx \
 src/utilities/cmc_fallbacks.h \
 src/mpi/cmc_mpi_io.h \
 src/netcdf/cmc_netcdf.hxx \

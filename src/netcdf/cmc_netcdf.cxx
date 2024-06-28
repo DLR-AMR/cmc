@@ -1,7 +1,7 @@
 #include "netcdf/cmc_netcdf.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_utilities.hxx"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 
 #include <utility>
 
@@ -676,7 +676,7 @@ NcData::TransferData()
 #include "cmc_netcdf.h"
 #include "utilities/cmc_container.h"
 #include "utilities/cmc_geo_util.h"
-#include "utilities/cmc_log_functions.h"
+#include "utilities/cmc_log_functions.hxx"
 #include "mpi/cmc_mpi_io.h"
 
 #define CMC_WITH_NETCDF 1
