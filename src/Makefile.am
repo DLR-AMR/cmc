@@ -46,7 +46,8 @@ src/t8code/cmc_t8_prefix_encoding.hxx \
 src/netcdf/cmc_nc_decompress.hxx \
 src/netcdf/cmc_nc_io.hxx \
 src/netcdf/cmc_nc_writer.hxx \
-src/netcdf/cmc_nc_reader.hxx
+src/netcdf/cmc_nc_reader.hxx \
+src/cmc_compression.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -83,7 +84,8 @@ src/t8code/cmc_t8_byte_variable.cxx \
 src/netcdf/cmc_nc_decompress.cxx \
 src/netcdf/cmc_nc_writer.cxx \
 src/netcdf/cmc_nc_io.cxx \
-src/netcdf/cmc_nc_reader.cxx
+src/netcdf/cmc_nc_reader.cxx \
+src/cmc_compression.cxx
 
 
 if ENABLE_FORTRAN
