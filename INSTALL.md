@@ -38,8 +38,8 @@ CMC does not ship with a `configure` script. It needs to be generated on the loc
 
 ### Configuration of CMC  
 
-Now, we have created a configure script. Move to the directory in which the CMC is ought to be built.  
-Suppose we want to build it in the directory `~/cmc_build`.  
+Now, we have created a configure script. Move into the directory in which CMC is ought to be built.  
+For the next steps, suppose we want to build it in the directory `~/cmc_build`.  
 
 Therefore, we need to call the freshly created `configure` script from the directory `~/cmc_build`.  
 ```
