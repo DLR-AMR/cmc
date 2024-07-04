@@ -1,5 +1,7 @@
 #include "netcdf/cmc_nc_io.hxx"
 
+#include <algorithm>
+
 namespace cmc
 {
 
@@ -187,4 +189,11 @@ CreateSpecificVariable(const nc_type type, const std::string& name, const int va
     }
 }
 
+std::vector<NcAttribute>::const_iterator
+FindAttribute(const std::vector<NcAttribute>& attributes, const std::string& attr_name)
+{
+    return std::find_if(attributes.begin(), attributes.end(), [&](const NcAttribute& attr){
+        return !attr.GetName().compare("attr");
+    });
+}
 }

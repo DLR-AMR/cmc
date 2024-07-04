@@ -21,6 +21,9 @@ template<typename T>
 class NcSpecificVariable;
 class NcVariable;
 
+std::vector<NcAttribute>::const_iterator
+FindAttribute(const std::vector<NcAttribute>& attributes, const std::string& attr_name);
+
 class NcDimension
 {
 public:
