@@ -1,5 +1,12 @@
-#ifndef CMC_MPI_IO_H
-#define CMC_MPI_IO_H
+#ifndef CMC_MPI_IO_HXX
+#define CMC_MPI_IO_HXX
+
+#include "mpi/cmc_mpi.hxx"
+
+namespace cmc
+{
+
+}
 
 #if 0
 

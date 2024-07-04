@@ -1,4 +1,11 @@
-#include "cmc_mpi_io.h"
+#include "mpi/cmc_mpi_io.hxx"
+
+namespace cmc
+{
+
+
+}
+
 
 #if 0
 

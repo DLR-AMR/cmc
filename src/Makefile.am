@@ -7,7 +7,7 @@ src/cmc_config.h \
 src/utilities/cmc_constants_definitions.h \
 src/utilities/cmc_log_functions.hxx \
 src/utilities/cmc_fallbacks.h \
-src/mpi/cmc_mpi_io.h \
+src/mpi/cmc_mpi_io.hxx \
 src/netcdf/cmc_netcdf.hxx \
 src/utilities/cmc_utilities.hxx \
 src/mpi/cmc_mpi.hxx \
