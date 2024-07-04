@@ -1,5 +1,5 @@
-#ifndef CMC_NC_IO_NAMING_CONVENTIONS_HXX
-#define CMC_NC_IO_NAMING_CONVENTIONS_HXX
+#ifndef CMC_NC_IO_CONVENTIONS_HXX
+#define CMC_NC_IO_CONVENTIONS_HXX
 
 #include <string>
 
@@ -13,4 +13,4 @@ typedef int CompressionSchemeType;
 
 }
 
-#endif /* !CMC_NC_IO_NAMING_CONVENTIONS_HXX */
+#endif /* !CMC_NC_IO_CONVENTIONS_HXX */

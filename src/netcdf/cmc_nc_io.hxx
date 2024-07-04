@@ -7,7 +7,7 @@
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "netcdf/cmc_netcdf.hxx"
-#include "netcdf/cmc_nc_io_naming_conventions.hxx"
+#include "netcdf/cmc_nc_io_conventions.hxx"
 
 #include <string>
 #include <vector>
