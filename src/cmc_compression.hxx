@@ -11,6 +11,12 @@
 namespace cmc
 {
 
+//enum CompressionTechnique {};
+
+//void Compress(std::vector<InputVar>&& input_variables, const CompressionTechnique compression_technique, const CompressionSettings& settings);
+
+//TODO: maybe define some decompression settings, but maybe not
+std::vector<OutputVar> Decompress(const std::string& file_name);
 
 }
 
