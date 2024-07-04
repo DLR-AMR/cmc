@@ -662,6 +662,8 @@ NcData::TransferData()
     if (_data_has_been_transfered_)
         cmc_err_msg("The data already has been transfered.");
     
+    _data_has_been_transfered_ = true;
+    
     return std::move(variables_);
 }
 
