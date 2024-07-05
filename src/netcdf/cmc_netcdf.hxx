@@ -40,6 +40,7 @@ class NcData
 public:
     NcData() = delete;
     NcData(const std::string& path_to_file, const NcOpeningMode mode, const MPI_Comm comm = MPI_COMM_WORLD)
+    : comm_{comm}
     {
         NcOpen(path_to_file, mode, comm);
     };
@@ -82,7 +83,8 @@ private:
     template<typename... Ts> void InquireAllVariables(const Hyperslab&, Ts&&...);
 
     int ncid_;
-
+    MPI_Comm comm_{MPI_COMM_WORLD};
+    
     int num_dimensions_{0};
     int num_global_attributes_{0};
     int id_unlimited_dimension_{-1};

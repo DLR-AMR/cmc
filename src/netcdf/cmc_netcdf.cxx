@@ -2,6 +2,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_utilities.hxx"
 #include "utilities/cmc_log_functions.hxx"
+#include "mpi/cmc_mpi_io.hxx"
 
 #include <utility>
 
@@ -471,10 +472,9 @@ GetDataLayout(const int dimensionality, const Hyperslab& global_hyperslab, const
 
 static
 std::vector<Hyperslab>
-DetermineDataDistribution(const Hyperslab& global_hyperslab)
+DetermineDataDistribution(const Hyperslab& global_hyperslab, const MPI_Comm comm)
 {
-    //TODO:: Update for the parallel case
-    return std::vector<Hyperslab>{global_hyperslab};
+    return DetermineSlicedDataDistribution(global_hyperslab, comm);
 }
 
 static
@@ -626,10 +626,9 @@ NcData::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
     /* Determine the data layout of the variable */
     const DataLayout data_layout = GetDataLayout(data_dimensionality, hyperslab, coordinate_dimension_ids_, dimension_ids);
 
-    /* TODO: Add parallelization */
-    //for now in serial only
-
-    std::vector<Hyperslab> local_hyperslabs = DetermineDataDistribution(hyperslab);
+    /* Calculate a sliced distribution of the data */
+    //TODO: Make a blocked distribution
+    std::vector<Hyperslab> local_hyperslabs = DetermineDataDistribution(hyperslab, comm_);
 
     /* Get the number of values we will read from the file (for memory allocation) */
     DomainIndex num_local_data_values = 0;
@@ -663,7 +662,7 @@ NcData::TransferData()
         cmc_err_msg("The data already has been transfered.");
     
     _data_has_been_transfered_ = true;
-    
+
     return std::move(variables_);
 }
 
