@@ -29,7 +29,7 @@ main(void)
     cmc::CmcInitialize();
     
     {
-
+        #if 0
         /* Create a mesh */
         t8_cmesh_t cmesh;
         t8_cmesh_init (&cmesh);
@@ -73,13 +73,14 @@ main(void)
         initial_mesh.IndicateWhetherDummyElementsArePresent(false);
 
         t8_forest_write_vtk(forest, "example_forest_diff_mesh");
+        #endif
 
         /* Create input variables */
         const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
         cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
 
-        cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 64),
-                                 cmc::DimensionInterval(cmc::Dimension::Lat, 0, 32)
+        cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 16),
+                                 cmc::DimensionInterval(cmc::Dimension::Lat, 0, 8)
                                  );
 
          /* Inquire the hyperslab of data for the given variables */
@@ -92,15 +93,16 @@ main(void)
         /* Create compression settings */
         cmc::CompressionSettings settings;
 
-        const double abs_max_err = 0.1;
+        const double abs_max_err = 1.0;
         settings.SetAbsoluteErrorCriterion(abs_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
         /* Create the compression data */
         cmc::CompressionData compression_data(nc_data.TransferData(), std::move(settings));
 
         /* Setup the example data for the compression */
-        compression_data.Setup(initial_mesh);
-
+        //compression_data.Setup(initial_mesh);
+        compression_data.Setup();
+        
         compression_data.Compress(cmc::CompressionMode::OneForOne);
 
         compression_data.WriteVTKFile("ExTempVar");

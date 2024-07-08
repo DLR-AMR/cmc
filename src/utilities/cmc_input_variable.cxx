@@ -237,10 +237,18 @@ InputVar::TransformCoordinatesToLinearIndices()
 
 //TODO: The same funciton for the Variable message (for the parallel case)
 void
-InputVar::AssignDataAtLinearIndices(const InputVar& variable, const MortonIndex start_offset, const UpdateLinearIndices& update)
+InputVar::AssignDataAtLinearIndices(const InputVar& variable, const UpdateLinearIndices& update)
 {
     std::visit([&](auto&& var){
-        var.AssignDataAtLinearIndices(variable, start_offset, update);
+        var.AssignDataAtLinearIndices(variable, update);
+    }, var_);
+}
+
+void
+InputVar::AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update)
+{
+    std::visit([&](auto&& var){
+        var.AssignDataAtLinearIndices(message, update);
     }, var_);
 }
 
@@ -417,9 +425,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<int8_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int8_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int8_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<int8_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -430,9 +440,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<char>& var_message = send_data[sd_iter->first];
+            //VariableMessage<char>& var_message = send_data[sd_iter->first];
+            //VariableMessage<char> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<char> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -443,9 +455,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<int16_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int16_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int16_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<int16_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -456,9 +470,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<int32_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int32_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int32_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<int32_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -469,9 +485,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<float>& var_message = send_data[sd_iter->first];
+            //VariableMessage<float>& var_message = send_data[sd_iter->first];
+            //VariableMessage<float> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<float> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -482,9 +500,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<double>& var_message = send_data[sd_iter->first];
+            //VariableMessage<double>& var_message = send_data[sd_iter->first];
+            //VariableMessage<double> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<double> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -495,9 +515,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<uint8_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint8_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint8_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<uint8_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -508,9 +530,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<uint16_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint16_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint16_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<uint16_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -521,9 +545,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<uint32_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint32_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint32_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<uint32_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -534,9 +560,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<int64_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int64_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<int64_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<int64_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -547,9 +575,11 @@ public:
         variables_send_data.reserve(send_data.size());
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end(); ++sd_iter)
         {
-            VariableMessage<uint64_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint64_t>& var_message = send_data[sd_iter->first];
+            //VariableMessage<uint64_t> send_var;
+            //DetachVarMessage(var_message, send_var);
             VariableMessage<uint64_t> send_var;
-            DetachVarMessage(var_message, send_var);
+            std::swap(send_var, sd_iter->second);
             variables_send_data.emplace_back(std::move(send_var));
         }
         return variables_send_data;
@@ -565,6 +595,24 @@ GatherDistributionData(const InputVar& variable, const DataOffsets& offsets)
     return std::visit(GatherSendData(offsets), variable.var_);
 }
 
+CmcType
+GetDataTypeFromVariable(const std::vector<InputVar>& input_variables, const int variable_id)
+{
+    /* Find the variable with the corresponding id */
+    auto var_iter = std::find_if(input_variables.begin(), input_variables.end(), [&](auto& var){
+        return (var.GetID() == variable_id);
+    });
+
+    /* Check if the variable has been found and return its corresponding CmcType */
+    if (var_iter != input_variables.end())
+    {
+        return var_iter->GetType();
+    } else
+    {
+        /* In case there is no variable with the corresponding ID */
+        return CmcType::TypeUndefined;
+    }
+}
 
 
 

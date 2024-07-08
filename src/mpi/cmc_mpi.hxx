@@ -14,7 +14,7 @@ namespace cmc
 {
 
 #ifdef CMC_ENABLE_MPI
-#define MPI_MORTON_INDEX_T MPI_UINT64_T
+#define MPI_MORTON_INDEX_T MPI_INT64_T
 #endif
 
 /**

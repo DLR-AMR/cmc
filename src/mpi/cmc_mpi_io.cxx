@@ -1,8 +1,8 @@
 #include "mpi/cmc_mpi_io.hxx"
+#include "utilities/cmc_log_functions.hxx"
 
 namespace cmc
 {
-
 
 std::vector<Hyperslab>
 DetermineSlicedDataDistribution(const Hyperslab& global_hyperslab, const MPI_Comm comm)
@@ -55,7 +55,7 @@ DetermineSlicedDataDistribution(const Hyperslab& global_hyperslab, const MPI_Com
                 *new_count_val_iter = count_value;
 
                 /* Set the flag */
-                first_dimension_has_been_split = true;
+                first_dimension_has_been_split = true; 
             } else
             { 
                 /* Set the new start and count value within the local hyperslab */

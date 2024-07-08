@@ -28,7 +28,7 @@ CompressionData::Setup()
 
     compression_data_->BuildInitialMesh();
 
-    compression_data_->DistributeDataOnInitialMesh();//TODO: implement//serial for now
+    compression_data_->DistributeDataOnInitialMesh();
 
     compression_data_->ApplyScalingAndOffset();
 

@@ -21,6 +21,7 @@ namespace cmc {
 constexpr int kInitialRefinementLevelIsUnknown = INT_MIN;
 constexpr int kMeshCorrespondsToNoneVariables = INT_MIN;
 constexpr int kMeshCorrespondsToAllVariables = INT_MIN + 1;
+constexpr int kDimensionalityIsUnknown = INT_MIN;
 
 class AmrMesh
 {
@@ -30,6 +31,8 @@ public:
     : mesh_{mesh} {};
     AmrMesh(t8_forest_t mesh, const int initial_refinement_level)
     : mesh_{mesh}, initial_refinement_level_{initial_refinement_level} {};
+    AmrMesh(t8_forest_t mesh, const int initial_refinement_level, const int dimensionality)
+    : mesh_{mesh}, initial_refinement_level_{initial_refinement_level}, dimensionality_{dimensionality} {};
     ~AmrMesh(){
         if (mesh_ != nullptr)
         {
@@ -40,7 +43,9 @@ public:
 
     AmrMesh(const AmrMesh& other)
     : mesh_{other.mesh_},
-      initial_refinement_level_{other.initial_refinement_level_}
+      initial_refinement_level_{other.initial_refinement_level_},
+      dimensionality_{other.dimensionality_},
+      are_dummy_elements_present_{other.are_dummy_elements_present_}
     {
         if (other.mesh_ != nullptr)
         {
@@ -59,7 +64,8 @@ public:
     };
 
     AmrMesh(AmrMesh&& other)
-    : mesh_{std::move(other.mesh_)}, initial_refinement_level_{other.initial_refinement_level_}, are_dummy_elements_present_{other.are_dummy_elements_present_}
+    : mesh_{std::move(other.mesh_)}, initial_refinement_level_{other.initial_refinement_level_},
+      dimensionality_{other.dimensionality_}, are_dummy_elements_present_{other.are_dummy_elements_present_}
     {
         other.mesh_ = nullptr;
     };
@@ -68,6 +74,7 @@ public:
         this->mesh_ = std::move(other.mesh_);
         other.mesh_ = nullptr;
         this->initial_refinement_level_ = other.initial_refinement_level_;
+        this->dimensionality_ = other.dimensionality_;
         this->are_dummy_elements_present_ = other.are_dummy_elements_present_;
         return *this;
     };
@@ -75,6 +82,8 @@ public:
     bool IsValid() const;
     int GetInitialRefinementLevel() const;
     void SetInitialRefinementLevel(const int initial_refinement_level);
+    int GetDimensionality() const;
+    void SetDimensionality(const int dimensionality);
     t8_gloidx_t GetNumberGlobalElements() const;
     t8_locidx_t GetNumberLocalElements() const;
     void IndicateWhetherDummyElementsArePresent(const bool are_dummy_elements_present);
@@ -85,6 +94,7 @@ public:
 private:
     t8_forest_t mesh_{nullptr};
     int initial_refinement_level_{kInitialRefinementLevelIsUnknown};
+    int dimensionality_{kDimensionalityIsUnknown};
     bool are_dummy_elements_present_{true};
 };
 
@@ -121,7 +131,7 @@ ReconstructMeshFromRefinementBits(const VectorView<uint8_t>& refinement_bits, co
 t8_forest_t
 ReconstructBaseMesh(const int dimensionality, const MPI_Comm comm);
 
-std::pair<t8_forest_t, int>
+std::tuple<t8_forest_t, int, int>
 BuildInitialMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_Comm comm);
 
 }

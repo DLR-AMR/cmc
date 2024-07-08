@@ -223,6 +223,19 @@ AmrMesh::SetMesh(t8_forest_t mesh)
     mesh_ = mesh;    
 }
 
+int
+AmrMesh::GetDimensionality() const
+{
+    return dimensionality_;
+}
+
+void
+AmrMesh::SetDimensionality(const int dimensionality)
+{
+    cmc_assert(dimensionality >= 2 && dimensionality <= 3);
+    dimensionality_ = dimensionality;
+}
+
 bool
 AmrMesh::IsValid() const
 {
@@ -563,7 +576,7 @@ void ValidateInitialRefinementLevelForDimensionality(const int initial_refinemen
     #endif
 }
 
-std::pair<t8_forest_t, int>
+std::tuple<t8_forest_t, int, int>
 BuildInitialMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_Comm comm)
 {
     const int dimensionality = DetermineDimensionalityOfTheData(domain);
@@ -584,9 +597,19 @@ BuildInitialMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_C
 
     AdaptDataInitialMesh adapt_data(domain, initial_refinement_level, initial_layout);
 
+    //TODO: Recursive construction without repartitioning may not be optimal in parallel
     /* Build the initial mesh via recursive refinement */
     initial_forest = t8_forest_new_adapt(initial_forest, RefineToInitialMesh, 1, 0, static_cast<void*>(&adapt_data));
-    return std::make_pair(initial_forest, initial_refinement_level); 
+
+    /* Repartition the forest */
+    t8_forest_t partitioned_forest;
+    t8_forest_init(&partitioned_forest);
+    const int partition_for_coarsening = 0; //TODO: change to one in the future
+    t8_forest_set_partition(partitioned_forest, initial_forest, partition_for_coarsening);
+    t8_forest_commit(partitioned_forest);
+
+    cmc_debug_msg("Num local elements: ", t8_forest_get_local_num_elements(partitioned_forest));
+    return std::make_tuple(partitioned_forest, initial_refinement_level, dimensionality); 
 }
 
 }

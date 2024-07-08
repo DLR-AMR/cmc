@@ -114,42 +114,17 @@ AmrData::BuildInitialMesh()
     /* Since all varibales are defined on the same global domain, we are able to take the domain of the first variable */
     const GeoDomain& global_domain = input_variables_.front().GetGlobalDomain();
 
-    #if 0
-    const int dimensionality = DetermineDimensionalityOfTheData(global_domain);
-
-    t8_cmesh_t cmesh = t8_cmesh_new_hypercube(DimensionToElementClass(dimensionality), comm_, 0, 0, 1);
-
-    const int initial_refinement_level = CalculateInitialRefinementLevel(global_domain);
-
-    initial_mesh_.SetInitialRefinementLevel(initial_refinement_level);
-
-    ValidateInitialRefinementLevelForDimensionality(initial_refinement_level, dimensionality);
-
-    /* Construct a forest from the cmesh */
-    t8_forest_t initial_forest;
-    t8_forest_init(&initial_forest);
-    t8_forest_set_cmesh(initial_forest, cmesh, comm_);
-    t8_forest_set_scheme(initial_forest, t8_scheme_new_default_cxx());
-    t8_forest_set_level(initial_forest, 0);
-    t8_forest_commit(initial_forest);
-    #endif
-
     /* The mesh layout is equal to the layout of the domains (the exact ordering of the dimensions is allowed to vary) */
     const DataLayout initial_mesh_layout = input_variables_.front().GetInitialDataLayout();
-    #if 0
-    AdaptDataInitialMesh adapt_data(global_domain, initial_refinement_level, initial_mesh_layout);
 
-    /* Build the initial mesh via recursive refinement */
-    initial_forest = t8_forest_new_adapt(initial_forest, RefineToInitialMesh, 1, 0, static_cast<void*>(&adapt_data)); 
-    #endif
-    auto [initial_forest, initial_refinement_level] = cmc::BuildInitialMesh(global_domain, initial_mesh_layout, comm_);
+    auto [initial_forest, initial_refinement_level, dimensionality] = cmc::BuildInitialMesh(global_domain, initial_mesh_layout, comm_);
 
     initial_mesh_.SetMesh(initial_forest);
     initial_mesh_.SetInitialRefinementLevel(initial_refinement_level);
-
+    initial_mesh_.SetDimensionality(dimensionality);
+    
     /* In most cases, there will be dummy elements present within the mesh */
     initial_mesh_.IndicateWhetherDummyElementsArePresent(true);
-
 }
 
 void
@@ -212,130 +187,221 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
 }
 
 
-void
-AmrData::DistributeDataOnInitialMesh()
+std::vector<MPI_Request>
+AmrData::SendInitialData()
 {
-    //TODO: Re-Integrate the parallelization
-    #if 0
-    cmc_assert(initial_mesh.IsValid());
+    int comm_size{1};
 
-    DataOffsets offsets = GatherGlobalDataOffsets(initial_mesh_, comm_);
-
-    //TransformToMortonIndices sollte hier hin 
-
-    //GroupVariablesForDistributing();//TODO: implement
-
-    //Call (friend) function supplying the send list for each variable
-    int comm_size = 1;
-
-    #ifdef CMC_ENABLE_MPI
-    int ret_val = MPI_Comm_size(comm_, &comm_size);
+    const int ret_val = MPI_Comm_size(comm_, &comm_size);
     MPICheckError(ret_val);
-    #endif
 
+    /* Gather the partitioning of the initial mesh */
+    const DataOffsets offsets = GatherGlobalDataOffsets(initial_mesh_, comm_);
+    cmc_debug_msg("Offsets inquired");
+
+    /* Inquire all data that has to be sent */
     std::vector<VariableSendMessage> send_messages;
     send_messages.reserve(comm_size * input_variables_.size());
 
+    /* Gather the data thas has to be communicated for all variables */
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
-        std::vector<VariableSendMessage> var_send_messages = GatherDataToBeDistributed(*input_var_iter);
-        send_messages.insert(std::back_insert_iterator(send_messages), std::make_move_iterator(var_send_messages.begin()), std::make_move_iterator(var_send_messages.end()));
+        std::vector<VariableSendMessage> var_send_messages = GatherDistributionData(*input_var_iter, offsets);
+        std::move(std::make_move_iterator(var_send_messages.begin()), std::make_move_iterator(var_send_messages.end()), std::back_insert_iterator(send_messages));
         var_send_messages.clear();
     }
 
-    /* Send the data for all variables */
-    for (auto send_iter = send_messages.begin(); send_iter != send_messages.end(); ++send_iter)
+    cmc_debug_msg("Size of send_messages: ", send_messages.size());
+
+
+    /* A vector collecting all send requests */
+    std::vector<MPI_Request> send_requests;
+    send_requests.reserve(2 * send_messages.size());
+
+    /* Send all messages */
+    for (auto sm_iter = send_messages.begin(); sm_iter != send_messages.end(); ++sm_iter)
     {
-        send_iter->SendMessage();
+        /* Send the message and receive the returned requests */
+        auto [req_morton_ids, req_data] = sm_iter->Send(comm_);
+
+        /* Store the requests */
+        send_requests.push_back(std::move(req_morton_ids));
+        send_requests.push_back(std::move(req_data));
     }
 
-    /* Move the data which remains local */
-    //....
+    return send_requests;
+}
 
-    MPIBarrier(...);
+std::vector<VariableRecvMessage>
+AmrData::ReceiveInitialData()
+{
+    /* Receive all messages */
+    bool are_messages_incoming{true};
 
-    /* Receive the data */
-    //....
+    std::vector<VariableRecvMessage> recv_messages;
+    recv_messages.reserve(input_variables_.size() * 2);
 
-
-    //if MPI
-    GatherGlobalDataOffsets();
-
-    ComputeMortonIndices();
-
-    // if MPI
-    CommunicateNonCompliantData();
-
-    //SortReceivedDataLocally();
-    #endif
-
-
-    // Serial code below!!!
-
-    const MortonIndex start_offset = 0;
-
-    for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
+    /* Message receiving loop */
+    while(are_messages_incoming)
     {
-        input_var_iter->TransformCoordinatesToLinearIndices();
+        int message_flag{0};
+        MPI_Status probe_status;
+
+        /* Check if there are any messages incoming */
+        int err = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm_, &message_flag, &probe_status);
+        MPICheckError(err);
+
+        /* Get the message if there is one */
+        if (message_flag != 0)
+        {
+            /* Get the necessary information for retrieving the message */
+            const int source = probe_status.MPI_SOURCE;
+            const int tag = probe_status.MPI_TAG;
+            const int variable_id = GetVariableIDFromTag(tag);
+            const CmcType var_type = GetDataTypeFromVariable(input_variables_, variable_id);
+            const MPI_Datatype data_type = ConvertCmcTypeToMPIType(var_type);
+
+            /* Get the number of elements from this message */
+            int num_elems{0};
+            if (IsMessageADataMessage(tag))
+            {
+                /* If the data contains actual data values */
+                err = MPI_Get_count(&probe_status, data_type, &num_elems);
+                MPICheckError(err);
+            } else
+            {
+                /* If the data contains Morton indices */
+                err = MPI_Get_count(&probe_status, MPI_MORTON_INDEX_T, &num_elems);
+                MPICheckError(err);
+            }
+
+
+            /** We only do receive two messages from each process that sends data, since it is collected prior to the communication ,
+              * Therefore, we need to check if we have already received elements from the rank this messag originated from. */
+            std::vector<cmc::VariableRecvMessage>::iterator msg_iter = std::find_if(recv_messages.begin(), recv_messages.end(),
+                                                                                    [&source](auto& msg){return source == msg.GetSendingRank();});
+            /* Check if there has been a message found coming from this rank */
+            if (msg_iter == recv_messages.end())
+            {
+                /* We have not yet received a message from this rank */
+                /* Allocate a variable message */
+                recv_messages.emplace_back(var_type, CreateVariableMessage(source, variable_id, var_type, num_elems));
+
+                /* Assign the newly created message to the iterator */
+                msg_iter = std::prev(recv_messages.end());
+            }
+
+            /* Check if it is a Morton indices message or the actual data message */
+            if (IsMessageADataMessage(tag))
+            {
+                /* Receive the actual data from this process */
+                err = MPI_Recv(msg_iter->GetInitialDataPtr(), num_elems, data_type, source, tag, comm_, MPI_STATUS_IGNORE);
+                MPICheckError(err); 
+
+                cmc_debug_msg("Received ", num_elems, " data values from rank ", source, " for variable ", variable_id);
+            } else
+            {
+                /* Otherwise, we receive the sent Morton indices */
+                err = MPI_Recv(msg_iter->GetInitialMortonIndicesPtr(), num_elems, MPI_MORTON_INDEX_T, source, tag, comm_, MPI_STATUS_IGNORE);
+                MPICheckError(err);
+
+                cmc_debug_msg("Received ", num_elems, " Morton indices from rank ", source, " for variable ", variable_id);
+            }  
+        } else
+        {
+            /* If all messages have been processed, we break the receiving loop */
+            are_messages_incoming = false;
+        }
     }
 
+    return recv_messages;
+}
+
+void
+AmrData::SortInitialDataIntoVariables(const std::vector<VariableRecvMessage>& messages)
+{
+    /* Update the uniform morton indices to linear element IDs corresponding to the initial mesh */
+    UpdateLinearIndices local_indices_update(UpdateLinearIndicesToTheInitialMesh());
+
+    /* Setup the variable with the right amount of global elements */
+    for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++ input_var_iter)
+    {
+        input_var_iter->SetUpFilledVariable(initial_mesh_.GetNumberLocalElements(), input_var_iter->GetMissingValue());
+    }
+
+    /* Iterate over all messages and assign their data to the correct variables */
+    for (auto msg_iter = messages.begin(); msg_iter != messages.end(); ++msg_iter)
+    {
+        /* Find the variable to which the current message is assigned */
+        auto var_iter = std::find_if(input_variables_.begin(), input_variables_.end(), [&msg_iter](auto& var){return var.GetID() == msg_iter->GetVariableID();});
+
+        /* All processes should have prior knowledge to all variables. Therefore, a variable with the ID from the message has to be found locally */
+        if (var_iter == input_variables_.end())
+        {
+            cmc_err_msg("A message has been received, but the variable ID does not correspond to any (local) variable.");
+        }
+
+        /* Assign the data from the messag at the right position within the variable */
+        var_iter->AssignDataAtLinearIndices(*msg_iter, local_indices_update);
+    }
+}
+
+/* Sorting the initial data only locally */
+void
+AmrData::SortLocalDataOnInitialMesh()
+{
     /* Update the uniform morton indices to linear element IDs corresponding to the initial mesh */
     UpdateLinearIndices local_indices_update(UpdateLinearIndicesToTheInitialMesh());
 
     std::vector<InputVar> sorted_input_variables;
     sorted_input_variables.reserve(input_variables_.size());
 
-    //Create new input variable with the same type
+    /* Create new variables and assign the sorted data to them */
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++ input_var_iter)
     {
         sorted_input_variables.push_back(MetaCopy(*input_var_iter));
         sorted_input_variables.back().SetUpFilledVariable(initial_mesh_.GetNumberLocalElements(), input_var_iter->GetMissingValue());
-        sorted_input_variables.back().AssignDataAtLinearIndices(*input_var_iter, start_offset, local_indices_update);
+        sorted_input_variables.back().AssignDataAtLinearIndices(*input_var_iter, local_indices_update);
     }
 
     /* Swap the sorted input variables with the initial input variables */
     std::swap(input_variables_, sorted_input_variables);
+}
 
+void
+AmrData::DistributeDataOnInitialMesh()
+{
+    #ifdef CMC_ENABLE_MPI
+    cmc_assert(initial_mesh_.IsValid());
 
-    //TODO: remove below:
+    /* Transform all coordinates to Morton indices */
+    for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
+    {
+        input_var_iter->TransformCoordinatesToLinearIndices();
+    }
 
-    //std::vector<float> converted_data;
-    //const int num_elems = 700*300;
-    //converted_data.reserve(num_elems);
-    //const float add_offset = 268.252690054217;
-    //const float scale_factor = 0.00151686422239082;
-    //const short missing_value = -32767;
-    //const CmcInputVariable& invar = sorted_input_variables[0].GetInternalVariant();
-    //const InputVariable<short>& ac_var = std::get<InputVariable<short>>(invar);
+    /* Gather and send all the data that has to be communicated */
+    std::vector<MPI_Request> send_requests = SendInitialData();
 
-    //for (int j = 0; j < num_elems; ++j)
-    //{
-    //    if (ac_var[j] == missing_value)
-    //    {
-    //        converted_data.push_back(static_cast<float>(missing_value));
-    //    } else
-    //    {
-    //        converted_data.push_back(scale_factor * static_cast<float>(ac_var[j]) + add_offset);
-    //    }
-    //}
+    /* Wait until all messages have been staged */
+    int err = MPI_Barrier(comm_);
+    MPICheckError(err);
 
-    //cmc_assert(sizeof(float) == sizeof(uint32_t));
+    /* After all messages have been staged, we will receive them */
+    const std::vector<VariableRecvMessage> received_messages = ReceiveInitialData();
 
-    //cmc_debug_msg("Binary presentation of all floats (in SFC order)");
-    //for (auto ii = converted_data.begin(); ii != converted_data.end(); ++ii)
-    //{
-    //    float val = *ii;
+    /* Sort the data accordingly to the Morton indices */
+    SortInitialDataIntoVariables(received_messages);
 
-    //    //float val = *ii;
-    //    //char* ptr = std::reinterpret_cast<char*>(&val);
-    //    //for (int j = 0; j < sizeof(float); ++j)
-    //    //{
-    //    //    std::cout << 
-    //    //}
-    //    std::cout << std::bitset<8*sizeof(float)>(*reinterpret_cast<uint32_t*>(&val)) <<" fuer " << *ii << std::endl;
-    //}
+    /* Wait until any send messages have been completed */
+    err = MPI_Waitall(send_requests.size(), send_requests.data(), MPI_STATUS_IGNORE);
+    MPICheckError(err);
 
-    //std::exit(1);
+    #else
+    /* Call a locally sorting function which setups the data compiant to the Morton order */
+    cmc_assert(initial_mesh_.IsValid());
+    SortLocalDataOnInitialMesh();
+    #endif
 }
 
 void

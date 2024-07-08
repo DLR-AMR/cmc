@@ -13,6 +13,7 @@
 #include "t8code/cmc_t8_mpi.hxx"
 #include "t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx"
 #include "t8code/cmc_t8_interpolation.hxx"
+#include "mpi/cmc_mpi_data.hxx"
 
 #include <iterator>
 #include <map>
@@ -50,6 +51,7 @@ private:
     std::vector<IndexReduction> correction_;
 };
 
+//TODO: only allow variable IDs between [0, 1024)
 template<class T>
 class InputVariable
 {
@@ -130,7 +132,8 @@ public:
 
     GeoDomain&& DetachGlobalDomain();
 
-    void AssignDataAtLinearIndices(const InputVar& var, const MortonIndex start_offset, const UpdateLinearIndices& update);
+    void AssignDataAtLinearIndices(const InputVar& var, const UpdateLinearIndices& update);
+    void AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update);
 
     struct ExtractedVar
     {
@@ -210,9 +213,8 @@ public:
 
     void TransformCoordinatesToLinearIndices();
     
-    //TODO: The same funciton for the Variable message (for the parallel case)
-    //Make this private
-    void AssignDataAtLinearIndices(const InputVar& variable, const MortonIndex start_offset, const UpdateLinearIndices& update);
+    void AssignDataAtLinearIndices(const InputVar& variable, const UpdateLinearIndices& update);
+    void AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update);
 
     const GeoDomain& GetGlobalDomain() const;
 
@@ -264,6 +266,8 @@ private:
     template<class T> friend void InputVar::ApplyOffset(const InputVariable<T>&);
 };
 
+CmcType
+GetDataTypeFromVariable(const std::vector<InputVar>& input_variables, const int variable_id);
 
 /** INPUT VARIABLE<T> MEMBER FUNCITONS **/
 
@@ -485,6 +489,9 @@ InputVariable<T>::TransformCoordinatesToMortonIndices()
             return;
         break;
         case DataFormat::CartesianFormat:
+            //TODO: maybe this is suited for a parallel search indentifying elements corresponding to the points or Morton
+            // indices calculation for integer coordinates
+            cmc_err_msg("Currently, it is not possible to transform coordinates from the Cartesian format to Morton indices.");
             //TransformCartesianCoordinatesToMortonIndex(const std::vector<CartesianCoordinate>& coordiantes, const GeoDomain& global_domain);
         break;
         case DataFormat::HyperslabFormat:
@@ -835,28 +842,52 @@ GatherDataToBeDistributed(const InputVariable<T>& variable, const DataOffsets& o
 
     for (size_t index = 0; index < num_coordinates; ++index)
     {
-        LinearIndex current_linear_index = variable.GetLinearIndexCoordinate(index);
+        const LinearIndex current_linear_index = variable.GetLinearIndexCoordinate(index);
 
         /* Check if the current linear index belongs to the same rank as the previous one, if not we need to find the new receiving rank */
         if (!(previous_lower_bound <= current_linear_index && current_linear_index < previous_upper_bound))
         {
-            auto owner_rank_iter = std::lower_bound(offsets.Begin(), offsets.End(), current_linear_index);
+            /* Find an iterator to the rank which is ought to hold the value corresponding to this linear index */
+            auto owner_rank_iter = std::upper_bound(offsets.Begin(), offsets.End(), current_linear_index);
 
-            owner_rank = (owner_rank_iter != offsets.End() ? std::distance(offsets.Begin(), owner_rank_iter) : offsets.size() - 1);
-
+            /* Get the integer number of the corresponding rank */
+            //owner_rank = (owner_rank_iter != offsets.End() ? std::distance(offsets.Begin(), owner_rank_iter) : offsets.size() - 1);
+            owner_rank = std::distance(offsets.Begin(), owner_rank_iter) - 1;
+            
+            if (owner_rank > 2)
+            {
+                cmc_debug_msg("Will Send to rank ", owner_rank, " because of index: ", current_linear_index);
+            }
             previous_lower_bound = offsets[owner_rank];
             previous_upper_bound = offsets[owner_rank + 1];
 
-            send_messages[owner_rank] = VariableMessage<T>(owner_rank, variable.GetID());
+            /* Check if the rank is already a receiving rank */
+            if (auto search_rk = send_messages.find(owner_rank); search_rk != send_messages.end())
+            {
+                /* If the rank is already listed in the ReceiverMap */
+                search_rk->second.data_.push_back(variable[index]);
+                search_rk->second.morton_indices_.push_back(current_linear_index);
+            } else
+            {
+                /* If the receiving rank is not yet listed within the ReceiverMap */
+                send_messages[owner_rank] = VariableMessage<T>(owner_rank, variable.GetID());
 
-            const size_t estimate_receiving_data_points = 2 * (num_coordinates / offsets.size());
+                const size_t estimate_receiving_data_points = 2 * (num_coordinates / offsets.size());
 
-            send_messages[owner_rank].data_.reserve(estimate_receiving_data_points);
-            send_messages[owner_rank].morton_indices_.reserve(estimate_receiving_data_points);
+                /* Reserve an estimate of data */
+                send_messages[owner_rank].data_.reserve(estimate_receiving_data_points);
+                send_messages[owner_rank].morton_indices_.reserve(estimate_receiving_data_points);
+                
+                /* Save the value and index */
+                send_messages[owner_rank].data_.push_back(variable[index]);
+                send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
+            }
+        } else
+        { 
+            /* If the current value belongs to same rank the previous value already belongs to */
+            send_messages[owner_rank].data_.push_back(variable[index]);
+            send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
         }
-
-        send_messages[owner_rank].data_.push_back(variable[index]);
-        send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
     }
 
     return send_messages;
@@ -943,16 +974,7 @@ InputVar::ApplyAxpyScalingAndOffset(const InputVariable<T>& variable)
                 destination_data.push_back(missing_value);
             }
         }
-        int all_vars_greater_than_zero = 0;
-        for (auto iter = destination_data.begin(); iter != destination_data.end(); ++iter)
-        {
-            //if (*iter >= 0)
-            //{
-            //    ++all_vars_greater_than_zero;
-            //} else
-            //{cmc_debug_msg("Val: ", *iter);}
-        }
-        cmc_debug_msg("Num vals greater equal zero: ", all_vars_greater_than_zero, ", Num vals in destination data: ", destination_data.size());
+        
         /* Set the transformed data of the variable within the new variable */
         transformed_variable.SetData(AccessKey(), std::move(destination_data));
 
@@ -1102,7 +1124,7 @@ InputVar::ApplyOffset(const InputVariable<T>& variable)
 }
 
 template<typename T>
-void InputVariable<T>::AssignDataAtLinearIndices(const InputVar& var, const MortonIndex start_offset, const UpdateLinearIndices& update)
+void InputVariable<T>::AssignDataAtLinearIndices(const InputVar& var, const UpdateLinearIndices& update)
 {
     cmc_assert(var.holds_alternative<InputVariable<T>>());
 
@@ -1114,6 +1136,23 @@ void InputVariable<T>::AssignDataAtLinearIndices(const InputVar& var, const Mort
         data_[update(*index_iter)] = source_var.data_[index];
     }
 }
+
+template<typename T>
+void InputVariable<T>::AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update)
+{
+    cmc_assert(std::holds_alternative<VariableMessage<T>>(message.GetInternalVariant()));
+
+    /* Get the message holding the actual data and their Morton idnices from the message */
+    const VariableMessage<T>& msg = std::get<VariableMessage<T>>(message.GetInternalVariant());
+
+    /* Iterate throught the indices and the data and assign it accordingly */
+    auto data_iter = msg.DataBegin();
+    for (auto morton_idx_iter = msg.MortonIndicesBegin(); morton_idx_iter != msg.MortonIndicesEnd(); ++morton_idx_iter, ++data_iter)
+    {
+        data_[update(*morton_idx_iter)] = *data_iter;
+    }
+}
+
 
 /** UPDATE LINEAR INDICES MEMBER FUNCTIONS **/
 template<typename T>
@@ -1128,8 +1167,8 @@ auto UpdateLinearIndices::operator()(T index_to_be_updated) const
     
     cmc_assert(previous_index_correction != correction_.begin());
 
-    /* The binary search yields the upepr bound of the Morton Indices, therefore we need to take a step back
-     * in order to obtain the previous uniform indices which were skipped (due to the possible coarse elementwithin the mesh) */
+    /* The binary search yields the upper bound of the Morton Indices, therefore we need to take a step back
+     * in order to obtain the previous uniform indices which were skipped (due to the possible coarse element within the mesh) */
     const MortonIndex correction = std::prev(previous_index_correction)->indices_to_subtract;
 
     return index_to_be_updated - correction;

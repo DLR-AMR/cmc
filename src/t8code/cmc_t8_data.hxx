@@ -79,6 +79,11 @@ private:
     AdaptData CreateAdaptationData(const CoarseningSample& adaptation_sample, const CompressionMode mode);
     std::vector<CoarseningSample> RetrieveMeshesToBeCoarsened(const CompressionMode compression_mode) const;
 
+    std::vector<MPI_Request> SendInitialData();
+    std::vector<VariableRecvMessage> ReceiveInitialData();
+    void SortInitialDataIntoVariables(const std::vector<VariableRecvMessage>& messages);
+    void SortLocalDataOnInitialMesh();
+
     std::vector<Var> variables_; //To be used after the Setup call
     
     std::vector<InputVar> input_variables_;
