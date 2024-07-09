@@ -71,23 +71,9 @@ ComputeRelativeDeviation(const VectorView<T>& values, const T& nominal_value, co
         {
             if (!ApproxCompare(missing_value, *iter))
             {
-                //if (std::abs(static_cast<double>(*iter) + previous_absolute_max_deviation[index] - static_cast<double>(nominal_value)) / std::abs(static_cast<double>(*iter) + previous_absolute_max_deviation[index])
-                //    < std::abs(static_cast<double>(*iter) - previous_absolute_max_deviation[index] - static_cast<double>(nominal_value)) / std::abs(static_cast<double>(*iter) - previous_absolute_max_deviation[index]))
-                //{
-                //    cmc_debug_msg("Hier ist die MINUS-Version groesser im Fehler", " fuer x_i = ", *iter, " und interpolation = ", nominal_value);
-                //} else
-                //{
-                //    cmc_debug_msg("Hier ist die PLUS-Version groesser im Fehler", " fuer x_i = ", *iter, " und interpolation = ", nominal_value);
-                //}
-                //Test calculation (produces slightly worse results than the previous bounds)
                 const double zaehler = previous_absolute_max_deviation[index] + std::abs(static_cast<double>(*iter) - static_cast<double>(nominal_value));
                 const double nenner = std::min(std::initializer_list<double>({static_cast<double>(*iter), static_cast<double>(*iter) - previous_absolute_max_deviation[index], static_cast<double>(*iter) + previous_absolute_max_deviation[index]}));
                 deviations.push_back(zaehler / nenner);
-                //Another test calculation
-                //deviations.push_back((std::abs(static_cast<double>(*iter) - static_cast<double>(nominal_value)) + previous_absolute_max_deviation[index]) / std::abs(std::abs(static_cast<double>(*iter)) - previous_absolute_max_deviation[index]));
-                //Previous calculation below
-                //deviations.push_back(std::max(std::abs(static_cast<double>(*iter) + previous_absolute_max_deviation[index] - static_cast<double>(nominal_value)) / std::abs(static_cast<double>(*iter) + previous_absolute_max_deviation[index]),
-                //                              std::abs(static_cast<double>(*iter) - previous_absolute_max_deviation[index] - static_cast<double>(nominal_value)) / std::abs(static_cast<double>(*iter) - previous_absolute_max_deviation[index])));
             } else
             {
                 deviations.push_back(0.0);
@@ -126,8 +112,9 @@ ComputeRelativeDeviation(const VectorView<T>& values, const T& nominal_value, co
         {
             if (!ApproxCompare(missing_value, *iter))
             {
-                deviations.emplace_back(std::max(std::abs(static_cast<double>(*iter) + previous_absolute_max_deviation[index] - static_cast<double>(nominal_value)) / std::abs(static_cast<double>(*iter) + previous_absolute_max_deviation[index]),
-                                                 std::abs(static_cast<double>(*iter) - previous_absolute_max_deviation[index] - static_cast<double>(nominal_value)) / std::abs(static_cast<double>(*iter) - previous_absolute_max_deviation[index])));
+                const double zaehler = (*iter > nominal_value ? static_cast<double>(*iter) - static_cast<double>(nominal_value) : static_cast<double>(nominal_value) - static_cast<double>(*iter)) + previous_absolute_max_deviation[index];
+                const double nenner = std::min(std::initializer_list<double>({static_cast<double>(*iter), static_cast<double>(*iter) - previous_absolute_max_deviation[index], static_cast<double>(*iter) + previous_absolute_max_deviation[index]}));
+                deviations.push_back(zaehler / nenner);
             } else
             {
                 deviations.emplace_back(0.0);
