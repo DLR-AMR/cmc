@@ -241,7 +241,8 @@ public:
     template<typename T> bool holds_alternative() const;
 
     friend std::vector<InputVar> SplitIntoSubVariables(const InputVar& variable, const Dimension dimension);
-    friend std::vector<VariableSendMessage> GatherDistributionData(const InputVar& variable, const DataOffsets& offsets);
+    //friend std::vector<VariableSendMessage> GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
+    friend void GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
     friend class TransformerInputToCompressionVariable;
 
     template <typename T> friend class InputVariable;
@@ -1150,6 +1151,7 @@ void InputVariable<T>::AssignDataAtLinearIndices(const VariableRecvMessage& mess
     for (auto morton_idx_iter = msg.MortonIndicesBegin(); morton_idx_iter != msg.MortonIndicesEnd(); ++morton_idx_iter, ++data_iter)
     {
         data_[update(*morton_idx_iter)] = *data_iter;
+        //cmc_debug_msg("We will write at pos: ", update(*morton_idx_iter), " the val: ", *data_iter);
     }
 }
 

@@ -33,6 +33,7 @@ CompressionData::Setup()
     compression_data_->ApplyScalingAndOffset();
 
     compression_data_->SetupVariablesForCompression();
+   //cmc_err_msg("Hier ist ende");
 }
 
 void

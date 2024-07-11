@@ -59,7 +59,6 @@ public:
     const VariableUtilities<T>& GetVariableUtilities() const {return utilities_;};
 
     void SetInterpolation(Interpolate2<T> interpolation_function) {utilities_.SetInterpolation(interpolation_function);};
-    //void SetInaccuracyComputation(ComputeInaccuracy<T> inaccuracy_computation_function) {utilities_.SetInaccuracyComputation(inaccuracy_computation_function);};
     void SetInaccuracyStorage(const TrackingOption& inaccuracy_tracking_option) {utilities_.SetInaccuracyStorage(inaccuracy_tracking_option);};
     void SetUpInaccuracyStorage(const size_t size_hint = kInvalidSizeHintForInaccuracyContainer) {utilities_.SetUpInaccuracyStorage(size_hint);};
     void SetUpCompressionCriteria(const CompressionSpecifications& variable_specifications);
@@ -71,7 +70,6 @@ public:
 
     void AllocateForDecompression(const size_t size_hint);
     void DecompressElementConstantly(const int index, const int num_insertions);
-
 
     ErrorCompliance EvaluateCoarsening(const std::vector<PermittedError>& permitted_errors, const t8_forest_t previous_mesh, const t8_locidx_t start_index, const int num_elements);
 
@@ -96,6 +94,8 @@ public:
     std::vector<ErrorCompliance> CheckErrorBoundsForValues(const std::vector<T>& alternative_values, const int index) const;
     double  GetRemainingMaxAllowedAbsoluteError(const int index) const;
     void SetVariableDataInNCFile(const int ncid, const int var_id) const;
+
+    void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
 
     friend class TransformerInputToCompressionVariable;
     friend class TransformerCompressionToOutputVariable;
@@ -176,6 +176,8 @@ public:
     const CmcVariable& GetInternalVariable () const;
     void SetVariableDataInNCFile(const int ncid, const int var_id) const;
     void SetMissingValueInNCFile(const int ncid, const int var_id, const int nc_type) const;
+
+    void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
 
     friend class TransformerInputToCompressionVariable;
     friend class TransformerCompressionToOutputVariable;
@@ -381,7 +383,8 @@ template<typename T>
 void
 Variable<T>::SwitchToDataNew()
 {
-    data_.swap(data_new_); data_new_.clear();
+    data_.swap(data_new_);
+    data_new_.clear();
 }
 
 template<typename T>
@@ -446,17 +449,72 @@ Variable<T>::GetDataAsCompressionValues() const
 
     for (auto iter = data_.begin(); iter != data_.end(); ++iter)
     {
-        //const T current_value = *iter;
-        //std::array<uint8_t, sizeof(T)> serialized_value;
-        //std::memcpy(serialized_value.data(), &current_value, sizeof(T));
-        //compression_data.emplace_back(std::move(serialized_value));
         compression_data.emplace_back(*iter);
     }
     
     return compression_data;
 }
 
-/** VAR MEMBER FUNCITONS **/
+#if 0
+/* Create an sc_array_t wrapper of the variable's data */
+    //sc_array_t in_data;
+    //in_data.elem_size = sizeof(T);
+    //in_data.elem_count = data_.size();
+    //in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
+    //in_data.array = reinterpret_cast<char*>(data_.data());
+    //in_data.array = static_cast<char*>(static_cast<void*>(data_.data()));
+
+/* Create a wrapper for the partitioned data */
+    //sc_array_t out_data;
+    //out_data.elem_size = sizeof(T);
+    //out_data.elem_count = data_new_.size();
+    //out_data.byte_alloc = static_cast<ssize_t>(out_data.elem_size * out_data.elem_count);
+    //out_data.array = reinterpret_cast<char*>(data_new_.data());
+    //out_data.array = static_cast<char*>(static_cast<void*>(data_new_.data()));
+
+#endif
+
+template<typename T>
+void
+Variable<T>::RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest)
+{
+    /* Create an sc_array_t wrapper of the variable's data */
+    sc_array_t* in_data = sc_array_new_data (static_cast<void*>(data_.data()), sizeof(T), data_.size());
+
+    cmc_debug_msg("Size of data_: ", data_.size());
+    cmc_debug_msg("Num local elems: ", t8_forest_get_local_num_elements(adapted_forest));
+    cmc_debug_msg("In Elem size: ", in_data->elem_size);
+
+    /* Allocate memory for the partitioned data */
+    const t8_locidx_t new_num_elems = t8_forest_get_local_num_elements(partitioned_forest);
+    data_new_ = std::vector<T>(new_num_elems);
+
+    cmc_debug_msg("Size of data_new: ", data_new_.size());
+    cmc_debug_msg("Num local elems (partitioned_foerst): ", new_num_elems);
+
+    /* Create a wrapper for the freshly allocated partitioned data */
+    sc_array_t* out_data = sc_array_new_data (static_cast<void*>(data_new_.data()), sizeof(T), data_new_.size());
+
+    cmc_debug_msg("Out Elem size: ", out_data->elem_size);
+
+    /* Partition the variables data */
+    t8_forest_partition_data(adapted_forest, partitioned_forest, in_data, out_data);
+
+    /* Destroy the array wrappers */
+    sc_array_destroy(in_data);
+    sc_array_destroy(out_data);
+
+    /* Set the variable's data to the newly partitioned data */
+    SwitchToDataNew();
+    cmc_debug_msg("Partition of variable data finsihed");
+    //cmc_err_msg("We stop here");
+    
+    /* Repartition the inaccuracy tracker */
+    utilities_.RepartitionInaccuracyData(adapted_forest, partitioned_forest);
+}
+
+
+/** VAR MEMBER FUNCTIONS **/
 inline
 Var& 
 Var::operator=(const Var& other)
@@ -735,6 +793,15 @@ const CmcVariable&
 Var::GetInternalVariable() const
 {
     return var_;
+}
+
+inline
+void
+Var::RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest)
+{
+    std::visit([&](auto& var) {
+        var.RepartitionData(adapted_forest, partitioned_forest);
+    }, var_);
 }
 
 }

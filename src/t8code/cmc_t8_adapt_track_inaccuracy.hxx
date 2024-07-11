@@ -6,6 +6,12 @@
 
 #include "t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx"
 
+#ifdef CMC_WITH_T8CODE
+#include <t8.h>
+#include <t8_forest/t8_forest.h>
+#include <t8_forest/t8_forest_partition.h>
+#endif
+
 #include <cmath>
 #include <memory>
 #include <iostream>
@@ -248,6 +254,7 @@ public:
     virtual void TransferPreviousDeviation(const int start_index_previous_values) = 0;
     virtual void SwitchDeviations() = 0;
     virtual void AllocateDeviationStorage(const int num_elements) = 0;
+    virtual void RepartitionDeviations(t8_forest_t initial_forest, t8_forest_t partitioned_forest) = 0;
 
     virtual InaccuracyContainer* clone() const = 0;
 
@@ -335,6 +342,43 @@ public:
         deviations_.reserve(num_elements);
     }
 
+    void RepartitionDeviations(t8_forest_t initial_forest, t8_forest_t partitioned_forest) override
+    {
+        /* Create an sc_array_t wrapper of the current tracked deviations */
+        //sc_array_t in_data;
+        //in_data.elem_size = sizeof(double);
+        //in_data.elem_count = previous_deviations_.size();
+        //in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
+        //in_data.array = reinterpret_cast<char*>(previous_deviations_.data());
+
+        sc_array_t* in_data = sc_array_new_data (static_cast<void*>(previous_deviations_.data()), sizeof(double), previous_deviations_.size());
+
+        /* Allocate memory for the partitioned data */
+        const t8_locidx_t new_num_elems = t8_forest_get_local_num_elements(partitioned_forest);
+        deviations_ = std::vector<double>(new_num_elems);
+
+        /* Create a wrapper for the freshly allocated partitioned deviations */
+        //sc_array_t out_data;
+        //out_data.elem_size = sizeof(double);
+        //out_data.elem_count = deviations_.size();
+        //out_data.byte_alloc = static_cast<ssize_t>(out_data.elem_size * out_data.elem_count);
+        //out_data.array = reinterpret_cast<char*>(deviations_.data());
+
+        sc_array_t* out_data = sc_array_new_data (static_cast<void*>(deviations_.data()), sizeof(double), deviations_.size());
+
+        /* Partition the deviations compliant to the new partitioned forest */
+        t8_forest_partition_data(initial_forest, partitioned_forest, in_data, out_data);
+
+        /* Destroy the array wrappers */
+        sc_array_destroy(in_data);
+        sc_array_destroy(out_data);
+
+        /* Set the variable's data to the newly partitioned data */
+        SwitchDeviations();
+
+        cmc_debug_msg("Repartition Deviations is finsihed");
+    }
+
 private:
     std::vector<double> previous_deviations_;
     std::vector<double> deviations_;
@@ -378,6 +422,8 @@ public:
     {};
     void TransferPreviousDeviation([[maybe_unused]] const int start_index_previous_values) override {};
     void AllocateDeviationStorage([[maybe_unused]] const int num_elements) override {};
+    void RepartitionDeviations(t8_forest_t initial_forest, t8_forest_t partitioned_forest) override {};
+
 private:
     std::unordered_map<int, double> deviations_;
 };

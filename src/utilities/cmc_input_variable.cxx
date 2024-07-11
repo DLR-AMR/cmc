@@ -412,6 +412,112 @@ SplitIntoSubVariables(const InputVar& variable, const Dimension dimension)
     return std::visit(SplitInputVariables(dimension), variable.var_);
 }
 
+
+struct GatherSendData
+{
+public:
+    GatherSendData() = delete;
+    GatherSendData(const DataOffsets& mpi_offsets, std::vector<VariableSendMessage>& append_messages)
+    : offsets{mpi_offsets}, messages{append_messages}{};
+
+    void operator()(const InputVariable<int8_t>& var) {
+        ReceiverMap<int8_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<char>& var) {
+        ReceiverMap<char> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<int16_t>& var) {
+        ReceiverMap<int16_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.emplace_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<int32_t>& var) {
+        ReceiverMap<int32_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<float>& var) {
+        ReceiverMap<float> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<double>& var) {
+        ReceiverMap<double> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<uint8_t>& var) {
+        ReceiverMap<uint8_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<uint16_t>& var) {
+        ReceiverMap<uint16_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<uint32_t>& var) {
+        ReceiverMap<uint32_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<int64_t>& var) {
+        ReceiverMap<int64_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+    void operator()(const InputVariable<uint64_t>& var) {
+        ReceiverMap<uint64_t> send_data = GatherDataToBeDistributed(var, offsets);
+        for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+        {
+            messages.push_back(std::move(sd_iter->second));
+            sd_iter = send_data.erase(sd_iter);
+        }
+    }
+private:
+    const DataOffsets& offsets;
+    std::vector<VariableSendMessage>& messages;
+};
+
+
+
+
+#if 0
+
 struct GatherSendData
 {
 public:
@@ -458,9 +564,10 @@ public:
             //VariableMessage<int16_t>& var_message = send_data[sd_iter->first];
             //VariableMessage<int16_t> send_var;
             //DetachVarMessage(var_message, send_var);
-            VariableMessage<int16_t> send_var;
-            std::swap(send_var, sd_iter->second);
-            variables_send_data.emplace_back(std::move(send_var));
+            //VariableMessage<int16_t> send_var;
+            //std::swap(send_var, sd_iter->second);
+            //variables_send_data.emplace_back(std::move(send_var));
+            variables_send_data.push_back(std::move(sd_iter->second));
         }
         return variables_send_data;
     }
@@ -588,11 +695,13 @@ private:
     const DataOffsets& offsets;
 };
 
+#endif
 
-std::vector<VariableSendMessage>
-GatherDistributionData(const InputVar& variable, const DataOffsets& offsets)
+//std::vector<VariableSendMessage>
+void
+GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages)
 {
-    return std::visit(GatherSendData(offsets), variable.var_);
+    std::visit(GatherSendData(offsets, messages), variable.var_);
 }
 
 CmcType

@@ -28,6 +28,9 @@ main(void)
     /* Initialize cmc */
     cmc::CmcInitialize();
     
+    sc_init (MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
+    t8_init (SC_LP_DEBUG);
+
     {
         #if 0
         /* Create a mesh */
@@ -79,8 +82,9 @@ main(void)
         const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
         cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
 
-        cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 16),
-                                 cmc::DimensionInterval(cmc::Dimension::Lat, 0, 8)
+        cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
+                                 cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
+                                 cmc::DimensionInterval(cmc::Dimension::Lev, 36, 37)
                                  );
 
          /* Inquire the hyperslab of data for the given variables */
@@ -111,7 +115,7 @@ main(void)
         #endif
 
     }
-
+    sc_finalize ();
     /* Finalize cmc */
     cmc::CmcFinalize();
 

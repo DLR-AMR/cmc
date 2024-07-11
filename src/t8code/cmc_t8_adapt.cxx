@@ -65,15 +65,27 @@ AdaptData::SetCurrentMesh(t8_forest_t forest)
 t8_forest_t
 AdaptData::RepartitionData(t8_forest_t adapted_forest)
 {
-    //TODO:: implement
+    /* Keep the adapted forest for the partition step */
+    t8_forest_ref(adapted_forest);
 
     /* Repartition the forest */
-    
+    t8_forest_t partitioned_forest;
+    t8_forest_init(&partitioned_forest);
+    const int partition_for_coarsening = 0; //TODO: change to one in the future
+    t8_forest_set_partition(partitioned_forest, adapted_forest, partition_for_coarsening);
+    t8_forest_commit(partitioned_forest);
+
     /* Repartition the variables */
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        var_iter->RepartitionData(adapted_forest, partitioned_forest);
+    }
 
+    /* Deallocate the addapted forest */
+    t8_forest_unref(&adapted_forest);
+    cmc_debug_msg("End of AdaptData->RepartitionData");
     /* Return the repartitioned forest */
-
-    return adapted_forest;
+    return partitioned_forest;
 }
 
 t8_forest_adapt_t

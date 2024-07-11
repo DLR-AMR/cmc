@@ -115,12 +115,6 @@ public:
     VariableUtilities() = default;
     ~VariableUtilities() = default;
 
-    //VariableUtilities(const VariableUtilities& other)
-    // : interpolate_{other.interpolate_}, compute_inaccuracy_{other.compute_inaccuracy_},
-    //   inaccuracy_storage_(other.inaccuracy_storage_->clone()) {};
-    //VariableUtilities(VariableUtilities&& other)
-    // : interpolate_{std::move(other.interpolate_)}, compute_inaccuracy_{std::move(other.compute_inaccuracy_)},
-    //   inaccuracy_storage_{std::move(other.inaccuracy_storage_)} {};
     VariableUtilities(const VariableUtilities& other)
      : interpolate_{other.interpolate_},
        error_domains_(other.error_domains_),
@@ -139,9 +133,6 @@ public:
 
     void SetInterpolation(Interpolate2<T> interpolate_function) {interpolate_ = interpolate_function;};
     InterpolationFunctional2<T>& GetInterpolation() {return interpolate_;};
-
-    //void SetInaccuracyComputation(ComputeInaccuracy<T> compute_inaccuracy_function) {compute_inaccuracy_ = compute_inaccuracy_function;};
-    //InaccuracyComputer<T>& GetInaccuracyComputation() {return compute_inaccuracy_;};
 
     void SetUpVariableErrorDomains(const CompressionSpecifications& variable_specifications, const GeoDomain& variable_global_domain);
 
@@ -164,6 +155,8 @@ public:
     double GetPreviousDeviation(const int index) const;
     void SwitchDeviations() {inaccuracy_storage_->SwitchDeviations();};
 
+    void RepartitionInaccuracyData(t8_forest_t initial_forest, t8_forest_t partitioned_forest);
+
     ed_iterator GetErrorDomainsBegin() { return error_domains_.begin(); };
     ed_iterator GetErrorDomainsEnd() { return error_domains_.end(); };
 
@@ -180,7 +173,6 @@ private:
     const InaccuracyComputer<T>& CompressionCriterionToInaccuracyComputer(const CompressionCriterion criterion) const;
 
     InterpolationFunctional2<T> interpolate_{InterpoalteToArithmeticMean};
-    //InaccuracyComputer<T> compute_inaccuracy_{ComputeAbsoluteDeviation};
 
     InaccuracyComputer<T> compute_absolute_inaccuracy_{ComputeAbsoluteDeviation, ComputeSingleAbsoluteDeviation};
     InaccuracyComputer<T> compute_relative_inaccuracy_{ComputeRelativeDeviation, ComputeSingleRelativeDeviation};
@@ -422,8 +414,16 @@ VariableUtilities<T>::CompressionCriterionToInaccuracyComputer(const Compression
     }
 }
 
+template<typename T>
+void
+VariableUtilities<T>::RepartitionInaccuracyData(t8_forest_t initial_forest, t8_forest_t partitioned_forest)
+{
+    cmc_assert(is_inaccuracy_storage_set_);
+    cmc_assert(inaccuracy_storage_ != nullptr);
 
-
+    /* Repartition the tracked deviations compliant to the new partitioned forest */
+    inaccuracy_storage_->RepartitionDeviations(initial_forest, partitioned_forest);
+}
 
 }
 

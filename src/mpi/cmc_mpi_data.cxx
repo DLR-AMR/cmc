@@ -130,10 +130,20 @@ public:
     std::pair<MPI_Request, MPI_Request> operator()(const VariableMessage<int16_t>& msg) {
         MPI_Request morton_req, data_req;
         /* Send the Morton indices */
+        //cmc_debug_msg("Morton indices that going to be sent");
+        //for (auto miter = msg.morton_indices_.begin(); miter != msg.morton_indices_.end(); ++miter)
+        //{
+        //    std::cout << *miter << ", ";
+        //}
         int err = MPI_Isend(msg.morton_indices_.data(), msg.morton_indices_.size(), MPI_MORTON_INDEX_T, msg.rank_, CreateMortonIndicesTag(msg.variable_id_), comm_, &morton_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
+        //cmc_debug_msg("Data that is going to be sent");
+        //for (auto miter = msg.data_.begin(); miter != msg.data_.end(); ++miter)
+        //{
+        //    std::cout << *miter << ", ";
+        //}
         /* Send the actual data */
         err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int16_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);

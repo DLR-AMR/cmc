@@ -66,8 +66,16 @@ public:
     VariableMessage(const int rank, const int variable_id)
     : rank_{rank}, variable_id_{variable_id}{};
     VariableMessage(const int rank, const int variable_id, const int num_elements)
-    : rank_{rank}, variable_id_{variable_id}, data_{std::vector<T>(num_elements)}, morton_indices_{std::vector<MortonIndex>(num_elements)}{};
+    : rank_{rank}, variable_id_{variable_id}, data_(num_elements), morton_indices_(num_elements){};
 
+    VariableMessage(const VariableMessage& other) = default;
+    VariableMessage& operator=(const VariableMessage& other) = default;
+    VariableMessage(VariableMessage&& other) = default;
+    VariableMessage& operator=(VariableMessage&& other) = default;
+
+    ~VariableMessage(){
+        cmc_debug_msg("VariableMessage of rank ", rank_, " for var ", variable_id_, " with data size = ", data_.size(), " and morton indices size ", morton_indices_.size(), " is destroyed!");
+    }
     void* GetInitialDataPtr() {return static_cast<void*>(data_.data());}
     void* GetInitialMortonIndicesPtr() {return static_cast<void*>(morton_indices_.data());}
 
@@ -140,12 +148,19 @@ public:
     template<typename T> VariableSendMessage(VariableMessage<T>&& var_message)
     : type_{ConvertToCmcType<T>()}, message_{std::move(var_message)}{};
 
+    VariableSendMessage(const VariableSendMessage& other) = default;
+    VariableSendMessage& operator=(const VariableSendMessage& other) = default;
+    VariableSendMessage(VariableSendMessage&& other) = default;
+    VariableSendMessage& operator=(VariableSendMessage&& other) = default;
+
     std::pair<MPI_Request, MPI_Request> Send(const MPI_Comm comm);
+    VarMessage& GetInternalVariant() {return message_;};
+    const VarMessage& GetInternalVariant() const {return message_;};
+
 private:
     CmcType type_;
     VarMessage message_;
 };
-
 
 class
 VariableRecvMessage
@@ -156,6 +171,11 @@ public:
 
     VariableRecvMessage(const CmcType type, VarMessage&& message)
     : type_{type}, message_{std::move(message)} {};
+
+    VariableRecvMessage(const VariableRecvMessage& other) = default;
+    VariableRecvMessage& operator=(const VariableRecvMessage& other) = default;
+    VariableRecvMessage(VariableRecvMessage&& other) = default;
+    VariableRecvMessage& operator=(VariableRecvMessage&& other) = default;
 
     void* GetInitialDataPtr();
     void* GetInitialMortonIndicesPtr();

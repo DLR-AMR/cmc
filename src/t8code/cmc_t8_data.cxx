@@ -154,15 +154,17 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
     /* Get the element scheme */
     t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
 
-    const int num_children = ts_c->t8_element_num_children(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, 0));
-    
-    MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, 0),
+    const t8_locidx_t first_ltree_id = 0;
+
+    const int num_children = ts_c->t8_element_num_children(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0));
+
+    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0),
                                                    ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
     
     std::vector<IndexReduction> index_correction;
     index_correction.emplace_back(linear_index_start_elem, linear_index_start_elem);
 
-    MortonIndex skipped_indices = 0;
+    MortonIndex skipped_indices = linear_index_start_elem;
 
     bool coarse_element_streak = false;
 
@@ -177,7 +179,7 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
             coarse_element_streak = true;
         } else if (coarse_element_streak)
         {
-            MortonIndex uniform_index_of_elem = GetMortonIndexOnLevel(elem, ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
+            const MortonIndex uniform_index_of_elem = GetMortonIndexOnLevel(elem, ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
             index_correction.emplace_back(uniform_index_of_elem, skipped_indices);
             coarse_element_streak = false;
         }
@@ -187,7 +189,9 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
 }
 
 
-std::vector<MPI_Request>
+/* TODO: Maybe pass output variables as in/out reference in order to be sure, that the send messages are not deallocated */
+[[nodiscard]]
+std::pair<std::vector<VariableSendMessage>, std::vector<MPI_Request>>
 AmrData::SendInitialData()
 {
     int comm_size{1};
@@ -206,9 +210,12 @@ AmrData::SendInitialData()
     /* Gather the data thas has to be communicated for all variables */
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
-        std::vector<VariableSendMessage> var_send_messages = GatherDistributionData(*input_var_iter, offsets);
-        std::move(std::make_move_iterator(var_send_messages.begin()), std::make_move_iterator(var_send_messages.end()), std::back_insert_iterator(send_messages));
-        var_send_messages.clear();
+        //std::vector<VariableSendMessage> var_send_messages = GatherDistributionData(*input_var_iter, offsets);
+        ////std::move(std::make_move_iterator(var_send_messages.begin()), std::make_move_iterator(var_send_messages.end()), std::back_insert_iterator(send_messages));
+        ////var_send_messages.clear();
+        //send_messages.insert(send_messages.end(), std::make_move_iterator(var_send_messages.begin()), std::make_move_iterator(var_send_messages.end()));
+        //var_send_messages.erase(var_send_messages.begin(), var_send_messages.end());
+        GatherDistributionData(*input_var_iter, offsets, send_messages);
     }
 
     cmc_debug_msg("Size of send_messages: ", send_messages.size());
@@ -229,7 +236,7 @@ AmrData::SendInitialData()
         send_requests.push_back(std::move(req_data));
     }
 
-    return send_requests;
+    return std::make_pair(std::move(send_messages), std::move(send_requests));
 }
 
 std::vector<VariableRecvMessage>
@@ -294,19 +301,35 @@ AmrData::ReceiveInitialData()
             /* Check if it is a Morton indices message or the actual data message */
             if (IsMessageADataMessage(tag))
             {
+                cmc_debug_msg("Trying to Received ", num_elems, " data values from rank ", source, " for variable ", variable_id);
+                void* dataptr = msg_iter->GetInitialDataPtr();
+                std::vector<int16_t> testdata(num_elems);
                 /* Receive the actual data from this process */
-                err = MPI_Recv(msg_iter->GetInitialDataPtr(), num_elems, data_type, source, tag, comm_, MPI_STATUS_IGNORE);
+                err = MPI_Recv(dataptr, num_elems, data_type, source, tag, comm_, MPI_STATUS_IGNORE);
                 MPICheckError(err); 
 
                 cmc_debug_msg("Received ", num_elems, " data values from rank ", source, " for variable ", variable_id);
+                //int16_t* dptr = static_cast<int16_t*>(msg_iter->GetInitialDataPtr());
+                //for (int i = 0;  i < num_elems; ++i)
+                //{
+                //    std::cout << *(dptr + i) << " ,";
+                //}
             } else
             {
+                cmc_debug_msg("Trying to Received ", num_elems, " Morton indices from rank ", source, " for variable ", variable_id);
+                void* miptr = msg_iter->GetInitialMortonIndicesPtr();
+                std::vector<int64_t> testdata(num_elems);
                 /* Otherwise, we receive the sent Morton indices */
-                err = MPI_Recv(msg_iter->GetInitialMortonIndicesPtr(), num_elems, MPI_MORTON_INDEX_T, source, tag, comm_, MPI_STATUS_IGNORE);
+                err = MPI_Recv(miptr, num_elems, MPI_MORTON_INDEX_T, source, tag, comm_, MPI_STATUS_IGNORE);
                 MPICheckError(err);
 
                 cmc_debug_msg("Received ", num_elems, " Morton indices from rank ", source, " for variable ", variable_id);
-            }  
+                //int64_t* dptr = static_cast<int64_t*>(msg_iter->GetInitialMortonIndicesPtr());
+                //for (int i = 0;  i < num_elems; ++i)
+                //{
+                //    std::cout << *(dptr + i) << " ,";
+                //}
+            } 
         } else
         {
             /* If all messages have been processed, we break the receiving loop */
@@ -380,9 +403,28 @@ AmrData::DistributeDataOnInitialMesh()
         input_var_iter->TransformCoordinatesToLinearIndices();
     }
 
-    /* Gather and send all the data that has to be communicated */
-    std::vector<MPI_Request> send_requests = SendInitialData();
+    /* Gather and send all the data that has to be communicated. 
+     * The send messages has to be returned in order to no get deallocated before 
+     * the actual sending has happend. Therefore, we keep them here 'alive' until 
+     * all send_requests have been completed */
+    auto [send_messages, send_requests] = SendInitialData();
+    
+    cmc_debug_msg("Sending ", send_messages.size(), " messages");
 
+    cmc_debug_msg("Size of data vector in message: ", std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.size());
+    cmc_debug_msg("Size of morton vector in message: ", std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).morton_indices_.size());
+    //for (auto diter = std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.begin(); diter != std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.end(); ++diter)
+    //{
+    //    if (*diter > -32000)
+    //    {
+    //        std::cout << "; pos: " << std::distance(std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.begin(), diter) << ", val: " << *diter << ";";
+    //    }
+    //}
+    
+    //for (int i = 1038140; i < 1038240 ; ++i)
+    //{
+    //    std::cout << std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()). morton_indices_[i] << ", ";
+    //}
     /* Wait until all messages have been staged */
     int err = MPI_Barrier(comm_);
     MPICheckError(err);
@@ -621,23 +663,22 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
 
             /* Keep the 'previous forest' after the adaptation step */
             t8_forest_ref(previous_forest);
-
+            cmc_debug_msg("Befroe adapt compression");
             /* Perform a coarsening iteration */
             t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, adapt_data.GetAdaptationFunction(), 0, 0, static_cast<void*>(&adapt_data));
-
+            cmc_debug_msg("Befroe update compression");
             /* Interpolate the data from the previous forest to the (new) coarsened forest */
             adapt_data.UpdateCompressionData();
-
+            cmc_debug_msg("Befroe repartition");
             /* Repartition the mesh as well as the data and receive the newly partitioned forest */
             adapted_forest = adapt_data.RepartitionData(adapted_forest);
-
+            cmc_debug_msg("after repartition");
             /* Free the former forest */
             t8_forest_unref(&previous_forest);
-
+            cmc_debug_msg("Befroe set partitioned mesh");
             adapt_data.SetCurrentMesh(adapted_forest);
 
             adapt_data.FinalizeCompressionIteration();
-
         }
     }
 
