@@ -8,6 +8,94 @@
 namespace cmc
 {
 
+constexpr int kLowestPermittedID = 0;
+constexpr int kHighestPermittedID = 1023;
+constexpr int kLowestNotPermittedID = kHighestPermittedID + 1;
+constexpr int kSubandIDOffset = 1024;
+constexpr int kSubbandIDFactor = 1024;
+constexpr int kMortonIDOffset = 1024 * 1024 + kSubandIDOffset;
+
+constexpr inline
+int
+CreateSubbandID(const int id, const int subband_id)
+{
+    cmc_assert(kLowestPermittedID <= id && id < kLowestNotPermittedID);
+    cmc_assert(kLowestPermittedID <= subband_id && subband_id < kLowestNotPermittedID);
+
+    return id * kSubbandIDFactor + subband_id;
+}
+
+constexpr inline
+int
+CreateMortonIndicesTag(const int id)
+{
+    return id + kMortonIDOffset;
+}
+
+constexpr inline
+int
+CreateDataTag(const int id)
+{
+    return id;
+}
+
+constexpr inline 
+int
+GetIDFromTag(const int msg_tag)
+{
+    if (msg_tag >= kMortonIDOffset)
+    {
+        return msg_tag - kMortonIDOffset;
+    } else
+    {
+        return msg_tag;
+    }
+}
+
+constexpr inline 
+int
+GetActualVariableIDFromTag(const int msg_tag)
+{
+    /* Check if the message corresponded to a message containing Morton Indices */
+    if (msg_tag >= kMortonIDOffset)
+    {
+        const int var_comm_id = msg_tag - kMortonIDOffset;
+
+        /* Check if it is a subband variable */
+        if (var_comm_id >= kLowestNotPermittedID)
+        {
+            /* Thsi integer division erases the subband information which was added for the communication and we obtain the initial id */
+            return static_cast<int>(var_comm_id / kSubbandIDFactor);
+        } else
+        {
+            return var_comm_id;
+        }
+    } else
+    {
+        /* Check if it is a subband variable */
+        if (msg_tag >= kLowestNotPermittedID)
+        {
+            /* Thsi integer division erases the subband information which was added for the communication and we obtain the initial id */
+            return static_cast<int>(msg_tag / kSubbandIDFactor);
+        } else
+        {
+            return msg_tag;
+        }
+    }
+}
+
+constexpr inline
+bool IsMessageADataMessage(const int msg_tag)
+{
+    return (msg_tag < kMortonIDOffset);
+}
+
+constexpr inline
+bool IsMessageAMortonIndicesMessage(const int msg_tag)
+{
+    return (msg_tag >= kMortonIDOffset);
+}
+
 constexpr int MortonIndicesTagOffset = 1024;
 
 MPI_Datatype ConvertCmcTypeToMPIType(const CmcType type);
@@ -98,6 +186,7 @@ public:
     std::vector<MortonIndex> morton_indices_;
 };
 
+#if 0
 inline
 int
 CreateMortonIndicesTag(const int variable_id)
@@ -124,6 +213,7 @@ bool IsMessageADataMessage(const int msg_tag)
 {
     return (msg_tag < MortonIndicesTagOffset);
 }
+#endif
 
 template<typename T>
 static 

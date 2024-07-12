@@ -107,7 +107,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int8_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int8_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: int8_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -121,7 +121,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<char>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<char>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: char) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -145,7 +145,7 @@ public:
         //    std::cout << *miter << ", ";
         //}
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int16_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int16_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: int16_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -159,7 +159,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int32_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int32_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: int32_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -173,7 +173,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<float>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<float>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: float) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -187,7 +187,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<double>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<double>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: double) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -201,7 +201,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint8_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint8_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: uint8_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -215,7 +215,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint16_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint16_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: uint16_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -229,7 +229,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint32_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint32_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: uint32_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -243,7 +243,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int64_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<int64_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: int64_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         
@@ -257,7 +257,7 @@ public:
         cmc_debug_msg("Send ", msg.morton_indices_.size(), " Morton indices to rank ", msg.rank_, " for variable ", msg.variable_id_);
 
         /* Send the actual data */
-        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint64_t>(), msg.rank_, CreateVariableDataTag(msg.variable_id_), comm_, &data_req);
+        err = MPI_Isend(msg.data_.data(), msg.data_.size(), ConvertToMPIType<uint64_t>(), msg.rank_, CreateDataTag(msg.variable_id_), comm_, &data_req);
         MPICheckError(err);
         cmc_debug_msg("Send ", msg.data_.size(), " data values (of type: uint64_t) to rank ", msg.rank_, " for variable ", msg.variable_id_);
         

@@ -79,6 +79,7 @@ AdaptData::RepartitionData(t8_forest_t adapted_forest)
     for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
     {
         var_iter->RepartitionData(adapted_forest, partitioned_forest);
+        
     }
 
     /* Deallocate the addapted forest */

@@ -227,6 +227,24 @@ InputVar::SetScaleFactor(const CmcUniversalType& scale_factor)
     }, var_);
 }
 
+
+int
+InputVar::GetInternID() const
+{
+    return std::visit([](auto&& var) -> int {
+        return var.GetInternID();
+    }, var_);
+}
+
+void
+InputVar::SetInternID(const int id)
+{
+    std::visit([&](auto&& var){
+        var.SetInternID(id);
+    }, var_);
+}
+
+
 void
 InputVar::TransformCoordinatesToLinearIndices()
 {
@@ -705,7 +723,7 @@ GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std
 }
 
 CmcType
-GetDataTypeFromVariable(const std::vector<InputVar>& input_variables, const int variable_id)
+GetDataTypeFromVariableViaID(const std::vector<InputVar>& input_variables, const int variable_id)
 {
     /* Find the variable with the corresponding id */
     auto var_iter = std::find_if(input_variables.begin(), input_variables.end(), [&](auto& var){
@@ -723,6 +741,23 @@ GetDataTypeFromVariable(const std::vector<InputVar>& input_variables, const int 
     }
 }
 
+CmcType
+GetDataTypeFromVariableViaInternID(const std::vector<InputVar>& input_variables, const int intern_id)
+{
+    /* Find the variable with the corresponding id */
+    auto var_iter = std::find_if(input_variables.begin(), input_variables.end(), [&](auto& var){
+        return (var.GetInternID() == intern_id);
+    });
 
+    /* Check if the variable has been found and return its corresponding CmcType */
+    if (var_iter != input_variables.end())
+    {
+        return var_iter->GetType();
+    } else
+    {
+        /* In case there is no variable with the corresponding ID */
+        return CmcType::TypeUndefined;
+    }
+}
 
 }

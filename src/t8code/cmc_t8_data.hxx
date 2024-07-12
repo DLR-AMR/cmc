@@ -75,7 +75,7 @@ private:
     void SetCompressionSettings(CompressionSettings& settings) {compression_settings_ = settings;};
     std::vector<IndexReduction> UpdateLinearIndicesToTheInitialMesh();
     void TransferToDecompressionData(OutputVar& output_variable, const Var& compression_variable, const GeoDomain& resulting_domain);
-
+    void CreateInternIDsForRedistribution();
     AdaptData CreateAdaptationData(const CoarseningSample& adaptation_sample, const CompressionMode mode);
     std::vector<CoarseningSample> RetrieveMeshesToBeCoarsened(const CompressionMode compression_mode) const;
 

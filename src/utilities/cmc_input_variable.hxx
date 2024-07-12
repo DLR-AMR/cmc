@@ -24,6 +24,7 @@ namespace cmc
 {
 
 constexpr int kNoGlobalContext = -1;
+constexpr int kNoInternalIDSet = -1;
 
 struct IndexReduction
 {
@@ -98,6 +99,9 @@ public:
     const GeoDomain& GetGlobalDomain() const;
     void SetGlobalDomain(const GeoDomain& domain);
     void SetGlobalDomain(GeoDomain&& domain);
+
+    int GetInternID() const;
+    void SetInternID(const int id);
 
     CmcUniversalType GetAddOffset() const;
     CmcUniversalType GetScaleFactor() const;
@@ -182,6 +186,7 @@ private:
     TrackingOption inaccuracy_tracking_{TrackingOption::TrackFullInaccuracy};
     InterpolationFunctional2<T> interpolation_{InterpoalteToArithmeticMean<T>};
 
+    int intern_id_{kNoInternalIDSet};
     int global_context_information_{kNoGlobalContext};
     Dimension has_split_dimension_{Dimension::DimensionUndefined};
     bool _has_been_invalidated_by_moving_{false};
@@ -234,6 +239,8 @@ public:
     void SetScaleFactor(const CmcUniversalType& scale_factor);
     int GetGlobalContextInformation() const;
     void SetGlobalContextInformation(const int global_context_information);
+    int GetInternID() const;
+    void SetInternID(const int id);
 
     void SetUpFilledVariable(const size_t num_elements, const CmcUniversalType& fill_value);
 
@@ -268,7 +275,10 @@ private:
 };
 
 CmcType
-GetDataTypeFromVariable(const std::vector<InputVar>& input_variables, const int variable_id);
+GetDataTypeFromVariableViaID(const std::vector<InputVar>& input_variables, const int variable_id);
+
+CmcType
+GetDataTypeFromVariableViaInternID(const std::vector<InputVar>& input_variables, const int intern_id);
 
 /** INPUT VARIABLE<T> MEMBER FUNCITONS **/
 
@@ -870,8 +880,9 @@ GatherDataToBeDistributed(const InputVariable<T>& variable, const DataOffsets& o
                 search_rk->second.morton_indices_.push_back(current_linear_index);
             } else
             {
+                cmc_assert(variable.GetInternID() != kNoInternalIDSet);
                 /* If the receiving rank is not yet listed within the ReceiverMap */
-                send_messages[owner_rank] = VariableMessage<T>(owner_rank, variable.GetID());
+                send_messages[owner_rank] = VariableMessage<T>(owner_rank, variable.GetInternID());
 
                 const size_t estimate_receiving_data_points = 2 * (num_coordinates / offsets.size());
 
@@ -892,6 +903,20 @@ GatherDataToBeDistributed(const InputVariable<T>& variable, const DataOffsets& o
     }
 
     return send_messages;
+}
+
+template<class T>
+int
+InputVariable<T>::GetInternID() const
+{
+    return intern_id_;
+}
+
+template<class T>
+void
+InputVariable<T>::SetInternID(const int id)
+{
+    intern_id_ = id;
 }
 
 /** INPUT VAR MEMBER FUNCTIONS **/

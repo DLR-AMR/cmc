@@ -188,6 +188,25 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
     return index_correction;
 }
 
+void
+AmrData::CreateInternIDsForRedistribution()
+{
+    for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
+    {
+        if (input_var_iter->GetGlobalContextInformation() != kNoGlobalContext)
+        {
+            /* If the variable is part of a higher dimensional one and resembles a subband of the variable */
+            const int intern_id = CreateSubbandID(input_var_iter->GetID(), input_var_iter->GetGlobalContextInformation());
+            input_var_iter->SetInternID(intern_id);
+        } else
+        {
+            /* If the variable has not been split */
+            const int intern_id = input_var_iter->GetID();
+            input_var_iter->SetInternID(intern_id);
+        }
+    }
+}
+
 
 /* TODO: Maybe pass output variables as in/out reference in order to be sure, that the send messages are not deallocated */
 [[nodiscard]]
@@ -264,8 +283,10 @@ AmrData::ReceiveInitialData()
             /* Get the necessary information for retrieving the message */
             const int source = probe_status.MPI_SOURCE;
             const int tag = probe_status.MPI_TAG;
-            const int variable_id = GetVariableIDFromTag(tag);
-            const CmcType var_type = GetDataTypeFromVariable(input_variables_, variable_id);
+            //const int variable_id = GetVariableIDFromTag(tag);
+            //const CmcType var_type = GetDataTypeFromVariable(input_variables_, variable_id);
+            const int variable_id = GetIDFromTag(tag);
+            const CmcType var_type = GetDataTypeFromVariableViaInternID(input_variables_, variable_id);
             const MPI_Datatype data_type = ConvertCmcTypeToMPIType(var_type);
 
             /* Get the number of elements from this message */
@@ -356,7 +377,7 @@ AmrData::SortInitialDataIntoVariables(const std::vector<VariableRecvMessage>& me
     for (auto msg_iter = messages.begin(); msg_iter != messages.end(); ++msg_iter)
     {
         /* Find the variable to which the current message is assigned */
-        auto var_iter = std::find_if(input_variables_.begin(), input_variables_.end(), [&msg_iter](auto& var){return var.GetID() == msg_iter->GetVariableID();});
+        auto var_iter = std::find_if(input_variables_.begin(), input_variables_.end(), [&msg_iter](auto& var){return var.GetInternID() == msg_iter->GetVariableID();});
 
         /* All processes should have prior knowledge to all variables. Therefore, a variable with the ID from the message has to be found locally */
         if (var_iter == input_variables_.end())
@@ -396,6 +417,9 @@ AmrData::DistributeDataOnInitialMesh()
 {
     #ifdef CMC_ENABLE_MPI
     cmc_assert(initial_mesh_.IsValid());
+
+    /* We create intern IDs that are uniquely identifiable for the parallel communication */
+    CreateInternIDsForRedistribution();
 
     /* Transform all coordinates to Morton indices */
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
@@ -680,7 +704,10 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
 
             adapt_data.FinalizeCompressionIteration();
         }
-    }
+        //int err = MPI_Barrier(MPI_COMM_WORLD);
+        //MPICheckError(err);
+        cmc_err_msg("hier is ende");
+        }
 
     #endif
 }
