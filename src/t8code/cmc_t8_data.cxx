@@ -161,13 +161,16 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
     const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0),
                                                    ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
     
+    /* Locally, this update function reduces the global_index to zero for the first local element */
     std::vector<IndexReduction> index_correction;
     index_correction.emplace_back(linear_index_start_elem, linear_index_start_elem);
 
+    /* All elements that are not holding data need to be accumulated in order to be subtracted additionally for the local index correction */
     MortonIndex skipped_indices = linear_index_start_elem;
 
     bool coarse_element_streak = false;
 
+    /* Iterate through all local elements and find how the global Morton indices need to be adjusted in order to comply the local data ordering */
     for (auto iter = 0; iter < num_local_elements; ++iter)
     {
         const t8_element_t* elem = t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, iter);
@@ -179,12 +182,15 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
             coarse_element_streak = true;
         } else if (coarse_element_streak)
         {
+            /* We accumulate the amount of skipped indices (with regard to the initial refinement level) and store the offset 
+             * once we have reached again an element on the initial refinement level */
             const MortonIndex uniform_index_of_elem = GetMortonIndexOnLevel(elem, ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
             index_correction.emplace_back(uniform_index_of_elem, skipped_indices);
             coarse_element_streak = false;
         }
     }
 
+    /* Return the correction scheme for the global indices */
     return index_correction;
 }
 
@@ -229,11 +235,6 @@ AmrData::SendInitialData()
     /* Gather the data thas has to be communicated for all variables */
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
-        //std::vector<VariableSendMessage> var_send_messages = GatherDistributionData(*input_var_iter, offsets);
-        ////std::move(std::make_move_iterator(var_send_messages.begin()), std::make_move_iterator(var_send_messages.end()), std::back_insert_iterator(send_messages));
-        ////var_send_messages.clear();
-        //send_messages.insert(send_messages.end(), std::make_move_iterator(var_send_messages.begin()), std::make_move_iterator(var_send_messages.end()));
-        //var_send_messages.erase(var_send_messages.begin(), var_send_messages.end());
         GatherDistributionData(*input_var_iter, offsets, send_messages);
     }
 
@@ -283,8 +284,6 @@ AmrData::ReceiveInitialData()
             /* Get the necessary information for retrieving the message */
             const int source = probe_status.MPI_SOURCE;
             const int tag = probe_status.MPI_TAG;
-            //const int variable_id = GetVariableIDFromTag(tag);
-            //const CmcType var_type = GetDataTypeFromVariable(input_variables_, variable_id);
             const int variable_id = GetIDFromTag(tag);
             const CmcType var_type = GetDataTypeFromVariableViaInternID(input_variables_, variable_id);
             const MPI_Datatype data_type = ConvertCmcTypeToMPIType(var_type);
@@ -330,11 +329,6 @@ AmrData::ReceiveInitialData()
                 MPICheckError(err); 
 
                 cmc_debug_msg("Received ", num_elems, " data values from rank ", source, " for variable ", variable_id);
-                //int16_t* dptr = static_cast<int16_t*>(msg_iter->GetInitialDataPtr());
-                //for (int i = 0;  i < num_elems; ++i)
-                //{
-                //    std::cout << *(dptr + i) << " ,";
-                //}
             } else
             {
                 cmc_debug_msg("Trying to Received ", num_elems, " Morton indices from rank ", source, " for variable ", variable_id);
@@ -345,11 +339,6 @@ AmrData::ReceiveInitialData()
                 MPICheckError(err);
 
                 cmc_debug_msg("Received ", num_elems, " Morton indices from rank ", source, " for variable ", variable_id);
-                //int64_t* dptr = static_cast<int64_t*>(msg_iter->GetInitialMortonIndicesPtr());
-                //for (int i = 0;  i < num_elems; ++i)
-                //{
-                //    std::cout << *(dptr + i) << " ,";
-                //}
             } 
         } else
         {
@@ -416,6 +405,7 @@ void
 AmrData::DistributeDataOnInitialMesh()
 {
     #ifdef CMC_ENABLE_MPI
+    cmc_debug_msg("in DistributeDataOnInitialMesh\n\n");
     cmc_assert(initial_mesh_.IsValid());
 
     /* We create intern IDs that are uniquely identifiable for the parallel communication */
@@ -433,22 +423,6 @@ AmrData::DistributeDataOnInitialMesh()
      * all send_requests have been completed */
     auto [send_messages, send_requests] = SendInitialData();
     
-    cmc_debug_msg("Sending ", send_messages.size(), " messages");
-
-    cmc_debug_msg("Size of data vector in message: ", std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.size());
-    cmc_debug_msg("Size of morton vector in message: ", std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).morton_indices_.size());
-    //for (auto diter = std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.begin(); diter != std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.end(); ++diter)
-    //{
-    //    if (*diter > -32000)
-    //    {
-    //        std::cout << "; pos: " << std::distance(std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()).data_.begin(), diter) << ", val: " << *diter << ";";
-    //    }
-    //}
-    
-    //for (int i = 1038140; i < 1038240 ; ++i)
-    //{
-    //    std::cout << std::get<VariableMessage<int16_t>>(send_messages.front().GetInternalVariant()). morton_indices_[i] << ", ";
-    //}
     /* Wait until all messages have been staged */
     int err = MPI_Barrier(comm_);
     MPICheckError(err);
@@ -553,13 +527,6 @@ AmrData::SetupVariablesForCompression()
         var_iter->SetAmrMesh(initial_mesh_);
     }
 
-    t8_vtk_data_field_t vtk_data;
-    std::vector<double> arr = variables_.front().GetDataAsDoubleVector();
-    vtk_data.data = arr.data();
-    strcpy (vtk_data.description, "Temp");
-    vtk_data.type = T8_VTK_SCALAR;
-
-    t8_forest_write_vtk_ext(initial_mesh_.GetMesh(), "initial_forest_with_data_diff_elems", 1,0,1,1,0,0,0,1, &vtk_data);
 }
 
 size_t AmrData::GetNumberOfInputVariables() const
@@ -594,10 +561,11 @@ AmrData::RetrieveMeshesToBeCoarsened(const CompressionMode compression_mode) con
         case CompressionMode::OneForOne:
             /* In case of a One For One compression, every variable is coarsened on it's own mesh */
             mesh_samples_to_be_coarsened.reserve(variables_.size());
-            for (auto iter = variables_.begin(); iter != variables_.end(); ++iter)
+            for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
             {
                 /* We push back the 'id' of each variable (i.e. 0, 1, 2,...,#num_variables - 1), since each variable has it's own mesh which needs to be coarsened */
-                mesh_samples_to_be_coarsened.emplace_back(CoarseningSample(std::distance(variables_.begin(), iter)));
+                //mesh_samples_to_be_coarsened.emplace_back(CoarseningSample(std::distance(variables_.begin(), iter)));
+                mesh_samples_to_be_coarsened.emplace_back(CoarseningSample(var_iter->GetInternalID()));
             }
         break;
         default:
@@ -704,9 +672,6 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
 
             adapt_data.FinalizeCompressionIteration();
         }
-        //int err = MPI_Barrier(MPI_COMM_WORLD);
-        //MPICheckError(err);
-        cmc_err_msg("hier is ende");
         }
 
     #endif
@@ -1221,7 +1186,7 @@ AmrData::WriteVTKFilePerVariable(const std::string& file_name) const
 
         vtk_data[0].data = converted_data.data();
 
-        const int vtk_err = t8_forest_vtk_write_file(var_iter->GetAmrMesh().GetMesh(), file_name.c_str(), 1, 1, 1, 1, 0, 1, vtk_data);
+        const int vtk_err = t8_forest_vtk_write_file(var_iter->GetAmrMesh().GetMesh(), (file_name + "_" + var_iter->GetName()).c_str(), 1, 1, 1, 1, 0, 1, vtk_data);
         
         if (vtk_err == 0)
             cmc_err_msg("An error occrued during the creation of the t8code-forest vtk file.");
@@ -1229,74 +1194,6 @@ AmrData::WriteVTKFilePerVariable(const std::string& file_name) const
     
     delete[] vtk_data;
 }
-
-
-#if 0
-
-
-
-
-
-struct LevelwisePrefixes
-{
-    LevelwisePrefixes(const int num_elements)
-    {
-        prefix_indicator.reserve(num_elements / 8 + 1);
-        prefixes.reserve (num_elements / 4);
-    }
-
-    std::vector<uint8_t> prefix_indicator;
-    std::vector<uint8_t> prefixes;
-};
-
-
-
-
-
-//vielleciht in Variabte<T> als Funktion
-std::vector<
-AmrData::GatherPrefixData()
-{
-    t8_forest_ref(forest);
-
-    std::vector<std::vector<uint8_t>> levelwise_prefix_indicator;
-    std::vector<std::vector<uint8_t>> levelwise_prefixes;
-
-    t8_forest_t forest_adapt = nullptr;
-
-    std::vector<Prefix<>> prefix_data = GetVariableDataAsPrefixVector();
-
-    while (t8_forest_get_local_num_elements(forest) > 1)
-    {
-        LevelwisePrefixes adapt_data(t8_forest_get_local_num_elements(forest));
-
-        forest_adapt = t8_forest_new_adapt(forest, FindRefinementBits, 0, 0, static_cast<void*>(&adapt_data));
-
-        forest = forest_adapt;
-
-        levelwise_prefix_indicator.push_back(std::move(adapt_data.prefix_indicator));
-        levelwise_prefixes.push_back(std::move(adapt_data.levelwise_prefixes));
-    }
-
-    if (forest_adapt != nullptr)
-    {
-        t8_forest_unref(&forest_adapt);
-    }
-
-    const size_t level_iterations = serialized_forest_refinements.size();
-
-    size_t num_bytes = 0;
-    for (size_t i = 0; i < level_iterations; ++i)
-    {
-        num_bytes += serialized_forest_refinements[i].size();
-    }
-
-    return serialized_forest_refinements;
-}
-
-#endif
-
-
 
 }
 
