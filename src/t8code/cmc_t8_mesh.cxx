@@ -130,7 +130,7 @@ IsAnyElementWithinGeoDomain(const int num_elements, const t8_element_t* elements
     cmc_assert(reference_domain.GetDimensionality() == 2 || reference_domain.GetDimensionality() == 3);
 
     //TODO:remove an define ar more abstract class of geodomains for the different element types
-    return true;//remove, just for tests now
+    //return true;//remove, just for tests now
 
     const int dimensionality = reference_domain.GetDimensionality();
 
@@ -584,7 +584,7 @@ BuildInitialMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_C
     t8_cmesh_t cmesh = t8_cmesh_new_hypercube(DimensionToElementClass(dimensionality), comm, 0, 0, 1);
 
     const int initial_refinement_level = CalculateInitialRefinementLevel(domain);
-
+    cmc_debug_msg("initial ref level is: ", initial_refinement_level);
     ValidateInitialRefinementLevelForDimensionality(initial_refinement_level, dimensionality);
 
     /* Construct a forest from the cmesh */
@@ -594,22 +594,41 @@ BuildInitialMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_C
     t8_forest_set_scheme(initial_forest, t8_scheme_new_default_cxx());
     t8_forest_set_level(initial_forest, 0);
     t8_forest_commit(initial_forest);
-
+    cmc_debug_msg("Constructed initial forest with: ", t8_forest_get_local_num_elements(initial_forest));
     AdaptDataInitialMesh adapt_data(domain, initial_refinement_level, initial_layout);
 
+    for (int i = 0; i < 4; ++i)
+    {
+        cmc_debug_msg("Domain length at ", i, " is ", domain.GetDimensionLength(static_cast<Dimension>(i)));
+        cmc_debug_msg("Start index: ", domain.GetDimensionStartIndex(static_cast<Dimension>(i)), " and End index: ", domain.GetDimensionEndIndex(static_cast<Dimension>(i)));
+    }
     //TODO: Recursive construction without repartitioning may not be optimal in parallel
     /* Build the initial mesh via recursive refinement */
-    initial_forest = t8_forest_new_adapt(initial_forest, RefineToInitialMesh, 1, 0, static_cast<void*>(&adapt_data));
+    //initial_forest = t8_forest_new_adapt(initial_forest, RefineToInitialMesh, 1, 0, static_cast<void*>(&adapt_data));
 
-    /* Repartition the forest */
-    t8_forest_t partitioned_forest;
-    t8_forest_init(&partitioned_forest);
-    const int partition_for_coarsening = 0; //TODO: change to one in the future
-    t8_forest_set_partition(partitioned_forest, initial_forest, partition_for_coarsening);
-    t8_forest_commit(partitioned_forest);
+    t8_forest_t adapted_forest;
+    for (int adaptation_steps = 0; adaptation_steps <= initial_refinement_level; ++adaptation_steps)
+    {
+        cmc_debug_msg("Iteration: ", adaptation_steps, "\n\n\n\n");
+        t8_forest_init(&adapted_forest);
+        t8_forest_set_adapt(adapted_forest, initial_forest, RefineToInitialMesh, 0);
+        const int set_partition_for_coarsening = 0; //TODO change to one later
+        t8_forest_set_partition(adapted_forest, NULL, set_partition_for_coarsening);
+        t8_forest_set_user_data(adapted_forest, static_cast<void*>(&adapt_data));
+        t8_forest_commit(adapted_forest);
 
-    cmc_debug_msg("Num local elements: ", t8_forest_get_local_num_elements(partitioned_forest));
-    return std::make_tuple(partitioned_forest, initial_refinement_level, dimensionality); 
+        initial_forest = adapted_forest;
+    }
+
+    ///* Repartition the forest */
+    //t8_forest_t partitioned_forest;
+    //t8_forest_init(&partitioned_forest);
+    //const int partition_for_coarsening = 0; //TODO: change to one in the future
+    //t8_forest_set_partition(partitioned_forest, initial_forest, partition_for_coarsening);
+    //t8_forest_commit(partitioned_forest);
+
+    cmc_debug_msg("Num local elements: ", t8_forest_get_local_num_elements(initial_forest));
+    return std::make_tuple(initial_forest, initial_refinement_level, dimensionality); 
 }
 
 }

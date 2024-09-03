@@ -37,28 +37,13 @@ public:
     t8_forest_t RepartitionData(t8_forest_t adapted_forest);
     t8_forest_adapt_t GetAdaptationFunction() const;
     
-    Var& GetCurrentCompressionVariable()
-    {
-        return variables_[corresponding_variable_id_];
-    };
+    Var& GetCurrentCompressionVariable();
+    const Var& GetCurrentCompressionVariable() const;
+    void InitializeCompressionIteration();
 
-    void InitializeCompressionIteration()
-    {
-        previous_number_of_elements_ = t8_forest_get_global_num_elements(GetCurrentMesh());
-        GetCurrentCompressionVariable().InitializeVariableForCompressionIteration();
-    };
+    void FinalizeCompressionIteration();
 
-    void FinalizeCompressionIteration()
-    {
-        new_number_of_elements_ = t8_forest_get_global_num_elements(GetCurrentMesh());
-        ++count_adaptation_step_;
-    };
-
-    void UpdateCompressionData()
-    {
-        Var& compression_variable = GetCurrentCompressionVariable();
-        compression_variable.UpdateCompressionData();
-    }
+    void UpdateCompressionData();
 
 private:
     const CompressionSettings& compression_settings_;

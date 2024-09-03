@@ -9,8 +9,6 @@ AdaptData::IsCompressionProgressing() const
 {
     /* If the the adpatation has not changed the number of elements, the compression has stagnated */
     return (previous_number_of_elements_ != new_number_of_elements_ ? true : false);
-    //TODO: Remopve or let a flag control that when the compression should progress
-    //return (previous_number_of_elements_ - new_number_of_elements_ <= 1000 ? false : true);
 }
 
 t8_forest_t
@@ -23,7 +21,7 @@ AdaptData::GetCurrentMesh() const
         return variables_.front().GetAmrMesh().GetMesh();
     } else
     {
-        return variables_[corresponding_variable_id_].GetAmrMesh().GetMesh();
+        return GetCurrentCompressionVariable().GetAmrMesh().GetMesh();
     }
 }
 
@@ -41,7 +39,7 @@ int AdaptData::GetInitialRefinementLevelOfMesh() const
         return variables_.front().GetAmrMesh().GetInitialRefinementLevel();
     } else
     {
-        return variables_[corresponding_variable_id_].GetAmrMesh().GetInitialRefinementLevel();
+        return GetCurrentCompressionVariable().GetAmrMesh().GetInitialRefinementLevel();
     }
 }
 
@@ -58,7 +56,7 @@ AdaptData::SetCurrentMesh(t8_forest_t forest)
         }
     } else
     {
-        variables_[corresponding_variable_id_].GetAmrMesh().SetMesh(forest);
+        GetCurrentCompressionVariable().GetAmrMesh().SetMesh(forest);
     }
 }
 
@@ -67,7 +65,7 @@ AdaptData::RepartitionData(t8_forest_t adapted_forest)
 {
     /* Keep the adapted forest for the partition step */
     t8_forest_ref(adapted_forest);
-
+    cmc_debug_msg("Forest in partition data hat num ocal elems: ", t8_forest_get_local_num_elements(adapted_forest));
     /* Repartition the forest */
     t8_forest_t partitioned_forest;
     t8_forest_init(&partitioned_forest);
@@ -75,14 +73,23 @@ AdaptData::RepartitionData(t8_forest_t adapted_forest)
     t8_forest_set_partition(partitioned_forest, adapted_forest, partition_for_coarsening);
     t8_forest_commit(partitioned_forest);
 
-    /* Repartition the variables */
-    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    if (corresponding_variable_id_ == kMeshCorrespondsToAllVariables)
+    {   
+        /* In a One For All compression mode */
+        /* Repartition the variables */
+        for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+        {
+            var_iter->RepartitionData(adapted_forest, partitioned_forest);
+        }
+    } else
     {
-        var_iter->RepartitionData(adapted_forest, partitioned_forest);
-        
+        /* In a One For One compression mode */
+        /* Repartition the variable */
+        Var& var = GetCurrentCompressionVariable();
+        var.RepartitionData(adapted_forest, partitioned_forest);
     }
 
-    /* Deallocate the addapted forest */
+    /* Deallocate the adapted forest */
     t8_forest_unref(&adapted_forest);
     cmc_debug_msg("End of AdaptData->RepartitionData");
     /* Return the repartitioned forest */
@@ -101,6 +108,58 @@ AdaptData::GetAdaptationFunction() const
         cmc_err_msg("Not implemented yet");
         return PerformAdaptiveCoarseningOneForOne;
     }
+}
+
+void
+AdaptData::UpdateCompressionData()
+{
+    Var& compression_variable = GetCurrentCompressionVariable();
+    compression_variable.UpdateCompressionData();
+}
+
+void
+AdaptData::FinalizeCompressionIteration()
+{
+    /* Store the number of elements obtained after the adaptation */
+    new_number_of_elements_ = t8_forest_get_global_num_elements(GetCurrentMesh());
+    ++count_adaptation_step_;
+}
+
+void
+AdaptData::InitializeCompressionIteration()
+{
+    previous_number_of_elements_ = t8_forest_get_global_num_elements(GetCurrentMesh());
+    /* Allocate the "..._new_" vectors which are used and filled during the compression */
+    if (corresponding_variable_id_ == kMeshCorrespondsToAllVariables)
+    {
+        /* In a One For All compression mode */
+        for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+        {
+            var_iter->InitializeVariableForCompressionIteration();
+        }
+    } else
+    {
+        /* In a One For One compression mode */
+        GetCurrentCompressionVariable().InitializeVariableForCompressionIteration();
+    }
+}
+
+Var&
+AdaptData::GetCurrentCompressionVariable()
+{
+    /* Search for the variable which is currently compressed */
+    auto var_iter = std::find_if(variables_.begin(), variables_.end(), [this](const Var& var){return var.GetInternalID() == corresponding_variable_id_;});
+    cmc_assert(var_iter != variables_.end());
+    return *var_iter;
+}
+
+const Var&
+AdaptData::GetCurrentCompressionVariable() const
+{
+    /* Search for the variable which is currently compressed */
+    auto var_iter = std::find_if(variables_.begin(), variables_.end(), [this](const Var& var){return var.GetInternalID() == corresponding_variable_id_;});
+    cmc_assert(var_iter != variables_.end());
+    return *var_iter;
 }
 
 }

@@ -126,7 +126,8 @@ public:
 
     Var(const int id, const CmcType type, CmcVariable&& variable)
     : id_{id}, type_{type}, var_{std::move(variable)}{};
-
+    Var(const int id, const int internal_id, const CmcType type, CmcVariable&& variable)
+    : id_{id}, internal_id_{internal_id}, type_{type}, var_{std::move(variable)}{};
     Var(const Var& other) = default;
     Var(Var&& other)
     :id_{other.id_}, type_{other.type_}, var_{std::move(other.var_)}{};
@@ -135,6 +136,7 @@ public:
     Var& operator=(Var&& other) = default;
 
     int GetID() const;
+    int GetInternalID() const;
     const std::string& GetName() const;
     const GeoDomain& GetGlobalDomain() const;
     DataLayout GetInitialDataLayout() const;
@@ -185,6 +187,7 @@ public:
 private:
 
     int id_;
+    int internal_id_;
     CmcType type_;
     CmcVariable var_;
 };
@@ -557,6 +560,13 @@ int
 Var::GetID() const
 {
     return id_;
+}
+
+inline
+int
+Var::GetInternalID() const
+{
+    return internal_id_;
 }
 
 inline

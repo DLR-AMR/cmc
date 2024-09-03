@@ -147,6 +147,7 @@ RefineToInitialMesh (t8_forest_t forest,
     }
 
     /* If the element is inside the global domain, it will be refined until the intial refinement level is reached */
+    //cmc_debug_msg("in adapt: init ref level: ", adapt_data->initial_refinement_level, " and init layout: ", adapt_data->initial_layout, " and eval is inside: ", IsMeshElementWithinGeoDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout));
     if (IsMeshElementWithinGeoDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
     {
         return 1;

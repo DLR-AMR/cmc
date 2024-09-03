@@ -10,57 +10,57 @@ TransformerInputToCompressionVariable::operator()(InputVar& input_var)
     {
         Variable<double> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Double, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Double, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<float>* vp = std::get_if<InputVariable<float>>(&input_var.var_))
     {
         Variable<float> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Float, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Float, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<int32_t>* vp = std::get_if<InputVariable<int32_t>>(&input_var.var_))
     {
         Variable<int32_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Int32_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Int32_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<int64_t>* vp = std::get_if<InputVariable<int64_t>>(&input_var.var_))
     {
         Variable<int64_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Int64_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Int64_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<uint32_t>* vp = std::get_if<InputVariable<uint32_t>>(&input_var.var_))
     {
         Variable<uint32_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Uint32_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Uint32_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<uint64_t>* vp = std::get_if<InputVariable<uint64_t>>(&input_var.var_))
     {
         Variable<uint64_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Uint64_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Uint64_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<int16_t>* vp = std::get_if<InputVariable<int16_t>>(&input_var.var_))
     {
         Variable<int16_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Int16_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Int16_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<uint16_t>* vp = std::get_if<InputVariable<uint16_t>>(&input_var.var_))
     {
         Variable<uint16_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Uint16_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Uint16_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<int8_t>* vp = std::get_if<InputVariable<int8_t>>(&input_var.var_))
     {
         Variable<int8_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Int8_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Int8_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<uint8_t>* vp = std::get_if<InputVariable<uint8_t>>(&input_var.var_))
     {
         Variable<uint8_t> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Uint8_t, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Uint8_t, CmcVariable(std::move(transformed_variable)));
     } else if (InputVariable<char>* vp = std::get_if<InputVariable<char>>(&input_var.var_))
     {
         Variable<char> transformed_variable;
         MoveData(transformed_variable, *vp);
-        return Var(input_var.GetID(), CmcType::Char, CmcVariable(std::move(transformed_variable)));
+        return Var(input_var.GetID(), input_var.GetInternID(), CmcType::Char, CmcVariable(std::move(transformed_variable)));
     } else
     {
         cmc_err_msg("The input variable could not be transformed to a compression variable.");
