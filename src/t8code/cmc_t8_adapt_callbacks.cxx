@@ -255,14 +255,14 @@ ApplyRefinementBits (t8_forest_t forest,
 }
 
 t8_locidx_t
-FindPrefixBitsEGU (t8_forest_t forest,
-                    [[maybe_unused]] t8_forest_t forest_from,
-                    [[maybe_unused]] int which_tree,
-                    int lelement_id,
-                    [[maybe_unused]] t8_eclass_scheme_c * ts,
-                    const int is_family,
-                    const int num_elements,
-                    [[maybe_unused]] t8_element_t * elements[])
+FindPrefixBits (t8_forest_t forest,
+                [[maybe_unused]] t8_forest_t forest_from,
+                [[maybe_unused]] int which_tree,
+                int lelement_id,
+                [[maybe_unused]] t8_eclass_scheme_c * ts,
+                const int is_family,
+                const int num_elements,
+                [[maybe_unused]] t8_element_t * elements[])
 {
     #ifdef CMC_WITH_T8CODE
     /* Get the adapt data from the forest */

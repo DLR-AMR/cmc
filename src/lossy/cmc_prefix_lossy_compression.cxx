@@ -51,7 +51,7 @@ PrefixCompressionData::Setup(const bool with_default_lossy_amr_compression)
 void
 PrefixCompressionData::Compress()
 {
-    /* Check if the default lossy compression is about be applied */
+    /* Check if the default lossy compression is about to be applied */
     if (perform_default_lossy_compression_)
     {
         /* Perform the default lossy compression */
@@ -86,7 +86,7 @@ PrefixCompressionData::Compress()
             t8_forest_t previous_forest = adapt_data.GetCurrentMesh();
 
             /* Perform a coarsening iteration */
-            t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, FindPrefixBitsEGU, 0, 0, static_cast<void*>(&adapt_data));
+            t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, FindPrefixBits, 0, 0, static_cast<void*>(&adapt_data));
 
             adapt_data.SetCurrentMesh(adapted_forest);
 
