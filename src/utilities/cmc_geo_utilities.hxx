@@ -13,6 +13,8 @@ Hyperslab TransformGeoDomainToHyperslab(const GeoDomain& domain);
 
 GeoDomain TransformHyperslabToGeoDomain(const Hyperslab& hyperslab);
 
+Hyperslab SubtractGeoDomainOffset(const Hyperslab& hyperslab, const GeoDomain& domain);
+
 }
 
 #endif /* !CMC_GEO_UTILITIES_HXX */

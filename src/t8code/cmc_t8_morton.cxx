@@ -1,5 +1,6 @@
 #include "t8code/cmc_t8_morton.hxx"
 #include "utilities/cmc_log_functions.hxx"
+#include "utilities/cmc_geo_utilities.hxx"
 
 namespace cmc
 {
@@ -109,11 +110,15 @@ TransformHyperslabCoordinatesToMortonIndices(const std::vector<Hyperslab>& hyper
     /* Transform each hyperslab coordinate to a Morton index */
     for (auto iter = hyperslabs.begin(); iter != hyperslabs.end(); ++iter)
     {
-        const DomainIndex num_hyperslab_coordinates = iter->GetNumberCoordinates();
+        /* The global domain may not start with zeros as start indices for the domain. Therefore, we need to create a normalized hyperslab
+        starting (globally) at (0,0,0,0), otherwise the Morton index calculation is shifted */
+        const Hyperslab normalized_hyperslab = SubtractGeoDomainOffset(*iter, global_domain);
+
+        const DomainIndex num_hyperslab_coordinates = normalized_hyperslab.GetNumberCoordinates();
 
         for (DomainIndex hs_coord_index = 0; hs_coord_index < num_hyperslab_coordinates; ++hs_coord_index)
         {
-            HsUpdateFn(*iter, linear_dimension_indices, hs_coord_index);
+            HsUpdateFn(normalized_hyperslab, linear_dimension_indices, hs_coord_index);
 
             morton_indices.push_back(GetMortonIndex(linear_dimension_indices, dimensionality));
         }

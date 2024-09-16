@@ -21,4 +21,13 @@ TransformHyperslabToGeoDomain(const Hyperslab& hyperslab)
                      hyperslab.GetDimensionStart(Dimension::Time), hyperslab.GetDimensionStart(Dimension::Time) + hyperslab.GetDimensionLength(Dimension::Time));
 }
 
+Hyperslab
+SubtractGeoDomainOffset(const Hyperslab& hyperslab, const GeoDomain& domain)
+{
+    return Hyperslab(hyperslab.GetDimensionStart(Dimension::Lon) - domain.GetDimensionStartIndex(Dimension::Lon),   hyperslab.GetDimensionLength(Dimension::Lon),
+                     hyperslab.GetDimensionStart(Dimension::Lat) - domain.GetDimensionStartIndex(Dimension::Lat),   hyperslab.GetDimensionLength(Dimension::Lat),
+                     hyperslab.GetDimensionStart(Dimension::Lev) - domain.GetDimensionStartIndex(Dimension::Lev),   hyperslab.GetDimensionLength(Dimension::Lev),
+                     hyperslab.GetDimensionStart(Dimension::Time) - domain.GetDimensionStartIndex(Dimension::Time), hyperslab.GetDimensionLength(Dimension::Time));
+}
+
 }

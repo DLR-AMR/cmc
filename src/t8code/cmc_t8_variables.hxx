@@ -247,6 +247,8 @@ VariableUtilities<T>::SetUpInaccuracyStorage(const size_t size_hint)
     }
 }
 
+/* Create the variable error domains for the variable. The general criterion considered on the whole domain is always put first within the 
+vector of error domains */
 template<class T>
 void
 VariableUtilities<T>::SetUpVariableErrorDomains(const CompressionSpecifications& variable_specifications, const GeoDomain& variable_global_domain)

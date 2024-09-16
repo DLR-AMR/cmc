@@ -506,7 +506,7 @@ DecodePrefixEGU (t8_forest_t forest,
     if (CheckIfBitIsSet(current_byte, adapt_data->prefix_indication_bit_position))
     {
         /* If it is set, there is a prefix */
-        if (IsMeshElementWithinGeoDomain(elements[0], ts, adapt_data->domain, initial_refinement_level, adapt_data->current_layout))
+        if (IsMeshElementWithinGlobalDomain(elements[0], ts, adapt_data->domain, initial_refinement_level, adapt_data->current_layout))
         {
             const auto [decoded_prefix, num_bits] = GetNextPrefix(adapt_data->prefix_lengths, adapt_data->prefix_length_byte_position, adapt_data->prefix_length_bit_position,
                                                                   adapt_data->prefix_encodings,  adapt_data->prefix_encoding_byte_position, adapt_data->prefix_encoding_bit_position);
@@ -529,7 +529,7 @@ DecodePrefixEGU (t8_forest_t forest,
     } else
     {
         /* IF the the element is inside the domain, it is a real decompression value, otherwise it might be a missing value */
-        if (IsMeshElementWithinGeoDomain(elements[0], ts, adapt_data->domain, initial_refinement_level, adapt_data->current_layout))
+        if (IsMeshElementWithinGlobalDomain(elements[0], ts, adapt_data->domain, initial_refinement_level, adapt_data->current_layout))
         {
             //cmc_debug_msg("For elem_id: ", lelement_id, ", Bit is not set");
             adapt_data->KeepAndCopyCompressionValue(lelement_id, t8_element_num_children(ts, elements[0]));

@@ -229,7 +229,29 @@ Variable<T>::GetPermittedError(const int num_elements, const t8_element_t* eleme
     double abs_err{std::numeric_limits<double>::max()};
     double rel_err{std::numeric_limits<double>::max()};
 
-    for (auto ed_iter = utilities_.GetErrorDomainsBegin(); ed_iter != utilities_.GetErrorDomainsEnd(); ++ed_iter)
+    /* The first error domain is always the general criterion on the whole domain */
+    auto ed_iter = utilities_.GetErrorDomainsBegin();
+    if (IsAnyElementWithinGlobalDomain(num_elements, elements, ts, ed_iter->GetDomain(), mesh_.GetInitialRefinementLevel(), attributes_.GetInitialDataLayout()))
+    {
+        if (ed_iter->GetCriterion() == CompressionCriterion::AbsoluteErrorThreshold)
+        {
+            is_abs_error_present = true;
+            if (ed_iter->GetError() < abs_err)
+            {
+                abs_err = ed_iter->GetError();
+            }
+        } else if (ed_iter->GetCriterion() == CompressionCriterion::RelativeErrorThreshold)
+        {
+            is_rel_error_present = true;
+            if (ed_iter->GetError() < rel_err)
+            {
+                rel_err = ed_iter->GetError();
+            }
+        }
+    }
+
+    /* Check all additional error domains */
+    for (++ed_iter; ed_iter != utilities_.GetErrorDomainsEnd(); ++ed_iter)
     {
         if (IsAnyElementWithinGeoDomain(num_elements, elements, ts, ed_iter->GetDomain(), mesh_.GetInitialRefinementLevel(), attributes_.GetInitialDataLayout()))
         {
@@ -356,7 +378,13 @@ Variable<T>::GetDataAsDoubleVector() const
 
         for (auto iter = data_.begin(); iter != data_.end(); ++iter)
         {
-            double_data.push_back(static_cast<double>(*iter));
+            if (!std::isnan(*iter))
+            {
+                double_data.push_back(static_cast<double>(*iter));
+            } else
+            {
+                double_data.push_back(attributes_.GetMissingValue());
+            }
         }
 
         return double_data;

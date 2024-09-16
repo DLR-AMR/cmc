@@ -1186,7 +1186,7 @@ AmrData::WriteVTKFilePerVariable(const std::string& file_name) const
 
         vtk_data[0].data = converted_data.data();
 
-        const int vtk_err = t8_forest_vtk_write_file(var_iter->GetAmrMesh().GetMesh(), (file_name + "_" + var_iter->GetName()).c_str(), 1, 1, 1, 1, 0, 1, vtk_data);
+        const int vtk_err = t8_forest_vtk_write_file(var_iter->GetAmrMesh().GetMesh(), (file_name + "_" + var_iter->GetName()).c_str(), 0, 1, 0, 0, 0, 1, vtk_data);
         
         if (vtk_err == 0)
             cmc_err_msg("An error occrued during the creation of the t8code-forest vtk file.");

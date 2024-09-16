@@ -534,20 +534,21 @@ SetUpInputVariable(const int ncid, const CoordinateArray<int>& coordinate_dimens
         offset += hs_iter->GetNumberCoordinates();
     }
 
-    //std::vector<float> converted_data;
-    //const int num_elems = 3600*1801;
-    //converted_data.reserve(num_elems);
+    #if 0
+    std::vector<float> converted_data;
+    const int num_elems = 3600*1800*12;
+    converted_data.reserve(num_elems);
     //const float add_offset = 0.0970683052537568;
     //const float scale_factor = 2.96247040388686e-06;
-    //for (int j = 0; j < num_elems; ++j)
-    //{
-    //    converted_data.push_back(scale_factor * static_cast<float>(local_data[j]) + add_offset);
-    //}
-    //FILE* file = fopen("era5_land_tp_lon_lat.bin", "wb");
-    //fwrite(converted_data.data(), sizeof(float), num_elems, file);
-    //fclose(file);
-    //std::exit(1);
-    
+    for (int j = 0; j < num_elems; ++j)
+    {
+        converted_data.push_back(static_cast<float>(local_data[j]));//scale_factor * static_cast<float>(local_data[j]) + add_offset);
+    }
+    FILE* file = fopen("co2_full_initial.bin", "wb");
+    fwrite(converted_data.data(), sizeof(float), num_elems, file);
+    fclose(file);
+    std::exit(1);
+    #endif
     variable.SetDataAndCoordinates(std::move(local_data), std::move(hyperslabs));
 
     return InputVar(std::move(variable));

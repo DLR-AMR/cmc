@@ -618,8 +618,30 @@ ByteVariable<T>::GetPermittedError(const int index) const
     bool is_rel_error_present{false};
     double abs_err{std::numeric_limits<double>::max()};
     double rel_err{std::numeric_limits<double>::max()};
+    
+    /* The first error domain is always the general criterion on the whole domain */
+    auto ed_iter = utilities_.GetErrorDomainsBegin();
+    if (IsAnyElementWithinGlobalDomain(1, &element, ts, ed_iter->GetDomain(), mesh_.GetInitialRefinementLevel(), attributes_.GetInitialDataLayout()))
+    {
+        if (ed_iter->GetCriterion() == CompressionCriterion::AbsoluteErrorThreshold)
+        {
+            is_abs_error_present = true;
+            if (ed_iter->GetError() < abs_err)
+            {
+                abs_err = ed_iter->GetError();
+            }
+        } else if (ed_iter->GetCriterion() == CompressionCriterion::RelativeErrorThreshold)
+        {
+            is_rel_error_present = true;
+            if (ed_iter->GetError() < rel_err)
+            {
+                rel_err = ed_iter->GetError();
+            }
+        }
+    }
 
-    for (auto ed_iter = utilities_.GetErrorDomainsBegin(); ed_iter != utilities_.GetErrorDomainsEnd(); ++ed_iter)
+    /* Check all additional error domains */
+    for (++ed_iter; ed_iter != utilities_.GetErrorDomainsEnd(); ++ed_iter)
     {
         if (IsAnyElementWithinGeoDomain(1, &element, ts, ed_iter->GetDomain(), mesh_.GetInitialRefinementLevel(), attributes_.GetInitialDataLayout()))
         {

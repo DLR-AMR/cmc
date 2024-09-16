@@ -65,7 +65,7 @@ PerformAdaptiveCoarseningOneForOne (t8_forest_t forest,
     {
         for (int j = 0; j < num_elements; ++j)
         {
-            if (!IsMeshElementWithinGeoDomain(elements[j], ts, compression_variable.GetGlobalDomain(), 12, compression_variable.GetInitialDataLayout()))
+            if (!IsMeshElementWithinGlobalDomain(elements[j], ts, compression_variable.GetGlobalDomain(), adapt_data->GetInitialRefinementLevelOfMesh(), compression_variable.GetInitialDataLayout()))
             {
                 compression_variable.LeaveElementUnchanged(lelement_id);
                 return kLeaveElementUnchanged;
@@ -147,8 +147,7 @@ RefineToInitialMesh (t8_forest_t forest,
     }
 
     /* If the element is inside the global domain, it will be refined until the intial refinement level is reached */
-    //cmc_debug_msg("in adapt: init ref level: ", adapt_data->initial_refinement_level, " and init layout: ", adapt_data->initial_layout, " and eval is inside: ", IsMeshElementWithinGeoDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout));
-    if (IsMeshElementWithinGeoDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
+    if (IsMeshElementWithinGlobalDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
     {
         return 1;
     } else

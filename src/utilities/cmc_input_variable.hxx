@@ -983,7 +983,7 @@ InputVar::ApplyAxpyScalingAndOffset(const InputVariable<T>& variable)
 
         InputVariable<CmcDefaultDataType> transformed_variable = variable.template ObtainMetaCopy<CmcDefaultDataType>();
 
-        /* Get the current data of te variable (as read only) */
+        /* Get the current data of the variable (as read only) */
         const std::vector<T>& source_data = variable.GetData(AccessKey());
 
         /* Create new data vector which will hold the transformed values */
@@ -1175,8 +1175,8 @@ void InputVariable<T>::AssignDataAtLinearIndices(const VariableRecvMessage& mess
     auto data_iter = msg.DataBegin();
     for (auto morton_idx_iter = msg.MortonIndicesBegin(); morton_idx_iter != msg.MortonIndicesEnd(); ++morton_idx_iter, ++data_iter)
     {
-        data_[update(*morton_idx_iter)] = *data_iter;
         //cmc_debug_msg("We will write at pos: ", update(*morton_idx_iter), " the val: ", *data_iter);
+        data_[update(*morton_idx_iter)] = *data_iter;
     }
 }
 
