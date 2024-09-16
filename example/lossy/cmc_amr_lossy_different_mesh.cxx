@@ -1,9 +1,11 @@
 #include "cmc.hxx"
 #include "utilities/cmc_utilities.hxx"
+#include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
 #include "lossy/cmc_amr_lossy_compression.hxx"
+#include "lossy/cmc_prefix_lossy_compression.hxx"
 #include "netcdf/cmc_netcdf.hxx"
 
 #include "t8_cmesh.h"
@@ -79,15 +81,21 @@ main(void)
         #endif
 
         /* Create input variables */
-        const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
+        const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
         cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
 
-        cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
-                                 cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
-                                 cmc::DimensionInterval(cmc::Dimension::Lev, 36, 37)
+        //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 700, 716),
+        //                         cmc::DimensionInterval(cmc::Dimension::Lat, 344, 360)
+        //                         //cmc::DimensionInterval(cmc::Dimension::Lev, 34, 36)
+        //                         );
+        //nc_data.SetHintHeightDimension(2);
+        nc_data.SetHintHeightDimension(6); //Set plev as height dimension
+        cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1200),
+                                 cmc::DimensionInterval(cmc::Dimension::Lat, 0, 601),
+                                 cmc::DimensionInterval(cmc::Dimension::Lev, 136, 137)
                                  );
 
-         /* Inquire the hyperslab of data for the given variables */
+        /* Inquire the hyperslab of data for the given variables */
         nc_data.InquireVariables(hyperslab, "t");
 
         /* Close the file, since we have gathered the data we wanted */
@@ -97,23 +105,62 @@ main(void)
         /* Create compression settings */
         cmc::CompressionSettings settings;
 
-        const double abs_max_err = 1.0;
+        const double abs_max_err = 0.0;
         settings.SetAbsoluteErrorCriterion(abs_max_err, cmc::kErrorCriterionHoldsForAllVariables);
+        //const double rel_max_err = 0.01;
+        //settings.SetRelativeErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
+        //cmc::SplitVariable split(cmc::kSplitAllVariables, cmc::Dimension::Lev);
+        //settings.SplitVariableByDimension(split);
 
+        #if 1
         /* Create the compression data */
         cmc::CompressionData compression_data(nc_data.TransferData(), std::move(settings));
 
         /* Setup the example data for the compression */
         //compression_data.Setup(initial_mesh);
         compression_data.Setup();
-        
+        compression_data.WriteVTKFile("mptrac_t_initial");
+
+        compression_data.Compress(cmc::CompressionMode::OneForOne);
+        compression_data.WriteVTKFile("mptrac_t_abs_2_0");
+        //compression_data.WriteCompressedData("co2_emi_data");
+        #else
+        /* Create the compression data */
+        cmc::PrefixCompressionData compression_data(nc_data.TransferData(), std::move(settings));
+
+        /* Setup the example data for the compression */
+        const bool perform_default_lossy_compression_as_well = false;
+        compression_data.Setup(perform_default_lossy_compression_as_well);
+
+        compression_data.Compress();
+        compression_data.WriteCompressedDataEGU("co2_emi_data_pref.nc");
+
+        #endif
+        #if 0
         compression_data.Compress(cmc::CompressionMode::OneForOne);
 
         compression_data.WriteVTKFile("ExTempVar");
 
-    
+        /* Decompress the variable and receive the external wrapper to it */
+        cmc::OutputVar decomrpessed_float_var = compression_data.DecompressVariable(5);
+        /* Obtain the actual decompressed variable based on it's data type */
+        cmc::OutputVariable<float> decompressed_float_variable = decomrpessed_float_var.SeizeOutputVariable<float>();
+        /* Get it's data */
+        std::vector<float> decompressed_float_data = decompressed_float_variable.GetData();
+        cmc::cmc_debug_msg("Num decompressed float data: ", decompressed_float_data.size());
+        
         #endif
 
+        //for (auto iter = decompressed_float_data.begin(); iter != decompressed_float_data.end(); ++iter)
+        //{
+        //    cmc::cmc_debug_msg(*iter, ", ");
+        //}
+        #endif
+
+        #if 0
+        compression_data.Decompress();
+        compression_data.WriteVTKFile("ExTempDecompressed");
+        #endif
     }
     sc_finalize ();
     /* Finalize cmc */

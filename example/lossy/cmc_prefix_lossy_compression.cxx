@@ -78,7 +78,7 @@ main(void)
     const bool perform_default_lossy_compression_as_well = false;
     compression_data.Setup(perform_default_lossy_compression_as_well);
 
-    compression_data.CompressEGU();
+    compression_data.Compress();
     compression_data.WriteCompressedDataEGU("prefix_compressed_data.nc");
     
     //compression_data.WriteCompressedData("prefix_compressed_data.nc");

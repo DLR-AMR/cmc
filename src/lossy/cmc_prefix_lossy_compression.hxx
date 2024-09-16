@@ -68,7 +68,7 @@ public:
     int GetMpiSize() const;
     
     void Setup(const bool with_default_lossy_amr_compression = false);
-    void CompressEGU();
+    void Compress();
     void WriteCompressedDataEGU(const std::string& file_name) const;
     template<int N> void DecompressVariableEGU(std::vector<PrefixDecompressionData>& decompression_data) const;
     

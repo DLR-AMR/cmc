@@ -49,7 +49,7 @@ PrefixCompressionData::Setup(const bool with_default_lossy_amr_compression)
 }
 
 void
-PrefixCompressionData::CompressEGU()
+PrefixCompressionData::Compress()
 {
     /* Check if the default lossy compression is about be applied */
     if (perform_default_lossy_compression_)
