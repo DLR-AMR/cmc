@@ -66,7 +66,6 @@ public:
 
     void InitializeCompressionIteration()
     {
-        previous_number_of_elements_ = new_number_of_elements_;
         byte_variable_.InitializeCompressionIteration();
     }
 
@@ -120,7 +119,6 @@ public:
     }
 private:
     ByteVar& byte_variable_;
-    t8_gloidx_t previous_number_of_elements_{INT16_MAX};
     t8_gloidx_t new_number_of_elements_{INT16_MAX};
     int count_adaptation_step_{0};
 };
