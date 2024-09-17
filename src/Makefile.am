@@ -48,7 +48,8 @@ src/netcdf/cmc_nc_io.hxx \
 src/netcdf/cmc_nc_writer.hxx \
 src/netcdf/cmc_nc_reader.hxx \
 src/cmc_compression.hxx \
-src/netcdf/cmc_nc_io_conventions.hxx
+src/netcdf/cmc_nc_io_conventions.hxx \
+src/utilities/cmc_bit_vector.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
