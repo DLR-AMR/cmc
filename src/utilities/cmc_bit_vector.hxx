@@ -7,6 +7,9 @@
 namespace cmc
 {
 
+namespace bit_vector
+{
+
 constexpr size_t kCharBit = CHAR_BIT;
 constexpr size_t kBitIndexStart = kCharBit - 1;
 
@@ -39,7 +42,7 @@ public:
     BitVector() = default;
     BitVector(const size_t num_bytes)
     : vector_(num_bytes, 0){};
-    BitVector(std::vector<uint8_t>&& bytes);
+    BitVector(std::vector<uint8_t>&& bytes)
     : vector_{std::move(bytes)}{};
 
     BitVector(const BitVector& other) = default;
@@ -73,7 +76,7 @@ public:
 private:
     size_t bit_position_{kBitIndexStart};
     size_t byte_position_{0};
-    std::vector<uint8_t> vector_(1, 0);
+    std::vector<uint8_t> vector_{0};
 };
 
 
@@ -82,7 +85,7 @@ private:
  * 
  * @param byte The byte from which the single bit (0b0000000x) will be appended
  */
-void
+inline void
 BitVector::AppendBit(const uint8_t byte)
 {
     if (bit_position_ >= 0)
@@ -184,25 +187,27 @@ inline
 void
 BitVector::AppendBits(const uint8_t byte, const int num_bits)
 {
-    if (bit_position_ >= num_bits - 1)
+    const size_t num_bits_decremented = static_cast<size_t>(num_bits - 1);
+
+    if (bit_position_ >= num_bits_decremented)
     {
         /* The four bits fit into the current byte */
-        vector_.back() |= ((GetNullifyBitMask(num_bits) & byte) << (bit_position_ - (num_bits - 1)));
+        vector_.back() |= ((GetNullifyBitMask(num_bits) & byte) << (bit_position_ - num_bits_decremented));
         bit_position_ -= num_bits;
-    } else if (bit_position_ < (num_bits - 1) && bit_position_ >= 0)
+    } else if (bit_position_ < num_bits_decremented && bit_position_ >= 0)
     {
         /* The bits of the four bits needs to be split across byte borders */
         const uint8_t in_byte = (GetNullifyBitMask(num_bits) & byte);
-        vector_.back() |= (in_byte >> (num_bits - 1 - bit_position_));
+        vector_.back() |= (in_byte >> (num_bits_decremented - bit_position_));
         vector_.emplace_back(0);
-        vector_.back() |= (in_byte << (kBitIndexStart - (num_bits - 1) + bit_position_ + 1));
+        vector_.back() |= (in_byte << (kBitIndexStart - num_bits_decremented + bit_position_ + 1));
         bit_position_ = kBitIndexStart - (bit_position_ + 1);
         ++byte_position_;
     } else
     {
         /* A new byte needs to be added and the bits will be assigned there */
         vector_.emplace_back(0);
-        vector_.back() |= ((GetNullifyBitMask(num_bits) & byte) << (kBitIndexStart - (num_bits - 1)));
+        vector_.back() |= ((GetNullifyBitMask(num_bits) & byte) << (kBitIndexStart - num_bits_decremented));
         bit_position_ = kBitIndexStart - num_bits;
         ++byte_position_;
     }
@@ -263,6 +268,7 @@ BitVector::IsEndOfByteReached(size_t& iterator) const
     return (iterator >= 0 ? false : true);
 }
 
+}
 
 }
 
