@@ -66,7 +66,6 @@ main(void)
         {
             cmc::ExpectFalse(*iter);
         }
-        cmc::cmc_debug_msg("Bit Value at pos: ", idx, " is: ", *iter);
         ++idx;
     }
 
