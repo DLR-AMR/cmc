@@ -20,9 +20,42 @@ constexpr size_t kCharBit = CHAR_BIT;
 class BitMap
 {
 public:
+
+    /**
+     * @brief A read-only forward-iterator for the BitMap in order to read it's bit field
+     * 
+     */
+    struct Iterator 
+    {
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type   = std::ptrdiff_t;
+        using value_type        = bool;
+        using pointer           = const uint8_t*;
+        using reference         = const uint8_t&;
+
+        Iterator(pointer byte) : byte_(byte) {};
+        Iterator(pointer byte, const int bit_position_constraint) : byte_{byte}, bit_position_{bit_position_constraint} {
+            if (bit_position_ >= kCharBit)
+            {
+                ++(this->byte_);
+                this->bit_position_ = 0;
+            }
+        };
+
+        value_type operator*() const { return (*byte_ >> bit_position_) & uint8_t{1}; }
+        Iterator& operator++() { ++bit_position_ ; if(bit_position_ >= kCharBit){bit_position_ = 0; ++byte_;}; return *this; }  
+        Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
+        friend bool operator== (const Iterator& a, const Iterator& b) { return a.byte_ == b.byte_ && a.bit_position_ == b.bit_position_; };
+        friend bool operator!= (const Iterator& a, const Iterator& b) { return a.byte_ != b.byte_ || a.bit_position_ != b.bit_position_; };  
+
+    private:
+        pointer byte_;
+        int bit_position_{0};
+    };
+
     BitMap() = default;
     BitMap(const size_t num_bits)
-    : vector_(num_bits / kCharBit + 1, 0){};
+    : vector_(num_bits / kCharBit + 1, 0), num_bits_{num_bits}{};
 
     BitMap(const BitMap& other) = default;
     BitMap& operator=(const BitMap& other) = default;
@@ -39,23 +72,26 @@ public:
     void AppendSetBit();
     void AppendUnsetBit();
 
-    void ToogleBit(const size_t& byte_position, const size_t& bit_position);
+    void ToggleBit(const size_t& byte_position, const size_t& bit_position);
     void ClearBit(const size_t& byte_position, const size_t& bit_position);
     void SetBit(const size_t& byte_position, const size_t& bit_position);
     bool IsBitSet(const size_t& byte_position, const size_t& bit_position);
 
-    void ToogleBit(const size_t global_bit_position);
+    void ToggleBit(const size_t global_bit_position);
     void ClearBit(const size_t global_bit_position);
     void SetBit(const size_t global_bit_position);
     bool IsBitSet(const size_t global_bit_position);
 
+    Iterator begin() const {return Iterator(vector_.data());};
+    const Iterator end() const {return Iterator(vector_.data() + vector_.size() - 1, num_bits_ % kCharBit);}
 
-    //TODO: Add byte iterator; ...and maybe Bit iterator? ...and PrefixLengthByteIterator?
+    size_t size() const {return num_bits_;};
 
 private:
     size_t bit_position_{0};
     size_t byte_position_{0};
     std::vector<uint8_t> vector_{0};
+    size_t num_bits_{0};
 };
 
 
@@ -91,6 +127,7 @@ BitMap::AppendSetBit()
         bit_position_ = 1;
         ++byte_position_;
     }
+    ++num_bits_;
 }
 
 inline void
@@ -107,10 +144,11 @@ BitMap::AppendUnsetBit()
         bit_position_ = 1;
         ++byte_position_;
     }
+    ++num_bits_;
 }
 
 inline void
-BitMap::ToogleBit(const size_t& byte_position, const size_t& bit_position)
+BitMap::ToggleBit(const size_t& byte_position, const size_t& bit_position)
 {
     cmc_assert(byte_position < vector_.size());
     vector_[byte_position] ^= uint8_t{1} << bit_position;
@@ -138,9 +176,9 @@ BitMap::IsBitSet(const size_t& byte_position, const size_t& bit_position)
 }
 
 inline void
-BitMap::ToogleBit(const size_t global_bit_position)
+BitMap::ToggleBit(const size_t global_bit_position)
 {
-    ToogleBit(global_bit_position / kCharBit, global_bit_position % kCharBit);
+    ToggleBit(global_bit_position / kCharBit, global_bit_position % kCharBit);
 }
 
 inline void
