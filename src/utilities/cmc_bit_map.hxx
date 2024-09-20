@@ -5,7 +5,6 @@
 #include "utilities/cmc_utilities.hxx"
 
 #include <vector>
-#include <limits>
 #include <climits>
 
 namespace cmc
@@ -14,16 +13,18 @@ namespace cmc
 namespace bit_map
 {
 
+/* The amount of bits within a byte */
 constexpr size_t kCharBit = CHAR_BIT;
 
-
+/**
+ * @brief A class representing a contiguous bit field with some convenience functions
+ */
 class BitMap
 {
 public:
 
     /**
      * @brief A read-only forward-iterator for the BitMap in order to read it's bit field
-     * 
      */
     struct Iterator 
     {
@@ -96,9 +97,9 @@ private:
 
 
 /**
- * @brief Append a single bit to the BitMap from the given \a byte
+ * @brief Append a single bit to the BitMap
  * 
- * @param bit The bit to be appended
+ * @param bit The bit to be appended (either 'true' == 1 or 'false' == 0)
  */
 inline void
 BitMap::AppendBit(const bool bit)
@@ -112,6 +113,9 @@ BitMap::AppendBit(const bool bit)
     }
 }
 
+/**
+ * @brief Append a 'true'-bit to the BitMap
+ */
 inline void
 BitMap::AppendSetBit()
 {
@@ -130,6 +134,9 @@ BitMap::AppendSetBit()
     ++num_bits_;
 }
 
+/**
+ * @brief Append a 'false'-bit to the BitMap
+ */
 inline void
 BitMap::AppendUnsetBit()
 {
@@ -147,6 +154,12 @@ BitMap::AppendUnsetBit()
     ++num_bits_;
 }
 
+/**
+ * @brief Toggle a bit at the given position
+ * 
+ * @param byte_position The byte-number of the bit to be toggled
+ * @param bit_position The intra-byte position of the bit
+ */
 inline void
 BitMap::ToggleBit(const size_t& byte_position, const size_t& bit_position)
 {
@@ -154,6 +167,12 @@ BitMap::ToggleBit(const size_t& byte_position, const size_t& bit_position)
     vector_[byte_position] ^= uint8_t{1} << bit_position;
 }
 
+/**
+ * @brief Clear a bit at the given position
+ * 
+ * @param byte_position The byte-number of the bit to be cleared
+ * @param bit_position The intra-byte position of the bit
+ */
 inline void
 BitMap::ClearBit(const size_t& byte_position, const size_t& bit_position)
 {
@@ -161,6 +180,12 @@ BitMap::ClearBit(const size_t& byte_position, const size_t& bit_position)
     vector_[byte_position] &= ~(uint8_t{1} << bit_position);
 }
 
+/**
+ * @brief Set a bit at the given position
+ * 
+ * @param byte_position The byte-number of the bit to be set
+ * @param bit_position The intra-byte position of the bit
+ */
 inline void
 BitMap::SetBit(const size_t& byte_position, const size_t& bit_position)
 {
@@ -168,6 +193,14 @@ BitMap::SetBit(const size_t& byte_position, const size_t& bit_position)
     vector_[byte_position] |= (uint8_t{1} << bit_position);
 }
 
+/**
+ * @brief Check whether the bit at the given position is set
+ * 
+ * @param byte_position The byte-number of the bit to be checked
+ * @param bit_position The intra-byte position of the bit
+ * @return true The bit at this position is set
+ * @return false The bit at this position is **not** set
+ */
 inline bool
 BitMap::IsBitSet(const size_t& byte_position, const size_t& bit_position)
 {
@@ -175,24 +208,46 @@ BitMap::IsBitSet(const size_t& byte_position, const size_t& bit_position)
     return ((vector_[byte_position] >> bit_position) & uint8_t{1});
 }
 
+/**
+ * @brief Toggle a bit at the given global bit position (0,...,N)
+ * 
+ * @param bit_position The global bit position
+ */
 inline void
 BitMap::ToggleBit(const size_t global_bit_position)
 {
     ToggleBit(global_bit_position / kCharBit, global_bit_position % kCharBit);
 }
 
+/**
+ * @brief CLear a bit at the given global bit position (0,...,N)
+ * 
+ * @param bit_position The global bit position
+ */
 inline void
 BitMap::ClearBit(const size_t global_bit_position)
 {
     ClearBit(global_bit_position / kCharBit, global_bit_position % kCharBit);
 }
 
+/**
+ * @brief Set a bit at the given global bit position (0,...,N)
+ * 
+ * @param bit_position The global bit position
+ */
 inline void
 BitMap::SetBit(const size_t global_bit_position)
 {
     SetBit(global_bit_position / kCharBit, global_bit_position % kCharBit);
 }
 
+/**
+ * @brief Check whether a bit at the given global bit position (0,...,N) is set
+ * 
+ * @param bit_position The global bit position
+ * @return true The bit at this position is set
+ * @return false The bit at this position is **not** set
+ */
 inline bool
 BitMap::IsBitSet(const size_t global_bit_position)
 {
