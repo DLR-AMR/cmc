@@ -25,6 +25,12 @@ void ExpectTrue(const bool expr)
     (expr ? void(0) : std::exit(CMC_TEST_FAILURE));
 }
 
+inline
+void ExpectFalse(const bool expr)
+{
+    (!expr ? void(0) : std::exit(CMC_TEST_FAILURE));
+}
+
 }
 
 #endif /* !CMC_TEST_HXX */
