@@ -14,7 +14,8 @@ namespace bit_map
 {
 
 /* The amount of bits within a byte */
-constexpr size_t kCharBit = CHAR_BIT;
+constexpr int kCharBitAsInt = CHAR_BIT;
+constexpr size_t kCharBit = static_cast<size_t>(kCharBitAsInt);
 
 /**
  * @brief A class representing a contiguous bit field with some convenience functions
@@ -23,6 +24,8 @@ class BitMap
 {
 public:
 
+    using byte_iterator = std::vector<uint8_t>::iterator;
+    using const_byte_iterator = std::vector<uint8_t>::const_iterator;
     /**
      * @brief A read-only forward-iterator for the BitMap in order to read it's bit field
      */
@@ -36,7 +39,7 @@ public:
 
         Iterator(pointer byte) : byte_(byte) {};
         Iterator(pointer byte, const int bit_position_constraint) : byte_{byte}, bit_position_{bit_position_constraint} {
-            if (bit_position_ >= kCharBit)
+            if (bit_position_ >= kCharBitAsInt)
             {
                 ++(this->byte_);
                 this->bit_position_ = 0;
@@ -44,7 +47,7 @@ public:
         };
 
         value_type operator*() const { return (*byte_ >> bit_position_) & uint8_t{1}; }
-        Iterator& operator++() { ++bit_position_ ; if(bit_position_ >= kCharBit){bit_position_ = 0; ++byte_;}; return *this; }  
+        Iterator& operator++() { ++bit_position_ ; if(bit_position_ >= kCharBitAsInt){bit_position_ = 0; ++byte_;}; return *this; }  
         Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
         friend bool operator== (const Iterator& a, const Iterator& b) { return a.byte_ == b.byte_ && a.bit_position_ == b.bit_position_; };
         friend bool operator!= (const Iterator& a, const Iterator& b) { return a.byte_ != b.byte_ || a.bit_position_ != b.bit_position_; };  
@@ -56,7 +59,7 @@ public:
 
     BitMap() = default;
     BitMap(const size_t num_bits)
-    : vector_(num_bits / kCharBit + 1, 0), num_bits_{num_bits}{};
+    : vector_(num_bits / kCharBit + (num_bits % kCharBit != 0 ? 1 : 0), 0), num_bits_{num_bits}{};
 
     BitMap(const BitMap& other) = default;
     BitMap& operator=(const BitMap& other) = default;
@@ -86,7 +89,15 @@ public:
     Iterator begin() const {return Iterator(vector_.data());};
     const Iterator end() const {return Iterator(vector_.data() + vector_.size() - 1, num_bits_ % kCharBit);}
 
+    byte_iterator begin_bytes() { return vector_.begin(); };
+    byte_iterator end_bytes() { return vector_.end(); };
+    const_byte_iterator begin_bytes() const { return vector_.begin(); };
+    const_byte_iterator end_bytes() const { return vector_.end(); };
+    const_byte_iterator cbegin_bytes() const { return vector_.cbegin(); };
+    const_byte_iterator cend_bytes() const { return vector_.cend(); };
+
     size_t size() const {return num_bits_;};
+    size_t size_bytes() const {return vector_.size();};
 
 private:
     size_t bit_position_{0};
