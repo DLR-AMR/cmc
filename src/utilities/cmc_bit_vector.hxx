@@ -13,13 +13,6 @@ namespace bit_vector
 constexpr size_t kCharBit = CHAR_BIT;
 constexpr size_t kBitIndexStart = kCharBit - 1;
 
-constexpr uint8_t kOneBitPrefix = 0x00;
-constexpr uint8_t kTwoBitPrefix = 0x01;
-constexpr uint8_t kNullifyTwoTailBits = ~((uint8_t) 0x03);
-constexpr uint8_t kNullifyThirdAndFourthTailBits = ~((uint8_t) 0x0C);
-constexpr uint8_t kPrefixContinues = 0x0F;
-
-
 constexpr uint8_t kNullifyAllExceptTwoTailBits = (uint8_t) 0x03;
 constexpr uint8_t kNullifyFourFrontBits = (uint8_t) 0x0F;
 constexpr uint8_t kNullifyAllExceptTailBit = (uint8_t) 0x01;
@@ -39,6 +32,9 @@ constexpr uint8_t kNullifyAllExceptTailBit = (uint8_t) 0x01;
 class BitVector
 {
 public:
+    using iterator = std::vector<uint8_t>::iterator;
+    using const_iterator = std::vector<uint8_t>::const_iterator;
+
     BitVector() = default;
     BitVector(const size_t num_bytes)
     : vector_(num_bytes, 0){};
@@ -62,17 +58,19 @@ public:
     void AppendBits(const uint8_t byte, const int num_bits);
     void AppendBits(const std::vector<uint8_t>& bytes, const int num_bits);
 
-    void ToogleBit(const size_t& byte_position, const size_t& bit_position);
-    void ClearBit(const size_t& byte_position, const size_t& bit_position);
-    void SetBit(const size_t& byte_position, const size_t& bit_position);
-    bool IsBitSet(const size_t& byte_position, const size_t& bit_position);
-
     void IncrementBitPosition(size_t& iterator, const int diff = 1);
     size_t GetFirstBitPositionOfByte() const;
     bool IsEndOfByteReached(size_t& iterator) const;
 
-    //TODO: Add byte iterator; ...and maybe Bit iterator? ...and PrefixLengthByteIterator?
+    iterator begin() { return vector_.begin(); };
+    iterator end() { return vector_.end(); };
+    const_iterator begin() const { return vector_.begin(); };
+    const_iterator end() const { return vector_.end(); };
+    const_iterator cbegin() const { return vector_.cbegin(); };
+    const_iterator cend() const { return vector_.cend(); };
 
+    size_t size() const { return vector_.size();};
+    
 private:
     size_t bit_position_{kBitIndexStart};
     size_t byte_position_{0};
@@ -174,7 +172,7 @@ uint8_t
 GetNullifyBitMask(const int num_nonzero_bits)
 {
     cmc_assert(num_nonzero_bits >= 0 && num_nonzero_bits <= CHAR_BIT);
-    return ((uint8_t) 0xFF >> (kCharBit - num_nonzero_bits));
+    return (uint8_t{0xFF} >> (kCharBit - num_nonzero_bits));
 }
 
 /**
