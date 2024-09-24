@@ -123,18 +123,22 @@ public:
     CmcType GetCmcType() const;
     int GetID() const;
 
+    void Reserve(const size_t num_elements);
+
     const GeoDomain& GetGlobalDomain() const;
     void SetGlobalDomain(const GeoDomain& domain);
     void SetGlobalDomain(GeoDomain&& domain);
 
     void SetDataLayout(const DataLayout layout);
 
-    void PushBack(const std::vector<T>& values, const Hyperslab& hyperslab);
-    void PushBack(const std::vector<T>& values, Hyperslab&& hyperslab);
-    void PushBack(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs);
-    void PushBack(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs);
-    void PushBack(const std::vector<T>& values, const int global_sfc_offset);
-    void PushBack(std::vector<T>&& values, const int global_sfc_offset);
+    void SetData(const std::vector<T>& values, const Hyperslab& hyperslab);
+    void SetData(const std::vector<T>& values, Hyperslab&& hyperslab);
+    void SetData(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs);
+    void SetData(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs);
+    void SetData(const std::vector<T>& values, const int global_sfc_offset);
+    void SetData(std::vector<T>&& values, const int global_sfc_offset);
+
+    void PushBack(const std::vector<T>& values);
 
     void OverwriteDataFromFile(const int ncid, const int var_id, const GeneralHyperslab& hyperslab, const size_t start_offset = 0);
 
@@ -150,9 +154,9 @@ private:
     std::vector<T> data_;
     T missing_value_;
     DataLayout layout_;
-    DataFormat format_;
+    DataFormat format_{DataFormat::LinearFormat};
     std::vector<Hyperslab> hyperslabs_;
-    LinearIndex global_sfc_offset_;
+    LinearIndex global_sfc_offset_{0};
     GeoDomain global_domain_;
     bool is_data_stack_full_{false};
 };
@@ -237,7 +241,7 @@ NcSpecificVariable<T>::GetDimensionsFromVariable() const
     {
         case DataFormat::LinearFormat:
             /* For example SFC indices */
-            nc_dims.emplace_back("lin_index", global_domain_.GetNumberReferenceCoordsCovered());
+            nc_dims.emplace_back("lin_index", data_.size());
             nc_dims.back().AppendNumToName(id_);
         break;
         default:
@@ -275,6 +279,13 @@ NcSpecificVariable<T>::GetCmcType() const
 }
 
 template<class T>
+void
+NcSpecificVariable<T>::Reserve(const size_t num_elements)
+{
+    data_.reserve(num_elements);
+};
+
+template<class T>
 const GeoDomain& 
 NcSpecificVariable<T>::GetGlobalDomain() const
 {
@@ -297,7 +308,7 @@ NcSpecificVariable<T>::SetGlobalDomain(GeoDomain&& domain)
 
 template<class T>
 void
-NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const Hyperslab& hyperslab)
+NcSpecificVariable<T>::SetData(const std::vector<T>& values, const Hyperslab& hyperslab)
 {
     if (is_data_stack_full_)
     {
@@ -312,7 +323,7 @@ NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const Hyperslab& h
 
 template<class T>
 void
-NcSpecificVariable<T>::PushBack(const std::vector<T>& values, Hyperslab&& hyperslab)
+NcSpecificVariable<T>::SetData(const std::vector<T>& values, Hyperslab&& hyperslab)
 {
     if (is_data_stack_full_)
     {
@@ -327,7 +338,7 @@ NcSpecificVariable<T>::PushBack(const std::vector<T>& values, Hyperslab&& hypers
 
 template<class T>
 void
-NcSpecificVariable<T>::PushBack(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs)
+NcSpecificVariable<T>::SetData(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs)
 {
     if (is_data_stack_full_)
     {
@@ -343,10 +354,16 @@ NcSpecificVariable<T>::PushBack(std::vector<T>&& values, std::vector<Hyperslab>&
     is_data_stack_full_ = true;
 }
 
+template<class T>
+void
+NcSpecificVariable<T>::PushBack(const std::vector<T>& values)
+{
+    std::copy_n(values.begin(), values.size(), std::back_insert_iterator(data_));
+}
 
 template<class T>
 void
-NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs)
+NcSpecificVariable<T>::SetData(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs)
 {
     if (is_data_stack_full_)
     {
@@ -364,7 +381,7 @@ NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const std::vector<
 
 template<class T>
 void
-NcSpecificVariable<T>::PushBack(std::vector<T>&& values, const int global_sfc_offset)
+NcSpecificVariable<T>::SetData(std::vector<T>&& values, const int global_sfc_offset)
 {
     if (is_data_stack_full_)
     {
@@ -380,7 +397,7 @@ NcSpecificVariable<T>::PushBack(std::vector<T>&& values, const int global_sfc_of
 
 template<class T>
 void
-NcSpecificVariable<T>::PushBack(const std::vector<T>& values, const int global_sfc_offset)
+NcSpecificVariable<T>::SetData(const std::vector<T>& values, const int global_sfc_offset)
 {
     if (is_data_stack_full_)
     {
@@ -525,6 +542,7 @@ NcVariable::DetachVariable()
 
     return var;
 }
+
 }
 
 #endif /* !CMC_NC_IO_HXX */
