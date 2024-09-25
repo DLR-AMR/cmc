@@ -102,7 +102,7 @@ private:
     DataLayout initial_data_layout_{DataLayout::LayoutUndefined};
     DataLayout pre_compression_layout_{DataLayout::LayoutUndefined};
     Dimension has_split_dimension_{Dimension::DimensionUndefined};
-    int global_context_information_{0}; //!< A variable for describing an optional additional relation (the meaning of this varibale may dependent on the context)
+    int global_context_information_{kGlobalContextInformationNotGiven}; //!< A variable for describing an optional additional relation (the meaning of this varibale may dependent on the context)
 };
 
 template<class T>
