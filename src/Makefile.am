@@ -50,7 +50,8 @@ src/netcdf/cmc_nc_reader.hxx \
 src/cmc_compression.hxx \
 src/netcdf/cmc_nc_io_conventions.hxx \
 src/utilities/cmc_bit_vector.hxx \
-src/utilities/cmc_bit_map.hxx
+src/utilities/cmc_bit_map.hxx \
+src/lossy/cmc_compression_class.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
