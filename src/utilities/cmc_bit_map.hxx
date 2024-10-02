@@ -124,7 +124,7 @@ private:
     const uint8_t* data_;
     std::size_t byte_position_{0};
     std::size_t bit_position_{0};
-    std::size_t size_;
+    const std::size_t size_;
 };
 
 /** BitMapView Member Functions **/
