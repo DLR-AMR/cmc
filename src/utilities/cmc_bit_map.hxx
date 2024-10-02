@@ -106,7 +106,61 @@ private:
     size_t num_bits_{0};
 };
 
+class BitMapView
+{
+public:
+    BitMapView()
+    : data_{nullptr}, size_{0} {};
+    BitMapView(const uint8_t* data, std::size_t num_bits)
+        : data_{data}, size_{num_bits}{};
 
+    bool GetBit(const size_t global_bit_position);
+
+    void MoveToStartBit(const size_t global_bit_position);
+
+    bool GetNextBit();
+
+private:
+    const uint8_t* data_;
+    std::size_t byte_position_{0};
+    std::size_t bit_position_{0};
+    std::size_t size_;
+};
+
+/** BitMapView Member Functions **/
+inline bool
+BitMapView::GetNextBit()
+{
+    if (bit_position_ < kCharBit)
+    {
+        /* Get the current bit of the current byte */
+        const bool next_bit = ((data_[byte_position_] >> bit_position_) & uint8_t{1});
+        ++bit_position_;
+        return next_bit;
+    } else
+    {
+        /* Get the first bit of the next byte */
+        ++byte_position_;
+        const bool next_bit = (data_[byte_position_] & uint8_t{1});
+        bit_position_ = 1;
+        return next_bit;
+    }
+}
+
+inline void
+BitMapView::MoveToStartBit(const size_t global_bit_position)
+{
+    byte_position_ = global_bit_position / kCharBit;
+    bit_position_ = global_bit_position % kCharBit;
+}
+
+inline bool
+BitMapView::GetBit(const size_t global_bit_position)
+{
+    return ((data_[global_bit_position / kCharBit] >> (global_bit_position % kCharBit)) & uint8_t{1});
+}
+
+/** BitMap Member Functions **/
 /**
  * @brief Append a single bit to the BitMap
  * 
