@@ -141,7 +141,50 @@ ConvertCmcTypeToNcType(const CmcType type)
         default:
             cmc_err_msg("A not supported CmcType has been supplied.");
             return NC_INT;
-        
+    }
+}
+
+CmcType
+ConvertNcTypeToCmcType(const nc_type type)
+{
+    switch (type)
+    {
+        case NC_BYTE:
+            return CmcType::Int8_t;
+        break;
+        case NC_CHAR:
+            return CmcType::Char;
+        break;
+        case NC_SHORT:
+            return CmcType::Int16_t;
+        break;
+        case NC_INT:
+            return CmcType::Int32_t;
+        break;
+        case NC_FLOAT:
+            return CmcType::Float;
+        break;
+        case NC_DOUBLE:
+            return CmcType::Double;
+        break;
+        case NC_UBYTE:
+            return CmcType::Uint8_t;
+        break;
+        case NC_USHORT:
+            return CmcType::Uint16_t;
+        break;
+        case NC_UINT:
+            return CmcType::Uint32_t;
+        break;
+        case NC_INT64:
+            return CmcType::Int64_t;
+        break;
+        case NC_UINT64:
+            return CmcType::Uint64_t;
+        break;
+        default:
+            cmc_err_msg("A not supported nc_type has been supplied.");
+            return CmcType::TypeUndefined;
     }
 }
 
@@ -193,7 +236,7 @@ std::vector<NcAttribute>::const_iterator
 FindAttribute(const std::vector<NcAttribute>& attributes, const std::string& attr_name)
 {
     return std::find_if(attributes.begin(), attributes.end(), [&](const NcAttribute& attr){
-        return !attr.GetName().compare("attr");
+        return !attr.GetName().compare(attr_name);
     });
 }
 }

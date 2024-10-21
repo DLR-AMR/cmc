@@ -516,6 +516,9 @@ NcSpecificVariable<T>::GetData() const
 nc_type
 ConvertCmcTypeToNcType(const CmcType type);
 
+CmcType
+ConvertNcTypeToCmcType(const nc_type type);
+
 NcGeneralVariable
 CreateSpecificVariable(const nc_type type, const std::string& name, const int var_id, const size_t size_hint = 8);
 
