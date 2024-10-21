@@ -52,6 +52,7 @@ public:
 
     std::vector<NcDimension> GetVariableDimensions(const std::string& variable_name);
 
+    CmcType GetTypeOfVariable(const std::string& variable_name);
 
 private:
     struct StashedVariable;

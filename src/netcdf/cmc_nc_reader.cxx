@@ -163,7 +163,7 @@ ReadAttribute(const int ncid, const int var_id, const char* att_name, const nc_t
         }
         break;
         default:
-            cmc_err_msg("The netCDF attriute has an invalid data type.");
+            cmc_err_msg("The netCDF attriute has an invalid data type. (String attributes cannot be processes yet).");
             return NcAttribute();
     }
 }
@@ -475,14 +475,31 @@ NcReader::GetUnlimitedDimensionIDs() const
     return unlimited_dimension_ids_;
 }
 
+CmcType
+NcReader::GetTypeOfVariable(const std::string& variable_name)
+{
+    cmc_assert(has_general_information_been_inquired_);
+
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        if (!variable_name.compare(var_iter->GetName()))
+        {
+            return var_iter->GetCmcType();
+        }
+    }
+
+    cmc_warn_msg("No variable corresponds to the name ", variable_name, ". Therefore, no type could be retrieved.");
+
+    return CmcType::TypeUndefined;
+}
+
 std::vector<NcDimension>
 NcReader::GetVariableDimensions(const std::string& variable_name)
 {
     cmc_assert(has_general_information_been_inquired_);
-    cmc_debug_msg("Number of variables: ", variables_.size());
+
     for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
     {
-        cmc_debug_msg("VAriable name is: ",var_iter->GetName());
         if (!variable_name.compare(var_iter->GetName()))
         {
             return var_iter->GetDimensions();
@@ -490,7 +507,7 @@ NcReader::GetVariableDimensions(const std::string& variable_name)
     }
 
     /* If no variable with the given name has been found, a warning is issued */
-    cmc_warn_msg("No variable correpsonds to the name ", variable_name, ". Therefore, no dimensions could be retrieved.");
+    cmc_warn_msg("No variable corresponds to the name ", variable_name, ". Therefore, no dimensions could be retrieved.");
 
     return std::vector<NcDimension>();
 }
