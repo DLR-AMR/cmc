@@ -1,6 +1,7 @@
 #include "netcdf/cmc_nc_reader.hxx"
 
 #include <algorithm>
+#include <cstring>
 
 namespace cmc
 {
@@ -163,7 +164,7 @@ ReadAttribute(const int ncid, const int var_id, const char* att_name, const nc_t
         }
         break;
         default:
-            cmc_err_msg("The netCDF attriute has an invalid data type. (String attributes cannot be processes yet).");
+            cmc_err_msg("The netCDF attribute has an invalid data type. (String attributes cannot be processed yet).");
             return NcAttribute();
     }
 }
@@ -342,7 +343,7 @@ NcReader::ReadVariableMetaDataAndGlobalAttributes()
 }
 
 void
-NcReader::ReadVariableData(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, NcVariable& variable)
+NcReader::ReadVariableDataFromFile(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, NcVariable& variable)
 {
     /* Iterate over all hyperslabs and count the amount of data which will be read */
     size_t num_data_values{0};
@@ -415,7 +416,7 @@ NcReader::ReadVariables()
         variables.emplace_back(InquireAttributes(ncid, var_id), ConvertDimensionIDs(ncid, dim_ids));
 
         /* Inquire the data of the variable */
-        ReadVariableData(ncid, type, stashed_var_iter->name, var_id, stashed_var_iter->hyperslabs, variables.back());
+        ReadVariableDataFromFile(ncid, type, stashed_var_iter->name, var_id, stashed_var_iter->hyperslabs, variables.back());
     }
 
     /* Inquire global attributes */
@@ -478,19 +479,44 @@ NcReader::GetUnlimitedDimensionIDs() const
 CmcType
 NcReader::GetTypeOfVariable(const std::string& variable_name)
 {
-    cmc_assert(has_general_information_been_inquired_);
+    /* Open the file to be read */
+    const int ncid = NcOpen();
 
-    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    /* Inquire some basic/meta information about the file and it's contents */
+    InquireGeneralFileInformation(ncid);
+
+    char var_name[NC_MAX_NAME];
+
+    nc_type var_type{NC_NAT};
+
+    /* Iterate over all variables (their IDs, correspond to 0, ..., num_variables -1) */
+    for (int var_id = 0; var_id < num_variables_; ++var_id)
     {
-        if (!variable_name.compare(var_iter->GetName()))
+        /* Inquire the name of the variable */
+        const int err = nc_inq_varname(ncid, var_id, var_name);
+        NcCheckError(err);
+
+        /* Check if the variable name complies with the given one */
+        if (std::strcmp(var_name, variable_name.c_str()) == 0)
         {
-            return var_iter->GetCmcType();
+            /* We have found the correct variable with the given name.
+             * Now, we are able to inquire the data type of the variable */
+            const int type_err = nc_inq_vartype(ncid, var_id, &type);
+            NcCheckError(type_err);
+
+            break;
         }
     }
 
-    cmc_warn_msg("No variable corresponds to the name ", variable_name, ". Therefore, no type could be retrieved.");
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
 
-    return CmcType::TypeUndefined;
+    if (var_type == NC_NAT)
+    {
+        cmc_warn_msg("Either the variable type is invalid or no variable corresponds to the name ", variable_name, ". Therefore, no type information could be retrieved.");
+    }
+
+    return ConvertNcTypeToCmcType(var_type);
 }
 
 std::vector<NcDimension>
