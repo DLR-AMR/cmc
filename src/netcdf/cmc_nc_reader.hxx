@@ -8,6 +8,7 @@
 #include "mpi/cmc_mpi.hxx"
 
 #include <vector>
+#include <cstring>
 
 namespace cmc
 {
@@ -26,6 +27,15 @@ public:
     NcReader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
     : file_name_{file_name}, comm_{comm} {};
 
+    /* Read and return the data of a single specified variable */
+    template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name);
+    template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name, const GeneralHyperslab& hyperslab);
+
+    //TODO: Implement
+    NcVariable ReadVariable(const std::string& variable_name);
+    std::vector<NcAttribute> ReadVariableAttributes(const std::string& variable_name);
+
+
     void StashVariableForReading(const std::string& variable_name, const std::vector<GeneralHyperslab>& hyperslabs);
     void StashVariableForReading(const std::string& variable_name, std::vector<GeneralHyperslab>&& hyperslabs);
     void StashVariableForReading(const std::string& variable_name, const GeneralHyperslab& hyperslab);
@@ -33,12 +43,17 @@ public:
 
     void ClearStashedVariables();
 
-    //void Read();
-
-    std::vector<NcAttribute> ReadGlobalAttrtibutes();
-    std::vector<NcVariable> ReadVariableMetaData();
-    std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariableMetaDataAndGlobalAttributes();
+    /* Read and return only the stashed variables and the global attributes */
     std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariables();
+
+    /* Read and return all global attributes */
+    std::vector<NcAttribute> ReadGlobalAttrtibutes();
+
+    /* Read all the meta data of all variables and return those "variable hulls" */
+    std::vector<NcVariable> ReadVariableMetaData();
+
+    /* Read all the meta data of all variables and return those "variable hulls". Additionally, read and return all global attributes  */
+    std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariableMetaDataAndGlobalAttributes();
 
     const std::string& GetFileName() const;
     int GetNetcdfFormat() const;
@@ -59,11 +74,12 @@ private:
 
     int NcOpen();
     void NcClose(const int ncid);
+    int FindVariableID(const int ncid, const std::string& variable_name);
     void InquireGeneralFileInformation(const int ncid);
     std::vector<NcAttribute> InquireAttributes(const int ncid, const int var_id);
     std::vector<NcVariable> InquireVariableMetaData(const int ncid);
     std::vector<NcDimension> ConvertDimensionIDs(const int ncid, const std::vector<int>& dim_ids);
-    void ReadVariableData(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, NcVariable& variable);
+    void ReadVariableDataFromFile(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, NcVariable& variable);
     
     const std::string file_name_;
     const MPI_Comm comm_;

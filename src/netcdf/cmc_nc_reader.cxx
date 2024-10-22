@@ -77,6 +77,31 @@ NcReader::InquireGeneralFileInformation(const int ncid)
     has_general_information_been_inquired_ = true;
 }
 
+int
+NcReader::FindVariableID(const int ncid, const std::string& variable_name)
+{
+    InquireGeneralFileInformation();
+
+    char var_name[NC_MAX_NAME];
+    
+    /* Iterate over all variables (their IDs, correspond to 0, ..., num_variables -1) */
+    for (int var_id = 0; var_id < num_variables_; ++var_id)
+    {
+        /* Inquire the name of the variable */
+        int err = nc_inq_varname(ncid, var_id, var_name);
+        NcCheckError(err);
+
+        /* Check if the variable name complies with the given one */
+        if (std::strcmp(var_name, variable_name.c_str()) == 0)
+        {
+            /* We have found a variable with the given name */
+            return var_id;
+        }
+    }
+
+    return NC_EBADTYPID;
+}
+
 NcAttribute
 ReadAttribute(const int ncid, const int var_id, const char* att_name, const nc_type type)
 {
