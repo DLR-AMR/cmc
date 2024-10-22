@@ -27,23 +27,26 @@ public:
     NcReader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
     : file_name_{file_name}, comm_{comm} {};
 
+    /* Read a single variable from the file */
+    NcVariable ReadVariable(const std::string& variable_name);
+
     /* Read and return the data of a single specified variable */
     template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name);
     template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name, const GeneralHyperslab& hyperslab);
 
+    /* Read only the attributes of single variable */
+    std::vector<NcAttribute> ReadVariableAttributes(const std::string& variable_name);
+
     /* Read and return all global attributes */
     std::vector<NcAttribute> ReadGlobalAttrtibutes();
 
-    //TODO: Implement
-    NcVariable ReadVariable(const std::string& variable_name);
-    std::vector<NcAttribute> ReadVariableAttributes(const std::string& variable_name);
-
-
+    /* Save variable names and hyperslabs which will be read together from the file on calling ReadVariables() */
     void StashVariableForReading(const std::string& variable_name, const std::vector<GeneralHyperslab>& hyperslabs);
     void StashVariableForReading(const std::string& variable_name, std::vector<GeneralHyperslab>&& hyperslabs);
     void StashVariableForReading(const std::string& variable_name, const GeneralHyperslab& hyperslab);
     void StashVariableForReading(const std::string& variable_name, GeneralHyperslab&& hyperslab);
-
+    
+    /* Remove all stored information from the stash */
     void ClearStashedVariables();
 
     /* Read and return only the stashed variables and the global attributes */
@@ -55,6 +58,15 @@ public:
     /* Read all the meta data of all variables and return those "variable hulls". Additionally, read and return all global attributes  */
     std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariableMetaDataAndGlobalAttributes();
 
+    /* Get the dimensions of a single variable */
+    std::vector<NcDimension> GetVariableDimensions(const std::string& variable_name);
+    
+    /* Get the data type of a single variable */
+    CmcType GetTypeOfVariable(const std::string& variable_name);
+
+    /* INquire some basic information about the file which can be obtained by the Getter-functions afterwards */
+    void InquireGeneralFileInformation();
+
     const std::string& GetFileName() const;
     int GetNetcdfFormat() const;
     int GetNumberOfDimensions() const;
@@ -62,12 +74,6 @@ public:
     int GetNumberOfGlobalAttributes() const;
     int GetNumberOfUnlimitedDimensions() const;
     std::vector<int> GetUnlimitedDimensionIDs() const;
-
-    NcVariable&& GetVariable(const std::string& variable_name);
-
-    std::vector<NcDimension> GetVariableDimensions(const std::string& variable_name);
-
-    CmcType GetTypeOfVariable(const std::string& variable_name);
 
 private:
     struct StashedVariable;

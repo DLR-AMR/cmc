@@ -77,6 +77,20 @@ NcReader::InquireGeneralFileInformation(const int ncid)
     has_general_information_been_inquired_ = true;
 }
 
+void
+NcReader::InquireGeneralFileInformation()
+{
+    if (has_general_information_been_inquired_) { return;}
+
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    InquireGeneralFileInformation(ncid);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+}
+
 int
 NcReader::FindVariableID(const int ncid, const std::string& variable_name)
 {
@@ -100,6 +114,8 @@ NcReader::FindVariableID(const int ncid, const std::string& variable_name)
             return var_id;
         }
     }
+
+    cmc_warn_msg("No variable with the given name has been found in the netCDF file.");
 
     return NC_EBADTYPID;
 }
@@ -547,6 +563,27 @@ NcReader::ReadVariable(const std::string& variable_name)
     return nc_var;
 }
 
+std::vector<NcAttribute>
+NcReader::ReadVariableAttributes(const std::string& variable_name)
+{
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    /* Inquire some basic/meta information about the file and it's contents */
+    InquireGeneralFileInformation(ncid);
+
+    /* Get the corresponding variable ID */
+    const int var_id = FindVariableID(ncid, variable_name);
+
+    /* Inquire the attributes of the given variable */
+    std::vector<NcAttribute> attributes = InquireAttributes(ncid, var_id);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    return attributes;
+}
+
 const std::string&
 NcReader::GetFileName() const
 {
@@ -604,28 +641,12 @@ NcReader::GetTypeOfVariable(const std::string& variable_name)
     /* Inquire some basic/meta information about the file and it's contents */
     InquireGeneralFileInformation(ncid);
 
-    char var_name[NC_MAX_NAME];
+    /* Get the corresponding variable ID */
+    const int var_id = FindVariableID(ncid, variable_name);
 
     nc_type var_type{NC_NAT};
-
-    /* Iterate over all variables (their IDs, correspond to 0, ..., num_variables -1) */
-    for (int var_id = 0; var_id < num_variables_; ++var_id)
-    {
-        /* Inquire the name of the variable */
-        const int err = nc_inq_varname(ncid, var_id, var_name);
-        NcCheckError(err);
-
-        /* Check if the variable name complies with the given one */
-        if (std::strcmp(var_name, variable_name.c_str()) == 0)
-        {
-            /* We have found the correct variable with the given name.
-             * Now, we are able to inquire the data type of the variable */
-            const int type_err = nc_inq_vartype(ncid, var_id, &var_type);
-            NcCheckError(type_err);
-
-            break;
-        }
-    }
+    const int type_err = nc_inq_vartype(ncid, var_id, &var_type);
+    NcCheckError(type_err);
 
     /* Close the file after the reading process is finished */
     NcClose(ncid);
@@ -641,20 +662,31 @@ NcReader::GetTypeOfVariable(const std::string& variable_name)
 std::vector<NcDimension>
 NcReader::GetVariableDimensions(const std::string& variable_name)
 {
-    cmc_assert(has_general_information_been_inquired_);
+    /* Open the file to be read */
+    const int ncid = NcOpen();
 
-    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
-    {
-        if (!variable_name.compare(var_iter->GetName()))
-        {
-            return var_iter->GetDimensions();
-        }
-    }
+    /* Inquire some basic/meta information about the file and it's contents */
+    InquireGeneralFileInformation(ncid);
 
-    /* If no variable with the given name has been found, a warning is issued */
-    cmc_warn_msg("No variable corresponds to the name ", variable_name, ". Therefore, no dimensions could be retrieved.");
+    /* Get the corresponding variable ID */
+    const int var_id = FindVariableID(ncid, variable_name);
 
-    return std::vector<NcDimension>();
+    /* Inquire the number of dimensions */
+    int num_dims{0};
+    int err = nc_inq_varndims(ncid, var_id, &num_dims);
+    NcCheckError(err);
+
+    /* Inquire the dimension ids */
+    std::vector<int> dim_ids(num_dims, 0);
+    err = nc_inq_vardimid(ncid, var_id, dim_ids.data());
+    NcCheckError(err);
+
+    std::vector<NcDimension> dims = ConvertDimensionIDs(ncid, dim_ids);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    return dims;
 }
 
 void
