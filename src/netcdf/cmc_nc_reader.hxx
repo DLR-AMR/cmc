@@ -120,7 +120,7 @@ struct NcReader::StashedVariable
 
 template<typename T>
 std::vector<T>
-NcReader::ReadVariable(const std::string& variable_name, const GeneralHyperslab& hyperslab)
+NcReader::ReadVariableData(const std::string& variable_name, const GeneralHyperslab& hyperslab)
 {
     /* Open the file to be read */
     const int ncid = NcOpen();
@@ -163,9 +163,9 @@ NcReader::ReadVariable(const std::string& variable_name, const GeneralHyperslab&
 
 template<typename T>
 std::vector<T>
-NcReader::ReadVariable(const std::string& variable_name)
+NcReader::ReadVariableData(const std::string& variable_name)
 {
-    return ReadVariable(variable_name, GetDataDomainAsGeneralHyperslab(variable_name))
+    return ReadVariableData(variable_name, GetDataDomainAsGeneralHyperslab(variable_name))
 }
 
 }
