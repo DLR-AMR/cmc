@@ -1,7 +1,6 @@
 #include "netcdf/cmc_nc_reader.hxx"
 
 #include <algorithm>
-#include <cstring>
 
 namespace cmc
 {
@@ -501,7 +500,7 @@ NcReader::GetTypeOfVariable(const std::string& variable_name)
         {
             /* We have found the correct variable with the given name.
              * Now, we are able to inquire the data type of the variable */
-            const int type_err = nc_inq_vartype(ncid, var_id, &type);
+            const int type_err = nc_inq_vartype(ncid, var_id, &var_type);
             NcCheckError(type_err);
 
             break;
