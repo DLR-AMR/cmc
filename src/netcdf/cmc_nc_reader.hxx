@@ -117,6 +117,49 @@ struct NcReader::StashedVariable
     const std::vector<GeneralHyperslab> hyperslabs;
 };
 
+template<typename T>
+std::vector<T>
+NcReader::ReadVariable(const std::string& variable_name, const GeneralHyperslab& hyperslab)
+{
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    InquireGeneralFileInformation(ncid);
+
+    /* Get the corresponding ID to the supplied variable name */
+    const int var_id = FindVariableID(ncid, variable_name);
+
+    /* We have found the correct variable with the given name.
+     * Now, we are able to inquire the data type of the variable */
+    nc_type var_type{NC_NAT};
+    const int type_err = nc_inq_vartype(ncid, var_id, &var_type);
+    NcCheckError(type_err);
+
+    /* Get the Cmc Type of the variable */
+    const CmcType type = ConvertNcTypeToCmcType(var_type);
+
+    /* Compare whether the CmcType complies with the template type */
+    if (type != ConvertToCmcType<T>())
+    {
+        cmc_err_msg("The variable ", variable_name, " is of a different type (CmcType: ", type, ") than the template type.");
+    }
+
+    /* Get the number of data values which will be read for this hyperslab */
+    const size_t size = hyperslab.GetNumberOfCoveredCoordinates();
+
+    /* Allocate a vector of the given size */
+    std::vector<T> data(size);
+
+    /* Read in the data */
+    const int data_err = nc_get_vara(ncid, var_id, hyperslab.start_values.data(), hyperslab.count_values.data(), static_cast<void*>(data.data()));
+    NcCheckError(data_err);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    return data;
+}
+
 }
 
 #endif /* !CMC_NC_READER_HXX */
