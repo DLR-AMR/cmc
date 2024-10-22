@@ -75,6 +75,7 @@ private:
     int NcOpen();
     void NcClose(const int ncid);
     int FindVariableID(const int ncid, const std::string& variable_name);
+    GeneralHyperslab GetDataDomainAsGeneralHyperslab(const std::string& variable_name);
     void InquireGeneralFileInformation(const int ncid);
     std::vector<NcAttribute> InquireAttributes(const int ncid, const int var_id);
     std::vector<NcVariable> InquireVariableMetaData(const int ncid);
@@ -158,6 +159,13 @@ NcReader::ReadVariable(const std::string& variable_name, const GeneralHyperslab&
     NcClose(ncid);
 
     return data;
+}
+
+template<typename T>
+std::vector<T>
+NcReader::ReadVariable(const std::string& variable_name)
+{
+    return ReadVariable(variable_name, GetDataDomainAsGeneralHyperslab(variable_name))
 }
 
 }

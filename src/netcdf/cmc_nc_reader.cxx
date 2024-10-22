@@ -80,10 +80,12 @@ NcReader::InquireGeneralFileInformation(const int ncid)
 int
 NcReader::FindVariableID(const int ncid, const std::string& variable_name)
 {
-    InquireGeneralFileInformation();
+    cmc_assert(is_file_opened_);
+
+    InquireGeneralFileInformation(ncid);
 
     char var_name[NC_MAX_NAME];
-    
+
     /* Iterate over all variables (their IDs, correspond to 0, ..., num_variables -1) */
     for (int var_id = 0; var_id < num_variables_; ++var_id)
     {
@@ -100,6 +102,46 @@ NcReader::FindVariableID(const int ncid, const std::string& variable_name)
     }
 
     return NC_EBADTYPID;
+}
+
+GeneralHyperslab
+NcReader::GetDataDomainAsGeneralHyperslab(const std::string& variable_name)
+{
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    InquireGeneralFileInformation(ncid);
+
+    /* Get the corresponding ID to the supplied variable name */
+    const int var_id = FindVariableID(ncid, variable_name);
+
+    /* Inquire the number of dimensions */
+    int num_dims{0};
+    int err = nc_inq_varndims(ncid, var_id, &num_dims);
+    NcCheckError(err);
+
+    /* Inquire the dimension ids */
+    std::vector<int> dim_ids(num_dims, 0);
+    err = nc_inq_vardimid(ncid, var_id, dim_ids.data());
+    NcCheckError(err);
+
+    /* Create vectors for the start and count values */
+    std::vector<size_t> start_values(num_dims, 0);
+    std::vector<size_t> count_values(num_dims, 0);
+
+    /* Get the length of each dimension */
+    int id{0};
+    for (auto dim_id_iter = dim_ids.begin(); dim_id_iter != dim_ids.end(); ++dim_id_iter, ++id)
+    {
+        const int dim_err = nc_inq_dimlen(ncid, *dim_id_iter, &count_values[id]);
+        NcCheckError(dim_err);
+    }
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    /* Create a GeneralHyperslab for the whole domain */
+    return GeneralHyperslab(std::move(start_values), std::move(count_values));
 }
 
 NcAttribute
