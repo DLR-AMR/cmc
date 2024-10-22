@@ -31,6 +31,9 @@ public:
     template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name);
     template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name, const GeneralHyperslab& hyperslab);
 
+    /* Read and return all global attributes */
+    std::vector<NcAttribute> ReadGlobalAttrtibutes();
+
     //TODO: Implement
     NcVariable ReadVariable(const std::string& variable_name);
     std::vector<NcAttribute> ReadVariableAttributes(const std::string& variable_name);
@@ -45,9 +48,6 @@ public:
 
     /* Read and return only the stashed variables and the global attributes */
     std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariables();
-
-    /* Read and return all global attributes */
-    std::vector<NcAttribute> ReadGlobalAttrtibutes();
 
     /* Read all the meta data of all variables and return those "variable hulls" */
     std::vector<NcVariable> ReadVariableMetaData();
@@ -76,6 +76,7 @@ private:
     void NcClose(const int ncid);
     int FindVariableID(const int ncid, const std::string& variable_name);
     GeneralHyperslab GetDataDomainAsGeneralHyperslab(const std::string& variable_name);
+    GeneralHyperslab GetDataDomainAsGeneralHyperslab(const int ncid, const std::string& variable_name);
     void InquireGeneralFileInformation(const int ncid);
     std::vector<NcAttribute> InquireAttributes(const int ncid, const int var_id);
     std::vector<NcVariable> InquireVariableMetaData(const int ncid);

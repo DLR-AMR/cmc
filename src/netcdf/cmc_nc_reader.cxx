@@ -105,10 +105,9 @@ NcReader::FindVariableID(const int ncid, const std::string& variable_name)
 }
 
 GeneralHyperslab
-NcReader::GetDataDomainAsGeneralHyperslab(const std::string& variable_name)
+NcReader::GetDataDomainAsGeneralHyperslab(const int ncid, const std::string& variable_name)
 {
-    /* Open the file to be read */
-    const int ncid = NcOpen();
+    cmc_assert(is_file_opened_);
 
     InquireGeneralFileInformation(ncid);
 
@@ -137,11 +136,23 @@ NcReader::GetDataDomainAsGeneralHyperslab(const std::string& variable_name)
         NcCheckError(dim_err);
     }
 
+    /* Create a GeneralHyperslab for the whole domain */
+    return GeneralHyperslab(std::move(start_values), std::move(count_values));
+}
+
+GeneralHyperslab
+NcReader::GetDataDomainAsGeneralHyperslab(const std::string& variable_name)
+{
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    /* Get the hyperslab of the variable from the opened file */
+    GeneralHyperslab hs = GetDataDomainAsGeneralHyperslab(ncid, variable_name);
+
     /* Close the file after the reading process is finished */
     NcClose(ncid);
 
-    /* Create a GeneralHyperslab for the whole domain */
-    return GeneralHyperslab(std::move(start_values), std::move(count_values));
+    return hs;
 }
 
 NcAttribute
@@ -492,6 +503,48 @@ NcReader::ReadVariables()
     NcClose(ncid);
 
     return std::make_pair(std::move(variables), std::move(global_attributes));
+}
+
+NcVariable
+NcReader::ReadVariable(const std::string& variable_name)
+{
+    /* Open the file to be read */
+    const int ncid = NcOpen();
+
+    /* Inquire some basic/meta information about the file and it's contents */
+    InquireGeneralFileInformation(ncid);
+
+    /* Get the corresponding variable ID */
+    const int var_id = FindVariableID(ncid, variable_name);
+
+    /* Inquire the data type of the variable */
+    nc_type type{NC_NAT};
+    int err = nc_inq_vartype(ncid, var_id, &type);
+    NcCheckError(err);
+
+    /* Inquire the number of dimensions */
+    int num_dims{0};
+    err = nc_inq_varndims(ncid, var_id, &num_dims);
+    NcCheckError(err);
+
+    /* Inquire the dimension ids */
+    std::vector<int> dim_ids(num_dims, 0);
+    err = nc_inq_vardimid(ncid, var_id, dim_ids.data());
+    NcCheckError(err);
+
+    /* Create an NcVariable out of the information */
+    NcVariable nc_var(InquireAttributes(ncid, var_id), ConvertDimensionIDs(ncid, dim_ids));
+
+    std::vector<GeneralHyperslab> hyperslab;
+    hyperslab.push_back(GetDataDomainAsGeneralHyperslab(ncid, variable_name));
+
+    /* Inquire the data of the variable */
+    ReadVariableDataFromFile(ncid, type, variable_name, var_id, hyperslab, nc_var);
+
+    /* Close the file after the reading process is finished */
+    NcClose(ncid);
+
+    return nc_var;
 }
 
 const std::string&
