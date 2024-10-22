@@ -45,7 +45,7 @@ public:
     void StashVariableForReading(const std::string& variable_name, std::vector<GeneralHyperslab>&& hyperslabs);
     void StashVariableForReading(const std::string& variable_name, const GeneralHyperslab& hyperslab);
     void StashVariableForReading(const std::string& variable_name, GeneralHyperslab&& hyperslab);
-    
+
     /* Remove all stored information from the stash */
     void ClearStashedVariables();
 
@@ -172,7 +172,7 @@ template<typename T>
 std::vector<T>
 NcReader::ReadVariableData(const std::string& variable_name)
 {
-    return ReadVariableData(variable_name, GetDataDomainAsGeneralHyperslab(variable_name))
+    return ReadVariableData<T>(variable_name, GetDataDomainAsGeneralHyperslab(variable_name));
 }
 
 }
