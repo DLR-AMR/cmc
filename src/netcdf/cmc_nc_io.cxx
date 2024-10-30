@@ -100,6 +100,50 @@ NcVariable::GetDimensions() const
     return dimensions_;
 }
 
+void
+NcVariable::SetupSpecificVariable(const std::string& var_name, const CmcType type)
+{
+    switch (type)
+    {
+        case CmcType::Int8_t:
+            variable_ = NcSpecificVariable<int8_t>(var_name);
+        break;
+        case CmcType::Char:
+            variable_ = NcSpecificVariable<char>(var_name);
+        break;
+        case CmcType::Int16_t:
+            variable_ = NcSpecificVariable<int16_t>(var_name);
+        break;
+        case CmcType::Int32_t:
+            variable_ = NcSpecificVariable<int32_t>(var_name);
+        break;
+        case CmcType::Float:
+            variable_ = NcSpecificVariable<float>(var_name);
+        break;
+        case CmcType::Double:
+            variable_ = NcSpecificVariable<double>(var_name);
+        break;
+        case CmcType::Uint8_t:
+            variable_ = NcSpecificVariable<uint8_t>(var_name);
+        break;
+        case CmcType::Uint16_t:
+            variable_ = NcSpecificVariable<uint16_t>(var_name);
+        break;
+        case CmcType::Uint32_t:
+            variable_ = NcSpecificVariable<uint32_t>(var_name);
+        break;
+        case CmcType::Int64_t:
+            variable_ = NcSpecificVariable<int64_t>(var_name);
+        break;
+        case CmcType::Uint64_t:
+            variable_ = NcSpecificVariable<uint64_t>(var_name);
+        break;
+        default:
+            cmc_err_msg("A not supported CmcType has been supplied.");
+    }
+}
+
+
 nc_type
 ConvertCmcTypeToNcType(const CmcType type)
 {

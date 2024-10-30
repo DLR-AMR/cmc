@@ -42,7 +42,7 @@ src/utilities/cmc_prefix.hxx \
 src/lossy/cmc_prefix_lossy_compression.hxx \
 src/t8code/cmc_t8_byte_variable.hxx \
 src/t8code/cmc_t8_variables.hxx \
-src/t8code/cmc_t8_prefix_encoding.hxx \
+src/lossy/cmc_prefix_encoding.hxx \
 src/netcdf/cmc_nc_decompress.hxx \
 src/netcdf/cmc_nc_io.hxx \
 src/netcdf/cmc_nc_writer.hxx \
@@ -51,7 +51,8 @@ src/cmc_compression.hxx \
 src/netcdf/cmc_nc_io_conventions.hxx \
 src/utilities/cmc_bit_vector.hxx \
 src/utilities/cmc_bit_map.hxx \
-src/lossy/cmc_compression_class.hxx
+src/lossy/cmc_compression_class.hxx \
+src/lossy/cmc_prefix_decompression.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -89,7 +90,8 @@ src/netcdf/cmc_nc_decompress.cxx \
 src/netcdf/cmc_nc_writer.cxx \
 src/netcdf/cmc_nc_io.cxx \
 src/netcdf/cmc_nc_reader.cxx \
-src/cmc_compression.cxx
+src/cmc_compression.cxx \
+src/lossy/cmc_prefix_decompression.cxx
 
 
 if ENABLE_FORTRAN

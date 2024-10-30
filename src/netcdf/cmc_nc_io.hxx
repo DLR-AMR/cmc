@@ -83,6 +83,9 @@ private:
 struct GeneralHyperslab
 {
 public:
+    GeneralHyperslab(std::vector<size_t>&& start_vals, std::vector<size_t>&& count_vals)
+    : start_values{std::move(start_vals)}, count_values{std::move(count_vals)}{};
+
     size_t GetNumberOfCoveredCoordinates() const
     {
         size_t num_coords{1};
@@ -105,6 +108,8 @@ public:
     NcSpecificVariable() = default;
     NcSpecificVariable(const int id)
     : id_{id} {};
+    NcSpecificVariable(const std::string& name)
+    : name_{name} {};
     NcSpecificVariable(const std::string& name, const int id)
     : name_{name}, id_{id} {};
     NcSpecificVariable(const std::string& name, const int id, const size_t size_hint)
@@ -212,6 +217,8 @@ public:
     template<class T> void SetSpecificVariable(NcSpecificVariable<T>&& variable);
     void SetSpecificVariable(const NcGeneralVariable& variable);
     void SetSpecificVariable(NcGeneralVariable&& variable);
+
+    void SetupSpecificVariable(const std::string& var_name, const CmcType type);
 
     std::vector<NcDimension> GetDimensionsFromVariable() const;
     const std::string& GetName() const;

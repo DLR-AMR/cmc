@@ -38,7 +38,7 @@ constexpr int kNumBits = CHAR_BIT;
 
 constexpr int PREFIX_ERROR = -1;
 
-constexpr std::array<uint8_t, CHAR_BIT> LowBitMask{0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01};
+constexpr std::array<uint8_t, CHAR_BIT + 1> LowBitMask{0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01, 0x00};
 
 template<int N>
 class CompressionValue;
@@ -313,6 +313,60 @@ bool LSBContinueIteration(const int iterator, [[maybe_unused]] const Prefix<N>& 
     }
 }
 
+
+template <typename T>
+std::array<uint8_t, sizeof(T)>
+SerializeValue(const T& value, const Endian desired_endianness = Endian::Big)
+{
+    std::array<uint8_t, sizeof(T)> serialized_value;
+    Prefix<sizeof(T)> value_(value);
+
+    /* Assign the bytes in the desired order */
+    switch (desired_endianness)
+    {
+        case Endian::Big:
+            for (int byte_id = GetMSBByteStart(value_), index = 0; MSBContinueIteration(byte_id, value_); MSBByteIncrement(byte_id), ++index)
+            {
+                serialized_value[index] = value_[byte_id];
+            }
+        break;
+        case Endian::Little:
+            for (int byte_id = GetLSBByteStart(value_), index = 0; LSBContinueIteration(byte_id, value_); LSBByteIncrement(byte_id), ++index)
+            {
+                serialized_value[index] = value_[byte_id];
+            }
+        break;
+        default:
+            cmc_err_msg("The given endianness is not recognized.");
+    }
+
+    return serialized_value;
+}
+
+template <typename T, typename Iter>
+std::array<uint8_t, sizeof(T)>
+DeserializeValue(Iter pos, const Endian endianness_of_bytes)
+{
+    std::array<uint8_t, sizeof(T)> serialized_value;
+
+    /* Assign the bytes compliant to the native order */
+    if (Endian::Native == endianness_of_bytes)
+    {
+        /* If the endianness_of_bytes of the serialized value equals the native format, we can just copy the values over */
+        std::copy_n(pos, sizeof(T), serialized_value.begin());
+    } else
+    {
+        /* If the endianness_of_bytes does not equal the native endianness, the byte sequence needs to be reversed */
+        const auto end_iter = pos + sizeof(T);
+        int index = sizeof(T) - 1;
+        for (auto iter = pos; iter != end_iter; ++iter, --index)
+        {
+            serialized_value[index] = *iter;
+        }
+    }
+    return serialized_value;
+}
+
 template<int N>
 Prefix<N>::Prefix(std::array<uint8_t, N>&& serialized_value)
 : prefix_mem_{std::move(serialized_value)} {};
@@ -459,8 +513,8 @@ public:
     int GetFrontBit() const;
     int GetCountOfSignificantBits() const;
     bool IsEmpty() const;
-    std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering(const int start_offset = 0) const;
-    std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering_Offset_4_Stride_12() const;
+    std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering() const;
+    //std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering_Offset_4_Stride_12() const;
     void ApplyPrefix(const std::vector<uint8_t>& serialized_prefix, const int num_bits);
 
     template<typename T> 
@@ -514,16 +568,18 @@ CompressionValue<N>::CompressionValue(const std::vector<uint8_t>& serialized_pre
 };
 
 
-/* This functions needs the serialized prefix to be aligned at the high bits ( e.g. four bit prefix: 0x(p1 p2 p3 p4 0 0 0 0)b */
+/* This functions needs the serialized prefix to be aligned at the high bits ( e.g. four bit prefix: 0b(p1 p2 p3 p4 0 0 0 0) */
 template<int N>
 void
 CompressionValue<N>::ApplyPrefix(const std::vector<uint8_t>& serialized_prefix, const int num_bits)
 {
     if (num_bits <= 0) {return;}
+    cmc_assert(trail_bit_ > 0);
 
     int bits_written = 0;
 
-    const int offset_shifting_ = (trail_bit_  - static_cast<int>(trail_bit_ / CHAR_BIT) * CHAR_BIT);
+    const int intern_trail_bit = trail_bit_ - 1;
+    const int offset_shifting_ = (trail_bit_ - static_cast<int>(trail_bit_ / CHAR_BIT) * CHAR_BIT);
     const int offset_shifting = (offset_shifting_ > 0 ? CHAR_BIT - offset_shifting_ : 0);
 
     for (int byte_id = GetMSBByteStart(prefix_), iter = 0, vec_index = 0;
@@ -531,9 +587,9 @@ CompressionValue<N>::ApplyPrefix(const std::vector<uint8_t>& serialized_prefix, 
          MSBByteIncrement(byte_id), ++iter)
     {
         /* Iterate until we are in the byte holding the bit after the current tail bit */
-        if (trail_bit_ <= (N - iter - 1) * CHAR_BIT) {continue;}
+        if (intern_trail_bit < (N - iter - 1) * CHAR_BIT) {continue;}
 
-        if (offset_shifting > 0 && bits_written >= CHAR_BIT - offset_shifting)
+        if (offset_shifting > 0 && bits_written != 0)
         {
             prefix_[byte_id] |= (serialized_prefix[vec_index - 1] << (CHAR_BIT - offset_shifting));
             bits_written += offset_shifting;
@@ -568,14 +624,19 @@ GetCommonPrefix(const CompressionValue<N>& value1, const CompressionValue<N>& va
     {
         if (xor_bits[byte_id] == 0)
         {
-            if (current_bit_length + CHAR_BIT <= maximum_prefix_length)
+            if (current_bit_length + CHAR_BIT < maximum_prefix_length)
             {
                 prefix_bits[byte_id] = value1[byte_id];
                 current_bit_length += CHAR_BIT;
-            } else
+            } else if (current_bit_length + CHAR_BIT == maximum_prefix_length)
+            {
+                prefix_bits[byte_id] = value1[byte_id];
+                return CompressionValue<N>(std::move(prefix_bits), max_trail_bit);
+            }
+            else
             {
                 const int bit_accessor = maximum_prefix_length - current_bit_length;
-                prefix_bits[byte_id] = value1[byte_id] & ~(xor_bits[byte_id] | LowBitMask[bit_accessor]);
+                prefix_bits[byte_id] = value1[byte_id] & ~(LowBitMask[bit_accessor]);
 
                 return CompressionValue<N>(std::move(prefix_bits), max_trail_bit);
             }
@@ -583,10 +644,17 @@ GetCommonPrefix(const CompressionValue<N>& value1, const CompressionValue<N>& va
         {
             for (int bit_index = 0; bit_index < CHAR_BIT; ++bit_index)
             {
-                if ((xor_bits[byte_id] & (kHighBit >> bit_index)) || maximum_prefix_length <= current_bit_length)
+                if (maximum_prefix_length <= current_bit_length)
+                {
+                    /* The maximum length has been reached */
+                    prefix_bits[byte_id] = value1[byte_id] & ~(LowBitMask[bit_index]);
+
+                    return CompressionValue<N>(std::move(prefix_bits), N * CHAR_BIT - current_bit_length);
+                }
+                else if ((xor_bits[byte_id] & (kHighBit >> bit_index)))
                 {
                     /* The first unequal bit has been found */
-                    prefix_bits[byte_id] = value1[byte_id] & ~(xor_bits[byte_id] | LowBitMask[bit_index]);
+                    prefix_bits[byte_id] = value1[byte_id] & ~(LowBitMask[bit_index]);
 
                     return CompressionValue<N>(std::move(prefix_bits), N * CHAR_BIT - current_bit_length);
                 } else
@@ -790,7 +858,64 @@ CompressionValue<N>::GetCountOfSignificantBits() const
     return N * CHAR_BIT - front_bit_ - trail_bit_;
 }
 
+template<int N>
+std::vector<uint8_t>
+CompressionValue<N>::GetSignificantBitsInBigEndianOrdering() const
+{
+    /* Get the number of bits for this prefix */
+    const int num_bits = GetCountOfSignificantBits();
 
+    if (num_bits == 0)
+    {
+        /* In case there are no significant bits, we are returning an empty vector */
+        return std::vector<uint8_t>();
+    }
+
+    /* Get the number of bytes needed to accomodate the prefix */
+    const int num_bytes = (num_bits / CHAR_BIT) + ((num_bits % CHAR_BIT) != 0 ? 1 : 0);
+    
+    /* Allocate the needed memory for the prefix */
+    std::vector<uint8_t> bytes(num_bytes, 0);
+
+    const int offset_shifting = front_bit_ - static_cast<int>(front_bit_ / CHAR_BIT) * CHAR_BIT;
+
+    int bits_written = 0;
+
+    const int bit_shift_to_front = offset_shifting;
+    const int bit_shift_to_back = CHAR_BIT - offset_shifting;
+
+    const int front_bits_written = CHAR_BIT - bit_shift_to_front;
+    const int tail_bits_written = CHAR_BIT - bit_shift_to_back;
+
+    for (int byte_id = GetMSBByteStart(prefix_), iter = 0, vec_index = 0;
+         MSBContinueIteration(byte_id, prefix_);
+         MSBByteIncrement(byte_id), ++iter)
+    {
+        /* Iterate until we are in the byte holding the start bit */
+        if (front_bit_ >= (iter + 1) * CHAR_BIT) {continue;}
+
+        /* Fill the back of the previous byte, if the start bit has an offset */
+        if ((bits_written > 0 && offset_shifting != 0))
+        {
+            /* Assign the front bits to the the back of the previous byte */
+            bytes[vec_index - 1] |= (prefix_[byte_id] >> (bit_shift_to_back));
+            bits_written += tail_bits_written;
+            if (bits_written >= num_bits) {break;}
+        }
+
+        /* Assign the the bits to the front part of the current  byte */
+        bytes[vec_index] |= (prefix_[byte_id] << (bit_shift_to_front));
+        bits_written += front_bits_written;
+        if (bits_written >= num_bits) {break;}
+
+        ++vec_index;
+    }
+
+    return bytes;
+}
+
+
+#if 0
 template<int N>
 std::vector<uint8_t>
 CompressionValue<N>::GetSignificantBitsInBigEndianOrdering(const int bit_start_offset) const
@@ -860,7 +985,9 @@ CompressionValue<N>::GetSignificantBitsInBigEndianOrdering(const int bit_start_o
 
     return bytes;
 }
+#endif
 
+#if 0
 template<int N>
 std::vector<uint8_t>
 CompressionValue<N>::GetSignificantBitsInBigEndianOrdering_Offset_4_Stride_12() const
@@ -936,6 +1063,7 @@ CompressionValue<N>::GetSignificantBitsInBigEndianOrdering_Offset_4_Stride_12() 
 
     return strided_vec;
 }
+#endif
 
 }
 

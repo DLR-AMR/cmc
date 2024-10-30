@@ -36,9 +36,6 @@ struct RefinementBits;
 
 struct DecompressionRefinementBits;
 
-template<int N>
-class PrefixDecompressionAdaptData;
-
 t8_locidx_t
 RefineToInitialMesh (t8_forest_t forest,
                      t8_forest_t forest_from,
@@ -90,15 +87,35 @@ ApplyRefinementBits (t8_forest_t forest,
                      t8_element_t * elements[]);
 
 t8_locidx_t
-FindPrefixBits (t8_forest_t forest,
-                [[maybe_unused]] t8_forest_t forest_from,
-                [[maybe_unused]] int which_tree,
-                int lelement_id,
-                [[maybe_unused]] t8_eclass_scheme_c * ts,
-                const int is_family,
-                const int num_elements,
-                [[maybe_unused]] t8_element_t * elements[]);
+ExtractCommonPrefixes (t8_forest_t forest,
+                       [[maybe_unused]] t8_forest_t forest_from,
+                       [[maybe_unused]] int which_tree,
+                       int lelement_id,
+                       [[maybe_unused]] t8_eclass_scheme_c * ts,
+                       const int is_family,
+                       const int num_elements,
+                       [[maybe_unused]] t8_element_t * elements[]);
 
+t8_locidx_t
+DecompressPrefixEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[]);
+
+
+t8_locidx_t
+DecompressSuffixEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[]);
 
 struct AdaptDataInitialMesh
 {
@@ -140,332 +157,9 @@ public:
     VectorView<uint8_t> encoded_refinements;  
 };
 
-template<int N>
-class PrefixDecompressionAdaptData
-{
-public:
-    PrefixDecompressionAdaptData() = delete;
-    PrefixDecompressionAdaptData(const VectorView<uint8_t>& span_prefix_indication_bits, const VectorView<uint8_t>& span_prefix_encoding_bytes)
-    : prefix_indication_bits{span_prefix_indication_bits}, prefix_encoding_bytes{span_prefix_encoding_bytes} {};
 
-    bool IsDeCompressionProgressing() const;
-    void InitializeCompressionIteration(const int size_hint);
-    void FinalizeCompressionIteration();
-
-    void ApplyPrefixForRange(const std::vector<uint8_t>& encoded_prefix, const int num_prefix_bits, const int start_index, const int num_elemnts);
-    void KeepCompressionValue(const int index);
-
-    const VectorView<uint8_t>& prefix_indication_bits;
-    const VectorView<uint8_t>& prefix_encoding_bytes;
-    std::vector<CompressionValue<N>> reconstructed_variable;
-    std::vector<CompressionValue<N>> reconstructed_variable_new;
-    int byte_position{0};
-    int bit_position{0};
-    int prefix_encoding_bytes_used{0};
-    int count_adaptation_step_{0};
-};
-
-
-template<int N>
-bool
-PrefixDecompressionAdaptData<N>::IsDeCompressionProgressing() const
-{
-    return (byte_position < prefix_indication_bits.size() ? true : false);
-}
-
-template<int N>
-void 
-PrefixDecompressionAdaptData<N>::InitializeCompressionIteration(const int size_hint)
-{
-    reconstructed_variable_new.reserve(size_hint);
-}
-
-template<int N>
-void 
-PrefixDecompressionAdaptData<N>::FinalizeCompressionIteration()
-{
-    std::swap(reconstructed_variable, reconstructed_variable_new);
-    reconstructed_variable_new.clear();
-    ++count_adaptation_step_;
-}
-
-template<int N>
-void
-PrefixDecompressionAdaptData<N>::ApplyPrefixForRange(const std::vector<uint8_t>& decoded_prefix, const int num_prefix_bits, const int start_index, const int num_elements)
-{
-    if (count_adaptation_step_ > 0)
-    {
-        /* Apply the prefix to the compression values of the range */
-        reconstructed_variable_new.push_back(CompressionValue(decoded_prefix, num_prefix_bits));
-    } else
-    {
-        /* Create a new compression value from the encoded prefix */
-        CompressionValue<N> prefixed_value = reconstructed_variable[start_index];
-        prefixed_value.ApplyPrefix(decoded_prefix, num_prefix_bits);
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, prefixed_value);
-    }
-}
-
-
-
-template<int N>
-class DecompressionPrefixAdaptData
-{
-public:
-    DecompressionPrefixAdaptData() = delete;
-    DecompressionPrefixAdaptData(const VectorView<uint8_t>& span_prefix_indication_bits, const VectorView<uint8_t>& span_prefix_lengths, const VectorView<uint8_t>& span_prefix_encodings)
-    : prefix_indication_bits{span_prefix_indication_bits}, prefix_lengths{span_prefix_lengths}, prefix_encodings{span_prefix_encodings} {};
-
-    bool IsDeCompressionProgressing() const;
-    void InitializeCompressionIteration(const int size_hint);
-    void FinalizeCompressionIteration();
-
-    void ApplyPrefixForRange(const std::vector<uint8_t>& encoded_prefix, const int num_prefix_bits, const int start_index, const int num_elemnts);
-    void KeepCompressionValue(const int index);
-    void KeepAndCopyCompressionValue(const int start_index, const int num_elemnts);
-
-    const VectorView<uint8_t>& prefix_indication_bits;
-    const VectorView<uint8_t>& prefix_lengths;
-    const VectorView<uint8_t>& prefix_encodings;
-
-    std::vector<CompressionValue<N>> reconstructed_variable;
-    std::vector<CompressionValue<N>> reconstructed_variable_new;
-
-    int prefix_indication_byte_position{0};
-    int prefix_indication_bit_position{0};
-
-    int prefix_encoding_byte_position{0};
-    int prefix_encoding_bit_position{0};
-
-    int prefix_length_byte_position{0};
-    int prefix_length_bit_position{CHAR_BIT};
-
-    int count_adaptation_step_{0};
-    GeoDomain domain;
-    DataLayout current_layout{DataLayout::LayoutUndefined};
-};
-
-template<int N>
-bool
-DecompressionPrefixAdaptData<N>::IsDeCompressionProgressing() const
-{
-    return (prefix_indication_byte_position < prefix_indication_bits.size() ? true : false);
-}
-
-template<int N>
-void 
-DecompressionPrefixAdaptData<N>::InitializeCompressionIteration(const int size_hint)
-{
-    reconstructed_variable_new.reserve(size_hint);
-}
-
-template<int N>
-void 
-DecompressionPrefixAdaptData<N>::FinalizeCompressionIteration()
-{
-    std::swap(reconstructed_variable, reconstructed_variable_new);
-    reconstructed_variable_new.clear();
-    prefix_indication_bit_position = 0;
-    ++prefix_indication_byte_position;
-    prefix_length_bit_position = CHAR_BIT;
-    ++prefix_length_byte_position;
-    prefix_encoding_bit_position = 0;
-    ++prefix_encoding_byte_position;
-    ++count_adaptation_step_;
-}
-
-template<int N>
-void
-DecompressionPrefixAdaptData<N>::ApplyPrefixForRange(const std::vector<uint8_t>& decoded_prefix, const int num_prefix_bits, const int start_index, const int num_elements)
-{
-   // cmc_debug_msg("in apply prefix for range");
-    if (count_adaptation_step_ > 0)
-    {
-        /* Apply the prefix to the compression values of the range */
-        CompressionValue<N> prefixed_value = reconstructed_variable[start_index];
-        prefixed_value.ApplyPrefix(decoded_prefix, num_prefix_bits);
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, prefixed_value);
-    } else
-    {
-        /* Create a new compression value from the encoded prefix */
-        const CompressionValue<N> prefixed_value(decoded_prefix, num_prefix_bits);
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, prefixed_value);
-    }
-}
-
-template<int N>
-void
-DecompressionPrefixAdaptData<N>::KeepCompressionValue(const int index)
-{
-    if (count_adaptation_step_ > 0)
-    {
-        reconstructed_variable_new.push_back(reconstructed_variable[index]);
-    } else
-    {
-        reconstructed_variable_new.push_back(CompressionValue<N>());
-    }
-}
-
-template<int N>
-void
-DecompressionPrefixAdaptData<N>::KeepAndCopyCompressionValue(const int start_index, const int num_elements)
-{
-   // cmc_debug_msg("in apply prefix for range");
-    if (count_adaptation_step_ > 0)
-    {
-        /* Set the compression value several times wihtin the new vector */
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, reconstructed_variable[start_index]);
-    } else
-    {
-        /* Create a new compression value from the encoded prefix */
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, CompressionValue<N>());
-    }
-}
-
-
-
-template<int N>
-class DecompressionPrefixAdaptDataEGU
-{
-public:
-    DecompressionPrefixAdaptDataEGU() = delete;
-    DecompressionPrefixAdaptDataEGU(const VectorView<uint8_t>& span_prefix_indication_bits, const VectorView<uint8_t>& span_prefix_lengths, const VectorView<uint8_t>& span_prefix_encodings)
-    : prefix_indication_bits{span_prefix_indication_bits}, prefix_lengths{span_prefix_lengths}, prefix_encodings{span_prefix_encodings} {};
-
-    DecompressionPrefixAdaptDataEGU(const VectorView<uint8_t>& span_prefix_indication_bits, const VectorView<uint8_t>& span_prefix_lengths, const VectorView<uint8_t>& span_prefix_encodings, const std::vector<CompressionValue<N>>& pref_reconstructed_variable)
-    : prefix_indication_bits{span_prefix_indication_bits}, prefix_lengths{span_prefix_lengths}, prefix_encodings{span_prefix_encodings}, reconstructed_variable{pref_reconstructed_variable}, count_adaptation_step_{1} {};
-
-    bool IsDeCompressionProgressing() const;
-    void InitializeCompressionIteration(const int size_hint);
-    void FinalizeCompressionIteration();
-
-    void ApplyPrefixForRange(const std::vector<uint8_t>& encoded_prefix, const int num_prefix_bits, const int start_index, const int num_elemnts);
-    void KeepCompressionValue(const int index);
-    void KeepAndCopyCompressionValue(const int start_index, const int num_elemnts);
-    void ApplyPrefixSingle(const std::vector<uint8_t>& decoded_prefix, const int num_prefix_bits, const int start_index);
-    const VectorView<uint8_t>& prefix_indication_bits;
-    const VectorView<uint8_t>& prefix_lengths;
-    const VectorView<uint8_t>& prefix_encodings;
-
-    std::vector<CompressionValue<N>> reconstructed_variable;
-    std::vector<CompressionValue<N>> reconstructed_variable_new;
-
-    int prefix_indication_byte_position{0};
-    int prefix_indication_bit_position{0};
-
-    int prefix_encoding_byte_position{0};
-    int prefix_encoding_bit_position{0};
-
-    int prefix_length_byte_position{0};
-    int prefix_length_bit_position{CHAR_BIT};
-
-    int count_adaptation_step_{0};
-    GeoDomain domain;
-    DataLayout current_layout{DataLayout::LayoutUndefined};
-};
-
-template<int N>
-bool
-DecompressionPrefixAdaptDataEGU<N>::IsDeCompressionProgressing() const
-{
-    return (prefix_indication_byte_position < prefix_indication_bits.size() ? true : false);
-}
-
-template<int N>
-void 
-DecompressionPrefixAdaptDataEGU<N>::InitializeCompressionIteration(const int size_hint)
-{
-    reconstructed_variable_new.reserve(size_hint);
-}
-
-template<int N>
-void 
-DecompressionPrefixAdaptDataEGU<N>::FinalizeCompressionIteration()
-{
-    reconstructed_variable = reconstructed_variable_new;
-    reconstructed_variable_new.clear();
-
-    prefix_indication_bit_position = 0;
-    ++prefix_indication_byte_position;
-
-    prefix_length_bit_position = CHAR_BIT;
-    ++prefix_length_byte_position;
-
-    prefix_encoding_bit_position = 0;
-    ++prefix_encoding_byte_position;
-
-    ++count_adaptation_step_;
-}
-
-template<int N>
-void
-DecompressionPrefixAdaptDataEGU<N>::ApplyPrefixForRange(const std::vector<uint8_t>& decoded_prefix, const int num_prefix_bits, const int start_index, const int num_elements)
-{
-   // cmc_debug_msg("in apply prefix for range");
-    if (count_adaptation_step_ > 0)
-    {
-        /* Apply the prefix to the compression values of the range */
-        CompressionValue<N> prefixed_value = reconstructed_variable[start_index];
-        prefixed_value.ApplyPrefix(decoded_prefix, num_prefix_bits);
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, prefixed_value);
-    } else
-    {
-        /* Create a new compression value from the encoded prefix */
-        const CompressionValue<N> prefixed_value(decoded_prefix, num_prefix_bits);
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, prefixed_value);
-    }
-}
-
-template<int N>
-void
-DecompressionPrefixAdaptDataEGU<N>::ApplyPrefixSingle(const std::vector<uint8_t>& decoded_prefix, const int num_prefix_bits, const int start_index)
-{
-   // cmc_debug_msg("in apply prefix for range");
-    if (count_adaptation_step_ > 0)
-    {
-        /* Apply the prefix to the compression values of the range */
-        CompressionValue<N> prefixed_value = reconstructed_variable[start_index];
-
-        prefixed_value.ApplyPrefix(decoded_prefix, num_prefix_bits);
-
-        reconstructed_variable_new.push_back(prefixed_value);
-    } else
-    {
-        /* Create a new compression value from the encoded prefix */
-        const CompressionValue<N> prefixed_value(decoded_prefix, num_prefix_bits);
-        reconstructed_variable_new.push_back(prefixed_value);
-    }
-}
-
-template<int N>
-void
-DecompressionPrefixAdaptDataEGU<N>::KeepCompressionValue(const int index)
-{
-    if (count_adaptation_step_ > 0)
-    {
-        reconstructed_variable_new.push_back(reconstructed_variable[index]);
-    } else
-    {
-        reconstructed_variable_new.push_back(CompressionValue<N>());
-    }
-}
-
-template<int N>
-void
-DecompressionPrefixAdaptDataEGU<N>::KeepAndCopyCompressionValue(const int start_index, const int num_elements)
-{
-   // cmc_debug_msg("in apply prefix for range");
-    if (count_adaptation_step_ > 0)
-    {
-        /* Set the compression value several times wihtin the new vector */
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, reconstructed_variable[start_index]);
-    } else
-    {
-        /* Create a new compression value from the encoded prefix */
-        std::fill_n(std::back_inserter(reconstructed_variable_new), num_elements, CompressionValue<N>());
-    }
-}
-
+//TODO: Remove below
+#if 0
 template<int N>
 t8_locidx_t
 DecodePrefixEGU (t8_forest_t forest,
@@ -592,6 +286,7 @@ DecodeSuffixEGU (t8_forest_t forest,
         return kLeaveElementUnchanged;
     }
 }
+#endif
 
 #endif /* CMC_WITH_T8CODE */
 

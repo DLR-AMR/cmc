@@ -373,6 +373,7 @@ NcReader::InquireVariableMetaData(const int ncid)
 
         /* Create an NcVariable out of the information */
         variables.emplace_back(InquireAttributes(ncid, var_id), ConvertDimensionIDs(ncid, dim_ids));
+        variables.back().SetupSpecificVariable(var_name, ConvertNcTypeToCmcType(type));
     }
 
     return variables;

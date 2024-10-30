@@ -87,7 +87,7 @@ public:
     bool IsBitSet(const size_t global_bit_position);
 
     Iterator begin() const {return Iterator(vector_.data());};
-    const Iterator end() const {return Iterator(vector_.data() + vector_.size() - 1, num_bits_ % kCharBit);}
+    const Iterator end() const {return Iterator(vector_.data() + vector_.size() - (num_bits_ % kCharBit != 0 ? 1 : 0), num_bits_ % kCharBit);}
 
     byte_iterator begin_bytes() { return vector_.begin(); };
     byte_iterator end_bytes() { return vector_.end(); };
@@ -112,7 +112,7 @@ public:
     BitMapView()
     : data_{nullptr}, size_{0} {};
     BitMapView(const uint8_t* data, std::size_t num_bits)
-        : data_{data}, size_{num_bits}{};
+    : data_{data}, size_{num_bits}{};
 
     bool GetBit(const size_t global_bit_position);
 
@@ -124,7 +124,7 @@ private:
     const uint8_t* data_;
     std::size_t byte_position_{0};
     std::size_t bit_position_{0};
-    const std::size_t size_;
+    std::size_t size_{0};
 };
 
 /** BitMapView Member Functions **/

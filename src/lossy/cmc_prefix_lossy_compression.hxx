@@ -6,12 +6,14 @@
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
 #include "t8code/cmc_t8_data.hxx"
 #include "mpi/cmc_mpi.hxx"
+#include "lossy/cmc_compression_class.hxx"
 
 #include <memory>
 
 namespace cmc
 {
 
+#if 0
 struct PrefixDecompressionData
 {
     std::vector<uint8_t> serialized_variable;
@@ -30,7 +32,7 @@ struct PrefixDecompressionData
     DataLayout precompression_layout{DataLayout::LayoutUndefined};
     int global_context_information{kGlobalContextInformationNotGiven};
 };
-
+#endif
 
 class PrefixCompressionData
 {
@@ -69,9 +71,8 @@ public:
     
     void Setup(const bool with_default_lossy_amr_compression = false);
     void Compress();
-    void WriteCompressedDataEGU(const std::string& file_name) const;
-    template<int N> void DecompressVariableEGU(std::vector<PrefixDecompressionData>& decompression_data) const;
-    
+    void WriteCompressedData(const std::string& file_name, const int time_step) const;
+
 private:
     std::unique_ptr<AmrData> compression_data_{nullptr};
     
@@ -85,6 +86,7 @@ private:
 
     bool perform_default_lossy_compression_{false};
 };
+
 
 }
 

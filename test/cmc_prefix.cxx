@@ -1,7 +1,7 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_prefix.hxx"
-#include "t8code/cmc_t8_prefix_encoding.hxx"
+#include "lossy/cmc_prefix_encoding.hxx"
 #include "utilities/cmc_span.hxx"
 
 #include <iostream>
@@ -13,6 +13,14 @@ int main(void)
     cmc::CmcInitialize();
     
     {
+
+
+
+
+
+
+
+
 
     return cmc::CMC_TEST_SKIP;
 

@@ -5,6 +5,7 @@
 #include "netcdf/cmc_netcdf.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
 #include "lossy/cmc_prefix_lossy_compression.hxx"
+#include "lossy/cmc_prefix_decompression.hxx"
 
 #include <cfenv>
 int
@@ -16,11 +17,13 @@ main(void)
     {
     
     #if 1
-    //const std::string file = "../../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
+
+    #if 1
+    const std::string file = "../../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
     //const std::string file = "../../data/tas_decreg_europe_v20140120_20010101_20010131.nc";
     //const std::string file = "../../data/era5_reanalysis_data_16_11_23.nc";
     //const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
-    const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
+    //const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
     
     /* Create an object which interatcs with the file and opens it */
     cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
@@ -36,10 +39,14 @@ main(void)
     //                         cmc::DimensionInterval(cmc::Dimension::Lev, 0, 37)
     //                         );
 
-    nc_data.SetHintHeightDimension(6); //Set plev as height dimension
+    nc_data.SetHintHeightDimension(2); //Set plev as height dimension
 
-    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1200),
-                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 601),
+    //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 60, 76),
+    //                         cmc::DimensionInterval(cmc::Dimension::Lat, 128, 144),
+    //                         cmc::DimensionInterval(cmc::Dimension::Lev, 0, 1)
+    //                         );
+    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
+                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
                              cmc::DimensionInterval(cmc::Dimension::Lev, 0, 1)
                              );
     //Test domain
@@ -52,7 +59,7 @@ main(void)
     //                         );
 
     /* Inquire the hyperslab of data for the given variables */
-    nc_data.InquireVariables(hyperslab, "t");
+    nc_data.InquireVariables(hyperslab, "tco3");
 
     /* Close the file, since we have gathered the data we wanted */
     nc_data.CloseFileHandle();
@@ -78,8 +85,29 @@ main(void)
     const bool perform_default_lossy_compression_as_well = false;
     compression_data.Setup(perform_default_lossy_compression_as_well);
 
+    cmc::cmc_debug_msg("\n\nSetup is finished\n\n");
+
     compression_data.Compress();
-    compression_data.WriteCompressedDataEGU("prefix_compressed_data.nc");
+
+    cmc::cmc_debug_msg("\n\nCompression is finished\n\n");
+
+    cmc::cmc_debug_msg("Write Compressed Data");
+    compression_data.WriteCompressedData("newly_example_compr_pref_tco3", 0);
+
+
+    #endif
+    #if 1
+
+    cmc::cmc_debug_msg("\n\nDecompression Start\n\n");
+
+    /* Decompress */
+    cmc::prefix::Decompressor decoder("newly_example_compr_pref_tco3");
+
+    decoder.Setup();
+    decoder.DecompressVariable("tco3");
+    
+    #endif
+    //compression_data.WriteCompressedDataEGU("prefix_compressed_data.nc");
     
     //compression_data.WriteCompressedData("prefix_compressed_data.nc");
 

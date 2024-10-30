@@ -535,16 +535,23 @@ SetUpInputVariable(const int ncid, const CoordinateArray<int>& coordinate_dimens
     }
 
     #if 0
+    cmc_debug_msg("Remove this file IO");
+    FILE* file = fopen("compr_initial_data.bin", "wb");
+    fwrite(destination.initial_data_.data(), sizeof(float), destination.initial_data_.size(), file);
+    fclose(file);
+    #endif
+
+    #if 0
     std::vector<float> converted_data;
-    const int num_elems = 3600*1800*12;
+    const int num_elems = 1440*721;
     converted_data.reserve(num_elems);
-    //const float add_offset = 0.0970683052537568;
-    //const float scale_factor = 2.96247040388686e-06;
+    const float add_offset = 0.00790779508439177;
+    const float scale_factor = 9.25404335362387e-08;
     for (int j = 0; j < num_elems; ++j)
     {
-        converted_data.push_back(static_cast<float>(local_data[j]));//scale_factor * static_cast<float>(local_data[j]) + add_offset);
+        converted_data.push_back(scale_factor * static_cast<float>(local_data[j]) + add_offset);
     }
-    FILE* file = fopen("co2_full_initial.bin", "wb");
+    FILE* file = fopen("tco3_initial_lat_lon.bin", "wb");
     fwrite(converted_data.data(), sizeof(float), num_elems, file);
     fclose(file);
     std::exit(1);

@@ -4,6 +4,8 @@
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_data_variables.hxx"
 
+#include "utilities/cmc_log_functions.hxx"
+
 #ifdef CMC_WITH_T8CODE
 namespace cmc
 {
@@ -255,33 +257,51 @@ ApplyRefinementBits (t8_forest_t forest,
 }
 
 t8_locidx_t
-FindPrefixBits (t8_forest_t forest,
-                [[maybe_unused]] t8_forest_t forest_from,
-                [[maybe_unused]] int which_tree,
-                int lelement_id,
-                [[maybe_unused]] t8_eclass_scheme_c * ts,
-                const int is_family,
-                const int num_elements,
-                [[maybe_unused]] t8_element_t * elements[])
+ExtractCommonPrefixes (t8_forest_t forest,
+                       [[maybe_unused]] t8_forest_t forest_from,
+                       [[maybe_unused]] int which_tree,
+                       int lelement_id,
+                       t8_eclass_scheme_c * ts,
+                       const int is_family,
+                       const int num_elements,
+                       t8_element_t * elements[])
 {
     #ifdef CMC_WITH_T8CODE
     /* Get the adapt data from the forest */
-    PrefixAdaptDataEGU* adapt_data = static_cast<PrefixAdaptDataEGU*>(t8_forest_get_user_data(forest));
+    PrefixAdaptData* adapt_data = static_cast<PrefixAdaptData*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
 
-    /** Only a family of elements can be coarsened.
-     * If only a single element is passed to the callback, the callback function can be returned immediately.
-    */
+    /* A prefix can only be extarcted from a family of elements. If a single element is passed to the adaptation funciton,
+     * it is stored as prefix and has to wait until it's siblings are present within the mesh in order to then perform
+     * a common prefix evaluation and extraction. */
     if (is_family == 0)
     {
-        adapt_data->LeaveCoarsePrefixUnchangedEGU(lelement_id);
+        /* Since, only a single element has been passed, we are dragging it's value along and try to coarsen it's corresponding family later */
+        adapt_data->LeaveCoarsePrefixUnchanged(lelement_id);
 
         /* The element stays the same, it will not be refined and it cannot be coarsened */
         return kLeaveElementUnchanged;
     } else
     {
-        adapt_data->EvaluateCommonPrefixEGU(lelement_id, num_elements);
-        /* If there is a common prefix */
+        //std::vector<int> non_missig_val_element_ids;
+        //non_missig_val_element_ids.reserve(num_elements);
+        //
+        //const int end_elem_id = lelement_id + num_elements;
+        //
+        //for (int elem_id = lelement_id; elem_id < end_elem_id; ++elem_id)
+        //{
+        //    //cmc_debug_msg("Elem Id: ", elem_id, ", ref lvl: ", adapt_data->GetInitialRefinementLevelOfMesh(), ", layout: ", adapt_data->GetInitialDataLayout());
+        //    if (IsMeshElementWithinGlobalDomain(elements[elem_id - lelement_id], ts, adapt_data->GetGlobalDomain(), adapt_data->GetInitialRefinementLevelOfMesh(), adapt_data->GetInitialDataLayout()))
+        //    {
+        //        non_missig_val_element_ids.push_back(elem_id);
+        //    }
+        //}
+        //adapt_data->ExtractCommonPrefix(non_missig_val_element_ids);
+        
+        /* Extract a common prefix of the family */
+        adapt_data->ExtractCommonPrefix(lelement_id, num_elements);
+
+        /* Therefore, we need to coarsen the mesh at this point */
         return kCoarsenElements;
     }
 
@@ -290,6 +310,97 @@ FindPrefixBits (t8_forest_t forest,
     #endif
 }
 
+t8_locidx_t
+DecompressPrefixEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Get the adapt data from the forest */
+    DecompressPrefixAdaptData* adapt_data = static_cast<DecompressPrefixAdaptData*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    bool refine_element{false};
+
+    /* Check if a prefix is given for this element */
+    if (adapt_data->IsPrefixGiven())
+    {
+        /* Get the next prefix and it's length */
+        auto [prefix, prefix_length] = adapt_data->GetNextPrefix();
+
+        //cmc_debug_msg("elem id: ", lelement_id, " mit prefix laenge: ", prefix_length);
+
+        /* Check if a refinement is given as well and append the prefix accordingly */
+        if (adapt_data->IsRefinementGiven())
+        {
+            adapt_data->ApplyPrefixAndRefine(lelement_id, prefix, prefix_length);
+            refine_element = true;
+        } else
+        {
+            adapt_data->ApplyPrefixAndLeaveElementUnchanged(lelement_id, prefix, prefix_length);
+        }
+    } else
+    {
+        /* If no prefix is given, we check whether the element will be refined */
+        if (adapt_data->IsRefinementGiven())
+        {
+            adapt_data->Refine(lelement_id);
+            refine_element = true;
+        } else
+        {
+            adapt_data->LeaveElementUnchanged(lelement_id);
+        }
+    }
+
+
+    return refine_element;
+
+    #else
+    return CMC_ERR;
+    #endif
+}
+
+t8_locidx_t
+DecompressSuffixEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Get the adapt data from the forest */
+    DecompressPrefixAdaptData* adapt_data = static_cast<DecompressPrefixAdaptData*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    /* Check if a prefix is given for this element */
+    if (adapt_data->IsPrefixGiven())
+    {
+        /* Get the next prefix and it's length */
+        auto [prefix, prefix_length] = adapt_data->GetNextPrefix();
+
+        //cmc_debug_msg("suff: elem id: ", lelement_id, " mit prefix laenge: ", prefix_length); 
+        adapt_data->ApplyPrefixAndLeaveElementUnchanged(lelement_id, prefix, prefix_length);
+        
+    } else
+    {
+        adapt_data->LeaveElementUnchanged(lelement_id);
+    }
+
+
+    return 0;
+
+    #else
+    return CMC_ERR;
+    #endif
+}
 
 }
 #endif

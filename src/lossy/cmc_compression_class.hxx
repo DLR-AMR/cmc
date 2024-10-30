@@ -26,7 +26,7 @@ public:
     Decompressor() = default;
     virtual ~Decompressor() = default;
 
-    virtual void Decompress(const std::string& file_name) = 0;
+    virtual void Decompress() = 0;
 };
 
 }

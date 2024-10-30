@@ -71,6 +71,10 @@ class VariableAttributes
 {
 public:
     VariableAttributes() = default;
+    VariableAttributes(const T missing_value, const DataLayout initial_layout, const DataLayout pre_compression_layout,
+                       const int global_context_information)
+    : missing_value_{missing_value}, initial_data_layout_{initial_layout}, pre_compression_layout_{pre_compression_layout},
+      global_context_information_{global_context_information}{};
     ~VariableAttributes(){};
 
     VariableAttributes(const VariableAttributes& other) = default;

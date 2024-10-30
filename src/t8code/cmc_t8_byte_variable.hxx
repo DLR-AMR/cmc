@@ -9,12 +9,12 @@
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_variables.hxx"
 #include "utilities/cmc_span.hxx"
-#include "t8code/cmc_t8_prefix_encoding.hxx"
+#include "lossy/cmc_prefix_encoding.hxx"
 #include <t8_forest/t8_forest_vtk.h>
 
-
-#include <bitset>
 #include <vector>
+#include <cmath>
+#include <iterator>
 
 #ifdef CMC_WITH_NETCDF
 #include "netcdf/cmc_netcdf.hxx"
@@ -40,6 +40,10 @@ public:
     ByteVariable() = default;
     ByteVariable(std::vector<CompressionValue<sizeof(T)>>&& serialized_data)
     : byte_values_(std::move(serialized_data)) {};
+    ByteVariable(const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
+                 const int global_context_information, const T missing_value)
+    : name_{name}, attributes_(missing_value, layout, pre_compression_layout, global_context_information), global_domain_{domain} {};
+
     ~ByteVariable() {
         ReleaseInitialMesh();
     }
@@ -57,14 +61,32 @@ public:
     void FinalizeCompressionIteration();
     void PopLevelwisePrefixEncoding();
 
+    void InitializeDecompressionIteration();
+    void FinalizeDecompressionIteration();
+    void InitializeSuffixDecompression();
+    void WriteDataToVTK_(const int step_id);
+
+    /** Compression Routines **/
     void LeaveCoarsePrefixUnchanged(const int elem_index);
     std::pair<bool, CompressionValue<sizeof(T)>> EvaluateCommonPrefix(VectorView<CompressionValue<sizeof(T)>>& byte_values);
+    std::pair<bool, CompressionValue<sizeof(T)>> EvaluateCommonPrefix(std::vector<CompressionValue<sizeof(T)>>& prefixes, const std::vector<int>& element_ids);
     void ExtractCommonPrefix(std::vector<CompressionValue<sizeof(T)>>& prefixes, const int elem_start_index, const int num_elements);
+    void ExtractCommonPrefix(std::vector<CompressionValue<sizeof(T)>>& prefixes, const std::vector<int>& element_ids);
     void ExtractCommonPrefixFromInitialData(const int elem_start_index, const int num_elements);
     void ExtractCommonPrefixFromPreviousPrefixes(const int elem_start_index, const int num_elements);
+    void ExtractCommonPrefixFromInitialData(const std::vector<int>& element_ids);
+    void ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& element_ids);
     void IndicatePrefixFound(const CompressionValue<sizeof(T)>& prefix);
     void IndicateNoPrefixFound();
-    NcVariable WriteCompressedData(const int id) const;
+    NcVariable WriteCompressedData(const int id, const int time_step) const;
+
+    /** De-Compression Routines **/
+    void AssignCompressionValueForDecompressionStart();
+    void DecompressionRefine(const int elem_id);
+    void DecompressionLeaveElementUnchanged(const int elem_id);
+    void RefineAndApplyCommonPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
+    void LeaveElementUnchangedAndApplyPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
+    void PrintCompressionValues() const;
 
     t8_forest_t GetMesh() const;
     void SetMesh(t8_forest_t forest);
@@ -96,8 +118,7 @@ private:
     std::vector<CompressionValue<sizeof(T)>> byte_values_;
     std::vector<LevelwisePrefixData<T>> prefixes_;
 
-    std::vector<CompressionValue<sizeof(T)>> previous_prefixes_;
-    std::vector<CompressionValue<sizeof(T)>> previous_prefixes_new_;
+    std::vector<CompressionValue<sizeof(T)>> byte_values_new_;
 
     bool is_initial_mesh_stored_{true};//TODO:revert to false
     t8_forest_t initial_mesh_{nullptr};
@@ -109,21 +130,43 @@ public:
     ByteVar() = delete;
     ByteVar(const int id, const CmcType type, CmcByteVariable&& variable)
     : id_{id}, type_{type}, var_{std::move(variable)}{};
-
+    ByteVar(const int id, const CmcType type, const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
+            const int global_context_information, const CmcUniversalType missing_value)
+    : id_{id}, type_{type} {
+        SetUpByteVariable(type, name, domain, layout, pre_compression_layout, global_context_information, missing_value);
+    };
     ~ByteVar() = default;
 
     const std::string& GetName() const;
     int GetID() const {return id_;}
     CmcType GetType() const {return type_;}
-    void PerformTailTruncation();
+
     void InitializeCompressionIteration();
+    void FinalizeCompressionIteration();
     void PopLevelwisePrefixEncoding();
 
+    void InitializeDecompressionIteration();
+    void FinalizeDecompressionIteration();
+    void InitializeSuffixDecompression();
+
+    void WriteDataToVTK_(const int step_id);
+
+    /** Compression Routines **/
+    void PerformTailTruncation();
     void ExtractCommonPrefixFromInitialData(const int elem_start_index, const int num_elements);
     void ExtractCommonPrefixFromPreviousPrefixes(const int elem_start_index, const int num_elements);
+    void ExtractCommonPrefixFromInitialData(const std::vector<int>& element_ids);
+    void ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& element_ids);
     void LeaveCoarsePrefixUnchanged(const int elem_index);
-    void FinalizeCompressionIteration();
-    NcVariable WriteCompressedData() const;
+    NcVariable WriteCompressedData(const int time_step) const;
+
+    /** De-Compression Routines **/
+    void AssignCompressionValueForDecompressionStart();
+    void DecompressionRefine(const int elem_id);
+    void DecompressionLeaveElementUnchanged(const int elem_id);
+    void RefineAndApplyCommonPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
+    void LeaveElementUnchangedAndApplyPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
+    void PrintCompressionValues() const;
 
     void SetMesh(t8_forest_t forest);
     t8_forest_t GetMesh() const;
@@ -136,6 +179,9 @@ public:
     void SetMissingValueInNCFile(const int ncid, const int var_id, const int nc_type) const;
     void StoreInitialMesh();
 private:
+    void SetUpByteVariable(const CmcType type, const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
+                      const int global_context_information, const CmcUniversalType missing_value);
+    
     int id_;
     CmcType type_;
     CmcByteVariable var_;
@@ -171,6 +217,33 @@ GetDataAsType(const std::vector<CompressionValue<N>>& cr_values)
     }
     
     return data;
+}
+
+template <typename T>
+void
+ByteVariable<T>::PrintCompressionValues() const
+{
+    if constexpr (sizeof(T) == 4)
+    {
+        int32_t val{0};
+        int i=0;
+        for (auto iter = byte_values_.begin(); iter != byte_values_.end(); ++iter)
+        {
+            const std::array<uint8_t, 4>& pref_mem = iter->GetMemoryForReading();
+            std::memcpy(&val, pref_mem.data(), 4);
+            cmc_debug_msg(std::bitset<32>(val), " fuer Elem: ", i);
+            ++i;
+        }
+    }
+}
+
+inline
+void
+ByteVar::PrintCompressionValues() const
+{
+    std::visit([](auto&& var){
+        var.PrintCompressionValues();
+    }, var_);
 }
 
 inline
@@ -326,11 +399,29 @@ ByteVar::FinalizeCompressionIteration()
     }, var_);
 }
 
-inline NcVariable
-ByteVar::WriteCompressedData() const
+inline
+void
+ByteVar::InitializeDecompressionIteration()
 {
-    return std::visit([this](auto&& var) -> NcVariable {
-        return var.WriteCompressedData(this->GetID());
+    std::visit([](auto&& var){
+        var.InitializeDecompressionIteration();
+    }, var_);
+}
+
+inline
+void
+ByteVar::FinalizeDecompressionIteration()
+{
+    std::visit([](auto&& var){
+        var.FinalizeDecompressionIteration();
+    }, var_);
+}
+
+inline NcVariable
+ByteVar::WriteCompressedData(const int time_step) const
+{
+    return std::visit([this, &time_step](auto&& var) -> NcVariable {
+        return var.WriteCompressedData(this->GetID(), time_step);
     }, var_);
 }
 
@@ -343,6 +434,177 @@ ByteVar::SetMissingValueInNCFile(const int ncid, const int var_id, const int nc_
         var.SetMissingValueInNCFile(ncid, var_id, nc_type);
     }, var_);
     #endif
+}
+
+inline
+void
+ByteVar::WriteDataToVTK_(const int step_id)
+{
+    std::visit([&step_id](auto&& var) {
+        var.WriteDataToVTK_(step_id);
+    }, var_);
+}
+
+template<typename T>
+void
+ByteVariable<T>::WriteDataToVTK_(const int step_id)
+{
+    std::string file_name = "decompressed_pref_ex_data_step_" + std::to_string(step_id);
+
+    std::vector<float> float_data;
+
+    #if 0
+    /* For compression write out */
+    if (step_id == 0)
+    {
+        float_data = GetDataAsType(byte_values_);
+    } else
+    {
+        float_data = GetDataAsType(prefixes_.back().prefixes);
+    }
+    #else
+    /* For decompression write eout */
+    float_data = GetDataAsType(byte_values_);
+    #endif
+
+    t8_forest_t current_mesh = GetMesh();
+
+    /* Create a new vtk field holding the element data arrays */
+    t8_vtk_data_field_t *vtk_data = new t8_vtk_data_field_t[1];
+
+        /* Set the type of the data and pointer to the data */
+        std::ignore = snprintf(vtk_data[0].description, 128, "%s", "tracer");
+        
+        vtk_data[0].type = T8_VTK_SCALAR;
+
+        std::vector<double> converted_data;
+        converted_data.reserve(float_data.size());
+        for (auto fiter = float_data.begin(); fiter != float_data.end(); ++fiter)
+        {
+            converted_data.push_back(static_cast<double>(*fiter));
+        }
+
+        vtk_data[0].data = converted_data.data();
+
+        const int vtk_err = t8_forest_vtk_write_file(current_mesh, file_name.c_str(), 0, 1, 0, 0, 0, 1, vtk_data);
+        
+        if (vtk_err == 0)
+            cmc_err_msg("An error occrued during the creation of the t8code-forest vtk file.");
+    
+    delete[] vtk_data;
+}
+
+inline
+void
+ByteVar::DecompressionRefine(const int elem_id)
+{
+    std::visit([&elem_id](auto&& var){
+        var.DecompressionRefine(elem_id);
+    }, var_);
+}
+
+inline
+void
+ByteVar::DecompressionLeaveElementUnchanged(const int elem_id)
+{
+    std::visit([&elem_id](auto&& var){
+        var.DecompressionLeaveElementUnchanged(elem_id);
+    }, var_);
+}
+
+inline
+void
+ByteVar::RefineAndApplyCommonPrefix(const int elem_id, const std::vector<uint8_t> prefix, const int num_prefix_bits)
+{
+    std::visit([&](auto&& var){
+        var.RefineAndApplyCommonPrefix(elem_id, prefix, num_prefix_bits);
+    }, var_);
+}
+
+inline
+void
+ByteVar::AssignCompressionValueForDecompressionStart()
+{
+    std::visit([](auto&& var){
+        var.AssignCompressionValueForDecompressionStart();
+    }, var_);
+}
+
+inline
+void
+ByteVar::LeaveElementUnchangedAndApplyPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits)
+{
+    std::visit([&](auto&& var){
+        var.LeaveElementUnchangedAndApplyPrefix(elem_id, prefix, num_prefix_bits);
+    }, var_);
+}
+
+inline
+void
+ByteVar::InitializeSuffixDecompression()
+{
+    std::visit([](auto&& var){
+        var.InitializeSuffixDecompression();
+    }, var_);
+}
+
+template<typename T>
+void
+ByteVariable<T>::InitializeSuffixDecompression()
+{
+    byte_values_new_.reserve(byte_values_.size());
+}
+
+template<typename T>
+void
+ByteVariable<T>::LeaveElementUnchangedAndApplyPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits)
+{
+    CompressionValue<sizeof(T)> value = byte_values_[elem_id];
+    value.ApplyPrefix(prefix, num_prefix_bits);
+
+    /* Copy the element over */
+    byte_values_new_.push_back(value);
+}
+
+template<typename T>
+void
+ByteVariable<T>::AssignCompressionValueForDecompressionStart()
+{
+    /* Push back an empty CompressionValue */
+    byte_values_.push_back(CompressionValue<sizeof(T)>());
+}
+
+template<typename T>
+void
+ByteVariable<T>::DecompressionRefine(const int elem_id)
+{
+    /* Since only a refinement is applied, we copy the value over several times */
+    const int num_copies = std::pow(2, GetDimensionalityOfDataLayout(this->GetInitialDataLayout()));
+
+    /* Insert the element as many times */
+    byte_values_new_.insert(byte_values_new_.end(), num_copies, byte_values_[elem_id]);
+}
+
+template<typename T>
+void
+ByteVariable<T>::DecompressionLeaveElementUnchanged(const int elem_id)
+{
+    /* Copy the element over */
+    byte_values_new_.push_back(byte_values_[elem_id]);
+}
+
+template<typename T>
+void
+ByteVariable<T>::RefineAndApplyCommonPrefix(const int elem_id, const std::vector<uint8_t> prefix, const int num_prefix_bits)
+{
+    /* Since only a refinement is applied, we copy the value over several times */
+    const int num_copies = std::pow(2, GetDimensionalityOfDataLayout(this->GetInitialDataLayout()));
+
+    CompressionValue<sizeof(T)> value = byte_values_[elem_id];
+    value.ApplyPrefix(prefix, num_prefix_bits);
+
+    /* Insert the element as many times */
+    byte_values_new_.insert(byte_values_new_.end(), num_copies, value);
 }
 
 template<typename T>
@@ -580,13 +842,21 @@ ByteVariable<T>::InitializeCompressionIteration()
 
 template<typename T>
 void
+ByteVariable<T>::InitializeDecompressionIteration()
+{
+    /* Allocate an upper bound of memory. This resembles the case, when all elements are refined during the decompression */
+    byte_values_new_.reserve(mesh_.GetNumberLocalElements() * std::pow(2, GetDimensionalityOfDataLayout(this->GetInitialDataLayout())));
+}
+
+template<typename T>
+void
 ByteVariable<T>::PopLevelwisePrefixEncoding()
 {
     prefixes_.pop_back();
 }
 
 /* If a single element is investigated and not a family of elements during the prefix extraction,
- * we are not altering the value/previous-prefix and keep it as a prefx for the next level */
+ * we are not altering the value/previous-prefix and keep it as a prefix for the next level */
 template<typename T>
 void
 ByteVariable<T>::LeaveCoarsePrefixUnchanged(const int elem_index)
@@ -602,13 +872,11 @@ ByteVariable<T>::LeaveCoarsePrefixUnchanged(const int elem_index)
         /* In any other prefix extraction iteration than the first, we just copy the previous prefix */
         LevelwisePrefixData<T>& previous_prefixes = (*std::prev(prefixes_.end(), 2));
         prefixes_.back().SetPrefix(previous_prefixes.prefixes[elem_index]);
-        //previous_prefixes_new_.push_back(previous_prefixes.prefixes[elem_index]);
         previous_prefixes.prefixes[elem_index] = CompressionValue<sizeof(T)>();
     } else
     {
         /* In the first prefix extraction iteration, we just keep the initial byte value and consider it in a 'coarser' iteration */
         prefixes_.back().SetPrefix(byte_values_[elem_index]);
-        //previous_prefixes_new_.push_back(byte_values_[elem_index]);
         /* Remove the 'prefix' from the initial data and replace it with an empty 'dummy value' */
         byte_values_[elem_index] = CompressionValue<sizeof(T)>();
     }
@@ -642,6 +910,14 @@ ByteVariable<T>::FinalizeCompressionIteration()
 
 template<typename T>
 void
+ByteVariable<T>::FinalizeDecompressionIteration()
+{
+    byte_values_ = std::move(byte_values_new_);
+    byte_values_new_.clear();
+}
+
+template<typename T>
+void
 ByteVariable<T>::ExtractCommonPrefixFromInitialData(const int elem_start_index, const int num_elements)
 {
     /* Extract a common prefix from the initial data */
@@ -656,8 +932,46 @@ ByteVariable<T>::ExtractCommonPrefixFromPreviousPrefixes(const int elem_start_in
     std::vector<CompressionValue<sizeof(T)>>& prev_prefixes = (*std::prev(prefixes_.end(), 2)).prefixes;
 
     /* Extract a common prefix from the initial data */
-    ExtractCommonPrefix(prev_prefixes, elem_start_index, num_elements);  
+    ExtractCommonPrefix(prev_prefixes, elem_start_index, num_elements);
 }
+
+template<typename T>
+void
+ByteVariable<T>::ExtractCommonPrefixFromInitialData(const std::vector<int>& elem_ids)
+{
+    /* Extract a common prefix from the initial data */
+    ExtractCommonPrefix(byte_values_, elem_ids);
+}
+
+template<typename T>
+void
+ByteVariable<T>::ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& elem_ids)
+{
+    /* Get the previous prefixes */
+    std::vector<CompressionValue<sizeof(T)>>& prev_prefixes = (*std::prev(prefixes_.end(), 2)).prefixes;
+
+    /* Extract a common prefix from the initial data */
+    ExtractCommonPrefix(prev_prefixes, elem_ids);  
+}
+
+inline
+void
+ByteVar::ExtractCommonPrefixFromInitialData(const std::vector<int>& elem_ids)
+{
+    std::visit([&](auto&& var){
+        var.ExtractCommonPrefixFromInitialData(elem_ids);
+    }, var_);
+}
+
+inline
+void
+ByteVar::ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& elem_ids)
+{
+    std::visit([&](auto&& var){
+        var.ExtractCommonPrefixFromPreviousPrefixes(elem_ids);
+    }, var_);
+}
+
 
 template<typename T>
 void
@@ -676,13 +990,63 @@ ByteVariable<T>::ExtractCommonPrefix(std::vector<CompressionValue<sizeof(T)>>& p
         /* We need to trim the previous prefixes by the extracted common prefix */
         for (int index = 0; index < num_elements; ++index)
         {
-            byte_values_[elem_start_index + index].SetFrontBit(sizeof(T) * CHAR_BIT - prefix.GetTrailBit());
+            prefixes[elem_start_index + index].SetFrontBit(sizeof(T) * CHAR_BIT - prefix.GetTrailBit());
         }
     } else
     {
         IndicateNoPrefixFound();
     }
 }
+
+
+template<typename T>
+void
+ByteVariable<T>::ExtractCommonPrefix(std::vector<CompressionValue<sizeof(T)>>& prefixes, const std::vector<int>& element_ids)
+{
+    /* Evaluate whether there is a common prefix to extract */
+    auto [is_prefix_found, prefix] = EvaluateCommonPrefix(prefixes, element_ids);
+
+    if (is_prefix_found)
+    {
+        IndicatePrefixFound(prefix);
+
+        /* We need to trim the previous prefixes by the extracted common prefix */
+        for (auto elem_id_iter = element_ids.begin(); elem_id_iter != element_ids.end(); ++elem_id_iter)
+        {
+            prefixes[*elem_id_iter].SetFrontBit(sizeof(T) * CHAR_BIT - prefix.GetTrailBit());
+        }
+    } else
+    {
+        IndicateNoPrefixFound();
+    }
+}
+
+
+template<typename T>
+std::pair<bool, CompressionValue<sizeof(T)>>
+ByteVariable<T>::EvaluateCommonPrefix(std::vector<CompressionValue<sizeof(T)>>& prefixes, const std::vector<int>& element_ids)
+{
+    cmc_assert(element_ids.size() >= 1);
+
+    /* Initialize the first prefix with the first value */
+    CompressionValue<sizeof(T)> prefix = prefixes[element_ids.front()];
+
+    if (prefix.IsEmpty()) {return  std::make_pair(false, CompressionValue<sizeof(T)>());}
+
+    /* Iterate over all leftover values */
+    for (auto elem_id_iter = ++(element_ids.begin()); elem_id_iter != element_ids.end(); ++elem_id_iter)
+    {
+        /* Find a common prefix of all variables */
+        prefix = GetCommonPrefix(prefix, prefixes[*elem_id_iter]);
+
+        /* Check if there is a prefix */
+        if (prefix.IsEmpty()) {return  std::make_pair(false, CompressionValue<sizeof(T)>());}
+    }
+
+    /* If the function arrives here, we do have found a common prefix of all values */
+    return std::make_pair(true, prefix);
+}
+
 
 template<typename T>
 std::pair<bool, CompressionValue<sizeof(T)>>
@@ -733,12 +1097,11 @@ DetermineForestRefinementBits(std::vector<uint8_t>& serialized_variable, t8_fore
 
 template<typename T>
 NcVariable
-ByteVariable<T>::WriteCompressedData(const int id) const
+ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
 {
     /* Declare a vector which will hold the level-wise encoded data */
     std::vector<std::vector<uint8_t>> buffered_data;
     buffered_data.reserve(prefixes_.size() + 1);
-
 
     size_t num_bytes = 0;
     /* Encode and retrieve the extracted prefixes */
@@ -759,8 +1122,13 @@ ByteVariable<T>::WriteCompressedData(const int id) const
     //TODO: Make mechanism for parallel output
     //The complete global byte size needs to gathered and the level data has to be filled in parallel to it
 
+    /* Generate a (potentially new) context information for the variable */
+    const int global_context_info = (attributes_.GetGlobalContextInformation() != kNoGlobalContext ? attributes_.GetGlobalContextInformation() : 0);
+
     /* Create a netCDF variable to put out */
-    NcSpecificVariable<uint8_t> compressed_variable{GetName(), id};
+    std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
+
+    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
     compressed_variable.Reserve(num_bytes);
 
     /* Put the buffered data into the variable to put out */
@@ -771,12 +1139,14 @@ ByteVariable<T>::WriteCompressedData(const int id) const
 
     /* Assign some attributes to it */
     std::vector<NcAttribute> attributes;
+    attributes.emplace_back("id", id);
+    attributes.emplace_back("time_step", time_step);
     attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
-    attributes.emplace_back("missing_value", attributes_.GetMissingValue());
     attributes.emplace_back("initial_layout", static_cast<int>(attributes_.GetInitialDataLayout()));
     attributes.emplace_back("pre_compression_layout", static_cast<int>(attributes_.GetPreCompressionLayout()));
-    attributes.emplace_back("global_context", attributes_.GetGlobalContextInformation());
-    attributes.emplace_back("datatype", static_cast<int>(ConvertToCmcType<T>()));
+    attributes.emplace_back("global_context", global_context_info);
+    attributes.emplace_back("data_type", static_cast<int>(ConvertToCmcType<T>()));
+    attributes.emplace_back("missing_value", attributes_.GetMissingValue());
     //TODO: Check if scaling and offset have been applied, if not we need to add those attributes
 
     /* Get the global domain of this variable */
