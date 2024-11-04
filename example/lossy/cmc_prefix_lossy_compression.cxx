@@ -81,7 +81,7 @@ main(void)
 
     {
     /* Create the compression data */
-    cmc::PrefixCompressionData compression_data(nc_data.TransferData(), std::move(settings));
+    cmc::amr::Compressor compression_data(nc_data.TransferData(), std::move(settings));
 
     /* Setup the example data for the compression */
     const bool perform_default_lossy_compression_as_well = false;

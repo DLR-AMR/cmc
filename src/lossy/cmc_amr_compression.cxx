@@ -17,8 +17,11 @@
 namespace cmc
 {
 
+namespace amr
+{
+
 int
-PrefixCompressionData::GetMpiSize() const
+Compressor::GetMpiSize() const
 {
     int comm_size{1};
     int err = MPI_Comm_size(comm_, &comm_size);
@@ -27,7 +30,7 @@ PrefixCompressionData::GetMpiSize() const
 }
 
 void
-PrefixCompressionData::Setup(const bool with_default_lossy_amr_compression)
+Compressor::Setup(const bool with_default_lossy_amr_compression)
 {
     compression_data_->SplitVariables();
 
@@ -53,7 +56,7 @@ PrefixCompressionData::Setup(const bool with_default_lossy_amr_compression)
 
 
 void
-PrefixCompressionData::Compress()
+Compressor::Compress()
 {
     /* Check if the default lossy compression is about to be applied */
     if (perform_default_lossy_compression_)
@@ -102,7 +105,7 @@ PrefixCompressionData::Compress()
 }
 
 void
-PrefixCompressionData::WriteCompressedData(const std::string& file_name, const int time_step) const
+Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
     std::vector<NcVariable> vars;
     vars.reserve(compression_variables_.size());
@@ -120,6 +123,8 @@ PrefixCompressionData::WriteCompressedData(const std::string& file_name, const i
 
 }
 
+}
+
 
 
 
@@ -127,7 +132,7 @@ PrefixCompressionData::WriteCompressedData(const std::string& file_name, const i
 
 
 void
-PrefixCompressionData::Compress()
+Compressor::Compress()
 {
     /* Check if the default lossy compression is about to be applied */
     if (perform_default_lossy_compression_)
@@ -176,7 +181,7 @@ PrefixCompressionData::Compress()
 //New version for now
 template<int N>
 void
-PrefixCompressionData::DecompressVariableEGU(std::vector<PrefixDecompressionData>& decompression_data) const
+Compressor::DecompressVariableEGU(std::vector<PrefixDecompressionData>& decompression_data) const
 {
     /* Build the initial mesh, corresponding to the data */
     for (auto var_iter = decompression_data.begin(); var_iter != decompression_data.end(); ++var_iter)
@@ -351,7 +356,7 @@ CmcTypeToNcType(const CmcType type)
 }
 
 void
-PrefixCompressionData::WriteCompressedDataEGU(const std::string& file_name) const
+Compressor::WriteCompressedDataEGU(const std::string& file_name) const
 {
     /* Create the netCDF file to which the cmompressed data will be written */
     cmc_assert(GetMpiSize() <= 1);

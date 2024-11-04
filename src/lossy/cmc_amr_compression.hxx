@@ -13,38 +13,41 @@
 namespace cmc
 {
 
-class PrefixCompressionData
+namespace amr
+{
+
+class Compressor
 {
 public:
-    PrefixCompressionData() = default;
+    Compressor() = default;
 
-    PrefixCompressionData(const std::vector<InputVar>& variables_to_compress, const CompressionSettings& settings)
+    Compressor(const std::vector<InputVar>& variables_to_compress, const CompressionSettings& settings)
     : compression_settings_{settings}
     {
         compression_data_ = std::make_unique<AmrData>(variables_to_compress, compression_settings_);
     };
-    PrefixCompressionData(std::vector<InputVar>&& variables_to_compress, const CompressionSettings& settings)
+    Compressor(std::vector<InputVar>&& variables_to_compress, const CompressionSettings& settings)
     : compression_settings_{settings}
     {
         compression_data_ = std::make_unique<AmrData>(std::move(variables_to_compress), compression_settings_);
     };
-    PrefixCompressionData(const std::vector<InputVar>& variables_to_compress, CompressionSettings&& settings)
+    Compressor(const std::vector<InputVar>& variables_to_compress, CompressionSettings&& settings)
     : compression_settings_(std::move(settings))
     {
         compression_data_ = std::make_unique<AmrData>(variables_to_compress, compression_settings_);
     };
-    PrefixCompressionData(std::vector<InputVar>&& variables_to_compress, CompressionSettings&& settings)
+    Compressor(std::vector<InputVar>&& variables_to_compress, CompressionSettings&& settings)
     : compression_settings_(std::move(settings))
     {
         compression_data_ = std::make_unique<AmrData>(std::move(variables_to_compress), compression_settings_);
     };
 
-    PrefixCompressionData(const PrefixCompressionData& other) = default;
-    PrefixCompressionData& operator=(const PrefixCompressionData& other) = default;
-    PrefixCompressionData(PrefixCompressionData&& other) = default;
-    PrefixCompressionData& operator=(PrefixCompressionData&& other) = default;
+    Compressor(const Compressor& other) = default;
+    Compressor& operator=(const Compressor& other) = default;
+    Compressor(Compressor&& other) = default;
+    Compressor& operator=(Compressor&& other) = default;
 
-    ~PrefixCompressionData() = default;
+    ~Compressor() = default;
 
     int GetMpiSize() const;
     
@@ -66,6 +69,7 @@ private:
     bool perform_default_lossy_compression_{false};
 };
 
+}
 
 }
 
