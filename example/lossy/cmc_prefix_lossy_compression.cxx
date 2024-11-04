@@ -3,7 +3,7 @@
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"
 #include "netcdf/cmc_netcdf.hxx"
-#include "lossy/cmc_amr_lossy_compression_settings.hxx"
+#include "utilities/cmc_compression_settings.hxx"
 #include "lossy/cmc_amr_compression.hxx"
 #include "decompression/cmc_prefix_decompression.hxx"
 

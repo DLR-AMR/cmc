@@ -3,7 +3,7 @@
 
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
-#include "lossy/cmc_amr_lossy_compression_settings.hxx"
+#include "utilities/cmc_compression_settings.hxx"
 #include "t8code/cmc_t8_data.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "lossy/cmc_compression_class.hxx"

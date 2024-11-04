@@ -18,7 +18,7 @@ src/t8code/cmc_t8_interpolation.hxx \
 src/utilities/cmc_span.hxx \
 src/t8code/cmc_t8_adapt_track_inaccuracy.hxx \
 src/t8code/cmc_t8_adapt.hxx \
-src/lossy/cmc_amr_lossy_compression_settings.hxx \
+src/utilities/cmc_compression_settings.hxx \
 src/t8code/cmc_t8_data.hxx \
 src/utilities/cmc_dimension_interval.hxx \
 src/utilities/cmc_geo_domain.hxx \
@@ -69,7 +69,7 @@ src/t8code/cmc_t8_data_variables.cxx \
 src/t8code/cmc_t8_interpolation.cxx \
 src/t8code/cmc_t8_adapt_track_inaccuracy.cxx \
 src/t8code/cmc_t8_adapt.cxx \
-src/lossy/cmc_amr_lossy_compression_settings.cxx \
+src/utilities/cmc_compression_settings.cxx \
 src/t8code/cmc_t8_data.cxx \
 src/utilities/cmc_geo_domain.cxx \
 src/utilities/cmc_hyperslab.cxx \

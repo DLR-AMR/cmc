@@ -1,7 +1,7 @@
-#ifndef CMC_AMR_LOSSY_COMPRESSION_SETTINGS_HXX
-#define CMC_AMR_LOSSY_COMPRESSION_SETTINGS_HXX
+#ifndef CMC_COMPRESSION_SETTINGS_HXX
+#define CMC_COMPRESSION_SETTINGS_HXX
 
-/** @file cmc_amr_lossy_compression_settings.hxx
+/** @file cmc_compression_settings.hxx
  */
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_domain.hxx"
@@ -112,4 +112,4 @@ private:
 
 }
 
-#endif /* !CMC_AMR_LOSSY_COMPRESSION_SETTINGS_HXX */
+#endif /* !CMC_COMPRESSION_SETTINGS_HXX */

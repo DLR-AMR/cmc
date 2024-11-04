@@ -1,8 +1,8 @@
 /**
- * @file cmc_amr_lossy_compression_settings.cxx
+ * @file cmc_compression_settings.cxx
  */
 
-#include "lossy/cmc_amr_lossy_compression_settings.hxx"
+#include "utilities/cmc_compression_settings.hxx"
 
 namespace cmc
 {

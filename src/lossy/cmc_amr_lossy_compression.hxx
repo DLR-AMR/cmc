@@ -5,7 +5,7 @@
  * All functions in order to perform the compression/decompression of the AMR lossy compressor lie within this file
  */
 #include "utilities/cmc_utilities.hxx"
-#include "lossy/cmc_amr_lossy_compression_settings.hxx" 
+#include "utilities/cmc_compression_settings.hxx"
 #include "t8code/cmc_t8_data.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "utilities/cmc_input_variable.hxx"

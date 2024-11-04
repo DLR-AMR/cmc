@@ -11,7 +11,7 @@
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_interpolation.hxx"
 #include "t8code/cmc_t8_adapt_track_inaccuracy.hxx"
-#include "lossy/cmc_amr_lossy_compression_settings.hxx"
+#include "utilities/cmc_compression_settings.hxx"
 #include "utilities/cmc_prefix.hxx"
 #include "t8code/cmc_t8_variables.hxx"
 

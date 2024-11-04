@@ -7,7 +7,7 @@
 #include "utilities/cmc_geo_domain.hxx"
 #include "t8code/cmc_t8_interpolation.hxx"
 #include "t8code/cmc_t8_adapt_track_inaccuracy.hxx"
-#include "lossy/cmc_amr_lossy_compression_settings.hxx"
+#include "utilities/cmc_compression_settings.hxx"
 
 #ifdef CMC_WITH_NETCDF
 #include "netcdf/cmc_netcdf.hxx"
@@ -123,14 +123,22 @@ public:
      : interpolate_{other.interpolate_},
        error_domains_(other.error_domains_),
        is_inaccuracy_storage_set_{other.is_inaccuracy_storage_set_},
-       tracking_option_{other.tracking_option_},
-       inaccuracy_storage_(other.inaccuracy_storage_->clone()) {};
+       tracking_option_{other.tracking_option_} {
+        	if (other.inaccuracy_storage_ != nullptr)
+            {
+                inaccuracy_storage_ = std::unique_ptr<InaccuracyContainer>(other.inaccuracy_storage_->clone());
+            }
+       };
     VariableUtilities(VariableUtilities&& other)
      : interpolate_{std::move(other.interpolate_)},
        error_domains_(std::move(other.error_domains_)),
        is_inaccuracy_storage_set_{std::move(other.is_inaccuracy_storage_set_)},
-       tracking_option_{std::move(other.tracking_option_)},
-       inaccuracy_storage_{std::move(other.inaccuracy_storage_)} {};
+       tracking_option_{std::move(other.tracking_option_)} {
+            if (other.inaccuracy_storage_ != nullptr)
+            {
+                inaccuracy_storage_ = std::move(other.inaccuracy_storage_);
+            }
+       };
 
     VariableUtilities& operator=(const VariableUtilities& other);
     VariableUtilities& operator=(VariableUtilities&& other);
@@ -185,7 +193,7 @@ private:
 
     bool is_inaccuracy_storage_set_{false};
     TrackingOption tracking_option_{TrackingOption::TrackFullInaccuracy};
-    std::unique_ptr<InaccuracyContainer> inaccuracy_storage_;
+    std::unique_ptr<InaccuracyContainer> inaccuracy_storage_{nullptr};
 };
 
 
