@@ -30,7 +30,7 @@ src/t8code/cmc_t8_morton.hxx \
 src/t8code/cmc_t8_mpi.hxx \
 src/mpi/cmc_mpi_data.hxx \
 src/lossy/cmc_amr_lossy_compression.hxx \
-src/t8code/cmc_t8_adapt_callbacks.h \
+src/t8code/cmc_t8_adapt_callbacks.hxx \
 src/utilities/cmc_variable_transformer_forward.hxx \
 src/utilities/cmc_variable_transformer.hxx \
 src/t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx \

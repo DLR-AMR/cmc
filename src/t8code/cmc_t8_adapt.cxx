@@ -1,5 +1,5 @@
 #include "t8code/cmc_t8_adapt.hxx"
-#include "t8code/cmc_t8_adapt_callbacks.h"
+#include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 
 namespace cmc {

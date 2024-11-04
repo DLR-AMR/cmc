@@ -2,7 +2,7 @@
 #include "netcdf/cmc_nc_io_conventions.hxx"
 #include "netcdf/cmc_nc_reader.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
-#include "t8code/cmc_t8_adapt_callbacks.h"
+#include "t8code/cmc_t8_adapt_callbacks.hxx"
 
 #include <variant>
 
@@ -413,6 +413,7 @@ Decompressor::DecompressVariable(const std::string& variable_base_name)
                 adapt_data.FinalizeDecompressionIteration();
             }
 
+            #if 0
             /* Perform the suffix decoding */
             adapt_data.InitializeSuffixDecompression();
 
@@ -424,6 +425,20 @@ Decompressor::DecompressVariable(const std::string& variable_base_name)
 
             /* Finalize the decompression iteration */
             adapt_data.FinalizeSuffixDecompression();
+
+            #else
+            /* Perform the suffix decoding */
+            adapt_data.InitializePlainSuffixDecompression();
+
+            /* Decompress the next level */
+            t8_forest_t decompressed_forest = t8_forest_new_adapt(adapt_data.GetCurrentMesh(), DecompressPlainSuffixEncoding, 0, 0, static_cast<void*>(&adapt_data));
+            
+            /* Store the decomrpessed mesh */
+            adapt_data.SetCurrentMesh(decompressed_forest);
+
+            /* Finalize the decompression iteration */
+            adapt_data.FinalizePlainSuffixDecompression();
+            #endif
 
             //....
 

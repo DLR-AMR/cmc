@@ -1,4 +1,4 @@
-#include "t8code/cmc_t8_adapt_callbacks.h"
+#include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "t8code/cmc_t8_adapt.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
@@ -396,6 +396,45 @@ DecompressSuffixEncoding (t8_forest_t forest,
 
 
     return 0;
+
+    #else
+    return CMC_ERR;
+    #endif
+}
+
+
+t8_locidx_t
+DecompressPlainSuffixEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Get the adapt data from the forest */
+    DecompressPrefixAdaptData* adapt_data = static_cast<DecompressPrefixAdaptData*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    const size_t num_significant_bits = adapt_data->GetCountSignificantBits(lelement_id);
+
+    const size_t leftover_bits = adapt_data->GetBitCountOfDataType() - num_significant_bits;
+
+    cmc_assert(leftover_bits <= adapt_data->GetBitCountOfDataType());
+
+    if (leftover_bits != 0)
+    {
+        std::vector<uint8_t> suffix = adapt_data->GetNextPlainSuffix(leftover_bits);
+
+        adapt_data->ApplyPrefixAndLeaveElementUnchanged(lelement_id, suffix, leftover_bits);
+    } else
+    {
+        adapt_data->LeaveElementUnchanged(lelement_id);
+    }
+
+    return kLeaveElementUnchanged;
 
     #else
     return CMC_ERR;

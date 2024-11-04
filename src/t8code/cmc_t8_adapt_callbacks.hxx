@@ -1,5 +1,5 @@
-#ifndef CMC_T8_ADAPT_CALLBACKS_H
-#define CMC_T8_ADAPT_CALLBACKS_H
+#ifndef CMC_T8_ADAPT_CALLBACKS_HXX
+#define CMC_T8_ADAPT_CALLBACKS_HXX
 
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_domain.hxx"
@@ -109,6 +109,16 @@ DecompressPrefixEncoding (t8_forest_t forest,
 
 t8_locidx_t
 DecompressSuffixEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[]);
+
+t8_locidx_t
+DecompressPlainSuffixEncoding (t8_forest_t forest,
                           t8_forest_t forest_from,
                           int which_tree,
                           int lelement_id,
@@ -292,4 +302,4 @@ DecodeSuffixEGU (t8_forest_t forest,
 
 }
 
-#endif /* !CMC_T8_ADAPT_CALLBACKS_H */
+#endif /* !CMC_T8_ADAPT_CALLBACKS_HXX */

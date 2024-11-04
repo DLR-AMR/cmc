@@ -1,7 +1,7 @@
 
 #include "t8code/cmc_t8_byte_variable.hxx"
 #include "t8code/cmc_t8_adapt.hxx"
-#include "t8code/cmc_t8_adapt_callbacks.h"
+#include "t8code/cmc_t8_adapt_callbacks.hxx"
 
 namespace cmc
 {

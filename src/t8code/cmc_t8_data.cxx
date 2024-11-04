@@ -1,6 +1,6 @@
 #include "t8code/cmc_t8_data.hxx"
 #include "t8code/cmc_t8_mpi.hxx"
-#include "t8code/cmc_t8_adapt_callbacks.h"
+#include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "utilities/cmc_variable_transformer.hxx"
 #include "utilities/cmc_output_variable.hxx"
 #include "utilities/cmc_geo_utilities.hxx"
