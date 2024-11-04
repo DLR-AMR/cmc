@@ -1,4 +1,4 @@
-#include "lossy/cmc_prefix_lossy_compression.hxx"
+#include "lossy/cmc_amr_compression.hxx"
 #include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_span.hxx"

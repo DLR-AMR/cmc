@@ -1,5 +1,5 @@
-#ifndef CMC_PREFIX_LOSSY_COMPRESSION_HXX
-#define CMC_PREFIX_LOSSY_COMPRESSION_HXX
+#ifndef CMC_AMR_COMPRESSION_HXX
+#define CMC_AMR_COMPRESSION_HXX
 
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
@@ -69,4 +69,4 @@ private:
 
 }
 
-#endif /* !CMC_PREFIX_LOSSY_COMPRESSION_HXX */
+#endif /* !CMC_AMR_COMPRESSION_HXX */
