@@ -6,7 +6,7 @@
 #include "utilities/cmc_output_variable.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
 #include "lossy/cmc_compression_class.hxx"
-#include "lossy/cmc_prefix_lossy_compression.hxx"
+#include "lossy/cmc_amr_compression.hxx"
 
 #include <vector>
 #include <memory>

@@ -4,7 +4,7 @@
 #include "utilities/cmc_output_variable.hxx"
 #include "netcdf/cmc_netcdf.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
-#include "lossy/cmc_prefix_lossy_compression.hxx"
+#include "lossy/cmc_amr_compression.hxx"
 #include "lossy/cmc_prefix_decompression.hxx"
 
 #include <cfenv>
@@ -25,6 +25,8 @@ main(void)
     //const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
     //const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
     
+    //const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
+    
     /* Create an object which interatcs with the file and opens it */
     cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
 
@@ -41,14 +43,12 @@ main(void)
 
     nc_data.SetHintHeightDimension(2); //Set plev as height dimension
 
-    //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 60, 76),
-    //                         cmc::DimensionInterval(cmc::Dimension::Lat, 128, 144),
-    //                         cmc::DimensionInterval(cmc::Dimension::Lev, 0, 1)
-    //                         );
     cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
                              cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
                              cmc::DimensionInterval(cmc::Dimension::Lev, 0, 1)
                              );
+
+
     //Test domain
     //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 8),
     //                         cmc::DimensionInterval(cmc::Dimension::Lat, 0, 8)
@@ -59,7 +59,8 @@ main(void)
     //                         );
 
     /* Inquire the hyperslab of data for the given variables */
-    nc_data.InquireVariables(hyperslab, "tco3");
+    //nc_data.InquireVariables(hyperslab, "tco3");
+    nc_data.InquireVariables(hyperslab, "t2m");
 
     /* Close the file, since we have gathered the data we wanted */
     nc_data.CloseFileHandle();
@@ -78,6 +79,7 @@ main(void)
 
     #endif
 
+    {
     /* Create the compression data */
     cmc::PrefixCompressionData compression_data(nc_data.TransferData(), std::move(settings));
 
@@ -92,20 +94,22 @@ main(void)
     cmc::cmc_debug_msg("\n\nCompression is finished\n\n");
 
     cmc::cmc_debug_msg("Write Compressed Data");
-    compression_data.WriteCompressedData("newly_example_compr_pref_tco3", 0);
+    compression_data.WriteCompressedData("newly_example_compr_pref_t2m", 0);
 
-
+    }
     #endif
     #if 1
 
+    {
     cmc::cmc_debug_msg("\n\nDecompression Start\n\n");
 
     /* Decompress */
-    cmc::prefix::Decompressor decoder("newly_example_compr_pref_tco3");
+    cmc::prefix::Decompressor decoder("newly_example_compr_pref_t2m");
 
     decoder.Setup();
-    decoder.DecompressVariable("tco3");
+    decoder.DecompressVariable("t2m");
     
+    }
     #endif
     //compression_data.WriteCompressedDataEGU("prefix_compressed_data.nc");
     
