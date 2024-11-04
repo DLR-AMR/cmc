@@ -9,7 +9,7 @@
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_variables.hxx"
 #include "utilities/cmc_span.hxx"
-#include "lossy/cmc_prefix_encoding.hxx"
+#include "utilities/cmc_prefix_encoding.hxx"
 #include <t8_forest/t8_forest_vtk.h>
 
 #include <vector>

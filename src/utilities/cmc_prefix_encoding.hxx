@@ -299,18 +299,22 @@ EncodeSuffixes(const std::vector<CompressionValue<N>>& suffixes)
         EncodeAndAppendPrefixLength(suffix_lengths, suffix_length);
 
         //cmc_debug_msg("Suffix TailBitPos: ", suff_iter->GetTrailBit());
-        if constexpr (N == 4)
-        {
-        //uint32_t bitssss = suff_iter->template ReinterpretDataAs<uint32_t>();
-        //cmc_debug_msg("Suffix_Length: ", suffix_length, "\t Bitset: ", std::bitset<32>(bitssss));
-        
+        //if constexpr (N == 4)
+        //{
+        ////uint32_t bitssss = suff_iter->template ReinterpretDataAs<uint32_t>();
+        ////cmc_debug_msg("Suffix_Length: ", suffix_length, "\t Bitset: ", std::bitset<32>(bitssss));
+        ////
         //std::vector<uint8_t> s = suff_iter->GetSignificantBitsInBigEndianOrdering();
+        //std::vector<uint8_t> sssss = s;
+        //sssss[0] = s[3]; sssss[1] = s[2]; sssss[2] = s[1]; sssss[3] = s[0];
+        ////
         //uint32_t valsss{0};
         //memcpy(&valsss, s.data(), s.size());
-        //cmc_debug_msg("Suffix_Length: ", suffix_length, "\t Bitset: ", std::bitset<32>(valsss));
-        }
+        //cmc_debug_msg("Bitset: ", std::bitset<32>(valsss), "    Suffix_Length: ", suffix_length);
+        //}
         //cmc_debug_msg("Suffix length: ", suffix_length);
         all_suffix_bits += suffix_length;
+
         /* Afterwards, the actual prefix itself has to encoded and stored as well */
         EncodeAndAppendPrefix(suffix_encodings, suff_iter->GetSignificantBitsInBigEndianOrdering(), suffix_length);
     }
@@ -355,35 +359,55 @@ EncodeSuffixes(const std::vector<CompressionValue<N>>& suffixes)
     return serialized_suffix_data;
 }
 
-#if 0
+
+
+template <int N>
 inline
-void
-DecodeSerializedVariable(const std::vector<uint8_t>& serialized_data, const std::vector<NcAttribute>& attributes)
+std::vector<uint8_t>
+EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
 {
-    
-}
-#endif
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(3 * suffixes.size() + 1);
 
-inline
-void
-DecodeLevelData(VectorView<uint8_t> level_bytes)
-{
-    cmc_debug_msg("size bytes: ", level_bytes.size(), " und extracted size: ", GetValueFromByteStream<size_t>(level_bytes.begin()));
-    cmc_assert(level_bytes.size() == GetValueFromByteStream<size_t>(level_bytes.begin()));
+    /* Iterate over all suffixes and check whether they exist (and have not been fully extracted), 
+     * if so, they will be encoded */
+    int all_suffix_bits = 0;
+    for (auto suff_iter = suffixes.begin(); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        /* If the suffix is empty, we indicate this and continue with the next suffix */
+        if (suff_iter->IsEmpty())
+        {
+            continue;
+        }
 
-    /* Offset for the first encoded values in the stream */
-    const size_t offset = sizeof(size_t);
+        all_suffix_bits += suff_iter->GetCountOfSignificantBits();
 
-    /* Get number of prefix indication bits */
-    const size_t num_bytes_indicator = GetValueFromByteStream<size_t>(level_bytes.begin());
+        /* Afterwards, the actual prefix itself has to encoded and stored as well */
+        EncodeAndAppendPrefix(suffix_encodings, suff_iter->GetSignificantBitsInBigEndianOrdering(), suff_iter->GetCountOfSignificantBits());
+    }
 
-    /* Get the number of bytes for the prefix lengths */
-    const size_t num_bytes_prefix_lengths = GetValueFromByteStream<size_t>(level_bytes.begin() + offset);
+    cmc_debug_msg("\nAll leftover Suffix Bits: ", all_suffix_bits, "\n");
 
-    /* Get the number of bytes for the prefix encodings */
-    const size_t num_bytes_prefixes = GetValueFromByteStream<size_t>(level_bytes.begin() + 2 * offset);
+    const size_t num_bytes_suffix_encodings = suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffix_encodings: ", num_bytes_suffix_encodings);
 
-    
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = sizeof(size_t) + num_bytes_suffix_encodings;
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_encodings.begin(), num_bytes_suffix_encodings, std::back_insert_iterator(serialized_suffix_data));
+
+    return serialized_suffix_data;
 }
 
 class PrefixDecoder
@@ -433,6 +457,9 @@ public:
     std::pair<std::vector<uint8_t>, int> GetNextPrefix();
 
     void MoveToGlobalPositionWithinLevel(const size_t global_start_position = 0);
+
+    void MoveToPlainEncodedSuffixLevel();
+    std::vector<uint8_t> GetNextPlainSuffix(const size_t num_bits);
 
 private:
     int DecodeTwoBitCode(const uint8_t two_bit_encoding) const;
@@ -499,6 +526,21 @@ bool
 PrefixDecoder::IsMoveToNextByteIndicator(const uint8_t four_bit_encoding) const
 {
     return ((four_bit_encoding >> kShiftFourBitPrefixLength) == kSkipToNextByteInEncodingStream);
+}
+
+inline
+void
+PrefixDecoder::MoveToPlainEncodedSuffixLevel()
+{
+    const size_t offset = sizeof(size_t);
+
+    /* Add the amount of bytes of the current level to the counter of all processed bytes */
+    processed_bytes_ += current_level_bytes_;
+
+    /* Get the following amount of bytes for the current level */
+    current_level_bytes_ = GetValueFromByteStream<size_t>(serialized_data_.data() + processed_bytes_);
+    cmc_debug_msg("Current lvl bbytes (in plain suff) is: ", current_level_bytes_);
+    prefixes_ = bit_vector::BitVectorView(serialized_data_.data() + processed_bytes_ + offset, current_level_bytes_ - offset);
 }
 
 inline
@@ -650,6 +692,13 @@ PrefixDecoder::GetNextPrefix()
 
     /* Get the actual prefix of the decoded length */
     return std::make_pair(prefixes_.GetNextBitSequence(static_cast<size_t>(prefix_length)), prefix_length);
+}
+
+inline
+std::vector<uint8_t>
+PrefixDecoder::GetNextPlainSuffix(const size_t num_bits)
+{
+    return prefixes_.GetNextBitSequence(num_bits);
 }
 
 }

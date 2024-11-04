@@ -1,7 +1,7 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_prefix.hxx"
-#include "lossy/cmc_prefix_encoding.hxx"
+#include "utilities/cmc_prefix_encoding.hxxx"
 #include "utilities/cmc_span.hxx"
 
 #include <iostream>

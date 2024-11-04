@@ -10,7 +10,7 @@
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adapt_track_inaccuracy.hxx"
 #include "t8code/cmc_t8_byte_variable.hxx"
-#include "lossy/cmc_prefix_encoding.hxx"
+#include "utilities/cmc_prefix_encoding.hxx"
 
 #include <vector>
 #include <memory>
@@ -189,6 +189,21 @@ public:
         byte_variable_.SetMesh(mesh);
     }
 
+    void InitializePlainSuffixDecompression()
+    {
+        byte_variable_.InitializeSuffixDecompression();
+        decoder_->MoveToPlainEncodedSuffixLevel();
+    }
+
+    void FinalizePlainSuffixDecompression()
+    {
+        byte_variable_.FinalizeDecompressionIteration();
+        ++count_decompression_step;
+
+        byte_variable_.WriteDataToVTK_(count_decompression_step);
+        //byte_variable_.PrintCompressionValues();
+    }
+
     void InitializeSuffixDecompression()
     {
         byte_variable_.InitializeSuffixDecompression();
@@ -246,6 +261,12 @@ public:
         return decoder_->GetNextPrefix();
     }
 
+    std::vector<uint8_t>
+    GetNextPlainSuffix(const size_t num_bits)
+    {
+        return decoder_->GetNextPlainSuffix(num_bits);
+    }
+
     void Refine(const int elem_id)
     {
         byte_variable_.DecompressionRefine(elem_id);
@@ -266,7 +287,15 @@ public:
         byte_variable_.LeaveElementUnchangedAndApplyPrefix(elem_id, prefix, num_prefix_bits);
     }
 
-private:
+    size_t GetCountSignificantBits(const int elem_id) const
+    {
+        return byte_variable_.GetCountSignificantBits(elem_id);
+    }
+    size_t GetBitCountOfDataType() const
+    {
+        return CmcTypeToBytes(byte_variable_.GetType()) * CHAR_BIT;
+    }
+private: 
     ByteVar& byte_variable_;
     std::vector<uint8_t> byte_stream_;
     std::unique_ptr<PrefixDecoder> decoder_;
