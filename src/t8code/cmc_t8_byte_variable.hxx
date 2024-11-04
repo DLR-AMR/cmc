@@ -87,6 +87,7 @@ public:
     void RefineAndApplyCommonPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
     void LeaveElementUnchangedAndApplyPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
     void PrintCompressionValues() const;
+    size_t GetCountSignificantBits(const int elem_id) const;
 
     t8_forest_t GetMesh() const;
     void SetMesh(t8_forest_t forest);
@@ -98,6 +99,7 @@ public:
     DataLayout GetPreCompressionLayout() const {return attributes_.GetPreCompressionLayout();};
     void SetMissingValueInNCFile(const int ncid, const int var_id, const int nc_type) const;
     
+    void KeepInitialData(const bool keep_data);
     void StoreInitialMesh();
     void ReleaseInitialMesh(); 
     friend class TransformerCompressionToByteVariable;
@@ -120,6 +122,7 @@ private:
 
     std::vector<CompressionValue<sizeof(T)>> byte_values_new_;
 
+    bool is_initial_data_kept_{true};
     bool is_initial_mesh_stored_{true};//TODO:revert to false
     t8_forest_t initial_mesh_{nullptr};
 };
@@ -167,6 +170,7 @@ public:
     void RefineAndApplyCommonPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
     void LeaveElementUnchangedAndApplyPrefix(const int elem_id, std::vector<uint8_t> prefix, const int num_prefix_bits);
     void PrintCompressionValues() const;
+    size_t GetCountSignificantBits(const int elem_id) const;
 
     void SetMesh(t8_forest_t forest);
     t8_forest_t GetMesh() const;
@@ -178,6 +182,8 @@ public:
     DataLayout GetPreCompressionLayout() const;
     void SetMissingValueInNCFile(const int ncid, const int var_id, const int nc_type) const;
     void StoreInitialMesh();
+    void KeepInitialData(const bool keep_data);
+
 private:
     void SetUpByteVariable(const CmcType type, const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
                       const int global_context_information, const CmcUniversalType missing_value);
@@ -297,6 +303,15 @@ ByteVar::StoreInitialMesh()
 {
     std::visit([](auto&& var){
         var.StoreInitialMesh();
+    }, var_);
+}
+
+inline
+void
+ByteVar::KeepInitialData(const bool keep_data)
+{
+    std::visit([&keep_data](auto&& var){
+        var.KeepInitialData(keep_data);
     }, var_);
 }
 
@@ -449,7 +464,7 @@ template<typename T>
 void
 ByteVariable<T>::WriteDataToVTK_(const int step_id)
 {
-    std::string file_name = "decompressed_pref_ex_data_step_" + std::to_string(step_id);
+    std::string file_name = "t2m_3d_time_lat_lon_pref_ex_data_step_" + std::to_string(step_id);
 
     std::vector<float> float_data;
 
@@ -486,7 +501,7 @@ ByteVariable<T>::WriteDataToVTK_(const int step_id)
 
         vtk_data[0].data = converted_data.data();
 
-        const int vtk_err = t8_forest_vtk_write_file(current_mesh, file_name.c_str(), 0, 1, 0, 0, 0, 1, vtk_data);
+        const int vtk_err = t8_forest_vtk_write_file(current_mesh, file_name.c_str(), 0, 0, 0, 0, 0, 1, vtk_data);
         
         if (vtk_err == 0)
             cmc_err_msg("An error occrued during the creation of the t8code-forest vtk file.");
@@ -546,6 +561,22 @@ ByteVar::InitializeSuffixDecompression()
     std::visit([](auto&& var){
         var.InitializeSuffixDecompression();
     }, var_);
+}
+
+inline
+size_t
+ByteVar::GetCountSignificantBits(const int elem_id) const
+{
+    return std::visit([&elem_id](const auto& var) -> size_t {
+        return var.GetCountSignificantBits(elem_id);
+    }, var_);
+}
+
+template<typename T>
+size_t
+ByteVariable<T>::GetCountSignificantBits(const int elem_id) const
+{
+    return byte_values_[elem_id].GetCountOfSignificantBits();
 }
 
 template<typename T>
@@ -1113,7 +1144,11 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
     }
 
     /* Encode and append the leftover suffixes (on the finest level) that could not be truncated or extracted */
+    #if 0
     buffered_data.emplace_back(EncodeSuffixes(byte_values_));
+    #else
+    buffered_data.emplace_back(EncodePlainSuffixes(byte_values_));
+    #endif
     cmc_debug_msg("Num bytes for suffixes: ", buffered_data.back().size());
     num_bytes += buffered_data.back().size();
     cmc_debug_msg("Overall bytes for this variable: ", num_bytes);
@@ -1206,6 +1241,20 @@ ByteVariable<T>::StoreInitialMesh()
     initial_mesh_ = mesh_.GetMesh();
     t8_forest_ref(initial_mesh_);
     is_initial_mesh_stored_ = true;
+}
+
+template<typename T>
+void
+ByteVariable<T>::KeepInitialData(const bool keep_data)
+{
+    is_initial_data_kept_ = keep_data;
+
+    if (!is_initial_data_kept_)
+    {
+        /* Try to release the memory of the stored intial data */
+        initial_data_.clear();
+        initial_data_.shrink_to_fit();
+    }
 }
 
 template<typename T>

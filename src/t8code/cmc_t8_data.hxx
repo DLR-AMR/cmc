@@ -31,10 +31,14 @@ public:
     AmrData() = delete;
     ~AmrData() = default;
     
-    AmrData(const std::vector<InputVar>& compression_variables, CompressionSettings& settings)
+    AmrData(const std::vector<InputVar>& compression_variables, const CompressionSettings& settings)
     : input_variables_{compression_variables}, compression_settings_{settings} {};
-    AmrData(std::vector<InputVar>&& compression_variables, CompressionSettings& settings)
+    AmrData(std::vector<InputVar>&& compression_variables, const CompressionSettings& settings)
     : input_variables_{std::move(compression_variables)}, compression_settings_{settings} {};
+    AmrData(const std::vector<InputVar>& compression_variables)
+    : input_variables_{compression_variables} {};
+    AmrData(std::vector<InputVar>&& compression_variables)
+    : input_variables_{std::move(compression_variables)} {};
 
     AmrData(const AmrData& other) = default;
     AmrData& operator=(const AmrData& other) = default;
@@ -47,6 +51,7 @@ public:
     void DistributeDataOnInitialMesh();
     void CompressByAdaptiveCoarsening(const CompressionMode compression_mode);
     void ApplyScalingAndOffset();
+    void TransformInputToCompressionVariables();
     void SetupVariablesForCompression();
     void SetInitialMesh(const AmrMesh& mesh);
     std::vector<ByteVar> GetByteVariablesForCompression();
@@ -87,7 +92,7 @@ private:
     std::vector<Var> variables_; //To be used after the Setup call
     
     std::vector<InputVar> input_variables_;
-    CompressionSettings& compression_settings_;
+    CompressionSettings compression_settings_;
     AmrMesh initial_mesh_;
     MPI_Comm comm_{MPI_COMM_WORLD};
 };

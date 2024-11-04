@@ -438,7 +438,7 @@ AmrData::DistributeDataOnInitialMesh()
     MPICheckError(err);
 
     #else
-    /* Call a locally sorting function which setups the data compiant to the Morton order */
+    /* Call a locally sorting function which setups the data compliant to the Morton order */
     cmc_assert(initial_mesh_.IsValid());
     SortLocalDataOnInitialMesh();
     #endif
@@ -478,9 +478,12 @@ AmrData::GetByteVariablesForCompression()
 }
 
 void
-AmrData::SetupVariablesForCompression()
+AmrData::TransformInputToCompressionVariables()
 {
     cmc_assert(initial_mesh_.IsValid());
+
+    /* Check if the input variables have already been transformed */
+    if (input_variables_.empty()) {return;}
 
     /* Create a callable transforming the input variables to  compression variables */
     TransformerInputToCompressionVariable transform_to_compression_variable;
@@ -491,11 +494,21 @@ AmrData::SetupVariablesForCompression()
     /* Transform each InputVariable to a compression variable */
     for (std::vector<cmc::InputVar>::iterator input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
+        /* Store the transformed compression variable */
         variables_.emplace_back(transform_to_compression_variable(*input_var_iter));
+
+        /* Set the intial mesh */
+        variables_.back().SetAmrMesh(initial_mesh_);
     }
 
     /* Delete the input variables (since they are no longer needed) */
     input_variables_.clear();
+}
+
+void
+AmrData::SetupVariablesForCompression()
+{
+    TransformInputToCompressionVariables();
 
     /* Check whether general compresison criteria have been supplied */
     const auto CapturekErrorCriterionHoldsForAllVariables = kErrorCriterionHoldsForAllVariables;
@@ -522,11 +535,7 @@ AmrData::SetupVariablesForCompression()
         
         /* Set the inaccuracy container up */
         var_iter->SetUpInaccuracyStorage(initial_mesh_.GetNumberLocalElements());
-
-        /* Set the intial mesh */
-        var_iter->SetAmrMesh(initial_mesh_);
     }
-
 }
 
 size_t AmrData::GetNumberOfInputVariables() const
