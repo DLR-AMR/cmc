@@ -11,7 +11,6 @@
 #include "utilities/cmc_input_variable.hxx"
 #include "t8code/cmc_t8_data_variables_forward.hxx"
 #include "utilities/cmc_output_variable_forward.hxx"
-#include "lossy/cmc_sz_like_compression.hxx"
 
 #ifdef CMC_ENABLE_MPI
 #include <mpi.h>
@@ -99,7 +98,6 @@ private:
 
     //std::unique_ptr<AmrData> compression_data_;
     std::unique_ptr<AmrData> compression_data_{nullptr};
-    std::unique_ptr<SZCompressor> sz_compression_data_{nullptr};
     CompressionSettings compression_settings_;
     CompressionMode compression_mode_{CompressionMode::CompressionModeUndefined};
     MPI_Comm comm_{MPI_COMM_WORLD};

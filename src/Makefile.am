@@ -37,7 +37,6 @@ src/t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx \
 src/utilities/cmc_output_variable_forward.hxx \
 src/utilities/cmc_output_variable.hxx \
 src/utilities/cmc_geo_utilities.hxx \
-src/lossy/cmc_sz_like_compression.hxx \
 src/utilities/cmc_prefix.hxx \
 src/lossy/cmc_amr_compression.hxx \
 src/t8code/cmc_t8_byte_variable.hxx \
@@ -84,7 +83,6 @@ src/utilities/cmc_variable_transformer.cxx \
 src/utilities/cmc_output_variable.cxx \
 src/utilities/cmc_cart_coordinate.cxx \
 src/utilities/cmc_geo_utilities.cxx \
-src/lossy/cmc_sz_like_compression.cxx \
 src/lossy/cmc_amr_compression.cxx \
 src/t8code/cmc_t8_byte_variable.cxx \
 src/netcdf/cmc_nc_decompress.cxx \

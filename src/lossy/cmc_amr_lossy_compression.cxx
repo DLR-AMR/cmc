@@ -261,19 +261,4 @@ CompressionData::WriteCompressedData(const std::string& file_name) const
     compression_data_->WriteCompressedData(file_name);
 }
 
-
-void
-CompressionData::SupplementarySZLikeCompression()
-{
-    if (!is_compression_applied_)
-    {
-        cmc_err_msg("Supplementary compression with SZ could not be applied.");
-        return;
-    }
-
-    sz_compression_data_ = std::make_unique<SZCompressor>(compression_data_->GetCompressionVariables());
-
-    sz_compression_data_->Compress();
-}
-
 }
