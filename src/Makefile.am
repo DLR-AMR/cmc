@@ -52,7 +52,7 @@ src/netcdf/cmc_nc_io_conventions.hxx \
 src/utilities/cmc_bit_vector.hxx \
 src/utilities/cmc_bit_map.hxx \
 src/lossy/cmc_compression_class.hxx \
-src/lossy/cmc_prefix_decompression.hxx \
+src/decompression/cmc_prefix_decompression.hxx \
 src/lossless/cmc_prefix_compression.hxx
 
 if ENABLE_FORTRAN
@@ -92,7 +92,7 @@ src/netcdf/cmc_nc_writer.cxx \
 src/netcdf/cmc_nc_io.cxx \
 src/netcdf/cmc_nc_reader.cxx \
 src/cmc_compression.cxx \
-src/lossy/cmc_prefix_decompression.cxx \
+src/decompression/cmc_prefix_decompression.cxx \
 src/lossless/cmc_prefix_compression.cxx
 
 

@@ -5,7 +5,7 @@
 #include "netcdf/cmc_netcdf.hxx"
 #include "lossy/cmc_amr_lossy_compression_settings.hxx"
 #include "lossy/cmc_amr_compression.hxx"
-#include "lossy/cmc_prefix_decompression.hxx"
+#include "decompression/cmc_prefix_decompression.hxx"
 
 #include <cfenv>
 int

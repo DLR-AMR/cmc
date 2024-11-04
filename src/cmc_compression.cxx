@@ -1,7 +1,7 @@
 #include "cmc_compression.hxx"
 #include "netcdf/cmc_nc_reader.hxx"
 #include "utilities/cmc_log_functions.hxx"
-#include "lossy/cmc_prefix_decompression.hxx"
+#include "decompression/cmc_prefix_decompression.hxx"
 
 #include <vector>
 

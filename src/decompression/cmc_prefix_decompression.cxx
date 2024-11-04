@@ -1,4 +1,4 @@
-#include "lossy/cmc_prefix_decompression.hxx"
+#include "decompression/cmc_prefix_decompression.hxx"
 #include "netcdf/cmc_nc_io_conventions.hxx"
 #include "netcdf/cmc_nc_reader.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
