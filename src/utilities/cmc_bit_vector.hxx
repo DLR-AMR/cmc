@@ -74,6 +74,8 @@ public:
 
     size_t size() const { return vector_.size();};
     
+    const uint8_t* data() const {return vector_.data();};
+
 private:
     size_t bit_position_{kBitIndexStart};
     size_t byte_position_{0};
