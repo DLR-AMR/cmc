@@ -99,6 +99,7 @@ public:
     size_t size() const {return num_bits_;};
     size_t size_bytes() const {return vector_.size();};
 
+    const std::vector<uint8_t>& GetByteData() const {return vector_;};
 private:
     size_t bit_position_{0};
     size_t byte_position_{0};
