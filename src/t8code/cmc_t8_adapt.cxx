@@ -142,6 +142,10 @@ AdaptData::InitializeCompressionIteration()
         /* In a One For One compression mode */
         GetCurrentCompressionVariable().InitializeVariableForCompressionIteration();
     }
+    /* Allocate a new bitmap which stores the coarsening operations reversely */
+    refinement_indications_.emplace_back();
+    refinement_indications_.back().Reserve(static_cast<size_t>(t8_forest_get_local_num_elements(GetCurrentMesh())));
+    //TODO: Offset bitmap such that it blends with the other processes in parallel (start_offset: first_global_elem_id % 8)
 }
 
 Var&
@@ -160,6 +164,26 @@ AdaptData::GetCurrentCompressionVariable() const
     auto var_iter = std::find_if(variables_.begin(), variables_.end(), [this](const Var& var){return var.GetInternalID() == corresponding_variable_id_;});
     cmc_assert(var_iter != variables_.end());
     return *var_iter;
+}
+
+void
+AdaptData::IndicateCoarsening()
+{
+    refinement_indications_.back().AppendSetBit();
+}
+
+void
+AdaptData::IndicateElementStaysUnchanged()
+{
+    refinement_indications_.back().AppendUnsetBit();
+}
+
+[[nodiscard]] std::vector<bit_map::BitMap>
+AdaptData::TransferIndicationBits()
+{
+    std::vector<bit_map::BitMap> temp_ = std::move(refinement_indications_);
+    refinement_indications_.clear();
+    return temp_;
 }
 
 }

@@ -84,8 +84,7 @@ main(void)
     cmc::amr::Compressor compression_data(nc_data.TransferData(), std::move(settings));
 
     /* Setup the example data for the compression */
-    const bool perform_default_lossy_compression_as_well = false;
-    compression_data.Setup(perform_default_lossy_compression_as_well);
+    compression_data.Setup();
 
     cmc::cmc_debug_msg("\n\nSetup is finished\n\n");
 

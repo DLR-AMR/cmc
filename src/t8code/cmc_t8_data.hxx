@@ -12,6 +12,7 @@
 #include "t8code/cmc_t8_adapt.hxx"
 #include "utilities/cmc_output_variable_forward.hxx"
 #include "t8code/cmc_t8_byte_variable.hxx"
+#include "utilities/cmc_bit_map.hxx"
 
 #ifdef CMC_ENABLE_MPI
 #include <mpi.h>
@@ -22,6 +23,16 @@
 
 namespace cmc
 {
+
+struct AdaptiveCoarseningIndications
+{
+    AdaptiveCoarseningIndications(const std::vector<bit_map::BitMap>& indications)
+    : ac_indicator_bits{indications} {};
+    AdaptiveCoarseningIndications(std::vector<bit_map::BitMap>&& indications)
+    : ac_indicator_bits{std::move(indications)} {};
+    
+    std::vector<bit_map::BitMap> ac_indicator_bits;
+};
 
 class AmrData
 {
@@ -55,6 +66,7 @@ public:
     void SetupVariablesForCompression();
     void SetInitialMesh(const AmrMesh& mesh);
     std::vector<ByteVar> GetByteVariablesForCompression();
+    [[nodiscard]] std::vector<AdaptiveCoarseningIndications> TransferIndicationBits();
 
     void DecompressToInitialRefinementLevel(const bool restrict_to_global_domain = true);
     std::vector<OutputVar> SeizeRawDecompressedVariable();
@@ -94,6 +106,9 @@ private:
     std::vector<InputVar> input_variables_;
     CompressionSettings compression_settings_;
     AmrMesh initial_mesh_;
+
+    std::vector<AdaptiveCoarseningIndications> ac_indications_;
+
     MPI_Comm comm_{MPI_COMM_WORLD};
 };
 

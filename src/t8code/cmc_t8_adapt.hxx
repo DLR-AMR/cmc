@@ -11,6 +11,7 @@
 #include "t8code/cmc_t8_adapt_track_inaccuracy.hxx"
 #include "t8code/cmc_t8_byte_variable.hxx"
 #include "utilities/cmc_prefix_encoding.hxx"
+#include  "utilities/cmc_bit_map.hxx"
 
 #include <vector>
 #include <memory>
@@ -46,9 +47,13 @@ public:
 
     void UpdateCompressionData();
 
+    void IndicateCoarsening();
+    void IndicateElementStaysUnchanged();
+    [[nodiscard]] std::vector<bit_map::BitMap> TransferIndicationBits();
 private:
     const CompressionSettings& compression_settings_;
     std::vector<Var>& variables_;
+    std::vector<bit_map::BitMap> refinement_indications_;
     t8_gloidx_t previous_number_of_elements_{-1};
     t8_gloidx_t new_number_of_elements_{0};
     int corresponding_variable_id_;

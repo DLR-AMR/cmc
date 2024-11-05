@@ -503,6 +503,9 @@ AmrData::TransformInputToCompressionVariables()
 
     /* Delete the input variables (since they are no longer needed) */
     input_variables_.clear();
+
+    /* Allocate memory for the indication bits resulting from the adaptive caorsening procedure */
+    ac_indications_.reserve(variables_.size());
 }
 
 void
@@ -608,7 +611,7 @@ AmrData::CheckConsistencyOfInputVariables() const
 bool
 AmrData::IsValidForCompression() const
 {
-    /* Checkt he variables's data and the initial mesh */
+    /* Check the variables's data and the initial mesh */
     const t8_locidx_t num_elements = initial_mesh_.GetNumberLocalElements();
 
     for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
@@ -681,11 +684,20 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
 
             adapt_data.FinalizeCompressionIteration();
         }
+
+        ac_indications_.emplace_back(adapt_data.TransferIndicationBits());
         }
 
     #endif
 }
 
+[[nodiscard]] std::vector<AdaptiveCoarseningIndications>
+AmrData::TransferIndicationBits()
+{
+    std::vector<AdaptiveCoarseningIndications> temp_ = std::move(ac_indications_);
+    ac_indications_.clear();
+    return temp_;
+}
 
 void 
 AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain)

@@ -30,7 +30,7 @@ Compressor::GetMpiSize() const
 }
 
 void
-Compressor::Setup(const bool with_default_lossy_amr_compression)
+Compressor::Setup()
 {
     compression_data_->SplitVariables();
 
@@ -43,42 +43,30 @@ Compressor::Setup(const bool with_default_lossy_amr_compression)
     compression_data_->ApplyScalingAndOffset();
 
     compression_data_->SetupVariablesForCompression();
-
-    if (!with_default_lossy_amr_compression)
-    {
-        /* In case a default lossy compression needs to be performed first, we have to postpone the transfomration to byte variables */
-        compression_variables_ = compression_data_->GetByteVariablesForCompression();
-    } else
-    {
-        perform_default_lossy_compression_ = true;
-    }
 }
 
 
 void
 Compressor::Compress()
 {
-    /* Check if the default lossy compression is about to be applied */
-    if (perform_default_lossy_compression_)
+
+    /* Perform the default lossy compression */
+    compression_data_->CompressByAdaptiveCoarsening(CompressionMode::OneForOne);
+
+    /* Transform the data to byte variables */
+    compression_variables_ = compression_data_->GetByteVariablesForCompression();
+
+    /* Get the coarsening/refienment bits for all variables */
+    ac_indications_ = compression_data_->TransferIndicationBits();
+    
+    /* Afterwards, we do not need the compression_data anymore since we have transfered all necessary data */
+    compression_data_.reset(nullptr);
+
+    /* Store the initial compressed mesh */
+    for (auto cv_iter = compression_variables_.begin(); cv_iter != compression_variables_.end(); ++cv_iter)
     {
-        /* Perform the default lossy compression */
-        compression_data_->CompressByAdaptiveCoarsening(CompressionMode::OneForOne);
-
-        /* Transform the data to byte variables */
-        compression_variables_ = compression_data_->GetByteVariablesForCompression();
-
-        /* Store the initial compressed mesh */
-        for (auto cv_iter = compression_variables_.begin(); cv_iter != compression_variables_.end(); ++cv_iter)
-        {
-            cv_iter->StoreInitialMesh();
-        }
+        cv_iter->StoreInitialMesh();
     }
-
-    /* Perform trail truncation until the error thresholds are exhausted */
-    //for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
-    //{
-    //    var_iter->PerformTailTruncation();
-    //}
 
     /* Afterwards, we create prefixes in the tree hierachy */
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
@@ -104,21 +92,77 @@ Compressor::Compress()
     }
 }
 
+static
+NcVariable
+CreateRefinementBitsVariable(const ByteVar& var, const int time_step, const std::vector<bit_map::BitMap>& levelwise_indication_bits)
+{
+    /* Generate a (potentially new) context information for the variable */
+    const int global_context_info = (var.GetGlobalContextInformation() != kNoGlobalContext ? var.GetGlobalContextInformation() : 0);
+
+    /* Create a netCDF variable to put out */
+    std::string var_name = var.GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step) + "ref_bits";
+
+    /* Count the bytes needed by the refinement bits */
+    size_t num_bytes = 0;
+    for (auto iter = levelwise_indication_bits.rbegin(); iter != levelwise_indication_bits.rend(); ++iter)
+    {
+        num_bytes += iter->size_bytes();
+    }
+
+    /* We add a size_t for each refinement level indicating the number of bits encoded */
+    num_bytes += sizeof(size_t) * levelwise_indication_bits.size();
+
+    NcSpecificVariable<uint8_t> indication_bits {var_name, var.GetID()};
+    indication_bits.Reserve(num_bytes);
+
+    /* We store a size_t of the number of bits in a stream */
+    std::vector<uint8_t> serialized_bit_count;
+    serialized_bit_count.reserve(sizeof(size_t));
+
+    /* We copy the data to the byte stream (in reverese in order to reconstruct it more easily during the decompression) */
+    for (auto iter = levelwise_indication_bits.rbegin(); iter != levelwise_indication_bits.rend(); ++iter)
+    {
+        /* We serialize the bit count and store it temporarily */
+        const size_t num_bits = iter->size();
+        serialized_bit_count.clear();
+        PushBackValueToByteStream(serialized_bit_count, num_bits);
+
+        /* Push back the bit count */
+        indication_bits.PushBack(serialized_bit_count);
+        
+        /* Afterwards, we are storing the actual refinement bits for this level */
+        indication_bits.PushBack(iter->GetByteData());
+    }
+
+    /* Assign some attributes to it */
+    std::vector<NcAttribute> attributes;
+    attributes.emplace_back("id", var.GetID());
+    attributes.emplace_back("time_step", time_step);
+    attributes.emplace_back("add_refinements", static_cast<int>(levelwise_indication_bits.size()));
+
+    return NcVariable(std::move(indication_bits), std::move(attributes));
+}
+
 void
 Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
     std::vector<NcVariable> vars;
-    vars.reserve(compression_variables_.size());
-    for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
+    vars.reserve(2 * compression_variables_.size());
+
+    int ac_bits_index = 0;
+    for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter, ++ac_bits_index)
     {
+        /* Write the compressed byte variable */
         vars.push_back(var_iter->WriteCompressedData(time_step));
+        /* Write the refinement bits from the adaptive coarsening steps */
+        vars.push_back(CreateRefinementBitsVariable(*var_iter, time_step, ac_indications_[ac_bits_index].ac_indicator_bits));
     }
 
     NcWriter writer(file_name, NC_NETCDF4); //oder NC_CDF5
 
     writer.AddVariable(vars.back());
     writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));
-    writer.Write();   
+    writer.Write();
 }
 
 }

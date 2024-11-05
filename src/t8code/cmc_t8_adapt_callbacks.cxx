@@ -60,6 +60,7 @@ PerformAdaptiveCoarseningOneForOne (t8_forest_t forest,
         !IsCoarsenedFromTheBeginningOnwards(ts, elements[0], adapt_data->GetInitialRefinementLevelOfMesh(), adapt_data->GetAdaptationStepCount()))
     {
         compression_variable.LeaveElementUnchanged(lelement_id);
+        adapt_data->IndicateElementStaysUnchanged();
         return kLeaveElementUnchanged;
     }
 
@@ -70,6 +71,7 @@ PerformAdaptiveCoarseningOneForOne (t8_forest_t forest,
             if (!IsMeshElementWithinGlobalDomain(elements[j], ts, compression_variable.GetGlobalDomain(), adapt_data->GetInitialRefinementLevelOfMesh(), compression_variable.GetInitialDataLayout()))
             {
                 compression_variable.LeaveElementUnchanged(lelement_id);
+                adapt_data->IndicateElementStaysUnchanged();
                 return kLeaveElementUnchanged;
             }
         }
@@ -85,11 +87,13 @@ PerformAdaptiveCoarseningOneForOne (t8_forest_t forest,
     if (evaluation.is_error_threshold_satisfied)
     {
         compression_variable.ApplyInterpolation(lelement_id, evaluation);
+        adapt_data->IndicateCoarsening();
         return kCoarsenElements;
     } else
     {
         compression_variable.PopInterpolation();
         compression_variable.LeaveElementUnchanged(lelement_id);
+        adapt_data->IndicateElementStaysUnchanged();
         return kLeaveElementUnchanged;
     }
 
