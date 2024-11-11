@@ -62,13 +62,17 @@ NcWriter::NcCreate()
     return ncid;
 }
 
-
-
 void
 NcWriter::NcClose(const int ncid) const
 {
     const int err = nc_close(ncid);
     NcCheckError(err);
+}
+
+void
+NcWriter::ReserveVariables(const size_t num_variables)
+{
+    variables_.reserve(num_variables);
 }
 
 void

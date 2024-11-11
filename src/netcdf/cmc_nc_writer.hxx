@@ -25,6 +25,7 @@ public:
     NcWriter(NcWriter&& other) = default;
     NcWriter& operator=(NcWriter&& other) = default;
 
+    void ReserveVariables(const size_t num_variables);
     void AddGlobalAttribute(const NcAttribute& attribute);
     void AddGlobalAttribute(NcAttribute&& attribute);
 
