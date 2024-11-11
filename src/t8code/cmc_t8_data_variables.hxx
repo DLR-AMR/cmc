@@ -129,8 +129,7 @@ public:
     Var(const int id, const int internal_id, const CmcType type, CmcVariable&& variable)
     : id_{id}, internal_id_{internal_id}, type_{type}, var_{std::move(variable)}{};
     Var(const Var& other) = default;
-    Var(Var&& other)
-    :id_{other.id_}, type_{other.type_}, var_{std::move(other.var_)}{};
+    Var(Var&& other) = default;
     
     Var& operator=(const Var& other);
     Var& operator=(Var&& other) = default;
