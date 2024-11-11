@@ -47,6 +47,18 @@ namespace cmc
 {
 
 void
+AmrData::SetCompressionSettings(const CompressionSettings& settings)
+{
+    compression_settings_ = settings;
+}
+
+void
+AmrData::SetCompressionSettings(CompressionSettings&& settings)
+{
+    compression_settings_ = std::move(settings);
+}
+
+void
 AmrData::SplitVariables()
 {
     if (!compression_settings_.AreThereVariablesToSplit())
@@ -302,11 +314,14 @@ AmrData::ReceiveInitialData()
                 MPICheckError(err);
             }
 
-
+            cmc_debug_msg("In Receive Initial Data: Id is: ", variable_id);
             /** We only do receive two messages from each process that sends data, since it is collected prior to the communication ,
               * Therefore, we need to check if we have already received elements from the rank this messag originated from. */
             std::vector<cmc::VariableRecvMessage>::iterator msg_iter = std::find_if(recv_messages.begin(), recv_messages.end(),
-                                                                                    [&source](auto& msg){return source == msg.GetSendingRank();});
+                                                                                    [&source, &variable_id](auto& msg){return (source == msg.GetSendingRank() && variable_id == msg.GetVariableID());});
+            
+            /* We receive (potentially) two messages from each process for each variable */
+
             /* Check if there has been a message found coming from this rank */
             if (msg_iter == recv_messages.end())
             {
@@ -323,7 +338,6 @@ AmrData::ReceiveInitialData()
             {
                 cmc_debug_msg("Trying to Received ", num_elems, " data values from rank ", source, " for variable ", variable_id);
                 void* dataptr = msg_iter->GetInitialDataPtr();
-                std::vector<int16_t> testdata(num_elems);
                 /* Receive the actual data from this process */
                 err = MPI_Recv(dataptr, num_elems, data_type, source, tag, comm_, MPI_STATUS_IGNORE);
                 MPICheckError(err); 
@@ -333,7 +347,6 @@ AmrData::ReceiveInitialData()
             {
                 cmc_debug_msg("Trying to Received ", num_elems, " Morton indices from rank ", source, " for variable ", variable_id);
                 void* miptr = msg_iter->GetInitialMortonIndicesPtr();
-                std::vector<int64_t> testdata(num_elems);
                 /* Otherwise, we receive the sent Morton indices */
                 err = MPI_Recv(miptr, num_elems, MPI_MORTON_INDEX_T, source, tag, comm_, MPI_STATUS_IGNORE);
                 MPICheckError(err);
@@ -361,13 +374,13 @@ AmrData::SortInitialDataIntoVariables(const std::vector<VariableRecvMessage>& me
     {
         input_var_iter->SetUpFilledVariable(initial_mesh_.GetNumberLocalElements(), input_var_iter->GetMissingValue());
     }
-
+    cmc_debug_msg("\n\n\nSizeof messages: ", messages.size(), "\n");
     /* Iterate over all messages and assign their data to the correct variables */
     for (auto msg_iter = messages.begin(); msg_iter != messages.end(); ++msg_iter)
     {
         /* Find the variable to which the current message is assigned */
         auto var_iter = std::find_if(input_variables_.begin(), input_variables_.end(), [&msg_iter](auto& var){return var.GetInternID() == msg_iter->GetVariableID();});
-
+        cmc_debug_msg("\n\n\nSort in intial data\n\nName: ", var_iter->GetName(), ", id: ", var_iter->GetID(), ", global context: ", var_iter->GetGlobalContextInformation());
         /* All processes should have prior knowledge to all variables. Therefore, a variable with the ID from the message has to be found locally */
         if (var_iter == input_variables_.end())
         {
@@ -390,9 +403,9 @@ AmrData::SortLocalDataOnInitialMesh()
     sorted_input_variables.reserve(input_variables_.size());
 
     /* Create new variables and assign the sorted data to them */
-    for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++ input_var_iter)
+    for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
-        sorted_input_variables.push_back(MetaCopy(*input_var_iter));
+        sorted_input_variables.emplace_back(MetaCopy(*input_var_iter));
         sorted_input_variables.back().SetUpFilledVariable(initial_mesh_.GetNumberLocalElements(), input_var_iter->GetMissingValue());
         sorted_input_variables.back().AssignDataAtLinearIndices(*input_var_iter, local_indices_update);
     }
@@ -411,6 +424,8 @@ AmrData::DistributeDataOnInitialMesh()
     /* We create intern IDs that are uniquely identifiable for the parallel communication */
     CreateInternIDsForRedistribution();
 
+    cmc_debug_msg("Size of input variables: ", input_variables_.size());
+
     /* Transform all coordinates to Morton indices */
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
@@ -422,14 +437,14 @@ AmrData::DistributeDataOnInitialMesh()
      * the actual sending has happend. Therefore, we keep them here 'alive' until 
      * all send_requests have been completed */
     auto [send_messages, send_requests] = SendInitialData();
-    
+    cmc_debug_msg("send_messages.size() = ", send_messages.size());
     /* Wait until all messages have been staged */
     int err = MPI_Barrier(comm_);
     MPICheckError(err);
 
     /* After all messages have been staged, we will receive them */
     const std::vector<VariableRecvMessage> received_messages = ReceiveInitialData();
-
+    cmc_debug_msg("received_messages.size() = ", received_messages.size());
     /* Sort the data accordingly to the Morton indices */
     SortInitialDataIntoVariables(received_messages);
 
@@ -1194,12 +1209,12 @@ AmrData::WriteVTKFilePerVariable(const std::string& file_name) const
 
     /* Create a new vtk field holding the element data arrays */
     t8_vtk_data_field_t *vtk_data = new t8_vtk_data_field_t[1];
-
-    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    int i = 0;
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter, ++i)
     {
 
         /* Set the type of the data and pointer to the data */
-        std::ignore = snprintf(vtk_data[0].description, 128, "%s", var_iter->GetName().c_str());
+        std::ignore = snprintf(vtk_data[0].description, 128, "%s_%d", var_iter->GetName().c_str(), i);
         
         vtk_data[0].type = T8_VTK_SCALAR;
 

@@ -30,7 +30,7 @@ struct AdaptiveCoarseningIndications
     : ac_indicator_bits{indications} {};
     AdaptiveCoarseningIndications(std::vector<bit_map::BitMap>&& indications)
     : ac_indicator_bits{std::move(indications)} {};
-    
+
     std::vector<bit_map::BitMap> ac_indicator_bits;
 };
 
@@ -55,6 +55,9 @@ public:
     AmrData& operator=(const AmrData& other) = default;
     AmrData(AmrData&& other) = default;
     AmrData& operator=(AmrData&& other) = default;
+
+    void SetCompressionSettings(const CompressionSettings& settings);
+    void SetCompressionSettings(CompressionSettings&& settings);
 
     void SplitVariables();
     bool CheckConsistencyOfInputVariables() const;
