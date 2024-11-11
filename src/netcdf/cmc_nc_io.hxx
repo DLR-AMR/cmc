@@ -248,7 +248,7 @@ NcSpecificVariable<T>::GetDimensionsFromVariable() const
     {
         case DataFormat::LinearFormat:
             /* For example SFC indices */
-            nc_dims.emplace_back("lin_index", data_.size());
+            nc_dims.emplace_back(GetName() + "_lin_index", data_.size());
             nc_dims.back().AppendNumToName(id_);
         break;
         default:
