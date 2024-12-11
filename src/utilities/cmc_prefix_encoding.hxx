@@ -473,6 +473,108 @@ EncodeSuffixes(const std::vector<CompressionValue<N>>& suffixes)
 template <int N>
 inline
 std::vector<uint8_t>
+EncodeSuffixLengths(const std::vector<CompressionValue<N>>& suffixes)
+{
+    /* A BitVector to store the encoded suffix lengths */
+    bit_vector::BitVector suffix_lengths;
+    suffix_lengths.Reserve(suffixes.size() / 2 + 1);
+    
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(suffixes.size() + 1);
+
+    std::vector<int> frequency(N * bit_vector::kCharBit + 1, int{0});
+
+    /* Iterate over all suffixes on this level */
+    for (auto val_iter = suffixes.begin(); val_iter != suffixes.end(); ++val_iter)
+    {
+        /* Get the count of significant bits, i.e. the length of the prefix */
+        const int suff_length = static_cast<uint16_t>(val_iter->GetCountOfSignificantBits());
+
+        /* Increment the counter for the given prefix length */
+        ++frequency[suff_length];
+    }
+
+    /* Create a huffman tree out of it */
+    huffman::HuffmanTree<int> huffman_encoder(frequency);
+    cmc_debug_msg("Huffmann Coder has been instantiated");
+
+    /* Iterate over all suffixes and check whether they exist (and have not been fully extracted), 
+     * if so, they will be encoded */
+    int all_suffix_bits = 0;
+
+    for (auto suff_iter = suffixes.begin(); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        /* If the prefix is not empty, it's length has to be encoded and stored. */
+        const int suffix_length = suff_iter->GetCountOfSignificantBits();
+
+        /* Encode the prefix length with the huffman tree */
+        const auto [code, code_length] = huffman_encoder.EncodeSymbol(static_cast<uint8_t>(suffix_length));
+
+        if (code_length > 0)
+        {
+            /* The code length is only encoded when there is an actual code. A code of length zero occurs, when the whole block is 
+             * is coarsened to only a single value (the optimal code in that case is of length zero) */
+            suffix_lengths.AppendBits(code, static_cast<int>(code_length));
+        }
+
+        if (suffix_length != 0)
+        {
+            /* If there is a prefix to encode, we get the prefix and set it in the encoded stream */
+            const std::vector<uint8_t> suffix = suff_iter->GetSignificantBitsInBigEndianOrdering();
+            suffix_encodings.AppendBits(suffix, suffix_length);
+        }
+
+
+        all_suffix_bits += suffix_length;
+    }
+
+    cmc_debug_msg("\nAll leftover Suffix Bits: ", all_suffix_bits, "\n");
+
+    /* We want to add a flag in the prefix lengths, that here (at the end of the process local encodings) is a boundary where we skip to the next byte in the prefix lengths as well as in the prefix encodings */
+    //EncodeAndAppendSuffixLengthByteBoundary(suffix_lengths);
+
+    /* Pack all the data to a single stream */
+    const size_t num_bytes_suffix_length_encodings = suffix_lengths.size();
+    cmc_debug_msg("num_bytes_suffix_length_encodings: ", num_bytes_suffix_length_encodings);
+    const size_t num_bytes_suffix_encodings = suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffix_encodings: ", num_bytes_suffix_encodings);
+
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = 3 * sizeof(size_t) + sizeof(uint16_t) + num_bytes_suffix_length_encodings + num_bytes_suffix_encodings;
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Afterwards, we store the number of bits for the suffix indicators, the number of bytes for the suffix lengths
+     * and then the number of bytes for the encoding of the actual suffixes */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffix_length_encodings);
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffix_encodings);
+
+    /* Serialioze the huffman tree and store it */
+    const size_t symbol_size = 6;
+    bit_vector::BitVector serialized_huffman_tree = huffman_encoder.SerializeHuffmanTree(symbol_size);
+    cmc_debug_msg("Huffmann tree has been serialized");
+    
+    const uint16_t huffman_tree_size = serialized_huffman_tree.size();
+    PushBackValueToByteStream(serialized_suffix_data, huffman_tree_size);
+    std::copy_n(serialized_huffman_tree.begin(), huffman_tree_size, std::back_insert_iterator(serialized_suffix_data));
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_lengths.begin(), num_bytes_suffix_length_encodings, std::back_insert_iterator(serialized_suffix_data));
+    std::copy_n(suffix_encodings.begin(), num_bytes_suffix_encodings, std::back_insert_iterator(serialized_suffix_data));
+
+    return serialized_suffix_data;
+}
+
+template <int N>
+inline
+std::vector<uint8_t>
 EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
 {
     /* A BitVector to store the actual encoded suffix */

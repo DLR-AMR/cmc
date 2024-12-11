@@ -1258,7 +1258,7 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, const Su
             return WriteCompressedData(id, time_step, EncodePlainSuffixes);
         break;
         case SuffixEncoding::LengthEncoding:
-            return WriteCompressedData(id, time_step, EncodeSuffixes);
+            return WriteCompressedData(id, time_step, EncodeSuffixLengths);
         break;
         default:
             cmc_err_msg("An unknown suffix encoding scheme has been supplied.");

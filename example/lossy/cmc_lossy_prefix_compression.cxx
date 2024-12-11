@@ -39,7 +39,7 @@ main(void)
     cmc::CompressionSettings settings;
 
     const double rel_max_err = 0.01;
-    settings.SetRelativeErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
+    settings.SetAbsoluteErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
 
 
