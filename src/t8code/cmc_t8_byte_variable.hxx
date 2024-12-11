@@ -59,6 +59,7 @@ public:
     const std::string& GetName() const {return name_;}
 
     void PerformTailTruncation();
+    void PerformTailTruncationOnInitialData();
 
     void InitializeCompressionIteration();
     void FinalizeCompressionIteration();
@@ -163,6 +164,7 @@ public:
 
     /** Compression Routines **/
     void PerformTailTruncation();
+    void PerformTailTruncationOnInitialData();
     void ExtractCommonPrefixFromInitialData(const int elem_start_index, const int num_elements);
     void ExtractCommonPrefixFromPreviousPrefixes(const int elem_start_index, const int num_elements);
     void ExtractCommonPrefixFromInitialData(const std::vector<int>& element_ids);
@@ -338,6 +340,15 @@ ByteVar::PerformTailTruncation()
 {
     std::visit([](auto&& var){
         var.PerformTailTruncation();
+    }, var_);
+}
+
+inline
+void
+ByteVar::PerformTailTruncationOnInitialData()
+{
+    std::visit([](auto&& var){
+        var.PerformTailTruncationOnInitialData();
     }, var_);
 }
 
@@ -800,6 +811,55 @@ ByteVariable<T>::PerformTailTruncation()
             //TODO: Revert! Only for now with absolute errors
             const std::vector<PermittedError> permitted_errors = GetRemainingMaxAllowedAbsoluteError(index);
             //const std::vector<PermittedError> permitted_errors = GetPermittedError(index);
+
+            /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
+            const CompressionValue<sizeof(T)> toggled_value = GetMaximumTailToggledValue(index, permitted_errors, *val_iter, missing_value);
+
+            /* Get the value which has been transformed by clearing as many of the last set bits as possible */
+            const CompressionValue<sizeof(T)> cleared_value = GetMaximumTailClearedValue(index, permitted_errors, *val_iter, missing_value);
+
+            /* Check which approach leads to more zero bits at the end */
+            const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
+            const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
+
+            /* Replace the initial value with the transformed one */
+            if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
+            {
+                /* If the toggling approach has been more successfull */
+                *val_iter = toggled_value;
+            } else
+            {
+                /* If the clearing approach has been more successfull */
+                *val_iter = cleared_value;
+            }
+
+            /* Update the trail bit count for the new value */
+            val_iter->UpdateTrailBitCount();
+            //cmc_debug_msg("Trailing Zeros: Toggled: ", num_toogled_trailing_zeros, ", Cleared: ", num_cleared_trailing_zeros);
+        } else
+        {
+            /* In order to not chenge missing values, we are just able to trim their trailing zeros */
+            (*val_iter).UpdateTrailBitCount();
+        }
+    }
+}
+
+
+template<typename T>
+void
+ByteVariable<T>::PerformTailTruncationOnInitialData()
+{
+    const T missing_value = attributes_.GetMissingValue();
+
+    /* Iterate through the serialized values and try to emplace as many zeros at the tail as possible (compliant to the error threshold) */
+    int index = 0;
+    for (auto val_iter = byte_values_.begin(); val_iter != byte_values_.end(); ++val_iter, ++index)
+    {
+        if (!ApproxCompare(initial_data_[index], missing_value))
+        {
+            /* Get the permitted error for the current values */
+            //TODO: Revert! Only for now with absolute errors
+            const std::vector<PermittedError> permitted_errors = GetPermittedError(index);
 
             /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
             const CompressionValue<sizeof(T)> toggled_value = GetMaximumTailToggledValue(index, permitted_errors, *val_iter, missing_value);

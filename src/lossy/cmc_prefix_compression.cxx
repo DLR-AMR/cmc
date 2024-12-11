@@ -47,6 +47,8 @@ Compressor::Setup()
 
     compression_data_->TransformInputToCompressionVariables();
 
+    compression_data_->SetupCompressionCriteria();
+    
     //compression_data_->FilterDataAsDifferences();
 
     compression_variables_ = compression_data_->GetByteVariablesForCompression();
@@ -63,13 +65,11 @@ Compressor::Compress()
     {
         //var_iter->XORConsecutiveValues();
         /* (Try to) release the initial data which already has been transformed */
-        var_iter->KeepInitialData(false);
+        var_iter->KeepInitialData(true);
 
-        /* Perform the tail truncation */
         /* Perform trail truncation until the error trhesholds are exhausted */
-        var_iter->PerformTailTruncation();
+        var_iter->PerformTailTruncationOnInitialData();
 
-        //var_iter->PrintCompressionValues();
         /* We create the adapt data based on the compression settings, the forest and the variable to consider during the adaptation/coarsening */
         PrefixAdaptData adapt_data{*var_iter};
 

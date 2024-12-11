@@ -12,7 +12,7 @@ namespace prefix
 
 struct CompressedVariableInfo;
 
-class Decompressor : public lossy::Decompressor
+class Decompressor : public cmc::lossy::Decompressor
 {
 public:
     Decompressor() = default;

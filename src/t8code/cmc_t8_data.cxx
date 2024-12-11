@@ -547,6 +547,26 @@ AmrData::SetupVariablesForCompression()
 {
     TransformInputToCompressionVariables();
 
+    SetupCompressionCriteria();
+    
+    SetupInaccuracyStorage();
+}
+
+void
+AmrData::SetupInaccuracyStorage()
+{
+    cmc_assert(variables_.size() > 0);
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        /* Set the inaccuracy container up */
+        var_iter->SetUpInaccuracyStorage(initial_mesh_.GetNumberLocalElements());
+    }
+}
+
+void
+AmrData::SetupCompressionCriteria()
+{
+    cmc_assert(variables_.size() > 0);
     /* Check whether general compresison criteria have been supplied */
     const auto CapturekErrorCriterionHoldsForAllVariables = kErrorCriterionHoldsForAllVariables;
     auto general_specifications_iter = std::find_if(compression_settings_.GetSpecificationsBegin(), compression_settings_.GetSpecificationsEnd(), [=](const CompressionSpecifications& arg){return arg.GetVariableID() == CapturekErrorCriterionHoldsForAllVariables;});
@@ -569,9 +589,6 @@ AmrData::SetupVariablesForCompression()
         {
             cmc_err_msg("There are no compression settings for the variable ('", var_iter->GetName(), "') given.");
         }
-        
-        /* Set the inaccuracy container up */
-        var_iter->SetUpInaccuracyStorage(initial_mesh_.GetNumberLocalElements());
     }
 }
 

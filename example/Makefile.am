@@ -4,6 +4,7 @@ example/lossy/cmc_prefix_lossy_compression \
 example/lossy/cmc_amr_lossy_different_mesh \
 example/lossy/cmc_amr_compression \
 example/lossless/cmc_lossless_prefix_compression \
+example/lossy/cmc_lossy_prefix_compression \
 example/lossy/cmc_amr_patch_compression
 
 example_netcdf_cmc_gather_nc_data_SOURCES =  example/netcdf/cmc_gather_nc_data.cxx
@@ -19,6 +20,8 @@ example_lossless_cmc_lossless_prefix_compression_SOURCES = example/lossless/cmc_
 example_lossy_cmc_amr_compression_SOURCES = example/lossy/cmc_amr_compression.cxx
 
 example_lossy_cmc_amr_patch_compression_SOURCES = example/lossy/cmc_amr_patch_compression.cxx
+
+example_lossy_cmc_lossy_prefix_compression_SOURCES = example/lossy/cmc_lossy_prefix_compression.cxx
 
 if ENABLE_FORTRAN
 bin_PROGRAMS += example/lossy_amr_nc_compression/cmc_fortran_lossy_amr_compression

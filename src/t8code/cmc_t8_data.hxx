@@ -66,6 +66,8 @@ public:
     void CompressByAdaptiveCoarsening(const CompressionMode compression_mode);
     void ApplyScalingAndOffset();
     void TransformInputToCompressionVariables();
+    void SetupCompressionCriteria();
+    void SetupInaccuracyStorage();
     void SetupVariablesForCompression();
     void SetInitialMesh(const AmrMesh& mesh);
     std::vector<ByteVar> GetByteVariablesForCompression();
