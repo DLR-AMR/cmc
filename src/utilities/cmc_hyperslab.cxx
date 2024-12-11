@@ -395,7 +395,7 @@ HyperslabIndex ReceiveDimensionIndexFromReferenceCoordsLonLatLev(const std::vect
     }
 }
 
-[[maybe_unused]] HyperslabIndex ReceiveDimensionIndexFromReferenceCoordsError([[maybe_unused]] const std::vector<HyperslabIndex>& reference_coordinates, [[maybe_unused]] const Dimension dimension){}
+[[maybe_unused]] HyperslabIndex ReceiveDimensionIndexFromReferenceCoordsError([[maybe_unused]] const std::vector<HyperslabIndex>& reference_coordinates, [[maybe_unused]] const Dimension dimension){return CMC_ERR;}
 
 DimensionValueExtractionFn
 GetDimensionValueFunctionForReferenceCoords(const DataLayout layout)
@@ -479,5 +479,635 @@ GetReferenceCoordTrimmingFunction(const DataLayout trimmed_data_layout)
     }
 }
 
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+
+    cmc_assert(global_lon_start <= lon_start);
+    cmc_assert(global_lat_start <= lat_start);
+
+    HyperslabIndex offset = (lon_start - global_lon_start) * global_lat_length + (lat_start - global_lat_start);
+
+    for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+    {
+        for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+        {
+            if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                (lon_iter + lon_start < global_lon_start + global_lon_length))
+            {
+                /* We are in the domain of the global hyperslab */
+                indices.push_back(offset + lat_iter);
+            } else
+            {
+                /* Indicate that this is outside of the domain */
+                indices.push_back(kOutsideOfHyperslabDomain);
+            }
+        }
+
+        /* Update the offset */
+        offset += global_lat_length;
+    }
+
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+
+    cmc_assert(global_lon_start <= lon_start);
+    cmc_assert(global_lat_start <= lat_start);
+
+    HyperslabIndex offset = (lat_start - global_lat_start) * global_lon_length + (lon_start - global_lon_start);
+
+    for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+    {
+        for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+        {
+            if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                (lon_iter + lon_start < global_lon_start + global_lon_length))
+            {
+                /* We are in the domain of the global hyperslab */
+                indices.push_back(offset + lon_iter);
+            } else
+            {
+                /* Indicate that this is outside of the domain */
+                indices.push_back(kOutsideOfHyperslabDomain);
+            }
+        }
+
+        /* Update the offset */
+        offset += global_lon_length;
+    }
+
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+
+    HyperslabIndex offset = (lat_start - global_lat_start) * global_lev_length + (lev_start - global_lev_start);
+
+    for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+    {
+        for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+        {
+            if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                (lev_iter + lev_start < global_lev_start + global_lev_length))
+            {
+                /* We are in the domain of the global hyperslab */
+                indices.push_back(offset + lev_iter);
+            } else
+            {
+                /* Indicate that this is outside of the domain */
+                indices.push_back(kOutsideOfHyperslabDomain);
+            }
+        }
+
+        /* Update the offset */
+        offset += global_lev_length;
+    }
+
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+
+    HyperslabIndex offset = (lev_start - global_lev_start) * global_lat_length + (lat_start - global_lat_start);
+
+    for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+    {
+        for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+        {
+            if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                (lev_iter + lev_start < global_lev_start + global_lev_length))
+            {
+                /* We are in the domain of the global hyperslab */
+                indices.push_back(offset + lat_iter);
+            } else
+            {
+                /* Indicate that this is outside of the domain */
+                indices.push_back(kOutsideOfHyperslabDomain);
+            }
+        }
+
+        /* Update the offset */
+        offset += global_lat_length;
+    }
+
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lon_start <= lon_start);
+
+    HyperslabIndex offset = (lon_start - global_lon_start) * global_lev_length + (lev_start - global_lev_start);
+
+    for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+    {
+        for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+        {
+            if ((lon_iter + lon_start < global_lon_start + global_lon_length) &&
+                (lev_iter + lev_start < global_lev_start + global_lev_length))
+            {
+                /* We are in the domain of the global hyperslab */
+                indices.push_back(offset + lev_iter);
+            } else
+            {
+                /* Indicate that this is outside of the domain */
+                indices.push_back(kOutsideOfHyperslabDomain);
+            }
+        }
+
+        /* Update the offset */
+        offset += global_lev_length;
+    }
+
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+
+    cmc_assert(global_lon_start <= lon_start);
+    cmc_assert(global_lev_start <= lev_start);
+
+    HyperslabIndex offset = (lev_start - global_lev_start) * global_lon_length + (lon_start - global_lon_start);
+
+    for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+    {
+        for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+        {
+            if ((lev_iter + lev_start < global_lev_start + global_lev_length) &&
+                (lon_iter + lon_start < global_lon_start + global_lon_length))
+            {
+                /* We are in the domain of the global hyperslab */
+                indices.push_back(offset + lon_iter);
+            } else
+            {
+                /* Indicate that this is outside of the domain */
+                indices.push_back(kOutsideOfHyperslabDomain);
+            }
+        }
+
+        /* Update the offset */
+        offset += global_lon_length;
+    }
+
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLatLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+    cmc_assert(global_lon_start <= lon_start);
+
+    HyperslabIndex offset = (lon_start - global_lon_start) * global_lat_length * global_lev_length + (lat_start - global_lat_start) * global_lev_length + (lev_start - global_lev_start);
+
+    for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+    {
+        for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+        {
+            for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+            {
+                if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                    (lev_iter + lev_start < global_lev_start + global_lev_length) &&
+                    (lon_iter + lon_start < global_lon_start + global_lon_length))
+                {
+                    /* We are in the domain of the global hyperslab */
+                    indices.push_back(offset + lev_iter);
+                } else
+                {
+                    /* Indicate that this is outside of the domain */
+                    indices.push_back(kOutsideOfHyperslabDomain);
+                }
+            }
+
+            /* Update the offset */
+            offset += global_lev_length;
+        }
+
+        /* Update the offset */
+        offset += (global_lat_length - lat_length) * global_lev_length;
+    }
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLonLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+    cmc_assert(global_lon_start <= lon_start);
+
+    HyperslabIndex offset = (lev_start - global_lev_start) * global_lon_length * global_lat_length + (lon_start - global_lon_start) * global_lat_length + (lat_start - global_lat_start);
+
+    for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+    {
+        for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+        {
+            for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+            {
+                if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                    (lev_iter + lev_start < global_lev_start + global_lev_length) &&
+                    (lon_iter + lon_start < global_lon_start + global_lon_length))
+                {
+                    /* We are in the domain of the global hyperslab */
+                    indices.push_back(offset + lat_iter);
+                } else
+                {
+                    /* Indicate that this is outside of the domain */
+                    indices.push_back(kOutsideOfHyperslabDomain);
+                }
+            }
+
+            /* Update the offset */
+            offset += global_lat_length;
+        }
+
+        /* Update the offset */
+        offset += (global_lon_length - lon_length) * global_lat_length;
+    }
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLevLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+    cmc_assert(global_lon_start <= lon_start);
+
+    HyperslabIndex offset = (lon_start - global_lon_start) * global_lev_length * global_lat_length + (lev_start - global_lev_start) * global_lat_length + (lat_start - global_lat_start);
+
+    for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+    {
+        for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+        {
+            for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+            {
+                if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                    (lev_iter + lev_start < global_lev_start + global_lev_length) &&
+                    (lon_iter + lon_start < global_lon_start + global_lon_length))
+                {
+                    /* We are in the domain of the global hyperslab */
+                    indices.push_back(offset + lat_iter);
+                } else
+                {
+                    /* Indicate that this is outside of the domain */
+                    indices.push_back(kOutsideOfHyperslabDomain);
+                }
+            }
+
+            /* Update the offset */
+            offset += global_lat_length;
+        }
+
+        /* Update the offset */
+        offset += (global_lev_length - lev_length) * global_lat_length;
+    }
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLatLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+    cmc_assert(global_lon_start <= lon_start);
+
+    HyperslabIndex offset = (lev_start - global_lev_start) * global_lat_length * global_lon_length + (lat_start - global_lat_start) * global_lon_length + (lon_start - global_lon_start);
+
+    for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+    {
+        for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+        {
+            for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+            {
+                if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                    (lev_iter + lev_start < global_lev_start + global_lev_length) &&
+                    (lon_iter + lon_start < global_lon_start + global_lon_length))
+                {
+                    /* We are in the domain of the global hyperslab */
+                    indices.push_back(offset + lon_iter);
+                } else
+                {
+                    /* Indicate that this is outside of the domain */
+                    indices.push_back(kOutsideOfHyperslabDomain);
+                }
+            }
+
+            /* Update the offset */
+            offset += global_lon_length;
+        }
+
+        /* Update the offset */
+        offset += (global_lat_length - lat_length) * global_lon_length;
+    } 
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLevLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+    cmc_assert(global_lon_start <= lon_start);
+
+    HyperslabIndex offset = (lat_start - global_lat_start) * global_lev_length * global_lon_length + (lev_start - global_lev_start) * global_lon_length + (lon_start - global_lon_start);
+
+    for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+    {
+        for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+        {
+            for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+            {
+                if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                    (lev_iter + lev_start < global_lev_start + global_lev_length) &&
+                    (lon_iter + lon_start < global_lon_start + global_lon_length))
+                {
+                    /* We are in the domain of the global hyperslab */
+                    indices.push_back(offset + lon_iter);
+                } else
+                {
+                    /* Indicate that this is outside of the domain */
+                    indices.push_back(kOutsideOfHyperslabDomain);
+                }
+            }
+
+            /* Update the offset */
+            offset += global_lon_length;
+        }
+
+        /* Update the offset */
+        offset += (global_lev_length - lev_length) * global_lon_length;
+    }
+    return indices;
+}
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLonLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
+{
+    std::vector<HyperslabIndex> indices;
+    indices.reserve(domain_indices_to_extract.GetNumberCoordinates());
+
+    const HyperslabIndex global_lon_start = global_hyperslab.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex global_lat_start = global_hyperslab.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex global_lev_start = global_hyperslab.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex global_lon_length = global_hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex global_lat_length = global_hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex global_lev_length = global_hyperslab.GetDimensionLength(Dimension::Lev);
+
+    const HyperslabIndex lon_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lon);
+    const HyperslabIndex lat_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lat);
+    const HyperslabIndex lev_start = domain_indices_to_extract.GetDimensionStart(Dimension::Lev);
+    const HyperslabIndex lon_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lat_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = domain_indices_to_extract.GetDimensionLength(Dimension::Lev);
+
+    cmc_assert(global_lev_start <= lev_start);
+    cmc_assert(global_lat_start <= lat_start);
+    cmc_assert(global_lon_start <= lon_start);
+
+    HyperslabIndex offset = (lat_start - global_lat_start) * global_lon_length * global_lev_length + (lon_start - global_lon_start) * global_lev_length + (lev_start - global_lev_start);
+
+    for (HyperslabIndex lat_iter = 0; lat_iter < lat_length; ++lat_iter)
+    {
+        for (HyperslabIndex lon_iter = 0; lon_iter < lon_length; ++lon_iter)
+        {
+            for (HyperslabIndex lev_iter = 0; lev_iter < lev_length; ++lev_iter)
+            {
+                if ((lat_iter + lat_start < global_lat_start + global_lat_length) &&
+                    (lev_iter + lev_start < global_lev_start + global_lev_length) &&
+                    (lon_iter + lon_start < global_lon_start + global_lon_length))
+                {
+                    /* We are in the domain of the global hyperslab */
+                    indices.push_back(offset + lev_iter);
+                } else
+                {
+                    /* Indicate that this is outside of the domain */
+                    indices.push_back(kOutsideOfHyperslabDomain);
+                }
+            }
+
+            /* Update the offset */
+            offset += global_lev_length;
+        }
+
+        /* Update the offset */
+        offset += (global_lon_length - lon_length) * global_lev_length;
+    }
+    return indices;
+}
+
+[[maybe_unused]] std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_Error([[maybe_unused]] const Hyperslab& global_hyperslab, [[maybe_unused]] const Hyperslab& domain_indices_to_extract){return std::vector<HyperslabIndex>();}
+
+LinearIndicesExtractionFn
+GetIndicesExtractionFunction(const DataLayout layout)
+{
+    switch (layout)
+    {
+        case DataLayout::Lon_Lat:
+            return GetIndicesForHyperslabDataExtraction_LonLat;
+        break;
+        case DataLayout::Lat_Lon:
+            return GetIndicesForHyperslabDataExtraction_LatLon;
+        break;
+        case DataLayout::Lat_Lev:
+            return GetIndicesForHyperslabDataExtraction_LatLev;
+        break;
+        case DataLayout::Lev_Lat:
+            return GetIndicesForHyperslabDataExtraction_LevLat;
+        break;
+        case DataLayout::Lon_Lev:
+            return GetIndicesForHyperslabDataExtraction_LonLev;
+        break;
+        case DataLayout::Lev_Lon:
+            return GetIndicesForHyperslabDataExtraction_LevLon;
+        break;
+        case DataLayout::Lon_Lat_Lev:
+            return GetIndicesForHyperslabDataExtraction_LonLatLev;
+        break;
+        case DataLayout::Lev_Lon_Lat:
+            return GetIndicesForHyperslabDataExtraction_LevLonLat;
+        break;
+        case DataLayout::Lon_Lev_Lat:
+            return GetIndicesForHyperslabDataExtraction_LonLevLat;
+        break;
+        case DataLayout::Lev_Lat_Lon:
+            return GetIndicesForHyperslabDataExtraction_LevLatLon;
+        break;
+        case DataLayout::Lat_Lev_Lon:
+            return GetIndicesForHyperslabDataExtraction_LatLevLon;
+        break;
+        case DataLayout::Lat_Lon_Lev:
+            return GetIndicesForHyperslabDataExtraction_LatLonLev;
+        break;
+        default :
+            cmc_err_msg("The variable contains an undefined data layout.");
+            return GetIndicesForHyperslabDataExtraction_Error;
+    }
+}
 
 }

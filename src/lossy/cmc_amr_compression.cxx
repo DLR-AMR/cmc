@@ -43,6 +43,7 @@ Compressor::Setup()
     compression_data_->ApplyScalingAndOffset();
 
     compression_data_->SetupVariablesForCompression();
+    //compression_data_->TransformInputToCompressionVariables();
 }
 
 
@@ -53,9 +54,12 @@ Compressor::Compress()
     /* Perform the default lossy compression */
     compression_data_->CompressByAdaptiveCoarsening(CompressionMode::OneForOne);
 
+    //compression_data_->WriteVTKFilePerVariable("ac_t2m_data");
+
+    //std::exit(1);
     /* Transform the data to byte variables */
     compression_variables_ = compression_data_->GetByteVariablesForCompression();
-
+    //std::exit(1);
     /* Get the coarsening/refienment bits for all variables */
     ac_indications_ = compression_data_->TransferIndicationBits();
     
@@ -66,6 +70,12 @@ Compressor::Compress()
     for (auto cv_iter = compression_variables_.begin(); cv_iter != compression_variables_.end(); ++cv_iter)
     {
         cv_iter->StoreInitialMesh();
+    }
+
+    /* Perform trail truncation until the error trhesholds are exhausted */
+    for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
+    {
+        var_iter->PerformTailTruncation();
     }
 
     /* Afterwards, we create prefixes in the tree hierachy */
@@ -146,21 +156,18 @@ CreateRefinementBitsVariable(const ByteVar& var, const int time_step, const std:
 void
 Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
-    std::vector<NcVariable> vars;
-    vars.reserve(2 * compression_variables_.size());
+    NcWriter writer(file_name, NC_NETCDF4); //oder NC_CDF5
+    writer.ReserveVariables(2 * compression_variables_.size());
 
     int ac_bits_index = 0;
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter, ++ac_bits_index)
     {
         /* Write the compressed byte variable */
-        vars.push_back(var_iter->WriteCompressedData(time_step));
+        writer.AddVariable(var_iter->WriteCompressedData(time_step));
         /* Write the refinement bits from the adaptive coarsening steps */
-        vars.push_back(CreateRefinementBitsVariable(*var_iter, time_step, ac_indications_[ac_bits_index].ac_indicator_bits));
+        //writer.AddVariable(CreateRefinementBitsVariable(*var_iter, time_step, ac_indications_[ac_bits_index].ac_indicator_bits));
     }
 
-    NcWriter writer(file_name, NC_NETCDF4); //oder NC_CDF5
-
-    writer.AddVariable(vars.back());
     writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));
     writer.Write();
 }

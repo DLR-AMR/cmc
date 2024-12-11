@@ -91,6 +91,7 @@ public:
     void WriteVTKFilePerVariable(const std::string& file_name) const;
 
     const std::vector<Var>& GetCompressionVariables() const {return variables_;};
+    void FilterDataAsDifferences();
 private:
     void SetCompressionSettings(CompressionSettings& settings) {compression_settings_ = settings;};
     std::vector<IndexReduction> UpdateLinearIndicesToTheInitialMesh();

@@ -49,10 +49,31 @@ typedef int64_t DomainIndex;
 enum DataFormat {FormatUndefined, LinearFormat, CartesianFormat, HyperslabFormat};
 
 /* Helper function for the variant */
+template<class...>
+constexpr bool always_false_v = false;
+
+template<class... Ts>
+struct overloaded : Ts...
+{
+  using Ts::operator()...;
+
+  /* Prevent implicit type conversions */
+  template<typename T>
+  constexpr void operator()(T) const
+  {
+    static_assert(always_false_v<T>, "Unsupported type");
+  }
+};
+
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+#if 0
 template<class... Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
+#endif
 
 inline constexpr
 size_t CmcTypeToBytes(const CmcType type)

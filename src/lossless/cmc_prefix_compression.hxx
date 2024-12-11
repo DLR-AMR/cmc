@@ -39,6 +39,9 @@ public:
 
     int GetMpiSize() const;
     
+    void SetSplitVariable(const SplitVariable& split_var);
+    void SetSplitVariable(SplitVariable&& split_var);
+
     void Setup();
     void Compress();
     void WriteCompressedData(const std::string& file_name, const int time_step) const;
@@ -47,6 +50,8 @@ private:
     std::unique_ptr<AmrData> compression_data_{nullptr};
 
     std::vector<ByteVar> compression_variables_;
+
+    std::vector<SplitVariable> split_variables_;
 
     MPI_Comm comm_{MPI_COMM_WORLD};
     bool is_compression_applied_{false};

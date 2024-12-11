@@ -56,14 +56,19 @@ public:
     }
 
     void AppendBit(const uint8_t byte);
+    void AppendBit(const bool is_bit_set);
     void AppendTwoBits(const uint8_t byte);
     void AppendFourBits(const uint8_t byte);
     void AppendBits(const uint8_t byte, const int num_bits);
     void AppendBits(const std::vector<uint8_t>& bytes, const int num_bits);
 
+    void AppendBits(const BitVector& bit_vector);
+
+    #if 0
     void IncrementBitPosition(size_t& iterator, const int diff = 1);
     size_t GetFirstBitPositionOfByte() const;
     bool IsEndOfByteReached(size_t& iterator) const;
+    #endif
 
     iterator begin() { return vector_.begin(); };
     iterator end() { return vector_.end(); };
@@ -73,9 +78,12 @@ public:
     const_iterator cend() const { return vector_.cend(); };
 
     size_t size() const { return vector_.size();};
-    
-    const uint8_t* data() const {return vector_.data();};
+    size_t size_bits() const { return vector_.size() * kCharBit - bit_position_ - 1;};
 
+    const uint8_t* data() const {return vector_.data();};
+    std::pair<std::vector<uint8_t>, size_t> GetBits() const {return std::make_pair(vector_, this->size_bits());};
+    const std::vector<uint8_t>& GetData() const {return vector_;};
+    
 private:
     size_t bit_position_{kBitIndexStart};
     size_t byte_position_{0};
@@ -109,6 +117,18 @@ public:
         return ((data_[byte_position_] >> bit_position_) & uint8_t{1});
     }
 
+    void MoveToNextBit()
+    {
+        if (bit_position_ > 0)
+        {
+            --bit_position_;
+        } else
+        {
+            ++byte_position_;
+            bit_position_  = kBitIndexStart;
+        }
+    }
+    
     void MoveToNextByte()
     {
         ++byte_position_;
@@ -133,7 +153,7 @@ public:
         const int bit_shift_to_front = kBitIndexStart - bit_position_;
         const int bit_shift_to_back = kCharBitInteger - bit_shift_to_front;
 
-        for (int num_bits_extracted = 0, byte_id = 0; num_bits_extracted < num_bits; ++byte_id, ++byte_position_)
+        for (size_t num_bits_extracted = 0, byte_id = 0; num_bits_extracted < num_bits; ++byte_id, ++byte_position_)
         {
             if (bit_shift_to_front > 0 && num_bits_extracted != 0)
             {
@@ -243,17 +263,41 @@ private:
 inline void
 BitVector::AppendBit(const uint8_t byte)
 {
-    if (bit_position_ >= 0)
+    if (bit_position_ > 0)
     {
         /* If the bit fits into the current byte */
         vector_.back() |= ((kNullifyAllExceptTailBit & byte) << bit_position_);
         bit_position_ -= 1;
     } else
     {
-        /* If a new byte has to be added which will then hold the given bit */
+        /* If the single bit fills the current byte */
+        vector_.back() |= (kNullifyAllExceptTailBit & byte);
         vector_.emplace_back(0);
-        vector_.back() |= ((kNullifyAllExceptTailBit & byte) << kBitIndexStart);
-        bit_position_ = kBitIndexStart - 1;
+        bit_position_ = kBitIndexStart;
+        ++byte_position_;
+    }
+}
+
+inline void
+BitVector::AppendBit(const bool is_bit_set)
+{
+    if (bit_position_ > 0)
+    {
+        /* If the bit fits into the current byte */
+        if (is_bit_set)
+        {
+            vector_.back() |= (uint8_t{1} << bit_position_);
+        }
+        --bit_position_;
+    } else
+    {
+        /* If the single bit fills the current byte */
+        if (is_bit_set)
+        {
+            vector_.back() |= uint8_t{1};
+        }
+        vector_.emplace_back(0);
+        bit_position_ = kBitIndexStart;
         ++byte_position_;
     }
 }
@@ -275,7 +319,7 @@ BitVector::AppendTwoBits(const uint8_t byte)
     } else if (bit_position_ == 1)
     {
         /* The two bits fit into the current byte */
-        vector_.back() |= ((kNullifyAllExceptTwoTailBits & byte) << (bit_position_ - 1));
+        vector_.back() |= (kNullifyAllExceptTwoTailBits & byte);
         vector_.push_back(0);
         bit_position_ = kBitIndexStart;
         ++byte_position_;
@@ -340,10 +384,35 @@ BitVector::AppendFourBits(const uint8_t byte)
     }
 }
 
+inline void
+BitVector::AppendBits(const BitVector& bit_vec)
+{
+    cmc_assert(bit_vec.size_bits() > 0);
+    if (bit_vec.size_bits() == 0) {return;}
+
+    //cmc_debug_msg("Size of bit vector to be appended: ", bit_vec.size(), " in bits: ", bit_vec.size_bits());
+    /* We copy all complete bytes */
+    for (auto byte_iter = bit_vec.begin(); byte_iter != std::prev(bit_vec.end()); ++byte_iter)
+    {
+        const uint8_t byte = *byte_iter;
+        this->AppendBits(byte, kCharBitInteger);
+    }
+
+    /* Additionally, we copy the remaining bits from the last byte */
+    if (bit_vec.bit_position_ != kBitIndexStart)
+    {
+        const uint8_t last_byte = (*std::prev(bit_vec.end())) >> bit_vec.bit_position_;
+        const int num_bits = kBitIndexStart - bit_vec.bit_position_;
+        //cmc_debug_msg("IN AppendBits(BitVec): num_bits = ", num_bits, ", und bit position: ", bit_vec.bit_position_); 
+        this->AppendBits(last_byte, num_bits);
+    }
+}
+
 inline
 uint8_t
 GetNullifyBitMaskMSB(const int num_nonzero_bits)
 {
+    //cmc_debug_msg("In GetNullifyBitMASkMSB: num_nonzero_bits: ", num_nonzero_bits);
     cmc_assert(num_nonzero_bits >= 0 && num_nonzero_bits <= CHAR_BIT);
     return (uint8_t{0xFF} >> (kCharBit - num_nonzero_bits));
 }
@@ -358,6 +427,9 @@ inline
 void
 BitVector::AppendBits(const uint8_t byte, const int num_bits)
 {
+    cmc_assert(num_bits > 0);
+    if (num_bits <= 0) {return;}
+
     const size_t num_bits_decremented = static_cast<size_t>(num_bits - 1);
 
     if (bit_position_ > num_bits_decremented)
@@ -380,15 +452,9 @@ BitVector::AppendBits(const uint8_t byte, const int num_bits)
         vector_.back() |= (in_byte << (kBitIndexStart - num_bits_decremented + bit_position_ + 1));
         bit_position_ = kBitIndexStart - (num_bits_decremented - bit_position_);
         ++byte_position_;
-    } else
-    {
-        cmc_debug_msg("Das hier tritt nicht ein.");
-        /* A new byte needs to be added and the bits will be assigned there */
-        vector_.push_back(0);
-        vector_.back() |= ((GetNullifyBitMaskMSB(num_bits) & byte) << (kBitIndexStart - num_bits_decremented));
-        bit_position_ = kBitIndexStart - num_bits;
-        ++byte_position_;
     }
+
+    //cmc_debug_msg("In AppendedBits(byte, num_bits): num_bits was: ", num_bits, ", new bit position_ = ", bit_position_);
 }
 
 /**
@@ -406,6 +472,9 @@ inline
 void
 BitVector::AppendBits(const std::vector<uint8_t>& bytes, const int num_bits)
 {
+    cmc_assert(num_bits > 0);
+    if (num_bits <= 0) {return;}
+
     int num_bits_appended = 0;
 
     for (auto byte_iter = bytes.begin(); byte_iter != bytes.end(); ++byte_iter)
@@ -413,17 +482,26 @@ BitVector::AppendBits(const std::vector<uint8_t>& bytes, const int num_bits)
         /* Compute the amount of bits we are appending to the vector within this iteration */
         const int bits_to_append = (num_bits - num_bits_appended) >= CHAR_BIT ? CHAR_BIT : (num_bits - num_bits_appended);
 
-        /* We need to tail-align the bits in order to use the given AppendBits(...)-function.
-         * In case we are appending a full byte, the shift-operation is a no-op */
-        const uint8_t byte_to_append = (*byte_iter) >> (CHAR_BIT - bits_to_append);
+        /* It may be possible that the vector is larger than the number of bits to append */
+        if (bits_to_append > 0)
+        {
+            /* We need to tail-align the bits in order to use the given AppendBits(...)-function.
+             * In case we are appending a full byte, the shift-operation is a no-op */
+            const uint8_t byte_to_append = (*byte_iter) >> (CHAR_BIT - bits_to_append);
 
-        /* Append the bits from this iteration */
-        AppendBits(byte_to_append, bits_to_append);
+            /* Append the bits from this iteration */
+            AppendBits(byte_to_append, bits_to_append);
 
-        /* Add that we have assigned the bits from this iteration */
-        num_bits_appended += bits_to_append;
+            /* Add that we have assigned the bits from this iteration */
+            num_bits_appended += bits_to_append;
+        } else
+        {
+            break;
+        }
     }
 }
+
+#if 0
 
 inline
 void
@@ -443,8 +521,10 @@ inline
 bool
 BitVector::IsEndOfByteReached(size_t& iterator) const
 {
-    return (iterator >= 0 ? false : true);
+    return (iterator == 0 ? true : false);
 }
+#endif
+
 
 }
 

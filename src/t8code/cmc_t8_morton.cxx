@@ -91,6 +91,7 @@ GetMortonIndex(const std::vector<DomainIndex>& coordinates, const int dimensiona
 std::vector<MortonIndex>
 TransformHyperslabCoordinatesToMortonIndices(const std::vector<Hyperslab>& hyperslabs, const DataLayout layout, const GeoDomain& global_domain)
 {
+    cmc_debug_msg("Hier werden Morton indices berechnet");
     /* Obtain the overall (local) number of coordinates */
     DomainIndex num_coordinates = 0;
     for (auto iter = hyperslabs.begin(); iter != hyperslabs.end(); ++iter)

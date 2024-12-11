@@ -10,10 +10,12 @@
 #include "t8code/cmc_t8_morton.hxx"
 #include "utilities/cmc_cart_coordinate.hxx"
 #include "utilities/cmc_geo_domain.hxx"
+#include "utilities/cmc_geo_utilities.hxx"
 #include "t8code/cmc_t8_mpi.hxx"
 #include "t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx"
 #include "t8code/cmc_t8_interpolation.hxx"
 #include "mpi/cmc_mpi_data.hxx"
+#include "utilities/cmc_binary_reader_forward.hxx"
 
 #include <iterator>
 #include <map>
@@ -59,12 +61,12 @@ class InputVariable
 public:
     InputVariable() = default;
     InputVariable(const std::string& name, const int id, const DataLayout layout)
-    : name_{name}, id_{id}, initial_layout_{layout}{};
+    : name_{name}, id_{id}, initial_layout_{layout}{cmc_debug_msg("Input Variable<T> is created");};
     InputVariable(std::string&& name, const int id, const DataLayout layout)
     : name_{std::move(name)}, id_{id}, initial_layout_{layout}{};
     InputVariable(const DataLayout layout, const DataFormat format)
     : initial_layout_{layout}, active_format_{format}{};
-    ~InputVariable(){};
+    ~InputVariable(){cmc_debug_msg("Input Variable<T> is destroyed");};
 
     InputVariable(const InputVariable& other) = default;
     InputVariable& operator=(const InputVariable& other) = default;
@@ -102,7 +104,7 @@ public:
 
     int GetInternID() const;
     void SetInternID(const int id);
-
+    DataFormat GetActiveDataFormat() const;
     CmcUniversalType GetAddOffset() const;
     CmcUniversalType GetScaleFactor() const;
     T GetMissingValue() const;
@@ -124,6 +126,8 @@ public:
 
     void Clear();
     bool IsValid() const;
+
+    ReceiverMap<T> GatherDataToBeDistributed(const DataOffsets& offsets) const;
 
     //TODO: Make domain index
     size_t GetIndexWithinDimension(const Dimension dimension, const size_t coordinate_position) const;
@@ -154,12 +158,14 @@ public:
     template<typename U> InputVariable<U> ObtainMetaCopy() const;
     
     friend std::vector<InputVariable> ExtractSubVariables <> (const InputVariable& variable, const Dimension split_dimension);
-    friend ReceiverMap<T> GatherDataToBeDistributed <> (const InputVariable& variable, const DataOffsets& offsets);
+    //friend ReceiverMap<T> GatherDataToBeDistributed <> (const InputVariable& variable, const DataOffsets& offsets);
     friend InputVariable HollowCopy <> (const InputVariable& variable);
     template <class U> friend class InputVariable;
     friend class TransformerInputToCompressionVariable;
 
-    /* Those functions are only accesible for certain functions */
+    std::vector<T> GetDataFromHyperslab(const Hyperslab& hyperslab) const;
+
+    /* Those functions are only accessible for certain functions */
     const std::vector<T>& GetData([[maybe_unused]] const AccessKey& key) const {return data_;};
     void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {data_ = std::move(data);};
 
@@ -203,7 +209,7 @@ public:
 
     template<typename T> InputVar(InputVariable<T>&& var);
 
-    ~InputVar() = default;
+    ~InputVar(){cmc_debug_msg("InputVar is destroyed");};
 
     InputVar(const InputVar& other) = default;
     InputVar& operator=(const InputVar& other) = default;
@@ -228,6 +234,7 @@ public:
     DataLayout GetInitialDataLayout() const;
 
     const CmcInputVariable& GetInternalVariant() const;
+    CmcInputVariable& GetInternalVariant([[maybe_unused]] const AccessKey& key);
 
     void ApplyScalingAndOffset();
 
@@ -241,20 +248,24 @@ public:
     void SetGlobalContextInformation(const int global_context_information);
     int GetInternID() const;
     void SetInternID(const int id);
-
+    DataFormat GetActiveDataFormat() const;
     void SetUpFilledVariable(const size_t num_elements, const CmcUniversalType& fill_value);
+
+    void GatherDistributionData(const DataOffsets& offsets, std::vector<VariableSendMessage>& messages) const;
 
     //TODO: Restrict function template call to possible variant types 
     template<typename T> bool holds_alternative() const;
 
     friend std::vector<InputVar> SplitIntoSubVariables(const InputVar& variable, const Dimension dimension);
     //friend std::vector<VariableSendMessage> GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
-    friend void GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
+    //friend void GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
     friend class TransformerInputToCompressionVariable;
 
     template <typename T> friend class InputVariable;
 
     friend InputVar MetaCopy(const InputVar& variable);
+
+    template<typename T> void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {std::visit([&](auto& var){var.SetData(key, std::move(data));}, var_);};
 private:
     template<class T> void ApplyAxpyScalingAndOffset(const InputVariable<T>&);
     template<class T> void ApplyScaling(const InputVariable<T>&);
@@ -272,6 +283,9 @@ private:
     template<class T> friend void InputVar::ApplyAxpyScalingAndOffset(const InputVariable<T>&);
     template<class T> friend void InputVar::ApplyScaling(const InputVariable<T>&);
     template<class T> friend void InputVar::ApplyOffset(const InputVariable<T>&);
+
+    friend struct bin_reader::ReadData;
+    friend struct bin_reader::Reader;
 };
 
 CmcType
@@ -279,6 +293,8 @@ GetDataTypeFromVariableViaID(const std::vector<InputVar>& input_variables, const
 
 CmcType
 GetDataTypeFromVariableViaInternID(const std::vector<InputVar>& input_variables, const int intern_id);
+
+//void GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
 
 /** INPUT VARIABLE<T> MEMBER FUNCITONS **/
 
@@ -355,6 +371,7 @@ void InputVariable<T>::SetDataAndCoordinates(std::vector<T>&& values, std::vecto
 {
     data_ = std::move(values);
     hyperslabs_ = std::move(hyperslabs);
+    active_format_ = DataFormat::HyperslabFormat;
 };
 
 template<class T>
@@ -448,6 +465,9 @@ template<class T>
 DataFormat
 InputVariable<T>::GetActiveFormat() const
 {
+    return active_format_;
+    //TODO: Remove this and just return the actual active format
+    #if 0
     if (linear_indices_.size() > 0 && cartesian_coordinates_.size() == 0 && hyperslabs_.size() == 0)
     {
         return DataFormat::LinearFormat;
@@ -461,13 +481,14 @@ InputVariable<T>::GetActiveFormat() const
     {
         return DataFormat::FormatUndefined;
     }
+    #endif
 }
 
 template<class T>
 size_t
 InputVariable<T>::GetNumberCoordinates() const
 {
-    switch (GetActiveFormat())
+    switch (active_format_)
     {
         case DataFormat::LinearFormat:
             return linear_indices_.size();
@@ -477,11 +498,13 @@ InputVariable<T>::GetNumberCoordinates() const
         break;
         case DataFormat::HyperslabFormat:
         {
+            cmc_debug_msg("HyperslabFormat Get Num coords:");
             HyperslabIndex count = 1;
             for (auto hs_iter = hyperslabs_.begin(); hs_iter != hyperslabs_.end(); ++hs_iter)
             {
                 count *= hs_iter->GetNumberCoordinates();
             }
+            cmc_debug_msg("Count of coords: ", count);
             return count;
         }
         break;
@@ -494,7 +517,8 @@ template<class T>
 void
 InputVariable<T>::TransformCoordinatesToMortonIndices()
 {
-    switch (GetActiveFormat())
+    cmc_debug_msg("In TransformCoordinatesToMOrtonIndices: Active format: ", GetActiveDataFormat());
+    switch (GetActiveDataFormat())
     {
         case DataFormat::LinearFormat:
             return;
@@ -512,6 +536,7 @@ InputVariable<T>::TransformCoordinatesToMortonIndices()
         default:
             cmc_err_msg("The variable's coordinates cannot to transformed to Morton indices.");
     };
+    cmc_debug_msg("Hier wird active format auf linear format gesetzt");
 
     active_format_ = DataFormat::LinearFormat;
 }
@@ -520,17 +545,20 @@ template<class T>
 bool
 InputVariable<T>::IsValid() const
 {
-    if ((linear_indices_.size() > 0 && cartesian_coordinates_.size()) > 0 ||
+    if ((linear_indices_.size() > 0 && cartesian_coordinates_.size() > 0) ||
         (linear_indices_.size() > 0 && hyperslabs_.size() > 0) ||
         (cartesian_coordinates_.size() > 0 && hyperslabs_.size() > 0))
     {
+        cmc_debug_msg("linear_indices_.size(): ", linear_indices_.size(), ", cartesian_coordinates_.size(): ", cartesian_coordinates_.size(), ", hyperslabs_.size(): ", hyperslabs_.size());
         return false;
     }
-    
+    cmc_debug_msg("Size hyperslabs: ", hyperslabs_.size());
     if (data_.size() != GetNumberCoordinates())
     {
+        cmc_debug_msg("data_.size(): ", data_.size(), ", GetNumberCoordinates(): ", GetNumberCoordinates());
         return false;
     }
+
     return true;
 }
 
@@ -720,7 +748,8 @@ InputVariable<T>::ExtractAllSubVariablesByDimensionFromHyperslabs(const Dimensio
     }
 
     const HyperslabIndex& num_coordinates = _num_coordinates;
-
+    cmc_debug_msg("Num extracted variables: ", num_extracted_variables);
+    cmc_debug_msg("Initial layout: ", initial_layout_);
     /* Reserve memory for each variable which will be extracted */
     for (size_t iter = 0; iter < num_extracted_variables; ++iter)
     {
@@ -814,8 +843,8 @@ ExtractSubVariables(const InputVariable<T>& variable, const Dimension split_dime
 
     for (size_t iter = 0; iter < num_extracted_variables; ++iter)
     {
-        extracted_variables[iter].name_.append("_" + std::to_string(iter));
-
+        //extracted_variables[iter].name_.append("_" + std::to_string(iter));
+        //cmc_debug_msg("Extract SubVariables: iter: ", iter, ", name: ", extracted_variables[iter].name_);
         extracted_variables[iter].global_context_information_ = iter;
 
         extracted_variables[iter].data_ = std::move(extracted_variable_data[iter].data);
@@ -833,15 +862,98 @@ ExtractSubVariables(const InputVariable<T>& variable, const Dimension split_dime
         extracted_variables[iter].has_split_dimension_ = split_dimension;
     }
 
+    //cmc_debug_msg("Value in extract sub variables is: ");
+    //    for (int j= 0; j < extracted_variables.size(); ++j)
+    //    {
+    //    for (int i = 0; i < 16*30; ++i)
+    //    {
+    //        cmc_debug_msg(extracted_variables[j][i]);
+    //    }
+    //    }
+
     return extracted_variables;
 }
 
 
+
+template<class T>
+ReceiverMap<T>
+InputVariable<T>::GatherDataToBeDistributed(const DataOffsets& offsets) const
+{
+    cmc_debug_msg("Active ormat der variable ist: ", GetActiveDataFormat());
+    cmc_assert(GetActiveDataFormat() == DataFormat::LinearFormat);
+
+    ReceiverMap<T> send_messages;
+
+    const size_t num_coordinates = GetNumberCoordinates();
+
+    LinearIndex previous_lower_bound = 0;
+    LinearIndex previous_upper_bound = 0;
+    int owner_rank = -1;
+
+    for (size_t index = 0; index < num_coordinates; ++index)
+    {
+        const LinearIndex current_linear_index = GetLinearIndexCoordinate(index);
+
+        /* Check if the current linear index belongs to the same rank as the previous one, if not we need to find the new receiving rank */
+        if (!(previous_lower_bound <= current_linear_index && current_linear_index < previous_upper_bound))
+        {
+            /* Find an iterator to the rank which is ought to hold the value corresponding to this linear index */
+            auto owner_rank_iter = std::upper_bound(offsets.Begin(), offsets.End(), current_linear_index);
+
+            /* Get the integer number of the corresponding rank */
+            //owner_rank = (owner_rank_iter != offsets.End() ? std::distance(offsets.Begin(), owner_rank_iter) : offsets.size() - 1);
+            owner_rank = std::distance(offsets.Begin(), owner_rank_iter) - 1;
+            
+            if (owner_rank > 2)
+            {
+                cmc_debug_msg("Will Send to rank ", owner_rank, " because of index: ", current_linear_index);
+            }
+            previous_lower_bound = offsets[owner_rank];
+            previous_upper_bound = offsets[owner_rank + 1];
+
+            /* Check if the rank is already a receiving rank */
+            if (auto search_rk = send_messages.find(owner_rank); search_rk != send_messages.end())
+            {
+                /* If the rank is already listed in the ReceiverMap */
+                search_rk->second.data_.push_back(data_[index]);
+                search_rk->second.morton_indices_.push_back(current_linear_index);
+            } else
+            {
+                cmc_assert(GetInternID() != kNoInternalIDSet);
+                /* If the receiving rank is not yet listed within the ReceiverMap */
+                send_messages[owner_rank] = VariableMessage<T>(owner_rank, GetInternID());
+
+                const size_t estimate_receiving_data_points = 2 * (num_coordinates / offsets.size());
+
+                /* Reserve an estimate of data */
+                send_messages[owner_rank].data_.reserve(estimate_receiving_data_points);
+                send_messages[owner_rank].morton_indices_.reserve(estimate_receiving_data_points);
+                
+                /* Save the value and index */
+                send_messages[owner_rank].data_.push_back(data_[index]);
+                send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
+            }
+        } else
+        { 
+            /* If the current value belongs to same rank the previous value already belongs to */
+            send_messages[owner_rank].data_.push_back(data_[index]);
+            send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
+        }
+    }
+
+    return send_messages;
+}
+
+
+
+#if 0
 template<class T>
 ReceiverMap<T>
 GatherDataToBeDistributed(const InputVariable<T>& variable, const DataOffsets& offsets)
 {
-    cmc_assert(variable.GetActiveFormat() == DataFormat::LinearFormat);
+    cmc_debug_msg("Active ormat der variable ist: ", variable.GetActiveDataFormat());
+    cmc_assert(variable.GetActiveDataFormat() == DataFormat::LinearFormat);
 
     ReceiverMap<T> send_messages;
 
@@ -904,6 +1016,7 @@ GatherDataToBeDistributed(const InputVariable<T>& variable, const DataOffsets& o
 
     return send_messages;
 }
+#endif
 
 template<class T>
 int
@@ -917,6 +1030,14 @@ void
 InputVariable<T>::SetInternID(const int id)
 {
     intern_id_ = id;
+    cmc_debug_msg("In Internal ID in InputVariable<t>: ", intern_id_);
+}
+
+template<class T>
+DataFormat
+InputVariable<T>::GetActiveDataFormat() const
+{
+    return active_format_;
 }
 
 /** INPUT VAR MEMBER FUNCTIONS **/
@@ -942,7 +1063,6 @@ InputVar::ApplyAxpyScalingAndOffset(const InputVariable<T>& variable)
     if (std::holds_alternative<T>(variable.GetScaleFactor()) &&
         std::holds_alternative<T>(variable.GetAddOffset()))
     {
-        //TODO: Apply transformation in palce and do not create a new variable
         const T scale_factor = std::get<T>(variable.GetScaleFactor());
         const T add_offset = std::get<T>(variable.GetAddOffset());
         const T missing_value = variable.GetMissingValue();
@@ -1180,6 +1300,40 @@ void InputVariable<T>::AssignDataAtLinearIndices(const VariableRecvMessage& mess
     }
 }
 
+template<typename T>
+std::vector<T>
+InputVariable<T>::GetDataFromHyperslab(const Hyperslab& hyperslab) const
+{
+    /* Get the global domain as hyperslab */
+    const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
+
+    /* Get the correct function to extract the linear indices for this hyperslab */
+    LinearIndicesExtractionFn indices_extraction_fn = GetIndicesExtractionFunction(initial_layout_);
+
+    /* Get the indices to extract the correct data */
+    std::vector<HyperslabIndex> indices = indices_extraction_fn(global_domain, hyperslab);
+
+    /* Allocate a vector which will hold the data; potentially padded with missing values */
+    std::vector<T> data;
+    data.reserve(indices.size());
+    //cmc_debug_msg("\n\nIn Getdata from hyperslab");
+    //cmc_debug_msg("Size of data in GetDatafromHyperslab: ", data_.size());
+    /* Iterate over all indices and extract the data */
+    for (auto index_iter = indices.begin(); index_iter != indices.end(); ++index_iter)
+    {
+        //cmc_debug_msg("IndexIterationVal: ", *index_iter);
+        if (*index_iter != kOutsideOfHyperslabDomain)
+        {
+            data.push_back(data_[*index_iter]);
+        } else
+        {
+            /* If the index is outside the global domain, we will assign a missing value */
+            data.push_back(missing_value_);
+        }
+    }
+    
+    return data;
+}
 
 /** UPDATE LINEAR INDICES MEMBER FUNCTIONS **/
 template<typename T>

@@ -30,7 +30,7 @@ main(void)
 
     test_var.PushBack(double_data, std::move(hyperslab));
 
-    cmc::ExpectTrue(test_var.GetActiveFormat() == cmc::DataFormat::HyperslabFormat);
+    cmc::ExpectTrue(test_var.GetActiveDataFormat() == cmc::DataFormat::HyperslabFormat);
     cmc::ExpectTrue(test_var.GetNumberCoordinates() == static_cast<size_t>(lon_length * lat_length));
     cmc::ExpectTrue(test_var.IsValid());
 

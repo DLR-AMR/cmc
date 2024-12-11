@@ -11,6 +11,7 @@ namespace cmc
 {
 
 typedef int64_t HyperslabIndex;
+constexpr HyperslabIndex kOutsideOfHyperslabDomain = -1;
 
 class Hyperslab
 {
@@ -63,6 +64,8 @@ public:
     const_iterator CountIndicesEnd() const { return count_indices_.end(); };
     const_iterator CountIndicesCBegin() const { return count_indices_.cbegin(); };
     const_iterator CountIndicesCEnd() const { return count_indices_.cend(); };
+
+    void NullifyStartIndices() {start_indices_.fill(0); };
 
 private:
     void SetupDimension(const DimensionInterval& dimension);
@@ -131,6 +134,23 @@ std::vector<HyperslabIndex> TrimRefCoordsToLonLev(const std::vector<HyperslabInd
 
 std::vector<HyperslabIndex> TrimRefCoordsError(const std::vector<HyperslabIndex>& reference_coordinates);
 
+using LinearIndicesExtractionFn = std::function<std::vector<HyperslabIndex>(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)>;
+
+LinearIndicesExtractionFn
+GetIndicesExtractionFunction(const DataLayout layout);
+
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLatLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLonLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLevLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLatLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLevLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLonLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
 }
 
 #endif /* !CMC_HYPERSLAB_HXX */

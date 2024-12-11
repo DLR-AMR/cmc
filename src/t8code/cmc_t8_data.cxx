@@ -244,10 +244,13 @@ AmrData::SendInitialData()
     std::vector<VariableSendMessage> send_messages;
     send_messages.reserve(comm_size * input_variables_.size());
 
+    cmc_debug_msg("SIze of input vars before gather distribution data: ", input_variables_.size());
     /* Gather the data thas has to be communicated for all variables */
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
-        GatherDistributionData(*input_var_iter, offsets, send_messages);
+        cmc_debug_msg("Active format just before gather distribution datad of input variable is: ", input_var_iter->GetActiveDataFormat());
+        const InputVar& in_var = *input_var_iter;
+        input_var_iter->GatherDistributionData(offsets, send_messages);
     }
 
     cmc_debug_msg("Size of send_messages: ", send_messages.size());
@@ -430,8 +433,13 @@ AmrData::DistributeDataOnInitialMesh()
     for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
     {
         input_var_iter->TransformCoordinatesToLinearIndices();
+        cmc_debug_msg("Directly after transform to lin indices: Active format of input variable is: ", input_var_iter->GetActiveDataFormat());
     }
 
+    for (auto input_var_iter = input_variables_.begin(); input_var_iter != input_variables_.end(); ++input_var_iter)
+    {
+        cmc_debug_msg("Active format of input variable is: ", input_var_iter->GetActiveDataFormat());
+    }
     /* Gather and send all the data that has to be communicated. 
      * The send messages has to be returned in order to no get deallocated before 
      * the actual sending has happend. Therefore, we keep them here 'alive' until 
@@ -457,6 +465,17 @@ AmrData::DistributeDataOnInitialMesh()
     cmc_assert(initial_mesh_.IsValid());
     SortLocalDataOnInitialMesh();
     #endif
+}
+
+void
+AmrData::FilterDataAsDifferences()
+{
+    cmc_assert(variables_.size() > 0);
+
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        var_iter->FilterDataAsDifferences();
+    }
 }
 
 void
@@ -696,7 +715,7 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
             t8_forest_unref(&previous_forest);
             cmc_debug_msg("Befroe set partitioned mesh");
             adapt_data.SetCurrentMesh(adapted_forest);
-
+            cmc_debug_msg("\n\nNum elems mesh after adaptation: ", t8_forest_get_global_num_elements(adapted_forest), "\n\n");
             adapt_data.FinalizeCompressionIteration();
         }
 

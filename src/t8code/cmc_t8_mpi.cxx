@@ -13,7 +13,7 @@ namespace cmc
 {
 
 DataOffsets
-GatherGlobalDataOffsets(const AmrMesh mesh, const MPI_Comm comm)
+GatherGlobalDataOffsets(const AmrMesh& mesh, const MPI_Comm comm)
 {
     #ifdef CMC_ENABLE_MPI
     int ret_val, size, rank;

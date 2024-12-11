@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS = -I config @CMC_T8_AMFLAGS@
 
 AM_CPPFLAGS = -I@includedir@ @CPPFLAGS@ 
-AM_CXXFLAGS = -std=c++2a 
+AM_CXXFLAGS = -std=c++2a -O0
 #-Wall -Wextra
 AM_LDFLAGS = -L@libdir@ @LDFLAGS@
 AM_FCFLAGS = @FCFLAGS@

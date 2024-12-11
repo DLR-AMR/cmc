@@ -118,6 +118,7 @@ SetupInputVar(const CmcType type, const std::string& name, const int id, const s
 InputVar::InputVar(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value, const DataLayout layout, const GeoDomain& domain)
 {
     var_ = SetupInputVar(type, name, id, num_elements, missing_value, layout, domain);
+    cmc_debug_msg("Input Var is created");
 }
 
 struct ObtainCmcType
@@ -236,6 +237,12 @@ InputVar::GetInternID() const
     }, var_);
 }
 
+CmcInputVariable&
+InputVar::GetInternalVariant([[maybe_unused]] const AccessKey& key)
+{
+    return var_;
+}
+
 void
 InputVar::SetInternID(const int id)
 {
@@ -244,7 +251,13 @@ InputVar::SetInternID(const int id)
     }, var_);
 }
 
-
+DataFormat
+InputVar::GetActiveDataFormat() const
+{
+    return std::visit([](auto&& var) -> DataFormat {
+        return var.GetActiveDataFormat();
+    }, var_);
+}
 void
 InputVar::TransformCoordinatesToLinearIndices()
 {
@@ -336,7 +349,6 @@ InputVar::GetInternalVariant() const
 void
 InputVar::ApplyScalingAndOffset()
 {
-    cmc_debug_msg("Vor apply offset ad scaling");
     std::visit([this](auto&& var) {
         const CmcDefaultDataType d_scale_factor = GetUniversalDataAs<CmcDefaultDataType>(var.GetScaleFactor());
         const CmcDefaultDataType d_add_offset = GetUniversalDataAs<CmcDefaultDataType>(var.GetAddOffset());
@@ -355,7 +367,6 @@ InputVar::ApplyScalingAndOffset()
             ApplyOffset(var);
         }
     }, var_);
-    //cmc_debug_msg("nach apply offset ad scaling");
 };
 
 struct SplitInputVariables
@@ -430,7 +441,7 @@ SplitIntoSubVariables(const InputVar& variable, const Dimension dimension)
     return std::visit(SplitInputVariables(dimension), variable.var_);
 }
 
-
+#if 0
 struct GatherSendData
 {
 public:
@@ -471,6 +482,7 @@ public:
         }
     }
     void operator()(const InputVariable<float>& var) {
+        cmc_debug_msg("IN GatherSend: Input Variable active format: ", var.GetActiveDataFormat());
         ReceiverMap<float> send_data = GatherDataToBeDistributed(var, offsets);
         for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
         {
@@ -531,7 +543,7 @@ private:
     std::vector<VariableSendMessage>& messages;
 };
 
-
+#endif
 
 
 #if 0
@@ -613,9 +625,10 @@ public:
             //VariableMessage<float>& var_message = send_data[sd_iter->first];
             //VariableMessage<float> send_var;
             //DetachVarMessage(var_message, send_var);
-            VariableMessage<float> send_var;
-            std::swap(send_var, sd_iter->second);
-            variables_send_data.emplace_back(std::move(send_var));
+            //VariableMessage<float> send_var;
+            //std::swap(send_var, sd_iter->second);
+            //variables_send_data.emplace_back(std::move(send_var));
+            variables_send_data.push_back(std::move(sd_iter->second));
         }
         return variables_send_data;
     }
@@ -715,11 +728,83 @@ private:
 
 #endif
 
-//std::vector<VariableSendMessage>
+
+template<typename T>
 void
-GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages)
+AppendSendData(std::vector<VariableSendMessage>& messages, ReceiverMap<T>&& send_data)
 {
-    std::visit(GatherSendData(offsets, messages), variable.var_);
+    for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+    {
+        messages.push_back(std::move(sd_iter->second));
+        sd_iter = send_data.erase(sd_iter);
+    }
+}
+
+void
+InputVar::GatherDistributionData(const DataOffsets& offsets, std::vector<VariableSendMessage>& messages) const
+{
+    cmc_debug_msg("In Gather Distribution data: InputVar active format: ", GetActiveDataFormat());
+
+    std::visit(overloaded {
+            [&offsets, &messages](const InputVariable<int8_t>& var)
+            {
+                ReceiverMap<int8_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<char>& var)
+            {
+                ReceiverMap<char> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<int16_t>& var)
+            {
+                ReceiverMap<int16_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<int32_t>& var)
+            {
+                ReceiverMap<int32_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<float>& var)
+            {
+                cmc_debug_msg("IN Gather distribution data lambda: InputVariable<T> active format: ", var.GetActiveDataFormat());
+                cmc_debug_msg("The name of the variable inside here is: ", var.GetName());
+                ReceiverMap<float> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<double>& var)
+            {
+                ReceiverMap<double> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<uint8_t>& var)
+            {
+                ReceiverMap<uint8_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<uint16_t>& var)
+            {
+                ReceiverMap<uint16_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<uint32_t>& var)
+            {
+                ReceiverMap<uint32_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<int64_t>& var)
+            {
+                ReceiverMap<int64_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [&offsets, &messages](const InputVariable<uint64_t>& var)
+            {
+                ReceiverMap<uint64_t> send_data = var.GatherDataToBeDistributed(offsets);
+                AppendSendData(messages, std::move(send_data));
+            },
+            [](auto& var){cmc_err_msg("Type Error in GatherDistributionData");}
+        }, var_);
 }
 
 CmcType

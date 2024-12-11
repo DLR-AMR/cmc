@@ -11,6 +11,7 @@
 #include "utilities/cmc_span.hxx"
 #include "utilities/cmc_prefix_encoding.hxx"
 #include <t8_forest/t8_forest_vtk.h>
+#include "utilities/cmc_huffman.hxx"
 
 #include <vector>
 #include <cmath>
@@ -39,7 +40,9 @@ class ByteVariable
 public:
     ByteVariable() = default;
     ByteVariable(std::vector<CompressionValue<sizeof(T)>>&& serialized_data)
-    : byte_values_(std::move(serialized_data)) {};
+    : byte_values_(std::move(serialized_data)) {
+        cmc_debug_msg("Variable has obtained data of size: ", byte_values_.size());
+    };
     ByteVariable(const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
                  const int global_context_information, const T missing_value)
     : name_{name}, attributes_(missing_value, layout, pre_compression_layout, global_context_information), global_domain_{domain} {};
@@ -104,12 +107,15 @@ public:
     void ReleaseInitialMesh(); 
     friend class TransformerCompressionToByteVariable;
 
+    void XORConsecutiveValues();
+
 private:
     CompressionValue<sizeof(T)> GetMaximumTailClearedValue(const int, const std::vector<PermittedError>&, const CompressionValue<sizeof(T)>&, const T&) const;
     CompressionValue<sizeof(T)> GetMaximumTailToggledValue(const int, const std::vector<PermittedError>&, const CompressionValue<sizeof(T)>&, const T&) const;
     std::vector<PermittedError> GetPermittedError(const int index) const;
     std::vector<PermittedError> GetRemainingMaxAllowedAbsoluteError(const int index) const;
-    
+    std::vector<int> GetPrefixLengthFrequency() const;
+
     std::string name_; //!< The name of the variable
     std::vector<T> initial_data_; //!< The actual data of the variable
     AmrMesh mesh_; //!< The mesh on which the variable is defined
@@ -184,6 +190,7 @@ public:
     void StoreInitialMesh();
     void KeepInitialData(const bool keep_data);
 
+    void XORConsecutiveValues();
 private:
     void SetUpByteVariable(const CmcType type, const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
                       const int global_context_information, const CmcUniversalType missing_value);
@@ -241,6 +248,15 @@ ByteVariable<T>::PrintCompressionValues() const
             ++i;
         }
     }
+}
+
+inline
+void
+ByteVar::XORConsecutiveValues()
+{
+    std::visit([](auto&& var) {
+        var.XORConsecutiveValues();
+    }, var_);
 }
 
 inline
@@ -462,10 +478,56 @@ ByteVar::WriteDataToVTK_(const int step_id)
 
 template<typename T>
 void
+ByteVariable<T>::XORConsecutiveValues()
+{
+    cmc_assert(byte_values_.size() >= 1);
+
+    CompressionValue<sizeof(T)> last_val = byte_values_[0];
+    CompressionValue<sizeof(T)> new_val;
+    for (size_t index = 1; index < byte_values_.size(); ++index)
+    {
+        new_val = byte_values_[index];
+        byte_values_[index] ^= last_val;
+        last_val = new_val;
+    }
+    byte_values_[0] = CompressionValue<sizeof(T)>(T(0));
+
+}
+
+template<typename T>
+std::vector<int>
+ByteVariable<T>::GetPrefixLengthFrequency() const
+{
+    std::vector<int> frequency(sizeof(T) * bit_vector::kCharBit + 1, int{0});
+
+    /* Iterate over all levels of extraction */
+    for (auto lvl_iter = prefixes_.begin(); lvl_iter != prefixes_.end(); ++lvl_iter)
+    {
+        /* Iterate over all prefixes on this level */
+        for (auto val_iter = lvl_iter->prefixes.begin(); val_iter != lvl_iter->prefixes.end(); ++val_iter)
+        {
+            /* Get the count of significant bits, i.e. the length of the prefix */
+            const size_t pref_length = val_iter->GetCountOfSignificantBits();
+
+            /* Increment the counter for the given prefix length */
+            ++frequency[pref_length];
+        }
+    }
+
+    int i = 0;
+    for (auto fiter = frequency.begin(); fiter != frequency.end(); ++fiter, ++i)
+    {
+        cmc_debug_msg("Frequency of Length: ", i, " is ", *fiter);
+    }
+    return frequency;
+}
+
+template<typename T>
+void
 ByteVariable<T>::WriteDataToVTK_(const int step_id)
 {
-    std::string file_name = "t2m_3d_time_lat_lon_pref_ex_data_step_" + std::to_string(step_id);
-
+    //std::string file_name = "t2m_3d_time_lat_lon_pref_ex_data_step_" + std::to_string(step_id);
+    const std::string file_name = GetName() + "_" + std::to_string(GetGlobalContextInformation()) + "_" + std::to_string(step_id);
     std::vector<float> float_data;
 
     #if 0
@@ -895,7 +957,7 @@ ByteVariable<T>::LeaveCoarsePrefixUnchanged(const int elem_index)
     /* In case that the element stays the same (the sibling elements are not yet present in the mesh).
      * We indicate the whole data/prefix as a common prefix and will evaluate in a later adaptation step. */
     prefixes_.back().SetRefinementIndicatorBit(false);
-    prefixes_.back().SetPrefixIndicatorBit(true);
+    prefixes_.back().SetPrefixIndicatorBit(true); //TODO: Wont this be erased later by the WriteCompressed nevertheless, can we directly set it to false?
 
     /* Copy the data/prefix to the next 'coarser level' */
     if (prefixes_.size() >= 2)
@@ -1125,7 +1187,7 @@ ByteVariable<T>::EvaluateCommonPrefix(VectorView<CompressionValue<sizeof(T)>>& b
 int
 DetermineForestRefinementBits(std::vector<uint8_t>& serialized_variable, t8_forest_t forest);
 
-
+#if 0
 template<typename T>
 NcVariable
 ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
@@ -1162,7 +1224,7 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
 
     /* Create a netCDF variable to put out */
     std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
-
+    cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
     NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
     compressed_variable.Reserve(num_bytes);
 
@@ -1224,6 +1286,117 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
     cmc_debug_msg("Write complete");
     #endif
 }
+
+#else
+
+
+
+template<typename T>
+NcVariable
+ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
+{
+    /* Declare a vector which will hold the level-wise encoded data */
+    std::vector<std::vector<uint8_t>> buffered_data;
+    buffered_data.reserve(prefixes_.size() + 1);
+
+    /* Construct a huffman coder */
+    std::vector<int> prefix_length_frequency = GetPrefixLengthFrequency();
+    huffman::HuffmanTree<int> huffman_encoder(prefix_length_frequency);
+
+    //TODO: Update
+    //Store an "uint16_t" as a placeholder for the size of the huffman tree
+    buffered_data.emplace_back(std::vector<uint8_t>{0,0});
+
+    /* We copy the serialized huffman tree to the stream */
+    const size_t symbol_size = 6;
+    bit_vector::BitVector serialized_huffman_tree = huffman_encoder.SerializeHuffmanTree(symbol_size);
+    buffered_data.emplace_back(serialized_huffman_tree.GetData());
+    cmc_debug_msg("Huffman Tree has been serialized to ", serialized_huffman_tree.size(), " bytes, resp. ", serialized_huffman_tree.size_bits(), " bits.");
+
+    size_t num_bytes = 0;
+    /* Encode and retrieve the extracted prefixes */
+    for (auto lw_prefix_iter = prefixes_.rbegin(); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter)
+    {
+        buffered_data.emplace_back(lw_prefix_iter->EncodeLevelData(huffman_encoder));
+        cmc_debug_msg("Num bytes for level: ", buffered_data.back().size());
+        num_bytes += buffered_data.back().size();
+    }
+
+    /* Encode and append the leftover suffixes (on the finest level) that could not be truncated or extracted */
+    #if 1
+    buffered_data.emplace_back(EncodePlainSuffixes(byte_values_));
+    #else
+    /* TRy the XOR scheme */
+    //buffered_data.emplace_back(EncodeSuffixesXORScheme(byte_values_));
+    buffered_data.emplace_back(EncodeSuffixesXORSchemeNew(byte_values_));
+    //buffered_data.emplace_back(EncodeSuffixesBitPlaneRLE(byte_values_));
+    #endif
+    cmc_debug_msg("Num bytes for suffixes: ", buffered_data.back().size());
+    num_bytes += buffered_data.back().size();
+    cmc_debug_msg("Overall bytes for this variable: ", num_bytes);
+
+
+    //TODO: Make mechanism for parallel output
+    //The complete global byte size needs to gathered and the level data has to be filled in parallel to it
+
+    /* Generate a (potentially new) context information for the variable */
+    const int global_context_info = (attributes_.GetGlobalContextInformation() != kNoGlobalContext ? attributes_.GetGlobalContextInformation() : 0);
+
+    /* Create a netCDF variable to put out */
+    std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
+    cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
+    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
+    compressed_variable.Reserve(num_bytes);
+    
+    /* Put the buffered data into the variable to put out */
+    for (auto lvl_data_iter = buffered_data.begin(); lvl_data_iter != buffered_data.end(); ++lvl_data_iter)
+    {
+        compressed_variable.PushBack(*lvl_data_iter);
+    }
+
+    /* Assign some attributes to it */
+    std::vector<NcAttribute> attributes;
+    attributes.emplace_back("id", id);
+    attributes.emplace_back("time_step", time_step);
+    attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
+    attributes.emplace_back("initial_layout", static_cast<int>(attributes_.GetInitialDataLayout()));
+    attributes.emplace_back("pre_compression_layout", static_cast<int>(attributes_.GetPreCompressionLayout()));
+    attributes.emplace_back("global_context", global_context_info);
+    attributes.emplace_back("data_type", static_cast<int>(ConvertToCmcType<T>()));
+    attributes.emplace_back("missing_value", attributes_.GetMissingValue());
+    //TODO: Check if scaling and offset have been applied, if not we need to add those attributes
+
+    /* Get the global domain of this variable */
+    const GeoDomain& var_domain = GetGlobalDomain();
+
+    /* Write the domain lengths as attributes */
+    if (const int lon = var_domain.GetDimensionLength(Dimension::Lon);
+        lon > 1)
+    {
+        attributes.emplace_back("lon", lon);
+    }
+    if (const int lat = var_domain.GetDimensionLength(Dimension::Lat);
+        lat > 1)
+    {
+        attributes.emplace_back("lat", lat);
+    }
+    if (const int lev = var_domain.GetDimensionLength(Dimension::Lev);
+        lev > 1)
+    {
+        attributes.emplace_back("lev", lev);
+    }
+    if (const int time = var_domain.GetDimensionLength(Dimension::Time);
+        time > 1)
+    {
+        attributes.emplace_back("time", time);
+    }
+
+
+    return NcVariable(std::move(compressed_variable), std::move(attributes));
+}
+
+#endif
+
 
 template<typename T>
 void

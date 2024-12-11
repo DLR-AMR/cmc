@@ -97,6 +97,8 @@ public:
 
     void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
 
+    void FilterDataAsDifferences();
+
     friend class TransformerInputToCompressionVariable;
     friend class TransformerCompressionToOutputVariable;
     friend class TransformerCompressionToByteVariable;
@@ -179,6 +181,8 @@ public:
     void SetMissingValueInNCFile(const int ncid, const int var_id, const int nc_type) const;
 
     void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
+
+    void FilterDataAsDifferences();
 
     friend class TransformerInputToCompressionVariable;
     friend class TransformerCompressionToOutputVariable;
@@ -543,6 +547,25 @@ Variable<T>::RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned
     utilities_.RepartitionInaccuracyData(adapted_forest, partitioned_forest);
 }
 
+template<typename T>
+void
+Variable<T>::FilterDataAsDifferences()
+{
+    T last_val = data_.front();
+    for (auto val_iter = std::next(data_.begin()); val_iter != data_.end(); ++val_iter)
+    {
+        T current_val = *val_iter;
+        if constexpr (std::is_signed_v<T>)
+        {
+            *val_iter = *val_iter - last_val; 
+        } else
+        {
+            *val_iter = *val_iter - last_val; 
+        }
+        last_val = current_val;
+    }
+    data_.front() = static_cast<T>(std::abs(0));
+}
 
 /** VAR MEMBER FUNCTIONS **/
 inline
@@ -838,6 +861,15 @@ Var::RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest)
 {
     std::visit([&](auto& var) {
         var.RepartitionData(adapted_forest, partitioned_forest);
+    }, var_);
+}
+
+inline
+void
+Var::FilterDataAsDifferences()
+{
+    std::visit([&](auto& var) {
+        var.FilterDataAsDifferences();
     }, var_);
 }
 

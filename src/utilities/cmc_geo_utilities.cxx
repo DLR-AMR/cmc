@@ -6,10 +6,10 @@ namespace cmc
 Hyperslab
 TransformGeoDomainToHyperslab(const GeoDomain& domain)
 {
-    return Hyperslab(domain.GetDimensionStartIndex(Dimension::Lon), domain.GetDimensionLength(Dimension::Lon),
-                     domain.GetDimensionStartIndex(Dimension::Lat), domain.GetDimensionLength(Dimension::Lat),
-                     domain.GetDimensionStartIndex(Dimension::Lev), domain.GetDimensionLength(Dimension::Lev),
-                     domain.GetDimensionStartIndex(Dimension::Time), domain.GetDimensionLength(Dimension::Time));
+    return Hyperslab(domain.GetDimensionStartIndex(Dimension::Lon), (domain.GetDimensionLength(Dimension::Lon) > 1 ? domain.GetDimensionLength(Dimension::Lon) : 1),
+                     domain.GetDimensionStartIndex(Dimension::Lat), (domain.GetDimensionLength(Dimension::Lat) > 1 ? domain.GetDimensionLength(Dimension::Lat) : 1),
+                     domain.GetDimensionStartIndex(Dimension::Lev), (domain.GetDimensionLength(Dimension::Lev) > 1 ? domain.GetDimensionLength(Dimension::Lev) : 1),
+                     domain.GetDimensionStartIndex(Dimension::Time), (domain.GetDimensionLength(Dimension::Time) > 1 ? domain.GetDimensionLength(Dimension::Time) : 1));
 }
 
 GeoDomain

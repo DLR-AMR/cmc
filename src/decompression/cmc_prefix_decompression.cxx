@@ -178,7 +178,7 @@ GetCompressionVariableInfo(const std::vector<NcVariable>& variable_hulls)
                 reconstructed_domain.UpdateDimension(DimensionInterval(Dimension::Lat, 0, std::get<int>(lat_iter->GetValue()))); 
             }
 
-            const auto lev_iter = FindAttribute(attributes, "lon");
+            const auto lev_iter = FindAttribute(attributes, "lev");
             if (lev_iter != attributes.end())
             {
                 /* Set the found lon diemnsion length in the geo domain */
@@ -226,7 +226,7 @@ SetUpByteVariableForDecompression(const std::vector<CompressedVariableInfo>& var
         /* Create a new byte variable from the given information */
         byte_variables.emplace_back(var_iter->id, var_iter->type, var_iter->base_name, var_iter->domain, var_iter->initial_layout, var_iter->pre_compression_layout,
                                     var_iter->global_context_information, var_iter->missing_value);
-        
+        cmc_debug_msg("In SetUpByteVariableForDecompression: Var_id: ", var_iter->id, ", var_type: ", var_iter->type, ", var base name: ", var_iter->base_name, ", var_iter->initial_layout: ",var_iter->initial_layout, ", var_iter->pre_compression_layout: ", var_iter->pre_compression_layout, ", var_iter->global_context_information: ", var_iter->global_context_information);
         /* Create the base mesh for this variable */
         t8_forest_t base_mesh = ReconstructBaseMesh(GetDimensionalityOfDataLayout(var_iter->initial_layout), MPI_COMM_WORLD);
 
@@ -241,6 +241,26 @@ SetUpByteVariableForDecompression(const std::vector<CompressedVariableInfo>& var
     return byte_variables;
 }
 
+static ByteVar
+CreateDecompressionByteVariable(const CompressedVariableInfo& var_info, const std::string& name, const int split_id)
+{
+    ByteVar var(var_info.id, var_info.type, name, var_info.domain, var_info.initial_layout, var_info.pre_compression_layout,
+                split_id, var_info.missing_value);
+    
+    cmc_debug_msg("In SetUpByteVariableForDecompression: Var_id: ", var_info.id, ", var_type: ", var_info.type, ", var base name: ", var_info.base_name, ", var_info.initial_layout: ",var_info.initial_layout, ", var_info.pre_compression_layout: ", var_info.pre_compression_layout, ", var_info.global_context_information: ", var_info.global_context_information);
+    
+    /* Create the base mesh for this variable */
+    t8_forest_t base_mesh = ReconstructBaseMesh(GetDimensionalityOfDataLayout(var_info.initial_layout), MPI_COMM_WORLD);
+
+    /* Assign the base mesh to the byte variable */
+    var.SetMesh(base_mesh);
+
+    /* The base mesh consists of a single element in either way. In order to append the extracted prefixes,
+     * we need to add an initial empty CompressionValue "representing the root element" */
+    var.AssignCompressionValueForDecompressionStart();
+
+    return var;
+}
 
 void
 Decompressor::Setup()
@@ -264,7 +284,7 @@ Decompressor::Setup()
     variable_info_ = EvaluateCompressionVariables(variable_hulls);
 
     /* Set up the byte variables for the first time step */
-    compression_variables_ = SetUpByteVariableForDecompression(variable_info_);
+    //compression_variables_ = SetUpByteVariableForDecompression(variable_info_);
 }
 
 
@@ -366,16 +386,17 @@ Decompressor::DecompressVariable(const std::string& variable_base_name)
 
     /* Get the number of time steps which are encoded */
     const int num_time_steps = GetNumberOfTimeSteps(variable_info_, variable_base_name);
-
+    cmc_debug_msg("Num_time_steps: ", num_time_steps);
     /* Get the number of split variables */
     const int num_split_variables = GetNumberOfSplitVariables(variable_info_, variable_base_name);
+    cmc_debug_msg("num_split_variables: ", num_split_variables);
 
-    /* Get an iterator to the corresponding byte variable */
-    auto var_iter = std::find_if(compression_variables_.begin(), compression_variables_.end(), [&variable_base_name](const ByteVar& byte_var){
-        return !byte_var.GetName().compare(variable_base_name);
+    /* Get an iterator to the corresponding variable information */
+    auto var_info_iter = std::find_if(variable_info_.begin(), variable_info_.end(), [&variable_base_name](const CompressedVariableInfo& var_info){
+        return !var_info.base_name.compare(variable_base_name);
     });
 
-    cmc_assert(var_iter != compression_variables_.end());
+    cmc_assert(var_info_iter != variable_info_.end());
 
     /* Create a reader for the compressed file */
     NcReader reader(file_name_);
@@ -388,14 +409,18 @@ Decompressor::DecompressVariable(const std::string& variable_base_name)
             /* Create the name of the variable we want to decompress */
             const std::string nc_var_name = variable_base_name + "_" + std::to_string(split_id) + "_" + std::to_string(time_step);
 
+            /* Create a byte variable from the meta data */
+            compression_variables_.emplace_back(CreateDecompressionByteVariable(*var_info_iter, nc_var_name, split_id));
+
             /* Read the (serialized) data of the variable from the file */
             std::vector<uint8_t> serialized_data = reader.ReadVariableData<uint8_t>(nc_var_name);
             cmc_debug_msg("Size of serialized data:", serialized_data.size());
+
             /* Get the initial refinement level of the data */
             const int initial_refinement_level = GetInitialRefinementLevel(variable_info_, variable_base_name);
 
             /* Create an adapt data class which handles the compressed byte stream */
-            DecompressPrefixAdaptData adapt_data(*var_iter, serialized_data);
+            DecompressPrefixAdaptData adapt_data(compression_variables_.back(), serialized_data);
 
             /* Decode the levels of the prefix encodings */
             for (int lvl = 0; lvl < initial_refinement_level; ++lvl)

@@ -525,7 +525,6 @@ SetUpInputVariable(const int ncid, const CoordinateArray<int>& coordinate_dimens
     DomainIndex offset = 0;
     for (auto hs_iter = hyperslabs.begin(); hs_iter != hyperslabs.end(); ++hs_iter)
     {
-        //const std::vector<Dimension> dimension_ordering = GetDimensionVectorFromLayout(layout);
         const auto [start_vals, count_vals] = GetStartAndCountValuesForVariable(*hs_iter, coordinate_dimension_ids, num_dimensions, dimension_ids);
 
         const int err = nc_get_vara(ncid, variable_id, start_vals.data(), count_vals.data(), static_cast<void*>(&local_data[offset]));
@@ -542,20 +541,24 @@ SetUpInputVariable(const int ncid, const CoordinateArray<int>& coordinate_dimens
     #endif
 
     #if 0
+    cmc_debug_msg("Remove this file IO");
+    /* Write out the binary data for other compressors to use and compare with */
     std::vector<float> converted_data;
-    const int num_elems = 1440*721;
-    converted_data.reserve(num_elems);
-    const float add_offset = 0.00790779508439177;
-    const float scale_factor = 9.25404335362387e-08;
-    for (int j = 0; j < num_elems; ++j)
+    //const int num_elems = 256 * 721 * 1440;
+    converted_data.reserve(offset);
+    const float add_offset = 268.794749612252;
+    const float scale_factor = 0.00162626377690319;
+    for (DomainIndex j = 0; j < offset; ++j)
     {
         converted_data.push_back(scale_factor * static_cast<float>(local_data[j]) + add_offset);
+        cmc_debug_msg(converted_data.back());
     }
-    FILE* file = fopen("tco3_initial_lat_lon.bin", "wb");
-    fwrite(converted_data.data(), sizeof(float), num_elems, file);
-    fclose(file);
-    std::exit(1);
+    //FILE* file = fopen("t2m_initial_time256_lat721_lon1440.bin", "wb");
+    //fwrite(converted_data.data(), sizeof(float), num_elems, file);
+    //fclose(file);
+    //std::exit(1);
     #endif
+
     variable.SetDataAndCoordinates(std::move(local_data), std::move(hyperslabs));
 
     return InputVar(std::move(variable));

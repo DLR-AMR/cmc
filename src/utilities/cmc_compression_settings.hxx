@@ -85,7 +85,8 @@ public:
     /* Split a variable at a specific dimension (e.g. 3D variable "Lat x Lon x Height" may be split into #Height 2D variables defined on the domain "Lat x Lon") */
     void SplitVariableByDimension(const SplitVariable& variable_to_split);
     void SplitVariableByDimension(SplitVariable&& variable_to_split);
-    
+    void SetSplitVariables(const std::vector<SplitVariable>& split_variables);
+    void SetSplitVariables(std::vector<SplitVariable>&& split_variables);
     sv_iterator GetSplitVariablesBegin() { return variables_to_split_.begin(); };
     sv_iterator GetSplitVariablesEnd() { return variables_to_split_.end(); };
     sv_const_iterator GetSplitVariablesBegin() const { return variables_to_split_.begin(); };

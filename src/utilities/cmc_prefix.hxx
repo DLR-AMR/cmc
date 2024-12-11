@@ -99,6 +99,15 @@ public:
         return prefix;
     }
 
+    Prefix& operator^=(const Prefix& rhs)
+    {
+        for (int i = 0; i < N; ++i)
+        {
+            prefix_mem_[i] ^= rhs.prefix_mem_[i];
+        }
+        return *this;
+    }
+
     int GetNumberLeadingZeros() const;
     
     int GetNumberTrailingZeros() const;
@@ -158,7 +167,7 @@ Prefix<N>::Prefix(const T& value)
 {
     if (N != static_cast<int>(sizeof(value)))
     {
-        cmc_debug_msg("Hier gehts nicht.");// N ist = ", N, " und value ist: ", value, " mit groesse : ", sizeof(T));
+        cmc_debug_msg("Hier gehts nicht. N ist = ", N, " und value mit groesse : ", sizeof(T));
     }
     cmc_assert(N == static_cast<int>(sizeof(value)));
     std::memcpy(this->prefix_mem_.data(), &value, sizeof(value));
@@ -388,7 +397,7 @@ Prefix<N>::GetNumberLeadingZeros() const
             {
                 if (prefix_mem_[byte_id] & (kHighBit >> bit_index))
                 {
-                    /* If true, the prefix does hold a zero at this position */
+                    /* If true, the prefix does hold not a zero at this position */
                     return num_leading_zeros;
                 } else
                 {
@@ -545,6 +554,15 @@ public:
         return prefix_.GetMemoryForReading();
     }
 
+    CompressionValue& operator^=(const CompressionValue& rhs)
+    {
+        prefix_ ^= rhs.prefix_;
+        return *this;
+    }
+
+    void NullifyNonSignificantFrontBits();
+    int GetLeadingZeroCountInSignificantBits() const;
+
 private:
     Prefix<N> prefix_;
     int front_bit_{0};
@@ -567,6 +585,80 @@ CompressionValue<N>::CompressionValue(const std::vector<uint8_t>& serialized_pre
     trail_bit_ = N * CHAR_BIT - num_bits;
 };
 
+template<int N>
+int
+CompressionValue<N>::GetLeadingZeroCountInSignificantBits() const
+{
+    //TODO only iterate until tail bit is reached
+
+    if (this->IsEmpty()) {return 0;}
+    cmc_assert(trail_bit_ == 0);
+    
+    int num_leading_zeros = 0;
+    int front_bit = front_bit_;
+
+    for (int byte_id = GetMSBByteStart(prefix_), iter = 0, vec_index = 0;
+         MSBContinueIteration(byte_id, prefix_);
+         MSBByteIncrement(byte_id), ++iter)
+    {
+        /* Iterate until we are in the byte holding the bit after the current front bit */
+        if (front_bit >= (iter + 1) * CHAR_BIT) {continue;}
+
+        for (int bit_index = front_bit % CHAR_BIT; bit_index < CHAR_BIT; ++bit_index)
+        {
+            if (prefix_[byte_id] & (kHighBit >> bit_index))
+            {
+                /* If true, the prefix does hold a zero at this position */
+                return num_leading_zeros;
+            } else
+            {
+                /* In this case a zero is present at the given position */
+                ++num_leading_zeros;
+            }
+        }
+
+        /* We reset the front bit in order to start at the beginning of the next byte */
+        front_bit = 0;
+    }
+    return num_leading_zeros;
+}
+
+template<int N>
+void
+CompressionValue<N>::NullifyNonSignificantFrontBits()
+{
+    /* Get the number of bits for this prefix */
+    const int num_bits = GetCountOfSignificantBits();
+
+    if (num_bits == N * CHAR_BIT)
+    {
+        /* In case there are no non-significant bits, we return immediately */
+        return;
+    }
+
+    int front_bits_to_nullify = front_bit_;
+
+    /* Nullify the first part of the prefix */
+    for (int byte_id = GetMSBByteStart(prefix_);
+         MSBContinueIteration(byte_id, prefix_);
+         MSBByteIncrement(byte_id))
+    {
+        if (front_bits_to_nullify <= 0) {break;}
+
+        if (front_bits_to_nullify >= CHAR_BIT)
+        {
+            /* Nullify the whole byte */
+            prefix_[byte_id]  = uint8_t{0};
+            front_bits_to_nullify -= CHAR_BIT;
+        } else 
+        {
+            const uint8_t bit_mask = LowBitMask[front_bits_to_nullify];
+            prefix_[byte_id] &= bit_mask;
+            break;
+        }
+    }
+
+}
 
 /* This functions needs the serialized prefix to be aligned at the high bits ( e.g. four bit prefix: 0b(p1 p2 p3 p4 0 0 0 0) */
 template<int N>

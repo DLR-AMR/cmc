@@ -127,6 +127,18 @@ CompressionSettings::SetCertainErrorForDomain(CertainErrorDomain&& error_domain,
 }
 
 void
+CompressionSettings::SetSplitVariables(const std::vector<SplitVariable>& split_variables)
+{
+    variables_to_split_ = split_variables;
+}
+
+void
+CompressionSettings::SetSplitVariables(std::vector<SplitVariable>&& split_variables)
+{
+    variables_to_split_ = std::move(split_variables);
+}
+
+void
 CompressionSettings::SplitVariableByDimension(const SplitVariable& variable_to_split)
 {
     cmc_assert(FindVariableInSplitVariables(variable_to_split.variable_id, variables_to_split_) == variables_to_split_.end());

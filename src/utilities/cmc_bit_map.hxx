@@ -79,12 +79,12 @@ public:
     void ToggleBit(const size_t& byte_position, const size_t& bit_position);
     void ClearBit(const size_t& byte_position, const size_t& bit_position);
     void SetBit(const size_t& byte_position, const size_t& bit_position);
-    bool IsBitSet(const size_t& byte_position, const size_t& bit_position);
+    bool IsBitSet(const size_t& byte_position, const size_t& bit_position) const;
 
     void ToggleBit(const size_t global_bit_position);
     void ClearBit(const size_t global_bit_position);
     void SetBit(const size_t global_bit_position);
-    bool IsBitSet(const size_t global_bit_position);
+    bool IsBitSet(const size_t global_bit_position) const;
 
     Iterator begin() const {return Iterator(vector_.data());};
     const Iterator end() const {return Iterator(vector_.data() + vector_.size() - (num_bits_ % kCharBit != 0 ? 1 : 0), num_bits_ % kCharBit);}
@@ -268,7 +268,7 @@ BitMap::SetBit(const size_t& byte_position, const size_t& bit_position)
  * @return false The bit at this position is **not** set
  */
 inline bool
-BitMap::IsBitSet(const size_t& byte_position, const size_t& bit_position)
+BitMap::IsBitSet(const size_t& byte_position, const size_t& bit_position) const
 {
     cmc_assert(byte_position < vector_.size());
     return ((vector_[byte_position] >> bit_position) & uint8_t{1});
@@ -315,7 +315,7 @@ BitMap::SetBit(const size_t global_bit_position)
  * @return false The bit at this position is **not** set
  */
 inline bool
-BitMap::IsBitSet(const size_t global_bit_position)
+BitMap::IsBitSet(const size_t global_bit_position) const
 {
     return IsBitSet(global_bit_position / kCharBit, global_bit_position % kCharBit);
 }

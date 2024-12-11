@@ -1,4 +1,4 @@
-#include "lossless/cmc_prefix_compression.hxx"
+#include "lossy/cmc_prefix_compression.hxx"
 #include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_span.hxx"
@@ -18,6 +18,9 @@ namespace cmc
 {
 
 namespace prefix
+{
+
+namespace lossy
 {
 
 int
@@ -115,6 +118,21 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
 
     writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));
     writer.Write();
+}
+
+void
+Compressor::SetCompressionSettings(const CompressionSettings& settings)
+{
+    compression_settings_ = settings;
+}
+
+void
+Compressor::SetCompressionSettings(CompressionSettings&& settings)
+{
+    compression_settings_ = std::move(settings);
+}
+
+
 }
 
 }

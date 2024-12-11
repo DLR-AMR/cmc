@@ -205,7 +205,7 @@ public:
         byte_variable_.FinalizeDecompressionIteration();
         ++count_decompression_step;
 
-        byte_variable_.WriteDataToVTK_(count_decompression_step);
+        //byte_variable_.WriteDataToVTK_(count_decompression_step);
         //byte_variable_.PrintCompressionValues();
     }
 

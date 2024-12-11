@@ -23,7 +23,7 @@ using CmcInputVariable = std::variant<InputVariable<int8_t>, InputVariable<char>
 using CmcDefaultDataType = float;
 inline CmcType GetDefaultCmcType() { return CmcType::Float; };
 
-template<class T> ReceiverMap<T> GatherDataToBeDistributed(const InputVariable<T>& variable, const DataOffsets& offsets);
+//template<class T> ReceiverMap<T> GatherDataToBeDistributed(const InputVariable<T>& variable, const DataOffsets& offsets);
 
 template<class T> std::vector<InputVariable<T>> ExtractSubVariables (const InputVariable<T>& variable, const Dimension split_dimension);
     

@@ -13,7 +13,7 @@ test/cmc_split_variables \
 test/cmc_lossy_amr_compression \
 test/cmc_prefix \
 test/cmc_nc_data_output_input \
-test/cmc_bitmap \ 
+test/cmc_bitmap \
 test/cmc_bitvector_view
 
 test_cmc_create_compression_settings_SOURCES = test/cmc_create_compression_settings.cxx

@@ -7,6 +7,7 @@
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_span.hxx"
+#include "utilities/cmc_huffman.hxx"
 
 #include "utilities/cmc_log_functions.hxx"
 
@@ -74,6 +75,7 @@ public:
     }
 
     std::vector<uint8_t> EncodeLevelData() const;
+    std::vector<uint8_t> EncodeLevelData(const huffman::HuffmanTree<int>& huffman_encoder) const;
 
     bit_map::BitMap refinement_indicator;
     bit_map::BitMap prefix_indicator;
@@ -261,6 +263,109 @@ LevelwisePrefixData<T>::EncodeLevelData() const
     return serialized_level_data;
 }
 
+/* Encode and serialize the data of a level */
+template<typename T>
+std::vector<uint8_t>
+LevelwisePrefixData<T>::EncodeLevelData(const huffman::HuffmanTree<int>& huffman_encoder) const
+{
+    /* Get an estimate for the memory allocation of the serialized data */
+    const size_t memory_estimate = prefixes.size();
+
+    /* Allocate a new BitMap for the prefix indicators based on the indications from the coarsening process */
+    bit_map::BitMap prefix_indications(prefix_indicator);
+    
+    /* Allocate a BitVector for the prefix lengths */
+    bit_vector::BitVector prefix_lengths;
+    prefix_lengths.Reserve(memory_estimate / 2 + 1);
+
+    /* Allocate a BitVector for the prefixes */
+    bit_vector::BitVector prefix_encodings;
+    prefix_encodings.Reserve(memory_estimate + 1);
+
+    int prefix_idx = 0;
+
+    /* We are iterating over the prefix indications and check whether there is an actual prefix left corresponding to this ID or not.
+     * Afterwards, we are encoding the length and the prefix itself and store them in a serialized way. */
+    for (auto pfi_iter = prefix_indicator.begin(); pfi_iter != prefix_indicator.end(); ++pfi_iter, ++prefix_idx)
+    {
+        /* Check if a prefix is indicated, if so it will be encoded if it is not empty; if no prefix is indicated, we just continue */
+        if (*pfi_iter)
+        {
+            if (prefixes[prefix_idx].IsEmpty())
+            {
+                /* If the prefix is empty, it has been extracted to a coarser level.
+                 * Therefore, we need to unset the indicator bit at this position. */
+                prefix_indications.ClearBit(prefix_idx);
+            } else
+            {
+                /* If the prefix is not empty, it's length has to be encoded and stored. */
+                const uint8_t num_bits_prefix = static_cast<uint8_t>(prefixes[prefix_idx].GetCountOfSignificantBits());
+
+                /* Encode the prefix length with the huffman tree */
+                //cmc_debug_msg("Symbol to huffman encode: ", static_cast<int>(num_bits_prefix));
+                const auto [code, code_length] = huffman_encoder.EncodeSymbol(num_bits_prefix);
+
+                if (code_length > 0)
+                {
+                    /* The code length is only encoded when there is an actual code. A code of length zero occurs, when the whole block is 
+                    * is coarsened to only a single value (the optimal code in that case is of length zero) */
+                    prefix_lengths.AppendBits(code, static_cast<int>(code_length));
+                }
+
+                if (num_bits_prefix != 0)
+                {
+                    /* If there is a prefix to encode, we get the prefix and set it in the encoded stream */
+                    prefix_encodings.AppendBits(prefixes[prefix_idx].GetSignificantBitsInBigEndianOrdering(), num_bits_prefix);
+                }
+
+                // const int prefix_length = prefixes[prefix_idx].GetCountOfSignificantBits();
+                //EncodeAndAppendPrefixLength(prefix_lengths, prefix_length);
+                /* Afterwards, the actual prefix itself has to encoded and stored as well */
+                //EncodeAndAppendPrefix(prefix_encodings, prefixes[prefix_idx].GetSignificantBitsInBigEndianOrdering(), static_cast<int>(num_bits_prefix));
+            }
+        }
+        
+    }
+    cmc_debug_msg("prefix_idx = ", prefix_idx, " sollte gleich Anzahl Elemente sein");
+
+    cmc_debug_msg("In encode level data");
+    /* Pack all the data to a single stream */
+    const size_t num_bits_indicator = prefix_indications.size();
+    cmc_debug_msg("num_bits_indicator: ", num_bits_indicator);
+    const size_t num_bytes_indicator = prefix_indications.size_bytes();
+    cmc_debug_msg("num_bytes_indicator: ", num_bytes_indicator);
+    const size_t num_bytes_prefix_length_encodings = prefix_lengths.size();
+    cmc_debug_msg("num_bytes_prefix_length_encodings: ", num_bytes_prefix_length_encodings);
+    const size_t num_bytes_prefix_encodings = prefix_encodings.size();
+    cmc_debug_msg("num_bytes_prefix_encodings: ", num_bytes_prefix_encodings);
+
+    /* Overall memory estimate (including the just computed number of bytes for this whole level) */
+    const size_t num_bytes_level = 4 * sizeof(size_t) + num_bytes_indicator + num_bytes_prefix_length_encodings + num_bytes_prefix_encodings;
+    cmc_debug_msg("num_bytes_level: ", num_bytes_level);
+
+    /* Now, we fill a buffer for the whole level */
+    std::vector<uint8_t> serialized_level_data;
+    serialized_level_data.reserve(num_bytes_level);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the whole level */
+    PushBackValueToByteStream(serialized_level_data, num_bytes_level);
+
+    /* Afterwards, we store the number of bits for each of the both indicators, the number of bytes for the prefix lengths
+     * and then the number of bytes for the encoding of the actual prefixes */
+    PushBackValueToByteStream(serialized_level_data, num_bits_indicator);
+    PushBackValueToByteStream(serialized_level_data, num_bytes_prefix_length_encodings);
+    PushBackValueToByteStream(serialized_level_data, num_bytes_prefix_encodings);
+
+    /* Afterwards, we will copy the indicators as well as the encodings */
+    std::copy_n(prefix_indications.begin_bytes(), prefix_indications.size_bytes(), std::back_insert_iterator(serialized_level_data));
+    std::copy_n(prefix_lengths.begin(), prefix_lengths.size(), std::back_insert_iterator(serialized_level_data));
+    std::copy_n(prefix_encodings.begin(), prefix_encodings.size(), std::back_insert_iterator(serialized_level_data));
+
+    cmc_debug_msg("serialized_level_data size: ", serialized_level_data.size());
+    return serialized_level_data;
+}
+
 
 template <int N>
 inline
@@ -370,6 +475,7 @@ EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
     bit_vector::BitVector suffix_encodings;
     suffix_encodings.Reserve(3 * suffixes.size() + 1);
 
+    int i = 0;
     /* Iterate over all suffixes and check whether they exist (and have not been fully extracted), 
      * if so, they will be encoded */
     int all_suffix_bits = 0;
@@ -381,6 +487,38 @@ EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
             continue;
         }
 
+   
+        #if 0
+        if constexpr (N == 4)
+        {
+        if (i < 1000)
+        {
+            cmc_debug_msg("\n");
+            CompressionValue<N> vall = *suff_iter;
+            cmc_debug_msg("Count significant bits: ", suff_iter->GetCountOfSignificantBits());
+            cmc_debug_msg("Start Bit: ", vall.GetFrontBit(), ", Tail Bit: ", vall.GetTrailBit());
+            cmc_debug_msg("Count leading zeros: ", suff_iter->GetNumberLeadingZeros());
+            cmc_debug_msg("Count trailing zeros: ", suff_iter->GetNumberTrailingZeros());
+            CompressionValue<N> prev_val = *std::prev(suff_iter);
+
+            uint32_t val = vall.template ReinterpretDataAs<uint32_t>();
+            cmc_debug_msg(std::bitset<32>(val));
+            vall.NullifyNonSignificantFrontBits();
+            prev_val.NullifyNonSignificantFrontBits();
+            val = vall.template ReinterpretDataAs<uint32_t>();
+
+            cmc_debug_msg(std::bitset<32>(val));
+            uint32_t diff = val - prev_val.template ReinterpretDataAs<uint32_t>();
+            vall ^= prev_val;
+            uint32_t xor_val = vall.template ReinterpretDataAs<uint32_t>();
+            cmc_debug_msg(std::bitset<32>(xor_val), " = xor", " mit significant leading zeros: ", vall.GetLeadingZeroCountInSignificantBits());
+            cmc_debug_msg(std::bitset<32>(diff), " = diff");
+            uint32_t adjusted_diff = (val >= prev_val.template ReinterpretDataAs<uint32_t>() ? val - prev_val.template ReinterpretDataAs<uint32_t>() : prev_val.template ReinterpretDataAs<uint32_t>() -val);
+            cmc_debug_msg(std::bitset<32>(adjusted_diff), " = diff_adjusted (needs explicit storage of sign)");
+            ++i;
+        }
+        }
+        #endif
         all_suffix_bits += suff_iter->GetCountOfSignificantBits();
 
         /* Afterwards, the actual prefix itself has to encoded and stored as well */
@@ -409,6 +547,383 @@ EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
 
     return serialized_suffix_data;
 }
+
+template <int N>
+inline
+std::vector<int>
+GetLeadingZeroFrequency(const std::vector<CompressionValue<N>>& values)
+{
+    std::vector<int> frequency(N * bit_vector::kCharBit + 1, int{0});
+
+    /* Iterate over all prefixes on this level */
+    for (auto val_iter = values.begin(); val_iter != values.end(); ++val_iter)
+    {
+        /* Get the count of significant bits, i.e. the length of the prefix */
+        const int leading_zero_count = val_iter->GetLeadingZeroCountInSignificantBits();
+
+        /* Increment the counter for the given prefix length */
+        ++frequency[leading_zero_count];
+    }
+
+    int i = 0;
+    for (auto fiter = frequency.begin(); fiter != frequency.end(); ++fiter, ++i)
+    {
+        cmc_debug_msg("Frequency of LeadingZero Count: ", i, " is ", *fiter);
+    }
+
+    return frequency;
+}
+
+#if 1
+
+template <int N>
+inline
+std::vector<uint8_t>
+EncodeSuffixesXORScheme(const std::vector<CompressionValue<N>>& suffixes)
+{
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(3 * suffixes.size() + 1);
+
+    //int i = 5000000;
+    std::vector<CompressionValue<N>> xor_suffixes;
+    xor_suffixes.reserve(suffixes.size());
+
+    /* Just copy the first value, since it cannot be xor'ed */
+    xor_suffixes.push_back(suffixes.front());
+    xor_suffixes.back().NullifyNonSignificantFrontBits();
+
+    for (auto suff_iter = std::next(suffixes.begin()); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        const CompressionValue<N>& previous_value = *std::prev(suff_iter);
+        xor_suffixes.push_back(*suff_iter);
+        xor_suffixes.back() ^= previous_value;
+        xor_suffixes.back().NullifyNonSignificantFrontBits();
+    }
+
+    /* Get the frequency of the leading zero counts */
+    std::vector<int> leading_zero_frequency = GetLeadingZeroFrequency<N>(xor_suffixes);
+
+    /* Create a huffman tree out of it */
+    huffman::HuffmanTree<int> huffman_encoder(leading_zero_frequency);
+    cmc_debug_msg("Huffmann Coder has been instantiated");
+    /* Serialioze the huffman tree and store it */
+    const size_t symbol_size = 6;
+    bit_vector::BitVector serialized_huffman_tree = huffman_encoder.SerializeHuffmanTree(symbol_size);
+    cmc_debug_msg("Huffmann tree has been serialized");
+    const uint16_t num_bits_huffman_tree = serialized_huffman_tree.size_bits();
+
+    cmc_debug_msg("Size of leading zero count huffman tree in suffixes: ", num_bits_huffman_tree);
+
+    //TODO: We just push to placeholders bacl 
+    suffix_encodings.AppendBits(uint8_t{0}, 8);
+    suffix_encodings.AppendBits(uint8_t{0}, 8);
+
+    /* Store the serialized huffman tree */
+    suffix_encodings.AppendBits(serialized_huffman_tree);
+    cmc_debug_msg("Suffix Encoding begins");
+    /* Iterate over all suffixes and encode them */
+    for (auto suff_iter = xor_suffixes.begin(); suff_iter != xor_suffixes.end(); ++suff_iter)
+    {
+        /* Get the leading zero count in the significant part of the value */
+        const int leading_zero_count = suff_iter->GetLeadingZeroCountInSignificantBits();
+        //cmc_debug_msg("Old front bit: ", suff_iter->GetFrontBit(), "LZC: ", leading_zero_count, ", new front bit: ", suff_iter->GetFrontBit() + leading_zero_count, ", tail_bit: ", suff_iter->GetTrailBit());
+        /* Only indicate the non zero part as significant */
+        suff_iter->SetFrontBit(suff_iter->GetFrontBit() + leading_zero_count);
+        /* Encode the leading zero count and append it to the suffix encodings */
+        const auto [code, code_length] = huffman_encoder.EncodeSymbol(leading_zero_count);
+        /* Set the leading zero count length */
+        if (code_length > 0)
+        {
+            /* The code length is only encoded when there is an actual code. A code of length zero occurs, when the whole data
+            * has only a sngle code (the optimal code in that case is of length zero) */
+            suffix_encodings.AppendBits(code, static_cast<int>(code_length));
+        }
+        const int significant_bits = suff_iter->GetCountOfSignificantBits();
+        if (significant_bits > 0)
+        {
+            /* Encode the remaining suffix */
+            EncodeAndAppendPrefix(suffix_encodings, suff_iter->GetSignificantBitsInBigEndianOrdering(), significant_bits); 
+        }
+    }
+
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = sizeof(size_t) + suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_encodings.begin(), suffix_encodings.size(), std::back_insert_iterator(serialized_suffix_data));
+
+    return serialized_suffix_data;
+}
+
+#endif
+
+
+template <int N>
+inline
+std::vector<uint8_t>
+EncodeSuffixesXORSchemeNew(const std::vector<CompressionValue<N>>& suffixes)
+{
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(3 * suffixes.size() + 1);
+
+    //int i = 5000000;
+    std::vector<CompressionValue<N>> xor_suffixes;
+    xor_suffixes.reserve(suffixes.size());
+
+    /* Just copy the first value, since it cannot be xor'ed */
+    xor_suffixes.push_back(suffixes.front());
+    xor_suffixes.back().NullifyNonSignificantFrontBits();
+
+    for (auto suff_iter = std::next(suffixes.begin()); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        const CompressionValue<N>& previous_value = *std::prev(suff_iter);
+        xor_suffixes.push_back(*suff_iter);
+        xor_suffixes.back() ^= previous_value;
+        xor_suffixes.back().NullifyNonSignificantFrontBits();
+    }
+
+    /* Get the frequency of the leading zero counts */
+    std::vector<int> leading_zero_frequency = GetLeadingZeroFrequency<N>(xor_suffixes);
+
+    /* We nullify the first encodings */
+    leading_zero_frequency[0] = 0;
+    leading_zero_frequency[1] = 0;
+    //leading_zero_frequency[2] = 0;
+
+    /* Create a huffman tree out of it */
+    huffman::HuffmanTree<int> huffman_encoder(leading_zero_frequency);
+    cmc_debug_msg("Huffmann Coder has been instantiated");
+    /* Serialioze the huffman tree and store it */
+    const size_t symbol_size = 6;
+    bit_vector::BitVector serialized_huffman_tree = huffman_encoder.SerializeHuffmanTree(symbol_size);
+    cmc_debug_msg("Huffmann tree has been serialized");
+    const uint16_t num_bits_huffman_tree = serialized_huffman_tree.size_bits();
+
+    cmc_debug_msg("Size of leading zero count huffman tree in suffixes: ", num_bits_huffman_tree);
+
+    //TODO: We just push to placeholders bacl 
+    suffix_encodings.AppendBits(uint8_t{0}, 8);
+    suffix_encodings.AppendBits(uint8_t{0}, 8);
+
+    /* Store the serialized huffman tree */
+    suffix_encodings.AppendBits(serialized_huffman_tree);
+    cmc_debug_msg("Suffix Encoding begins");
+    /* Iterate over all suffixes and encode them */
+    for (auto suff_iter = xor_suffixes.begin(); suff_iter != xor_suffixes.end(); ++suff_iter)
+    {
+        /* Get the leading zero count in the significant part of the value */
+        const int leading_zero_count = suff_iter->GetLeadingZeroCountInSignificantBits();
+        if (leading_zero_count >= 2)
+        {
+            /* Push back a flag that we encode a LZC */
+            suffix_encodings.AppendBit(true);
+            /* Only indicate the non zero part as significant */
+            suff_iter->SetFrontBit(suff_iter->GetFrontBit() + leading_zero_count);
+            /* Encode the leading zero count and append it to the suffix encodings */
+            const auto [code, code_length] = huffman_encoder.EncodeSymbol(leading_zero_count);
+            /* Set the leading zero count length */
+            if (code_length > 0)
+            {
+                /* The code length is only encoded when there is an actual code. A code of length zero occurs, when the whole data
+                * has only a sngle code (the optimal code in that case is of length zero) */
+                suffix_encodings.AppendBits(code, static_cast<int>(code_length));
+            }
+        } else
+        {
+            /* Push back a flag that we do not encode a LZC */
+            suffix_encodings.AppendBit(false);
+        }
+    
+        const int significant_bits = suff_iter->GetCountOfSignificantBits();
+        if (significant_bits > 0)
+        {
+            /* Encode the remaining suffix */
+            EncodeAndAppendPrefix(suffix_encodings, suff_iter->GetSignificantBitsInBigEndianOrdering(), significant_bits); 
+        }
+    }
+
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = sizeof(size_t) + suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_encodings.begin(), suffix_encodings.size(), std::back_insert_iterator(serialized_suffix_data));
+
+    return serialized_suffix_data;
+}
+
+
+
+template <int N>
+inline
+std::vector<uint8_t>
+EncodeSuffixesBitPlaneRLE(const std::vector<CompressionValue<N>>& suffixes)
+{
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(3 * suffixes.size() + 1);
+
+    //int i = 5000000;
+    std::vector<CompressionValue<N>> xor_suffixes;
+    xor_suffixes.reserve(suffixes.size());
+
+    /* Just copy the first value, since it cannot be xor'ed */
+    xor_suffixes.push_back(suffixes.front());
+    xor_suffixes.back().NullifyNonSignificantFrontBits();
+
+    for (auto suff_iter = std::next(suffixes.begin()); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        const CompressionValue<N>& previous_value = *std::prev(suff_iter);
+        xor_suffixes.push_back(*suff_iter);
+        xor_suffixes.back() ^= previous_value;
+        xor_suffixes.back().NullifyNonSignificantFrontBits();
+    }
+
+    const size_t stride = 8;
+    const size_t num_full_iterations = xor_suffixes.size() / stride;
+    const size_t end_iteration_idx = num_full_iterations * stride;
+    const size_t remaining_vals = xor_suffixes.size() % stride;
+
+    for (auto iter = 0; iter < end_iteration_idx;)
+    {
+        /* Check if an encoding is possible */
+        bool encode_bit_plane_rle_possible = true;
+        const int num_significant_bits = xor_suffixes[iter].GetCountOfSignificantBits();
+        for (auto idx = iter + 1; idx < iter + stride; ++idx)
+        {
+            if (num_significant_bits != xor_suffixes[idx].GetCountOfSignificantBits())
+            {
+                encode_bit_plane_rle_possible = false;
+                break;
+            }
+        }
+
+        /* Check if it possible to encode */
+        if (encode_bit_plane_rle_possible)
+        {
+            suffix_encodings.AppendBit(true);
+
+            if (num_significant_bits > 0)
+            {
+                /* Build bit plane */
+                std::vector<std::vector<uint8_t>> significant_bits;
+                significant_bits.reserve(stride);
+
+                for (auto idx = 0; idx < stride; ++idx)
+                {
+                    significant_bits.emplace_back(xor_suffixes[iter + idx].GetSignificantBitsInBigEndianOrdering());
+                }
+
+                bit_vector::BitVector bit_plane;
+                bit_plane.Reserve((num_significant_bits * stride) / 8 + 1);
+
+                /* Iterate over all significant bit positions */
+                for (auto bit_pos = 0; bit_pos < num_significant_bits; ++bit_pos)
+                {
+                    const int byte_id = bit_pos / bit_vector::kCharBit;
+                    const int bit_id = bit_vector::kBitIndexStart - (bit_pos % bit_vector::kCharBit);
+
+                    /* Iterate over all values in the stride */
+                    for (auto val_iter = significant_bits.begin(); val_iter != significant_bits.end(); ++val_iter)
+                    {
+                        /* Append the current bit from this value */
+                        bit_plane.AppendBit(static_cast<uint8_t>(((*val_iter)[byte_id] >> bit_id) & uint8_t{1}));
+                    }
+                }
+
+                /* After the bit plane has been constructed, we try an RLE */
+                bit_vector::BitVectorView view(bit_plane.data(), bit_plane.size());
+
+                const size_t num_bits = stride * num_significant_bits;
+
+                bool was_previous_bit_set = view.IsCurrentBitSet();
+                view.MoveToNextBit();
+
+                uint8_t run_length_counter = 0;
+
+                for (auto bit_index = 1; bit_index < num_bits; ++bit_index)
+                {
+                    const bool is_current_bit_set = view.IsCurrentBitSet();
+                    view.MoveToNextBit();
+
+                    /* We can create a maxiumum run length of 16 which is resembled by the counter == 15 */
+                    if (was_previous_bit_set == is_current_bit_set && run_length_counter < 15 && bit_index < num_bits - 1)
+                    {
+                        /* If there is a run length */
+                        ++run_length_counter;
+                    } else
+                    {
+                        /* If the bits differ */
+                        /* Write out the previous run length */
+                        suffix_encodings.AppendBit(was_previous_bit_set);
+                        suffix_encodings.AppendFourBits(run_length_counter);
+                        was_previous_bit_set = is_current_bit_set;
+                        run_length_counter = 0;
+                    }
+                }
+            }
+
+
+            iter += stride;
+        } else
+        {
+            suffix_encodings.AppendBit(false);
+            if (num_significant_bits > 0)
+            {
+            EncodeAndAppendPrefix(suffix_encodings, xor_suffixes[iter].GetSignificantBitsInBigEndianOrdering(), num_significant_bits); 
+            }
+            ++iter;
+        }
+    }
+
+    /* Just append the remaining suffixes */
+    for (auto iter = num_full_iterations * stride; iter < xor_suffixes.size(); ++iter)
+    {
+        suffix_encodings.AppendBit(false);
+        const int num_significant_bits = xor_suffixes[iter].GetCountOfSignificantBits();
+        if (num_significant_bits > 0)
+        {
+            EncodeAndAppendPrefix(suffix_encodings, xor_suffixes[iter].GetSignificantBitsInBigEndianOrdering(), num_significant_bits); 
+        }
+    }
+
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = sizeof(size_t) + suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_encodings.begin(), suffix_encodings.size(), std::back_insert_iterator(serialized_suffix_data));
+
+    return serialized_suffix_data;
+}
+
 
 class PrefixDecoder
 {
