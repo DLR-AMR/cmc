@@ -163,7 +163,7 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter, ++ac_bits_index)
     {
         /* Write the compressed byte variable */
-        writer.AddVariable(var_iter->WriteCompressedData(time_step));
+        writer.AddVariable(var_iter->WriteCompressedData(time_step, SuffixEncoding::LengthEncoding));
         /* Write the refinement bits from the adaptive coarsening steps */
         //writer.AddVariable(CreateRefinementBitsVariable(*var_iter, time_step, ac_indications_[ac_bits_index].ac_indicator_bits));
     }

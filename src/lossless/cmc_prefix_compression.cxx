@@ -110,7 +110,7 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
     
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
     {
-        writer.AddVariable(var_iter->WriteCompressedData(time_step));
+        writer.AddVariable(var_iter->WriteCompressedData(time_step, SuffixEncoding::Plain));
     }
 
     writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));

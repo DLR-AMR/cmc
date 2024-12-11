@@ -23,6 +23,10 @@
 namespace cmc
 {
 
+enum SuffixEncoding {Plain, LengthEncoding};
+
+template <int N> using SuffixEncodingFunc = std::vector<uint8_t> (const std::vector<CompressionValue<N>>&);
+
 constexpr int kTwoBitPrefixEncodingOffset = 0b01;
 constexpr int kFourBitPrefixEncodingStart = 0b1000;
 constexpr int kFourBitPrefixEncodingOffset = 0b0011;

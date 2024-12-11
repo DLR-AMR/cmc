@@ -33,28 +33,9 @@ Compressor::GetMpiSize() const
 }
 
 void
-Compressor::SetSplitVariable(const SplitVariable& split_var)
-{
-    split_variables_.push_back(split_var);
-}
-
-void
-Compressor::SetSplitVariable(SplitVariable&& split_var)
-{
-    split_variables_.push_back(std::move(split_var));
-}
-
-void
 Compressor::Setup()
 {
-    if (split_variables_.size() > 0)
-    {
-        CompressionSettings settings;
-        settings.SetSplitVariables(split_variables_);
-
-        compression_data_->SetCompressionSettings(std::move(settings));
-        compression_data_->SplitVariables();
-    }
+    compression_data_->SplitVariables();
 
     compression_data_->CheckConsistencyOfInputVariables();
 
@@ -83,6 +64,11 @@ Compressor::Compress()
         //var_iter->XORConsecutiveValues();
         /* (Try to) release the initial data which already has been transformed */
         var_iter->KeepInitialData(false);
+
+        /* Perform the tail truncation */
+        /* Perform trail truncation until the error trhesholds are exhausted */
+        var_iter->PerformTailTruncation();
+
         //var_iter->PrintCompressionValues();
         /* We create the adapt data based on the compression settings, the forest and the variable to consider during the adaptation/coarsening */
         PrefixAdaptData adapt_data{*var_iter};
@@ -113,7 +99,7 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
     
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
     {
-        writer.AddVariable(var_iter->WriteCompressedData(time_step));
+        writer.AddVariable(var_iter->WriteCompressedData(time_step, SuffixEncoding::LengthEncoding));
     }
 
     writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));

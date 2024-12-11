@@ -81,7 +81,8 @@ public:
     void ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& element_ids);
     void IndicatePrefixFound(const CompressionValue<sizeof(T)>& prefix);
     void IndicateNoPrefixFound();
-    NcVariable WriteCompressedData(const int id, const int time_step) const;
+    NcVariable WriteCompressedData(const int id, const int time_step, const SuffixEncoding encoding_scheme) const;
+    NcVariable WriteCompressedData(const int id, const int time_step, SuffixEncodingFunc<sizeof(T)> suffix_encoder) const;
 
     /** De-Compression Routines **/
     void AssignCompressionValueForDecompressionStart();
@@ -167,8 +168,8 @@ public:
     void ExtractCommonPrefixFromInitialData(const std::vector<int>& element_ids);
     void ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& element_ids);
     void LeaveCoarsePrefixUnchanged(const int elem_index);
-    NcVariable WriteCompressedData(const int time_step) const;
-
+    NcVariable WriteCompressedData(const int time_step, const SuffixEncoding encoding_scheme) const;
+    
     /** De-Compression Routines **/
     void AssignCompressionValueForDecompressionStart();
     void DecompressionRefine(const int elem_id);
@@ -449,10 +450,10 @@ ByteVar::FinalizeDecompressionIteration()
 }
 
 inline NcVariable
-ByteVar::WriteCompressedData(const int time_step) const
+ByteVar::WriteCompressedData(const int time_step, const SuffixEncoding encoding_scheme) const
 {
-    return std::visit([this, &time_step](auto&& var) -> NcVariable {
-        return var.WriteCompressedData(this->GetID(), time_step);
+    return std::visit([this, &time_step, &encoding_scheme](auto&& var) -> NcVariable {
+        return var.WriteCompressedData(this->GetID(), time_step, encoding_scheme);
     }, var_);
 }
 
@@ -1187,10 +1188,27 @@ ByteVariable<T>::EvaluateCommonPrefix(VectorView<CompressionValue<sizeof(T)>>& b
 int
 DetermineForestRefinementBits(std::vector<uint8_t>& serialized_variable, t8_forest_t forest);
 
-#if 0
+template<typename T>
+inline NcVariable
+ByteVariable<T>::WriteCompressedData(const int id, const int time_step, const SuffixEncoding encoding_scheme) const
+{
+    switch (encoding_scheme)
+    {
+        case SuffixEncoding::Plain:
+            return WriteCompressedData(id, time_step, EncodePlainSuffixes);
+        break;
+        case SuffixEncoding::LengthEncoding:
+            return WriteCompressedData(id, time_step, EncodeSuffixes);
+        break;
+        default:
+            cmc_err_msg("An unknown suffix encoding scheme has been supplied.");
+            return NcVariable();
+    }
+}
+
 template<typename T>
 NcVariable
-ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
+ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEncodingFunc<sizeof(T)> suffix_encoder) const
 {
     /* Declare a vector which will hold the level-wise encoded data */
     std::vector<std::vector<uint8_t>> buffered_data;
@@ -1206,15 +1224,11 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
     }
 
     /* Encode and append the leftover suffixes (on the finest level) that could not be truncated or extracted */
-    #if 0
-    buffered_data.emplace_back(EncodeSuffixes(byte_values_));
-    #else
-    buffered_data.emplace_back(EncodePlainSuffixes(byte_values_));
-    #endif
+    buffered_data.emplace_back(suffix_encoder(byte_values_));
+
     cmc_debug_msg("Num bytes for suffixes: ", buffered_data.back().size());
     num_bytes += buffered_data.back().size();
     cmc_debug_msg("Overall bytes for this variable: ", num_bytes);
-
 
     //TODO: Make mechanism for parallel output
     //The complete global byte size needs to gathered and the level data has to be filled in parallel to it
@@ -1273,129 +1287,7 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
 
 
     return NcVariable(std::move(compressed_variable), std::move(attributes));
-    #if 0
-    const std::string file_name = "test_nc_output_file.nc";
-    const int netcdf_format = NC_CDF5;
-
-    /* Create a writer which outputs the data */
-    NcWriter writer(file_name, netcdf_format);
-    cmc_debug_msg("Writer has been created");
-    writer.AddVariable(std::move(compressed_variable), std::move(attributes));
-    cmc_debug_msg("Variable has been added");
-    writer.Write();
-    cmc_debug_msg("Write complete");
-    #endif
 }
-
-#else
-
-
-
-template<typename T>
-NcVariable
-ByteVariable<T>::WriteCompressedData(const int id, const int time_step) const
-{
-    /* Declare a vector which will hold the level-wise encoded data */
-    std::vector<std::vector<uint8_t>> buffered_data;
-    buffered_data.reserve(prefixes_.size() + 1);
-
-    /* Construct a huffman coder */
-    std::vector<int> prefix_length_frequency = GetPrefixLengthFrequency();
-    huffman::HuffmanTree<int> huffman_encoder(prefix_length_frequency);
-
-    //TODO: Update
-    //Store an "uint16_t" as a placeholder for the size of the huffman tree
-    buffered_data.emplace_back(std::vector<uint8_t>{0,0});
-
-    /* We copy the serialized huffman tree to the stream */
-    const size_t symbol_size = 6;
-    bit_vector::BitVector serialized_huffman_tree = huffman_encoder.SerializeHuffmanTree(symbol_size);
-    buffered_data.emplace_back(serialized_huffman_tree.GetData());
-    cmc_debug_msg("Huffman Tree has been serialized to ", serialized_huffman_tree.size(), " bytes, resp. ", serialized_huffman_tree.size_bits(), " bits.");
-
-    size_t num_bytes = 0;
-    /* Encode and retrieve the extracted prefixes */
-    for (auto lw_prefix_iter = prefixes_.rbegin(); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter)
-    {
-        buffered_data.emplace_back(lw_prefix_iter->EncodeLevelData(huffman_encoder));
-        cmc_debug_msg("Num bytes for level: ", buffered_data.back().size());
-        num_bytes += buffered_data.back().size();
-    }
-
-    /* Encode and append the leftover suffixes (on the finest level) that could not be truncated or extracted */
-    #if 1
-    buffered_data.emplace_back(EncodePlainSuffixes(byte_values_));
-    #else
-    /* TRy the XOR scheme */
-    //buffered_data.emplace_back(EncodeSuffixesXORScheme(byte_values_));
-    buffered_data.emplace_back(EncodeSuffixesXORSchemeNew(byte_values_));
-    //buffered_data.emplace_back(EncodeSuffixesBitPlaneRLE(byte_values_));
-    #endif
-    cmc_debug_msg("Num bytes for suffixes: ", buffered_data.back().size());
-    num_bytes += buffered_data.back().size();
-    cmc_debug_msg("Overall bytes for this variable: ", num_bytes);
-
-
-    //TODO: Make mechanism for parallel output
-    //The complete global byte size needs to gathered and the level data has to be filled in parallel to it
-
-    /* Generate a (potentially new) context information for the variable */
-    const int global_context_info = (attributes_.GetGlobalContextInformation() != kNoGlobalContext ? attributes_.GetGlobalContextInformation() : 0);
-
-    /* Create a netCDF variable to put out */
-    std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
-    cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
-    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
-    compressed_variable.Reserve(num_bytes);
-    
-    /* Put the buffered data into the variable to put out */
-    for (auto lvl_data_iter = buffered_data.begin(); lvl_data_iter != buffered_data.end(); ++lvl_data_iter)
-    {
-        compressed_variable.PushBack(*lvl_data_iter);
-    }
-
-    /* Assign some attributes to it */
-    std::vector<NcAttribute> attributes;
-    attributes.emplace_back("id", id);
-    attributes.emplace_back("time_step", time_step);
-    attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
-    attributes.emplace_back("initial_layout", static_cast<int>(attributes_.GetInitialDataLayout()));
-    attributes.emplace_back("pre_compression_layout", static_cast<int>(attributes_.GetPreCompressionLayout()));
-    attributes.emplace_back("global_context", global_context_info);
-    attributes.emplace_back("data_type", static_cast<int>(ConvertToCmcType<T>()));
-    attributes.emplace_back("missing_value", attributes_.GetMissingValue());
-    //TODO: Check if scaling and offset have been applied, if not we need to add those attributes
-
-    /* Get the global domain of this variable */
-    const GeoDomain& var_domain = GetGlobalDomain();
-
-    /* Write the domain lengths as attributes */
-    if (const int lon = var_domain.GetDimensionLength(Dimension::Lon);
-        lon > 1)
-    {
-        attributes.emplace_back("lon", lon);
-    }
-    if (const int lat = var_domain.GetDimensionLength(Dimension::Lat);
-        lat > 1)
-    {
-        attributes.emplace_back("lat", lat);
-    }
-    if (const int lev = var_domain.GetDimensionLength(Dimension::Lev);
-        lev > 1)
-    {
-        attributes.emplace_back("lev", lev);
-    }
-    if (const int time = var_domain.GetDimensionLength(Dimension::Time);
-        time > 1)
-    {
-        attributes.emplace_back("time", time);
-    }
-
-
-    return NcVariable(std::move(compressed_variable), std::move(attributes));
-}
-
-#endif
 
 
 template<typename T>
