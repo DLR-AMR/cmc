@@ -49,7 +49,7 @@ private:
 };
 
 template <typename T>
-T InterpoalteToArithmeticMean(const VectorView<T>& values, [[maybe_unused]] const t8_forest_t old_forest, [[maybe_unused]] const t8_locidx_t lelement_id, const int num_elements, T missing_value)
+T InterpolateToArithmeticMean(const VectorView<T>& values, [[maybe_unused]] const t8_forest_t old_forest, [[maybe_unused]] const t8_locidx_t lelement_id, const int num_elements, T missing_value)
 {
     cmc_assert(std::is_arithmetic_v<T>);
     cmc_assert(!values.empty());

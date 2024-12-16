@@ -41,7 +41,7 @@ main(void)
 
     /* Set thr inaccuracy storage and the interpolation funciton to use (those options are the default if not specified) */
     test_var.SetInaccuracyTrackingOption(cmc::TrackingOption::TrackFullInaccuracy);
-    test_var.SetInterpolation(cmc::InterpoalteToArithmeticMean);
+    test_var.SetInterpolation(cmc::InterpolateToArithmeticMean);
 
 
     /** CREATE A FLOAT VARIABLE **/

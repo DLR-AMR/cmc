@@ -190,7 +190,7 @@ private:
     GeoDomain global_domain_;
 
     TrackingOption inaccuracy_tracking_{TrackingOption::TrackFullInaccuracy};
-    InterpolationFunctional2<T> interpolation_{InterpoalteToArithmeticMean<T>};
+    InterpolationFunctional2<T> interpolation_{InterpolateToArithmeticMean<T>};
 
     int intern_id_{kNoInternalIDSet};
     int global_context_information_{kNoGlobalContext};

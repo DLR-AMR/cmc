@@ -184,7 +184,7 @@ public:
 private:
     const InaccuracyComputer<T>& CompressionCriterionToInaccuracyComputer(const CompressionCriterion criterion) const;
 
-    InterpolationFunctional2<T> interpolate_{InterpoalteToArithmeticMean};
+    InterpolationFunctional2<T> interpolate_{InterpolateToArithmeticMean};
 
     InaccuracyComputer<T> compute_absolute_inaccuracy_{ComputeAbsoluteDeviation, ComputeSingleAbsoluteDeviation};
     InaccuracyComputer<T> compute_relative_inaccuracy_{ComputeRelativeDeviation, ComputeSingleRelativeDeviation};
