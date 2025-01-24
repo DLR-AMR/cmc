@@ -100,6 +100,8 @@ public:
     size_t size_bytes() const {return vector_.size();};
 
     const std::vector<uint8_t>& GetByteData() const {return vector_;};
+
+    friend class BitMapView;
 private:
     size_t bit_position_{0};
     size_t byte_position_{0};
@@ -114,6 +116,8 @@ public:
     : data_{nullptr}, size_{0} {};
     BitMapView(const uint8_t* data, std::size_t num_bits)
     : data_{data}, size_{num_bits}{};
+    BitMapView(const BitMap& bitmap)
+    : data_{bitmap.vector_.data()}, size_{bitmap.num_bits_}{};
 
     bool GetBit(const size_t global_bit_position);
 

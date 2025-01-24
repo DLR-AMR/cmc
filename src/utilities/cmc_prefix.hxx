@@ -1,10 +1,14 @@
 #ifndef CMC_PREFIX_HXX
 #define CMC_PREFIX_HXX
 
+#include "utilities/cmc_serialized_compression_value_forward.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_log_functions.hxx"
+#include "utilities/cmc_arithmetic_encoder.hxx"
+#include "utilities/cmc_bytes.hxx"
 
 #include <array>
+#include <vector>
 #include <climits>
 #include <cstring>
 #include <bitset>
@@ -12,432 +16,9 @@
 namespace cmc
 {
 
-constexpr int NIBBLE_BIT = 4;
-
-enum Endian 
-{
-    /* These macros are GCC macros. Other compilers might not work. */
-    Little = __ORDER_LITTLE_ENDIAN__,
-    Big = __ORDER_BIG_ENDIAN__,
-    Native = __BYTE_ORDER__
-};
-
-constexpr bool IsLittleEndian = (Endian::Native == Endian::Little);
-constexpr bool IsBigEndian = (Endian::Native == Endian::Big);
-constexpr bool IsUnsupportedEndianness = (IsLittleEndian || IsBigEndian);
-
-constexpr int kFloat = static_cast<int>(sizeof(float));
-constexpr int kDouble = static_cast<int>(sizeof(double));
-
-
-constexpr uint8_t kZeroByte = 0x00;
-constexpr uint8_t kLowBit = 0x01;
-constexpr uint8_t kHighBit = 0x80;
-
-constexpr int kNumBits = CHAR_BIT;
-
-constexpr int PREFIX_ERROR = -1;
-
-constexpr std::array<uint8_t, CHAR_BIT + 1> LowBitMask{0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01, 0x00};
-
-template<int N>
-class CompressionValue;
-
-template<int N>
-class Prefix;
-
-inline uint8_t
-GetBitMaskToClearBit(const int index)
-{
-    return ~(kLowBit << index);
-}
-
-inline bool
-CheckIfBitIsSet(const uint8_t byte, const int bit_index)
-{
-    return (byte & (kLowBit << bit_index) ? true : false);
-}
-
-/* This class stores the bytes of a given value in the native order */
-template<int N>
-class Prefix
-{
-public:
-    Prefix(){
-        prefix_mem_.fill((uint8_t)0U);
-    };
-
-    template<typename T> Prefix(const T& value);
-    Prefix(std::array<uint8_t, N>&& serialized_value);
-
-    ~Prefix() = default;
-
-    Prefix(const Prefix& other) = default;
-    Prefix& operator=(const Prefix& other) = default;
-    Prefix(Prefix&& other) = default;
-    Prefix& operator=(Prefix&& other) = default;
-
-    uint8_t& operator[](const int index)
-    {
-        cmc_assert(index < N);
-        return prefix_mem_[index];
-    }
-    const uint8_t& operator[](const int index) const
-    {
-        cmc_assert(index < N);
-        return prefix_mem_[index];
-    }
-
-    friend Prefix operator^(const Prefix& prefix1, const Prefix& prefix2)
-    {
-        std::array<uint8_t, N> prefix;
-        for (int i = 0; i < N; ++i)
-        {
-            prefix[i] = prefix1[i] ^ prefix2[i];
-        }
-
-        return prefix;
-    }
-
-    Prefix& operator^=(const Prefix& rhs)
-    {
-        for (int i = 0; i < N; ++i)
-        {
-            prefix_mem_[i] ^= rhs.prefix_mem_[i];
-        }
-        return *this;
-    }
-
-    int GetNumberLeadingZeros() const;
-    
-    int GetNumberTrailingZeros() const;
-
-    const std::array<uint8_t, N>& GetMemoryForReading() const
-    {
-        return prefix_mem_;
-    }
-
-    friend class CompressionValue<N>;
-private:
-    std::array<uint8_t, N> prefix_mem_;
-};
-
-
-template<typename T>
-static inline
-int GetMSBytePosition(const T& value)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return sizeof(value) - 1;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return 0;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return PREFIX_ERROR;
-    }
-}
-
-template<typename T>
-static inline
-int GetLSBytePosition(const T& value)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return 0;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return sizeof(value) - 1;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return PREFIX_ERROR;
-    }
-}
-
-template<int N>
-template<typename T>
-Prefix<N>::Prefix(const T& value)
-{
-    if (N != static_cast<int>(sizeof(value)))
-    {
-        cmc_debug_msg("Hier gehts nicht. N ist = ", N, " und value mit groesse : ", sizeof(T));
-    }
-    cmc_assert(N == static_cast<int>(sizeof(value)));
-    std::memcpy(this->prefix_mem_.data(), &value, sizeof(value));
-};
-
-template<int N>
-inline
-constexpr int GetMSBByteStart([[maybe_unused]] const Prefix<N>& prefix)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return N - 1;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return 0;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return PREFIX_ERROR;
-    }
-}
-
-template<int N>
-inline
-constexpr int GetMSBByteEnd([[maybe_unused]] const Prefix<N>& prefix)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return 0;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return N - 1;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return PREFIX_ERROR;
-    }
-}
-
-static inline
-void MSBByteIncrement(int& iterator)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        --iterator;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        ++iterator;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-    }
-}
-
-template<int N>
-inline
-bool MSBContinueIteration(const int iterator, [[maybe_unused]] const Prefix<N>& prefix)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return iterator >= GetMSBByteEnd(prefix);
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return iterator <= GetMSBByteEnd(prefix);
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return false;
-    }
-}
-
-
-template<int N>
-inline
-constexpr int GetLSBByteStart([[maybe_unused]] const Prefix<N>& prefix)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return 0;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return N - 1;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return PREFIX_ERROR;
-    }
-}
-
-template<int N>
-inline
-constexpr int GetLSBByteEnd([[maybe_unused]] const Prefix<N>& prefix)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return N - 1;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return 0;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return PREFIX_ERROR;
-    }
-}
-
-static inline
-void LSBByteIncrement(int& iterator)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        ++iterator;
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        --iterator;
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-    }
-}
-
-template<int N>
-inline
-bool LSBContinueIteration(const int iterator, [[maybe_unused]] const Prefix<N>& prefix)
-{
-    if constexpr (IsLittleEndian)
-    {
-        /* If little endian */
-        return iterator <= GetLSBByteEnd(prefix);
-    } else if constexpr (IsBigEndian)
-    {
-        /* If big endian */
-        return iterator >= GetLSBByteEnd(prefix);
-    } else
-    {
-        cmc_err_msg("The native endianness is not supported");
-        return false;
-    }
-}
-
-
 template <typename T>
-std::array<uint8_t, sizeof(T)>
-SerializeValue(const T& value, const Endian desired_endianness = Endian::Big)
-{
-    std::array<uint8_t, sizeof(T)> serialized_value;
-    Prefix<sizeof(T)> value_(value);
-
-    /* Assign the bytes in the desired order */
-    switch (desired_endianness)
-    {
-        case Endian::Big:
-            for (int byte_id = GetMSBByteStart(value_), index = 0; MSBContinueIteration(byte_id, value_); MSBByteIncrement(byte_id), ++index)
-            {
-                serialized_value[index] = value_[byte_id];
-            }
-        break;
-        case Endian::Little:
-            for (int byte_id = GetLSBByteStart(value_), index = 0; LSBContinueIteration(byte_id, value_); LSBByteIncrement(byte_id), ++index)
-            {
-                serialized_value[index] = value_[byte_id];
-            }
-        break;
-        default:
-            cmc_err_msg("The given endianness is not recognized.");
-    }
-
-    return serialized_value;
-}
-
-template <typename T, typename Iter>
-std::array<uint8_t, sizeof(T)>
-DeserializeValue(Iter pos, const Endian endianness_of_bytes)
-{
-    std::array<uint8_t, sizeof(T)> serialized_value;
-
-    /* Assign the bytes compliant to the native order */
-    if (Endian::Native == endianness_of_bytes)
-    {
-        /* If the endianness_of_bytes of the serialized value equals the native format, we can just copy the values over */
-        std::copy_n(pos, sizeof(T), serialized_value.begin());
-    } else
-    {
-        /* If the endianness_of_bytes does not equal the native endianness, the byte sequence needs to be reversed */
-        const auto end_iter = pos + sizeof(T);
-        int index = sizeof(T) - 1;
-        for (auto iter = pos; iter != end_iter; ++iter, --index)
-        {
-            serialized_value[index] = *iter;
-        }
-    }
-    return serialized_value;
-}
-
-template<int N>
-Prefix<N>::Prefix(std::array<uint8_t, N>&& serialized_value)
-: prefix_mem_{std::move(serialized_value)} {};
-
-template<int N>
-int
-Prefix<N>::GetNumberLeadingZeros() const
-{
-    int num_leading_zeros = 0;
-    for (int byte_id = GetMSBByteStart(*this); MSBContinueIteration(byte_id, *this); MSBByteIncrement(byte_id))
-    {
-        /* Check whether the full byte is zero */
-        if (prefix_mem_[byte_id] == kZeroByte)
-        {
-            num_leading_zeros += CHAR_BIT;
-        } else
-        {
-            for (int bit_index = 0; bit_index < CHAR_BIT; ++bit_index)
-            {
-                if (prefix_mem_[byte_id] & (kHighBit >> bit_index))
-                {
-                    /* If true, the prefix does hold not a zero at this position */
-                    return num_leading_zeros;
-                } else
-                {
-                    ++num_leading_zeros;
-                }
-            }
-        }
-    }
-    return num_leading_zeros;
-}
-
-
-template<int N>
-int
-Prefix<N>::GetNumberTrailingZeros() const
-{
-    int num_trailing_zeros = 0;
-    for (int byte_id = GetLSBByteStart(*this); LSBContinueIteration(byte_id, *this); LSBByteIncrement(byte_id))
-    {
-        /* Check whether the full byte is zero */
-        if (prefix_mem_[byte_id] == kZeroByte)
-        {
-            num_trailing_zeros += CHAR_BIT;
-        } else
-        {
-            for (int bit_index = 0; bit_index < CHAR_BIT; ++bit_index)
-            {
-                if (prefix_mem_[byte_id] & (kLowBit << bit_index))
-                {
-                    /* If true, the prefix does hold a zero at this position */
-                    return num_trailing_zeros;
-                } else
-                {
-                    ++num_trailing_zeros;
-                }
-            }
-        }
-    }
-    return num_trailing_zeros;
-}
+std::vector<T>
+GetCompressionValuesAs(const std::vector<CompressionValue<sizeof(T)>>& serialized_values, const int start_index, const int num_elements);
 
 template<int N>
 struct CommonPrefix 
@@ -518,6 +99,7 @@ public:
     void UpdateTrailBitCount();
     void UpdateFrontBitCount();
     void SetFrontBit(const int front_bit);
+    void SetTailBit(const int tail_bit);
     int GetTrailBit() const;
     int GetFrontBit() const;
     int GetCountOfSignificantBits() const;
@@ -525,6 +107,7 @@ public:
     std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering() const;
     //std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering_Offset_4_Stride_12() const;
     void ApplyPrefix(const std::vector<uint8_t>& serialized_prefix, const int num_bits);
+    void AddIntegerResidual(const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
 
     template<typename T> 
     auto ReinterpretDataAs() const
@@ -563,6 +146,8 @@ public:
     void NullifyNonSignificantFrontBits();
     int GetLeadingZeroCountInSignificantBits() const;
 
+    void PerformIntegerSubtraction(const CompressionValue& residual);
+    void PerformIntegerAddition(const CompressionValue& residual);
 private:
     Prefix<N> prefix_;
     int front_bit_{0};
@@ -597,14 +182,20 @@ CompressionValue<N>::GetLeadingZeroCountInSignificantBits() const
     int num_leading_zeros = 0;
     int front_bit = front_bit_;
 
+    int counter = front_bit_;
+
     for (int byte_id = GetMSBByteStart(prefix_), iter = 0, vec_index = 0;
          MSBContinueIteration(byte_id, prefix_);
          MSBByteIncrement(byte_id), ++iter)
     {
+        if (counter + trail_bit_ >= N * CHAR_BIT)
+        {
+            return num_leading_zeros;
+        }
         /* Iterate until we are in the byte holding the bit after the current front bit */
         if (front_bit >= (iter + 1) * CHAR_BIT) {continue;}
 
-        for (int bit_index = front_bit % CHAR_BIT; bit_index < CHAR_BIT; ++bit_index)
+        for (int bit_index = front_bit % CHAR_BIT; bit_index < CHAR_BIT; ++bit_index, ++counter)
         {
             if (prefix_[byte_id] & (kHighBit >> bit_index))
             {
@@ -779,8 +370,16 @@ template<int N>
 void
 CompressionValue<N>::SetFrontBit(const int front_bit)
 {
-    cmc_assert(CHAR_BIT * N >= front_bit + trail_bit_);
+    //cmc_assert(CHAR_BIT * N >= front_bit + trail_bit_);
     front_bit_ = front_bit;
+}
+
+template<int N>
+void
+CompressionValue<N>::SetTailBit(const int tail_bit)
+{
+    //cmc_assert(CHAR_BIT * N >= front_bit + trail_bit_);
+    trail_bit_ = tail_bit;
 }
 
 template<int N>
@@ -1006,156 +605,184 @@ CompressionValue<N>::GetSignificantBitsInBigEndianOrdering() const
     return bytes;
 }
 
-
-#if 0
-template<int N>
-std::vector<uint8_t>
-CompressionValue<N>::GetSignificantBitsInBigEndianOrdering(const int bit_start_offset) const
+template<>
+inline void
+CompressionValue<1>::PerformIntegerAddition(const CompressionValue<1>& residual)
 {
-    cmc_assert(bit_start_offset >= 0 && bit_start_offset < CHAR_BIT);
-
-    const int num_bits = GetCountOfSignificantBits();
-    //if (num_bits == 0) {cmc_err_msg("Num significant bits is zero (in setsignificant bits inbigendian...)");}
-    const int num_bytes = (num_bits + bit_start_offset) / CHAR_BIT + (((num_bits + bit_start_offset) % CHAR_BIT) != 0 ? 1 : 0);
-    //cmc_debug_msg("NumyBytes: ", num_bytes);
-
-    if (num_bits == 0)
-    {
-        /* In case there are no significant bits, we are returning an empty vector */
-        return std::vector<uint8_t>();
-    }
-    
-    std::vector<uint8_t> bytes(num_bytes, 0);
-
-    const int front_bit_position = front_bit_ - static_cast<int>(front_bit_ / CHAR_BIT) * CHAR_BIT;
-
-    int bits_written = 0;
-
-    const int offset_shifting = front_bit_position - bit_start_offset;
-
-    bool do_offset_shifiting = true;
-
-    const int bit_shift_to_front = (offset_shifting < 0 ? std::abs(offset_shifting) : offset_shifting);
-    const int bit_shift_to_back = (offset_shifting < 0 ? CHAR_BIT - std::abs(offset_shifting) : CHAR_BIT - offset_shifting);
-
-    const int front_bits_written = (offset_shifting < 0 ? bit_shift_to_front : CHAR_BIT - bit_shift_to_front);
-    const int tail_bits_written = (offset_shifting < 0 ? bit_shift_to_back : CHAR_BIT - bit_shift_to_back);
-
-    int vec_offset = (offset_shifting < 0 ? 1 : 0);
-
-    for (int byte_id = GetMSBByteStart(prefix_), iter = 0, vec_index = 0;
-         MSBContinueIteration(byte_id, prefix_);
-         MSBByteIncrement(byte_id), ++iter)
-    {
-        /* Iterate until we are in the byte holding the start bit */
-        if (front_bit_ >= (iter + 1) * CHAR_BIT) {continue;}
-
-        if (offset_shifting < 0 && do_offset_shifiting)
-        {
-            /* If not all significant bits have space within the first byte */
-            bytes[vec_index] = (prefix_[byte_id] >> std::abs(offset_shifting));
-            bits_written = CHAR_BIT - bit_start_offset;
-            do_offset_shifiting = false;
-            if (bits_written >= num_bits) {break;}
-        }
-
-        /* Fill the back of the previous byte, if the start_bit has an offset */
-        if (bit_shift_to_front > 0 && ((offset_shifting >= 0 && bits_written > 0) ||
-                                       (offset_shifting < 0 && bits_written > CHAR_BIT - bit_start_offset)))
-        {
-            bytes[vec_index + vec_offset - 1] |= (prefix_[byte_id] >> (bit_shift_to_back));
-            bits_written += tail_bits_written;
-            if (bits_written >= num_bits) {break;}
-        }
-
-        bytes[vec_index + vec_offset] |= (prefix_[byte_id] << (bit_shift_to_front));
-        bits_written += front_bits_written;    
-        if (bits_written >= num_bits) {break;}
-
-        ++vec_index;
-    }
-
-    return bytes;
+    /* Get the value and the residual */
+    uint8_t value = this->template ReinterpretDataAs<uint8_t>();
+    const uint8_t res = residual.template ReinterpretDataAs<uint8_t>();
+    /* Perform the integer addition */
+    value += res;
+    /* Store the value */
+    prefix_ = Prefix<1>(value);
 }
-#endif
 
-#if 0
-template<int N>
-std::vector<uint8_t>
-CompressionValue<N>::GetSignificantBitsInBigEndianOrdering_Offset_4_Stride_12() const
+template<>
+inline void
+CompressionValue<2>::PerformIntegerAddition(const CompressionValue<2>& residual)
 {
-    const int offset = 4;
-    const int max_contiguous_bit_count = 12;
-    if (max_contiguous_bit_count >= GetCountOfSignificantBits())
-    {
-        return GetSignificantBitsInBigEndianOrdering(offset);
-    }
-
-    const uint8_t nullify_front_bits = 0x0F;
-
-    const std::vector<uint8_t> significant_bits = GetSignificantBitsInBigEndianOrdering();
-
-    const int num_significant_bits = GetCountOfSignificantBits();
-
-    const int num_bytes = (num_significant_bits + offset * ((num_significant_bits / max_contiguous_bit_count) + 1)) / CHAR_BIT + ((((num_significant_bits + offset * ((num_significant_bits / max_contiguous_bit_count) + 1))) % CHAR_BIT) != 0 ? 1 : 0);
-    
-    std::vector<uint8_t> strided_vec;
-    strided_vec.reserve(num_bytes);
-
-    int bit_count = 0;
-
-    const int processed_bits = 4;
-
-    int shift_to_back = processed_bits;
-    int shift_to_front = processed_bits;
-
-    bool switch_position = true;
-    strided_vec.push_back(0);
-
-    for (int index = 0; index < significant_bits.size(); ++index)
-    {
-        if (bit_count + processed_bits > max_contiguous_bit_count)
-        {
-            /* Offset the current bits */
-            strided_vec.push_back(significant_bits[index] >> shift_to_back);
-            bit_count = processed_bits;
-            switch_position = !switch_position;
-        } else
-        {
-            if (switch_position)
-            {
-                strided_vec.back() |= significant_bits[index] >> shift_to_back;
-                bit_count += processed_bits;
-            } else
-            {
-                strided_vec.push_back(significant_bits[index] >> shift_to_back);
-                bit_count += processed_bits;
-            }
-        }
-
-        if (bit_count + processed_bits > max_contiguous_bit_count)
-        {
-            /* Offset the current bits */
-            strided_vec.push_back((significant_bits[index] & nullify_front_bits));
-            bit_count = processed_bits;
-            switch_position = !switch_position;
-        } else
-        {
-            if (switch_position)
-            {
-                strided_vec.push_back(significant_bits[index] << shift_to_front);
-                bit_count += processed_bits;   
-            } else
-            {
-                strided_vec.back() |= (significant_bits[index] & nullify_front_bits);
-                bit_count += processed_bits;
-            }
-        }
-    }
-
-    return strided_vec;
+    /* Get the value and the residual */
+    uint16_t value = this->template ReinterpretDataAs<uint16_t>();
+    const uint16_t res = residual.template ReinterpretDataAs<uint16_t>();
+    /* Perform the integer addition */
+    value += res;
+    /* Store the value */
+    prefix_ = Prefix<2>(value);
 }
-#endif
+
+template<>
+inline void
+CompressionValue<4>::PerformIntegerAddition(const CompressionValue<4>& residual)
+{
+    /* Get the value and the residual */
+    uint32_t value = this->template ReinterpretDataAs<uint32_t>();
+    const uint32_t res = residual.template ReinterpretDataAs<uint32_t>();
+    /* Perform the integer addition */
+    value += res;
+    /* Store the value */
+    prefix_ = Prefix<4>(value);
+}
+
+template<>
+inline void
+CompressionValue<8>::PerformIntegerAddition(const CompressionValue<8>& residual)
+{
+    /* Get the value and the residual */
+    uint64_t value = this->template ReinterpretDataAs<uint64_t>();
+    const uint64_t res = residual.template ReinterpretDataAs<uint64_t>();
+    /* Perform the integer addition */
+    value += res;
+    /* Store the value */
+    prefix_ = Prefix<8>(value);
+}
+
+template<>
+inline void
+CompressionValue<1>::PerformIntegerSubtraction(const CompressionValue<1>& residual)
+{
+    /* Get the value and the residual */
+    uint8_t value = this->template ReinterpretDataAs<uint8_t>();
+    const uint8_t res = residual.template ReinterpretDataAs<uint8_t>();
+    /* Perform the integer addition */
+    value -= res;
+    /* Store the value */
+    prefix_ = Prefix<1>(value);
+}
+
+template<>
+inline void
+CompressionValue<2>::PerformIntegerSubtraction(const CompressionValue<2>& residual)
+{
+    /* Get the value and the residual */
+    uint16_t value = this->template ReinterpretDataAs<uint16_t>();
+    const uint16_t res = residual.template ReinterpretDataAs<uint16_t>();
+    /* Perform the integer addition */
+    value -= res;
+    /* Store the value */
+    prefix_ = Prefix<2>(value);
+}
+
+template<>
+inline void
+CompressionValue<4>::PerformIntegerSubtraction(const CompressionValue<4>& residual)
+{
+    /* Get the value and the residual */
+    uint32_t value = this->template ReinterpretDataAs<uint32_t>();
+    const uint32_t res = residual.template ReinterpretDataAs<uint32_t>();
+    /* Perform the integer addition */
+    value -= res;
+    /* Store the value */
+    prefix_ = Prefix<4>(value);
+}
+
+template<>
+inline void
+CompressionValue<8>::PerformIntegerSubtraction(const CompressionValue<8>& residual)
+{
+    /* Get the value and the residual */
+    uint64_t value = this->template ReinterpretDataAs<uint64_t>();
+    const uint64_t res = residual.template ReinterpretDataAs<uint64_t>();
+    /* Perform the integer addition */
+    value -= res;
+    /* Store the value */
+    prefix_ = Prefix<8>(value);
+}
+
+template<int N>
+void
+CompressionValue<N>::AddIntegerResidual(const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits)
+{
+    //cmc_assert(not residual_bits.empty());
+    cmc_assert(residual_bits.size() <= static_cast<size_t>(N));
+
+    /* Decode the encoded LZC */
+    const auto [signum, lzc] = arithmetic_encoding::DecodeLZC(encoded_lzc);
+
+    //cmc_debug_msg("Signum: ", signum, ", lzc: ", lzc);
+    if (lzc == N * CHAR_BIT)
+    {
+        /* The residual is empty, therefore nothing has to be added */
+        return;
+    }
+
+    std::array<uint8_t, N> serialized_val;
+    serialized_val.fill(uint8_t{0});
+
+    /* Set up an compression value holding the residual in the front bits */
+    CompressionValue<N> residual(serialized_val);
+    residual.SetTailBit(N * CHAR_BIT - lzc);
+
+    /* Afterwards, we add the the implicit one bit */
+    residual.ApplyPrefix(std::vector<uint8_t>{0x80}, 1);
+    const int remaining_bits = N * CHAR_BIT - lzc - 1;
+    //const int remaining_bits = N * CHAR_BIT - lzc;
+
+    cmc_assert((not residual_bits.empty()) || ((remaining_bits == 0) && residual_bits.empty()));
+
+    if (residual.GetTrailBit() > 0)
+    {
+        /* And finally, we combine it with the actual remaining residual bits */
+        residual.ApplyPrefix(residual_bits, remaining_bits);
+    }
+
+    /* Now, we should have a full CompressionValue resembling the residual */
+    cmc_assert(residual.GetFrontBit() == 0 && residual.GetTrailBit() == 0);
+
+    //if constexpr (N == 4)
+    //{
+    //    uint32_t eeee = residual.template ReinterpretDataAs<uint32_t>();
+    //    cmc_debug_msg("The residual is: ", std::bitset<32>(eeee));
+    //}
+    /* Dependeing on the signum, either add or subtract the residual */
+    if (signum == true)
+    {
+        this->PerformIntegerAddition(residual);
+    } else
+    {
+        this->PerformIntegerSubtraction(residual);
+    }
+}
+
+template <typename T>
+std::vector<T>
+GetCompressionValuesAs(const std::vector<CompressionValue<sizeof(T)>>& serialized_values, const int start_index, const int num_elements)
+{
+    cmc_assert(start_index >= 0 && num_elements > 0);
+    cmc_assert(static_cast<size_t>(start_index + num_elements) <= serialized_values.size());
+
+    std::vector<T> vals;
+    vals.reserve(num_elements);
+
+    const int end_index = start_index + num_elements;
+
+    for (int idx = start_index; idx < end_index; ++idx)
+    {
+        vals.push_back(serialized_values[idx].template ReinterpretDataAs<T>());
+    }
+
+    return vals;
+}
 
 }
 

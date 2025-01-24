@@ -11,7 +11,8 @@
 #include "t8code/cmc_t8_adapt_track_inaccuracy.hxx"
 #include "t8code/cmc_t8_byte_variable.hxx"
 #include "utilities/cmc_prefix_encoding.hxx"
-#include  "utilities/cmc_bit_map.hxx"
+#include "utilities/cmc_bit_map.hxx"
+#include "utilities/cmc_diff_decoder.hxx"
 
 #include <vector>
 #include <memory>
@@ -50,6 +51,10 @@ public:
     void IndicateCoarsening();
     void IndicateElementStaysUnchanged();
     [[nodiscard]] std::vector<bit_map::BitMap> TransferIndicationBits();
+
+    void IndicateToKeepInitialData() {do_variables_keep_initial_data_ = true;};
+    void IndicateToStoreInitialMesh() {GetCurrentCompressionVariable().StoreCurrentMeshAsInitialMesh();};
+    
 private:
     const CompressionSettings& compression_settings_;
     std::vector<Var>& variables_;
@@ -59,6 +64,7 @@ private:
     int corresponding_variable_id_;
     CompressionMode mode_;
     int count_adaptation_step_{0};
+    bool do_variables_keep_initial_data_{false};
 };
 
 
@@ -170,6 +176,213 @@ private:
     int count_adaptation_step_{0};
 };
 
+class FittingPyramidAdaptData
+{
+public:
+
+};
+
+
+class DiffAdaptData
+{
+public:
+    DiffAdaptData() = delete;
+    DiffAdaptData(ByteVar& variable)
+    : byte_variable_{variable}{
+        new_number_of_elements_ = t8_forest_get_global_num_elements(variable.GetAmrMesh().GetMesh());
+    };
+
+    /* The compression runs until the (single) root element of the mesh is reached */
+    bool IsCompressionProgressing()
+    {
+        return (new_number_of_elements_ > 1 ? true : false);
+    }
+
+    /* Allocate memory and prepare the variable for the prefix extraction */
+    void InitializeCompressionIteration()
+    {
+        byte_variable_.InitializeCompressionIteration();
+        if (count_adaptation_step_ == 0)
+        {
+            //byte_variable_.WriteDataToVTK_(11100);
+            //byte_variable_.PrintCompressionValues();
+        }
+    }
+
+    void FinalizeCompressionIteration()
+    {
+        new_number_of_elements_ = t8_forest_get_global_num_elements(GetCurrentMesh());
+        byte_variable_.FinalizeCompressionIteration();
+        ++count_adaptation_step_;
+
+        //byte_variable_.WriteDataToVTK_(11100 + count_adaptation_step_);
+    }
+
+
+    void ExtractMeanAndLeaveDifferences(const int elem_index, const int num_elements)
+    {
+        /* Extract an interpolated value from the family of elements indicated by the start_index and the element count
+         * and leave the differences behind */
+        //cmc_debug_msg("In Ectract Mean and leave differences: adaptation count: ", count_adaptation_step_);
+        if (count_adaptation_step_ > 0)
+        {
+            //cmc_debug_msg("Why is this not called?????");
+            byte_variable_.ExtractMeanAndLeaveDifferencesFromPreviousMeans(elem_index, num_elements);
+        } else
+        {
+            //cmc_debug_msg("\n\n\n Wird der FAll hier aufgereufen");
+            byte_variable_.ExtractMeanAndLeaveDifferencesFromInitialData(elem_index, num_elements);
+        }
+    }
+
+    void LeaveValueUnchanged(const int elem_index)
+    {
+        byte_variable_.LeaveValueUnchangedForNextMeanComputation(elem_index);
+    }
+
+    /* Get the mesh the data/prefixes of the variable are currently defined on */
+    t8_forest_t GetCurrentMesh() const
+    {
+        return byte_variable_.GetMesh();
+    }
+
+    /* Update the mesh of the variable (to be called after an adaptation step) */
+    void SetCurrentMesh(t8_forest_t mesh)
+    {
+        byte_variable_.SetMesh(mesh);
+    }
+
+    #if 0
+    /* Receive the initial refinement level of the data */
+    int GetInitialRefinementLevelOfMesh() const
+    {
+        return byte_variable_.GetAmrMesh().GetInitialRefinementLevel();
+    }
+
+    const GeoDomain& GetGlobalDomain() const
+    {
+        return byte_variable_.GetGlobalDomain();
+    }
+
+    DataLayout GetInitialDataLayout() const
+    {
+        return byte_variable_.GetInitialDataLayout();
+    }
+    #endif
+    /* Get the number of iterations (of the prefix extraction) that have been performed */
+    int GetAdaptationStepCount() const
+    {
+        return count_adaptation_step_;
+    }
+
+private:
+    ByteVar& byte_variable_;
+    t8_gloidx_t new_number_of_elements_{2};
+    int count_adaptation_step_{0};
+};
+
+
+
+
+class MeanAdaptData
+{
+public:
+    MeanAdaptData() = delete;
+    MeanAdaptData(ByteVar& variable)
+    : byte_variable_{variable}{
+        new_number_of_elements_ = t8_forest_get_global_num_elements(variable.GetAmrMesh().GetMesh());
+    };
+
+    /* The compression runs until the (single) root element of the mesh is reached */
+    bool IsCompressionProgressing()
+    {
+        return (new_number_of_elements_ > 1 ? true : false);
+    }
+
+    /* Allocate memory and prepare the variable for the prefix extraction */
+    void InitializeCompressionIteration()
+    {
+        byte_variable_.InitializeCompressionIteration();
+        if (count_adaptation_step_ == 0)
+        {
+            //byte_variable_.WriteDataToVTK_(11100);
+            //byte_variable_.PrintCompressionValues();
+        }
+    }
+
+    void FinalizeCompressionIteration()
+    {
+        new_number_of_elements_ = t8_forest_get_global_num_elements(GetCurrentMesh());
+        byte_variable_.FinalizeCompressionIteration();
+        ++count_adaptation_step_;
+
+        //byte_variable_.WriteDataToVTK_(11100 + count_adaptation_step_);
+    }
+
+
+    void ExtractMean(const int elem_index, const int num_elements)
+    {
+        /* Extract an interpolated value from the family of elements indicated by the start_index and the element count
+         * and leave the differences behind */
+        //cmc_debug_msg("In Ectract Mean and leave differences: adaptation count: ", count_adaptation_step_);
+        if (count_adaptation_step_ > 0)
+        {
+            //cmc_debug_msg("Why is this not called?????");
+            byte_variable_.ExtractMeanFromPreviousMeans(elem_index, num_elements);
+        } else
+        {
+            //cmc_debug_msg("\n\n\n Wird der FAll hier aufgereufen");
+            byte_variable_.ExtractMeanFromInitialData(elem_index, num_elements);
+        }
+    }
+
+    void LeaveValueUnchanged(const int elem_index)
+    {
+        byte_variable_.LeaveValueUnchangedForNextMeanComputation(elem_index);
+    }
+
+    
+    /* Get the mesh the data/prefixes of the variable are currently defined on */
+    t8_forest_t GetCurrentMesh() const
+    {
+        return byte_variable_.GetMesh();
+    }
+
+    /* Update the mesh of the variable (to be called after an adaptation step) */
+    void SetCurrentMesh(t8_forest_t mesh)
+    {
+        byte_variable_.SetMesh(mesh);
+    }
+
+    /* Receive the initial refinement level of the data */
+    int GetInitialRefinementLevelOfMesh() const
+    {
+        return byte_variable_.GetAmrMesh().GetInitialRefinementLevel();
+    }
+
+    const GeoDomain& GetGlobalDomain() const
+    {
+        return byte_variable_.GetGlobalDomain();
+    }
+
+    DataLayout GetInitialDataLayout() const
+    {
+        return byte_variable_.GetInitialDataLayout();
+    }
+
+    /* Get the number of iterations (of the prefix extraction) that have been performed */
+    int GetAdaptationStepCount() const
+    {
+        return count_adaptation_step_;
+    }
+
+private:
+    ByteVar& byte_variable_;
+    t8_gloidx_t new_number_of_elements_{2};
+    int count_adaptation_step_{0};
+};
+
+
 class DecompressPrefixAdaptData
 {
 public:
@@ -179,7 +392,9 @@ public:
         decoder_ = std::make_unique<PrefixDecoder>(byte_stream_);
     };
     DecompressPrefixAdaptData(ByteVar& variable, std::vector<uint8_t>&& compressed_byte_stream)
-    : byte_variable_{variable}, byte_stream_{std::move(compressed_byte_stream)} {};
+    : byte_variable_{variable}, byte_stream_{std::move(compressed_byte_stream)} {
+        decoder_ = std::make_unique<PrefixDecoder>(byte_stream_);
+    };
     ~DecompressPrefixAdaptData() = default;
 
     /* Get the mesh the data/prefixes of the variable are currently defined on */
@@ -304,6 +519,105 @@ private:
     ByteVar& byte_variable_;
     std::vector<uint8_t> byte_stream_;
     std::unique_ptr<PrefixDecoder> decoder_;
+    int count_decompression_step{0};
+};
+
+
+
+
+class DecompressDiffAdaptData
+{
+public:
+    DecompressDiffAdaptData() = delete;
+    DecompressDiffAdaptData(ByteVar& variable, const std::vector<uint8_t>& compressed_byte_stream)
+    : byte_variable_{variable}, byte_stream_{compressed_byte_stream} {
+        decoder_ = std::make_unique<diff::DiffDecoder>(byte_stream_, byte_variable_.GetType());
+    };
+    DecompressDiffAdaptData(ByteVar& variable, std::vector<uint8_t>&& compressed_byte_stream)
+    : byte_variable_{variable}, byte_stream_{std::move(compressed_byte_stream)} {
+        decoder_ = std::make_unique<diff::DiffDecoder>(byte_stream_, byte_variable_.GetType());
+    };
+    ~DecompressDiffAdaptData() = default;
+
+    /* Get the mesh the data/prefixes of the variable are currently defined on */
+    t8_forest_t GetCurrentMesh() const
+    {
+        return byte_variable_.GetMesh();
+    }
+
+    int GetInitialRefinementLevelOfMesh() const
+    {
+        return byte_variable_.GetAmrMesh().GetInitialRefinementLevel();
+    }
+
+    DataLayout GetInitialDataLayout() const
+    {
+        return byte_variable_.GetInitialDataLayout();
+    }
+
+    ByteVar& GetCurrentCompressionVariable() {return byte_variable_;}
+    const ByteVar& GetCurrentCompressionVariable() const {return byte_variable_;}
+
+    /* Update the mesh of the variable (to be called after an adaptation step) */
+    void SetCurrentMesh(t8_forest_t mesh)
+    {
+        byte_variable_.SetMesh(mesh);
+    }
+
+    void InitializeDiffDecompression()
+    {
+        cmc_debug_msg("In adapt init diff decompression");
+        if (count_decompression_step == 0)
+        {
+            cmc_debug_msg("in if");
+            byte_variable_.SetDiffDecompressionRootElementValue(decoder_->GetRootElementValue());
+            cmc_debug_msg("Root elem value is set");
+        }
+        cmc_debug_msg("before init byte var diff decompression");
+        byte_variable_.InitializeDiffDecompression();
+        cmc_debug_msg("Before move to next refinement lvl");
+        decoder_->MoveToNextRefinementLevel();
+        cmc_debug_msg("at the end of adapt init diff decomp");
+    }
+
+    void FinalizeDiffDecompression()
+    {
+        byte_variable_.FinalizeDecompressionIteration();
+        ++count_decompression_step;
+
+        //byte_variable_.WriteDataToVTK_(count_decompression_step);
+        //byte_variable_.PrintCompressionValues();
+    }
+
+    size_t GetBitCountOfDataType() const
+    {
+        return CmcTypeToBytes(byte_variable_.GetType()) * CHAR_BIT;
+    }
+
+    uint32_t GetNextEncodedResidualLength()
+    {
+        return decoder_->GetNextEncodedResidualLength();
+    }
+
+    std::vector<uint8_t> GetNextResidualBitSequence(const size_t num_bits)
+    {
+        return decoder_->GetNextResidualBitSequence(num_bits);
+    }
+    
+    void StoreElementUnchanged(const int elem_id)
+    {
+        byte_variable_.StoreElementUnchanged(elem_id);
+    }
+
+    void ApplyResidualAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits)
+    {
+        byte_variable_.ApplyResidualAndStoreElement(elem_id, encoded_lzc, residual_bits);
+    }
+
+private: 
+    ByteVar& byte_variable_;
+    std::vector<uint8_t> byte_stream_;
+    std::unique_ptr<diff::DiffDecoder> decoder_;
     int count_decompression_step{0};
 };
 

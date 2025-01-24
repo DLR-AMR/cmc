@@ -14,7 +14,10 @@ test/cmc_lossy_amr_compression \
 test/cmc_prefix \
 test/cmc_nc_data_output_input \
 test/cmc_bitmap \
-test/cmc_bitvector_view
+test/cmc_bitvector_view \
+test/cmc_arithmetic_coding \
+test/cmc_initial_mesh_coverage \
+test/cmc_serialize_value
 
 test_cmc_create_compression_settings_SOURCES = test/cmc_create_compression_settings.cxx
 test_cmc_create_input_variables_SOURCES = test/cmc_create_input_variables.cxx
@@ -29,6 +32,9 @@ test_cmc_prefix_SOURCES = test/cmc_prefix.cxx
 test_cmc_nc_data_output_input_SOURCES = test/cmc_nc_data_output_input.cxx
 test_cmc_bitmap_SOURCES = test/cmc_bitmap.cxx
 test_cmc_bitvector_view_SOURCES = test/cmc_bitvector_view.cxx
+test_cmc_arithmetic_coding_SOURCES = test/cmc_arithmetic_coding.cxx
+test_cmc_initial_mesh_coverage_SOURCES = test/cmc_initial_mesh_coverage.cxx
+test_cmc_serialize_value_SOURCES = test/cmc_serialize_value.cxx
 
 check_PROGRAMS += $(cmc_test_programs)
 TESTS += $(cmc_test_programs)

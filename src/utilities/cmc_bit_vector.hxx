@@ -64,6 +64,11 @@ public:
 
     void AppendBits(const BitVector& bit_vector);
 
+    template<int N> void AppendBytes(const std::array<uint8_t, N>& byte_stream);
+    void AppendBytes(const std::vector<uint8_t>& byte_stream);
+
+    void AddPaddingToFullByte();
+
     #if 0
     void IncrementBitPosition(size_t& iterator, const int diff = 1);
     size_t GetFirstBitPositionOfByte() const;
@@ -83,7 +88,9 @@ public:
     const uint8_t* data() const {return vector_.data();};
     std::pair<std::vector<uint8_t>, size_t> GetBits() const {return std::make_pair(vector_, this->size_bits());};
     const std::vector<uint8_t>& GetData() const {return vector_;};
-    
+
+    void TrimToContent() {if (bit_position_ == kBitIndexStart) {/* If the last byte is empty, we remove it */ vector_.pop_back();}};
+
 private:
     size_t bit_position_{kBitIndexStart};
     size_t byte_position_{0};
@@ -137,6 +144,8 @@ public:
     
     std::vector<uint8_t> GetNextBitSequence(const size_t num_bits)
     {
+        if (num_bits == 0) {return std::vector<uint8_t>();}
+        
         /* Number of bytes and bits needed to be extracted */
         const size_t num_bytes_ = num_bits / kCharBit;
         const size_t num_bits_ = num_bits % kCharBit;
@@ -387,7 +396,7 @@ BitVector::AppendFourBits(const uint8_t byte)
 inline void
 BitVector::AppendBits(const BitVector& bit_vec)
 {
-    cmc_assert(bit_vec.size_bits() > 0);
+    //cmc_assert(bit_vec.size_bits() > 0);
     if (bit_vec.size_bits() == 0) {return;}
 
     //cmc_debug_msg("Size of bit vector to be appended: ", bit_vec.size(), " in bits: ", bit_vec.size_bits());
@@ -525,6 +534,35 @@ BitVector::IsEndOfByteReached(size_t& iterator) const
 }
 #endif
 
+template<int N>
+inline void
+BitVector::AppendBytes(const std::array<uint8_t, N>& byte_stream)
+{
+    for (int idx = 0; idx < N; ++idx)
+    {
+        AppendBits(byte_stream[idx], kCharBit);
+    }
+}
+
+inline void
+BitVector::AppendBytes(const std::vector<uint8_t>& byte_stream)
+{
+    for (auto byte_iter = byte_stream.begin(); byte_iter != byte_stream.end(); ++byte_iter)
+    {
+        AppendBits(*byte_iter, kCharBit);
+    }
+}
+
+inline void
+BitVector::AddPaddingToFullByte()
+{
+    if (bit_position_ != kBitIndexStart)
+    {
+        vector_.emplace_back(0);
+        bit_position_ = kBitIndexStart;
+        ++byte_position_;
+    }
+}
 
 }
 

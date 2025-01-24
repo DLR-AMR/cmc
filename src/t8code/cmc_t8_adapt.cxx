@@ -114,6 +114,14 @@ void
 AdaptData::UpdateCompressionData()
 {
     Var& compression_variable = GetCurrentCompressionVariable();
+
+    if (count_adaptation_step_ == 0 && do_variables_keep_initial_data_)
+    {
+        /* Potentially, save the initial data  before it is lost */
+        compression_variable.KeepInitialData();
+    }
+
+    /* Update the data with the newly coarsened data */
     compression_variable.UpdateCompressionData();
 }
 

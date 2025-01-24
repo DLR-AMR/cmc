@@ -80,6 +80,83 @@ T InterpolateToArithmeticMean(const VectorView<T>& values, [[maybe_unused]] cons
     }
 }
 
+
+template <typename T>
+T InterpolateToArithmeticMean(const VectorView<T>& values, const int num_elements, T missing_value)
+{
+    cmc_assert(std::is_arithmetic_v<T>);
+    cmc_assert(!values.empty());
+
+    //T number_non_missing_values = 0;
+    //T sum = 0;
+
+    double number_non_missing_values = 0;
+    double sum = 0;
+
+    for (auto iter = values.begin(); iter != values.end(); ++iter)
+    {
+        if (!ApproxCompare(*iter, missing_value))
+        {
+            sum += static_cast<double>(*iter);
+            ++number_non_missing_values;
+        }
+    }
+
+    const bool perform_interpolation = (kProhibitCoarseningOfMissingValues ? number_non_missing_values == num_elements : number_non_missing_values > 0);
+
+    if (perform_interpolation)
+    {
+        return static_cast<T>(sum / number_non_missing_values);
+    } else
+    {
+        return missing_value;
+    }
+}
+
+template <typename T>
+T InterpolateToMidRange(const VectorView<T>& values, const int num_elements, T missing_value)
+{
+    cmc_assert(std::is_arithmetic_v<T>);
+    cmc_assert(!values.empty());
+
+    T min = std::numeric_limits<T>::max();
+    T max = std::numeric_limits<T>::min();
+
+    bool min_found = false;
+    bool max_found = false;
+
+    for (auto iter = values.begin(); iter != values.end(); ++iter)
+    {
+        if (!ApproxCompare(*iter, missing_value))
+        {
+            if (min > *iter)
+            {
+                min = *iter;
+                min_found = true;
+            }
+            else if (max < *iter)
+            {
+                max = *iter;
+                max_found = true;
+            }
+        }
+    }
+
+    if (min_found && max_found)
+    {
+        return ((max + min) / 2);
+    } else if (min_found && !max_found)
+    {
+        return min;
+    } else if (!min_found && max_found)
+    {
+        return max;
+    } else
+    {
+        return missing_value;
+    }
+}
+
 }
 
 #endif /* !CMC_T8_INTERPOLATION_HXX */

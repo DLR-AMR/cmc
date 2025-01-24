@@ -5,6 +5,7 @@
 
 #if CMC_WITH_T8CODE
 #include <t8_eclass.h>
+#include <t8_element_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_quad/t8_default_quad_cxx.hxx>
@@ -731,6 +732,117 @@ BuildInitialMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_C
 
     cmc_debug_msg("Num local elements: ", t8_forest_get_local_num_elements(initial_forest));
     return std::make_tuple(initial_forest, initial_refinement_level, dimensionality); 
+}
+
+struct SearchInfo
+{
+    int initial_refinement_level{-1};
+    t8_linearidx_t lower_linear_id{0};
+    t8_linearidx_t upper_linear_id{0};
+    t8_eclass_scheme_c * ts{nullptr};
+    std::vector<DomainIndex> found_local_elem_ids;
+};
+
+static int
+cmc_t8_find_element_coverage_search_fn (t8_forest_t forest, const t8_locidx_t ltreeid, const t8_element_t *element,
+                             const int is_leaf, const t8_element_array_t *leaf_elements,
+                             const t8_locidx_t tree_leaf_index, void *query, sc_array_t *query_indices,
+                             int *query_matches, const size_t num_active_queries)
+{
+    return 1;
+}
+
+static int
+cmc_t8_find_element_coverage_search_query_fn (t8_forest_t forest, const t8_locidx_t ltreeid, const t8_element_t *element,
+                                   const int is_leaf, const t8_element_array_t *leaf_elements,
+                                   const t8_locidx_t tree_leaf_index, void *query, sc_array_t *query_indices,
+                                   int *query_matches, const size_t num_active_queries)
+{
+    SearchInfo *search_data = static_cast<SearchInfo*>(t8_forest_get_user_data (forest));
+    cmc_assert(search_data != nullptr);
+
+    //const t8_linearidx_t elem_id_initial_ref_level = search_data->ts->t8_element_get_linear_id(element, search_data->initial_refinement_level);
+    const int level = search_data->ts->t8_element_level(element);
+    cmc_assert(search_data->initial_refinement_level >= level);
+
+    const int num_children = search_data->ts->t8_element_num_children(element);
+
+    const t8_linearidx_t lower_init_elem_id = search_data->ts->t8_element_get_linear_id(element, search_data->initial_refinement_level);
+    const t8_linearidx_t upper_init_elem_id = lower_init_elem_id + std::pow(num_children, search_data->initial_refinement_level - level);
+    
+    cmc_assert(lower_init_elem_id < upper_init_elem_id);
+    //cmc_debug_msg("Search Check: Lower Limit: ", lower_init_elem_id, ", Upper Limit: ", upper_init_elem_id);
+    /* Check if the elements ID lies within the searched range */
+    //if (search_data->lower_linear_id <= elem_id_initial_ref_level && elem_id_initial_ref_level < search_data->upper_linear_id)
+    if ((lower_init_elem_id <= search_data->lower_linear_id && upper_init_elem_id > search_data->lower_linear_id) ||
+        (lower_init_elem_id > search_data->lower_linear_id && lower_init_elem_id < search_data->upper_linear_id) ||
+        (upper_init_elem_id <= search_data->upper_linear_id && upper_init_elem_id > search_data->lower_linear_id))
+    {
+        if (is_leaf)
+        {
+            /* If its a leaf element, we store its local ID */
+            search_data->found_local_elem_ids.push_back(static_cast<DomainIndex>(tree_leaf_index));
+        }
+        /* We only have this single query */
+        query_matches[0] = 1;
+    } else
+    {
+        /* If it does not comply, we exclude this element from the search */
+        query_matches[0] = 0;
+    }
+
+    return 0;
+}
+
+std::vector<DomainIndex>
+GetInitialElementCoverage(AmrMesh& mesh, t8_eclass_scheme_c * ts, const t8_element_t* element)
+{
+    /* Store potential user data upfront; it will be reassigned later  */
+    void* initial_user_data = t8_forest_get_user_data(mesh.mesh_);
+
+    /* Fill a struct with search information */
+    SearchInfo search_data;
+    search_data.initial_refinement_level = mesh.GetInitialRefinementLevel();
+
+    /* Get the current element level */
+    const int elem_level = ts->t8_element_level(element);
+
+    /* Get the ID difference on the initial refienemnt level */
+    cmc_assert(elem_level <= search_data.initial_refinement_level);
+    const int diff = std::abs(search_data.initial_refinement_level - elem_level);
+
+        /* Get the lower initial lineat id on that level */
+        search_data.lower_linear_id = ts->t8_element_get_linear_id (element, search_data.initial_refinement_level);
+
+        /* Get number of children per refinement */
+        const int num_children = ts->t8_element_num_children(element);
+
+        /* Compute the upper linear ID of all elements which are looked for */
+        search_data.upper_linear_id = search_data.lower_linear_id + std::pow(num_children, diff);
+
+        //cmc_debug_msg("Search elements with: [", search_data.lower_linear_id, ", ", search_data.upper_linear_id, ")", "; level diff is: ", diff, ", num_children: ", num_children);
+        /* Store the tree scheme */
+        search_data.ts = ts;
+
+        /* Pass a pointer to the search data struct to the forest */
+        t8_forest_set_user_data (mesh.mesh_, static_cast<void*>(&search_data));
+
+        /* Now, we search for all elememts in the mesh that have a linear ID on the initial refinement level
+        * laying between [lower_linear_id, upper_linear_id) */
+        sc_array dummy_search_query;
+        sc_array_init_count (&dummy_search_query, sizeof (int), 1);
+
+        /* Search the elements that match the range of IDs on the initial_refinement_level */
+        t8_forest_search(mesh.mesh_, cmc_t8_find_element_coverage_search_fn, cmc_t8_find_element_coverage_search_query_fn, &dummy_search_query);
+
+        /* At last, reassign the previous pointer to the user_data struct */
+        t8_forest_set_user_data (mesh.mesh_, initial_user_data);
+
+        /* Deallocat the sc array */
+        sc_array_reset (&dummy_search_query);
+
+    /* We return the local element IDs that matched to the query */
+    return search_data.found_local_elem_ids;
 }
 
 }

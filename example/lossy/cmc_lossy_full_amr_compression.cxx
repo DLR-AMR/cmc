@@ -4,7 +4,7 @@
 #include "utilities/cmc_output_variable.hxx"
 #include "netcdf/cmc_netcdf.hxx"
 #include "utilities/cmc_compression_settings.hxx"
-#include "lossy/cmc_prefix_compression.hxx"
+#include "lossy/cmc_full_amr_compression.hxx"
 #include "decompression/cmc_prefix_decompression.hxx"
 #include "utilities/cmc_binary_reader.hxx"
 
@@ -15,13 +15,13 @@ main(void)
     cmc::CmcInitialize();
     
     {
-    //const std::string file = "../../data/SDRBENCH-EXASKY-NYX-512x512x512/temperature.f32";
+
     const std::string file = "../../data/100x500x500/Pf48.bin.f32";
     cmc::CmcType type(cmc::CmcType::Float);
-    const std::string name("qcloudf_log");
+    const std::string name("precipf48");
     const int id = 0;
     const size_t num_elements = 500 * 500 * 100;
-    cmc::CmcUniversalType missing_value(static_cast<float>(3224.5));
+    cmc::CmcUniversalType missing_value(static_cast<float>(3224.4));
     cmc::DataLayout layout(cmc::DataLayout::Lev_Lat_Lon);
     cmc::GeoDomain domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 500),
                           cmc::DimensionInterval(cmc::Dimension::Lat, 0, 500),
@@ -35,23 +35,22 @@ main(void)
     std::vector<cmc::InputVar> vars;
     vars.emplace_back(std::move(variable));
 
-     /* Create compression settings */
+    /* Create compression settings */
     cmc::CompressionSettings settings;
-
-    //const double rel_max_err = 0.01;
-    //settings.SetAbsoluteErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
     const double abs_max_err = 3.0;
     settings.SetAbsoluteErrorCriterion(abs_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
+    //const double rel_max_err = 0.0005;
+    //settings.SetRelativeErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
+
+    //cmc::SplitVariable split(cmc::kSplitAllVariables, cmc::Dimension::Lev);
+    //settings.SplitVariableByDimension(split);
+
 
     {
-    
     /* Create the compression data */
-    //cmc::prefix::Compressor compression_data(nc_data.TransferData()); //netCDF data
-    cmc::prefix::lossy::Compressor compression_data(std::move(vars), std::move(settings)); //Binary data
-
-    //compression_data.SetSplitVariable(cmc::SplitVariable(cmc::kSplitAllVariables, cmc::Dimension::Lev));
+    cmc::full_amr::Compressor compression_data(std::move(vars), std::move(settings));
 
     /* Setup the example data for the compression */
     compression_data.Setup();
@@ -61,24 +60,23 @@ main(void)
     compression_data.Compress();
 
     cmc::cmc_debug_msg("\n\nCompression is finished\n\n");
-
     cmc::cmc_debug_msg("Write Compressed Data");
-    compression_data.WriteCompressedData("Pf48.bin.f32.new_scheme2.cmc", 0);
+    compression_data.WriteCompressedData("AMR_AC_PREF_Pf48_AbsErr_3_0.cmc", 0);
 
     }
 
     {
-    #if 0
+        #if 0
     cmc::cmc_debug_msg("\n\nDecompression Start\n\n");
 
     /* Decompress */
-    cmc::prefix::lossy::Decompressor decoder("nyx_velocity_x");
+    cmc::prefix::Decompressor decoder("newly_example_compr_pref_t2m");
 
     decoder.Setup();
-    decoder.DecompressVariable("velocity_x");
-    
-    #endif
+    decoder.DecompressVariable("t2m");
+        #endif
     }
+
 
     }
 

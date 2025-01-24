@@ -72,7 +72,7 @@ public:
     void DecompressElementConstantly(const int index, const int num_insertions);
 
     ErrorCompliance EvaluateCoarsening(const std::vector<PermittedError>& permitted_errors, const t8_forest_t previous_mesh, const t8_locidx_t start_index, const int num_elements);
-
+    ErrorCompliance EvaluateCoarseningRegardingInitialData(const int adaptation_step, const std::vector<PermittedError>& permitted_errors, t8_eclass_scheme_c* ts, t8_element_t* elem, const t8_locidx_t start_index, const int num_elements);
     void InitializeVariableForCompressionIteration();
     void UpdateCompressionData();
     void UpdateDecompressionData();
@@ -99,6 +99,11 @@ public:
 
     void FilterDataAsDifferences();
 
+    void StoreCurrentMeshAsInitialMesh() {initial_mesh_ = mesh_;}
+    bool ShouldInitialDataBeKept() const;
+    void KeepInitialData();
+    void IndicateToKeepInitialData();
+
     friend class TransformerInputToCompressionVariable;
     friend class TransformerCompressionToOutputVariable;
     friend class TransformerCompressionToByteVariable;
@@ -117,6 +122,9 @@ private:
     VariableAttributes<T> attributes_;
     VariableUtilities<T> utilities_;
     GeoDomain global_domain_;
+    std::vector<T> initial_data_;
+    AmrMesh initial_mesh_;
+    bool is_initial_data_kept_{false};
 };
 
 
@@ -156,6 +164,7 @@ public:
 
     std::vector<PermittedError> GetPermittedError(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c * ts) const;
     ErrorCompliance EvaluateCoarsening(const std::vector<PermittedError>& permitted_errors, const t8_forest_t previous_mesh, const t8_locidx_t start_index, const int num_elements);
+    ErrorCompliance EvaluateCoarseningRegardingInitialData(const int adaptation_step, const std::vector<PermittedError>& permitted_errors, t8_eclass_scheme_c* ts, t8_element_t* elem, const t8_locidx_t start_index, const int num_elements);
 
     void ApplyInterpolation(const int lelement_id, const ErrorCompliance& evaluation);
     void PopInterpolation();
@@ -183,6 +192,10 @@ public:
     void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
 
     void FilterDataAsDifferences();
+
+    void StoreCurrentMeshAsInitialMesh();
+    void KeepInitialData();
+    void IndicateToKeepInitialData();
 
     friend class TransformerInputToCompressionVariable;
     friend class TransformerCompressionToOutputVariable;
@@ -333,6 +346,59 @@ Variable<T>::EvaluateCoarsening(const std::vector<PermittedError>& permitted_err
     StoreInterpolationResult(interpolated_value);
     
     return error_evaluation;
+}
+
+template<typename T>
+ErrorCompliance
+Variable<T>::EvaluateCoarseningRegardingInitialData(const int adaptation_step, const std::vector<PermittedError>& permitted_errors, t8_eclass_scheme_c* ts, t8_element_t* elem, const t8_locidx_t start_index, const int num_elements)
+{
+    const T missing_value = attributes_.GetMissingValue();
+    
+    /* Obtain the values to be interpolated */
+    const VectorView<T> values(data_.data() + start_index, num_elements);
+
+    const T interpolated_value = utilities_.Interpolate(values, mesh_.GetMesh(), start_index, num_elements, missing_value);
+
+    /* Allocate memory for the parent element */
+    t8_element_t *elem_parent;
+    ts->t8_element_new (1, &elem_parent);
+    ts->t8_element_parent (elem, elem_parent);
+
+    /* Get the local element indices of the initial elements */
+    const std::vector<DomainIndex> initial_elem_indices = GetInitialElementCoverage(initial_mesh_, ts, elem_parent);
+
+    /* Destroy the element */
+    ts->t8_element_destroy (1, &elem_parent);
+
+    const std::vector<T>& initial_data = (adaptation_step == 0 ? data_ : initial_data_);
+    const ErrorCompliance error_evaluation = utilities_.IsCoarseningErrorCompliantRegardingInitialData(permitted_errors, initial_data, initial_elem_indices, interpolated_value, missing_value);
+    
+    StoreInterpolationResult(interpolated_value);
+    
+    return error_evaluation;
+}
+
+
+template<typename T>
+bool
+Variable<T>::ShouldInitialDataBeKept() const
+{
+    return is_initial_data_kept_;
+}
+
+template<typename T>
+void
+Variable<T>::KeepInitialData()
+{
+    is_initial_data_kept_ = true;
+    initial_data_ = std::move(data_);
+}
+
+template<typename T>
+void
+Variable<T>::IndicateToKeepInitialData()
+{
+    is_initial_data_kept_ = true;
 }
 
 template<typename T>
@@ -547,12 +613,211 @@ Variable<T>::RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned
     utilities_.RepartitionInaccuracyData(adapted_forest, partitioned_forest);
 }
 
+#if 0
+
 template<typename T>
 void
 Variable<T>::FilterDataAsDifferences()
 {
-    T last_val = data_.front();
-    for (auto val_iter = std::next(data_.begin()); val_iter != data_.end(); ++val_iter)
+
+    //for (auto i = 3000000; i < 3001000; ++i)
+    //{
+    //    T vval = data_[i];
+    //    uint32_t ival;
+    //    std::memcpy(&ival, &vval, 4);
+    //    cmc_debug_msg("Index ", i, " is ", std::bitset<32>(ival));
+    //}
+    //cmc_debug_msg("End of initial data\n\n");
+
+    #if 0
+    if constexpr (std::is_same_v<T, float>)
+    {
+    uint32_t last_val{0};
+
+    for (size_t i = 0; i < data_.size(); ++i)
+    {
+        uint32_t val;
+        std::memcpy(&val, &data_[i], 4);
+
+        uint32_t res = (val >= last_val ? val -last_val : last_val -val);
+
+        T f;
+        std::memcpy(&f, &res, 4);
+
+        data_[i] = f;
+
+        last_val = val;
+    }
+
+    }
+    #endif
+
+    #if 1
+    const T missing_value = 0.008;
+
+    T last_res{0};
+    size_t num_null_bits = 0;
+
+    std::vector<int> null_bit_freq(33, 0);
+    for (size_t i = 0; i < data_.size();)
+    {
+        if (ApproxCompare(data_[i], missing_value))
+        {
+            ++i;
+            continue;
+        }
+
+        #if 1
+        T max{std::numeric_limits<T>::lowest()};
+        T min{std::numeric_limits<T>::max()};
+
+        for (auto j = 0; j < 8; ++j)
+        {
+            if (data_[i+j] > max)
+            {
+                max = data_[i+j];
+            }
+            if (data_[i+j] < min)
+            {
+                min = data_[i+j];
+            }
+        }
+
+        //const T f_mid_range = (max + min) / 2;
+        const T f_mid_range = min;
+        #else
+        T mean{0};
+        for (auto j = 0; j < 8; ++j)
+        {
+            mean += data_[i+j];
+        }
+        mean /= 8;
+        const T f_mid_range = mean;
+        
+        #endif
+
+
+        uint32_t mid_range{0};
+        std::memcpy(&mid_range, &f_mid_range, 4);
+
+        for (auto j = 0; j < 8; ++j)
+        {
+            uint32_t val;
+            std::memcpy(&val, &data_[i+j], 4);
+
+            uint32_t res = (mid_range >= val ? mid_range - val : val - mid_range);
+            //uint32_t res = val - mid_range;
+
+            #if 0
+            uint32_t diff_res = (last_res >= res ? last_res - res : res - last_res);
+
+            T f_diff_res;
+            std::memcpy(&f_diff_res, &diff_res, 4);
+
+            data_[i+j] = f_diff_res; 
+
+            CompressionValue<sizeof(T)> cval(f_diff_res);
+            num_null_bits += static_cast<size_t>(cval.GetNumberLeadingZeros());
+
+            ++null_bit_freq[cval.GetNumberLeadingZeros()];
+            last_res = res;
+            #else
+
+            T f_res;
+            std::memcpy(&f_res, &res, 4);
+
+            CompressionValue<sizeof(T)> cval(f_res);
+            num_null_bits += static_cast<size_t>(cval.GetNumberLeadingZeros());
+            data_[i+j] = f_res;
+            
+            
+            #endif
+        }
+
+        i += 8;
+    }
+    cmc_debug_msg("Num Null bits: ",num_null_bits );
+
+    for (auto iter = null_bit_freq.begin(); iter != null_bit_freq.end(); ++iter)
+    {
+        cmc_debug_msg("All Null bit Length: ", std::distance(null_bit_freq.begin(), iter), " has frequency: ", *iter);
+
+    }
+
+    for (auto i = 3000000; i < 3001000; ++i)
+    {
+        T vval = data_[i];
+        uint32_t ival;
+        std::memcpy(&ival, &vval, 4);
+        CompressionValue<4> cval(ival);
+        cmc_debug_msg("Index ", i, " is ", std::bitset<32>(ival), " with num lzc: ", cval.GetLeadingZeroCountInSignificantBits(), " and usigned repr: ", ival);
+    }
+
+    #endif
+
+
+
+    #if 0
+    uint32_t last_res = 0;
+
+    for (auto i = 2000000; i < 2008000; i += 8)
+    {
+        T val{0};
+        for (auto j = 0; j < 8; ++j)
+        {
+            val += data_[i+j];
+        }
+        val /= 8;
+
+
+        if constexpr(std::is_same_v<T, float>)
+        {
+            uint32_t intval;
+            std::memcpy(&intval, &val, 4);
+            cmc_debug_msg("Mean is:  ", std::bitset<32>(intval), " = ", val);
+        }
+
+        uint32_t intmean;
+        std::memcpy(&intmean, &val, 4);
+
+        for (auto j = 0; j < 8; ++j)
+        {
+            uint32_t intval;
+            std::memcpy(&intval, &data_[i+j], 4);
+            uint32_t res = (intmean >= intval ? intmean - intval : intval - intmean);
+            uint32_t diff_res = (last_res >= res ? last_res - res : res - last_res);
+            last_res = res;
+            cmc_debug_msg("Int Diff: ", std::bitset<32>(diff_res), " = ", diff_res, " und normal res would be: ", res);
+        }
+        cmc_debug_msg("");
+    }
+    #endif
+    #if 0
+    for (auto i = 11000000; i < 11001000; ++i)
+    {
+        cmc_debug_msg("Initial value at ",i, " is: ", data_[i]);
+    }
+    T last_val = *std::next(data_.begin());
+    for (auto val_iter = std::next(std::next(data_.begin())); val_iter != data_.end(); ++val_iter)
+    {
+        T current_val = *val_iter;
+        if constexpr (std::is_signed_v<T>)
+        {
+            *val_iter = *val_iter - last_val; 
+        } else
+        {
+            *val_iter = *val_iter - last_val; 
+        }
+        last_val = current_val;
+    }
+
+    for (auto i = 11000000; i < 11001000; ++i)
+    {
+        cmc_debug_msg("First Difference value at ",i, " is: ", data_[i]);
+    }
+
+    last_val = data_.front();
+    for (auto val_iter = std::next(std::next(data_.begin())); val_iter != data_.end(); ++val_iter)
     {
         T current_val = *val_iter;
         if constexpr (std::is_signed_v<T>)
@@ -565,7 +830,47 @@ Variable<T>::FilterDataAsDifferences()
         last_val = current_val;
     }
     data_.front() = static_cast<T>(std::abs(0));
+
+    for (auto i = 11000000; i < 11001000; ++i)
+    {
+        cmc_debug_msg("Second Difference value at ",i, " is: ", data_[i]);
+    }
+    #endif
 }
+#else
+
+
+template<typename T>
+void
+Variable<T>::FilterDataAsDifferences()
+{
+    if constexpr (std::is_same_v<T, float>)
+    {
+    uint32_t last_val{0};
+
+    for (size_t i = 0; i < data_.size(); ++i)
+    {
+        uint32_t val;
+        std::memcpy(&val, &data_[i], 4);
+
+        uint32_t res = (val >= last_val ? val -last_val : last_val -val);
+
+        T f;
+        std::memcpy(&f, &res, 4);
+
+        data_[i] = f;
+
+        last_val = val;
+    }
+    uint32_t zero = 0;
+    T fzero;
+    std::memcpy(&fzero, &zero, 4);
+    data_[0] = fzero;
+    }
+}
+
+#endif
+
 
 /** VAR MEMBER FUNCTIONS **/
 inline
@@ -688,6 +993,15 @@ Var::EvaluateCoarsening(const std::vector<PermittedError>& permitted_errors, con
 {
     return std::visit([&](auto&& var) -> ErrorCompliance {
         return var.EvaluateCoarsening(permitted_errors, previous_mesh, start_index, num_elements);
+    }, var_);
+}
+
+inline
+ErrorCompliance
+Var::EvaluateCoarseningRegardingInitialData(const int adaptation_step, const std::vector<PermittedError>& permitted_errors, t8_eclass_scheme_c* ts, t8_element_t* elem, const t8_locidx_t start_index, const int num_elements)
+{
+    return std::visit([&](auto&& var) -> ErrorCompliance {
+        return var.EvaluateCoarseningRegardingInitialData(adaptation_step, permitted_errors, ts, elem, start_index, num_elements);
     }, var_);
 }
 
@@ -870,6 +1184,33 @@ Var::FilterDataAsDifferences()
 {
     std::visit([&](auto& var) {
         var.FilterDataAsDifferences();
+    }, var_);
+}
+
+inline
+void
+Var::StoreCurrentMeshAsInitialMesh()
+{
+    std::visit([&](auto& var) {
+        var.StoreCurrentMeshAsInitialMesh();
+    }, var_);
+}
+
+inline
+void
+Var::KeepInitialData()
+{
+    std::visit([](auto& var) {
+        var.KeepInitialData();
+    }, var_);
+}
+
+inline
+void
+Var::IndicateToKeepInitialData()
+{
+    std::visit([](auto& var) {
+        var.IndicateToKeepInitialData();
     }, var_);
 }
 

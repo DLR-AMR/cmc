@@ -64,6 +64,7 @@ public:
     void BuildInitialMesh();
     void DistributeDataOnInitialMesh();
     void CompressByAdaptiveCoarsening(const CompressionMode compression_mode);
+    void CompressByAdaptiveCoarseningWithRegardToInitialData(); //Automatically one for one compression
     void ApplyScalingAndOffset();
     void TransformInputToCompressionVariables();
     void SetupCompressionCriteria();
@@ -73,6 +74,8 @@ public:
     std::vector<ByteVar> GetByteVariablesForCompression();
     [[nodiscard]] std::vector<AdaptiveCoarseningIndications> TransferIndicationBits();
 
+    void IndicateToKeepInitialMeshAndData();
+    
     void DecompressToInitialRefinementLevel(const bool restrict_to_global_domain = true);
     std::vector<OutputVar> SeizeRawDecompressedVariable();
     OutputVar DecompressVariable(const int variable_id);

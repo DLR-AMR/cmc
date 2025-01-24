@@ -12,6 +12,7 @@
 #include <cassert>
 #include <limits>
 #include <string>
+#include <cstring>
 
 #define CMC_MACRO_EXPANSION(x) #x
 #define CMC_MACRO_EXPANSION2(x) CMC_MACRO_EXPANSION(x)
@@ -67,13 +68,6 @@ struct overloaded : Ts...
 
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
-
-#if 0
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
-#endif
 
 inline constexpr
 size_t CmcTypeToBytes(const CmcType type)
@@ -167,6 +161,24 @@ ConvertToCmcType()
         std::exit(EXIT_FAILURE);
         return CmcType::TypeUndefined;
     }
+}
+
+template <typename T, typename U>
+auto
+ReinterpretValuesAs(const std::vector<T>& values)
+ -> std::enable_if_t<sizeof(T) == sizeof(U), std::vector<U>>
+{
+    std::vector<U> reinterpreted_values;
+    reinterpreted_values.reserve(values.size());
+
+    for (auto idx = 0; idx < values.size(); ++values)
+    {
+        U reintpr_value;
+        std::memcpy(&reintpr_value, &values[idx], sizeof(T));
+        reinterpreted_values.push_back(reintpr_value);
+    }
+
+    return reinterpreted_values;
 }
 
 }

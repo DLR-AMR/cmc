@@ -44,6 +44,8 @@ ReadBinaryData(const size_t num_elements, const std::string& file_name)
 {
     std::vector<T> values(num_elements);
 
+    //TODO: Check for existence 
+    
     /* Open the file for input */
     std::ifstream in(file_name, std::ios::binary);
     in.seekg(0, std::ios::beg);

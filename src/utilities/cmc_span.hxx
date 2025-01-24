@@ -3,6 +3,8 @@
 
 #include "cmc_utilities.hxx"
 
+#include <vector>
+
 namespace cmc
 {
 
@@ -13,6 +15,8 @@ public:
     VectorView() = delete;
     VectorView(const T* data, std::size_t size)
     : data_{data}, size_{size}{};
+    VectorView(const std::vector<T>& vector)
+    : data_{vector.data()}, size_{vector.size()} {};
 
     constexpr VectorView(const VectorView& other) = default;
     constexpr VectorView& operator=(const VectorView& other) = default;

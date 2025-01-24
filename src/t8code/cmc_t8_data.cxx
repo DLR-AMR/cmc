@@ -608,6 +608,20 @@ AmrData::CreateAdaptationData(const CoarseningSample& adaptation_sample, const C
     return AdaptData(compression_settings_, variables_, adaptation_sample, mode);
 }
 
+void
+AmrData::IndicateToKeepInitialMeshAndData()
+{
+    if (variables_.size() == 0)
+    {
+        cmc_warn_msg("Indication to keep the initial data and mesh in the variables works only after the variables have been set up. Currently, the input variables have not yet been transformed to compression variables.");
+    }
+    for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter)
+    {
+        var_iter->IndicateToKeepInitialData();
+        var_iter->StoreCurrentMeshAsInitialMesh();
+    }
+}
+
 std::vector<CoarseningSample>
 AmrData::RetrieveMeshesToBeCoarsened(const CompressionMode compression_mode) const
 {
@@ -710,6 +724,64 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
         /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
         AdaptData adapt_data = CreateAdaptationData(*current_sample, compression_mode);
 
+        /* Keep the initial data in order to perform the error evaluation regarding the initial data */
+        adapt_data.IndicateToKeepInitialData();
+        /* We need to keep the intial mesh in order to be able to compute the deviations regarding the initial data */
+        adapt_data.IndicateToStoreInitialMesh();
+
+        while (adapt_data.IsCompressionProgressing())
+        {
+            adapt_data.InitializeCompressionIteration();
+
+            t8_forest_t previous_forest = adapt_data.GetCurrentMesh();
+
+            /* Keep the 'previous forest' after the adaptation step */
+            t8_forest_ref(previous_forest);
+            //cmc_debug_msg("Befroe adapt compression");
+            /* Perform a coarsening iteration */
+            t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, adapt_data.GetAdaptationFunction(), 0, 0, static_cast<void*>(&adapt_data));
+            //cmc_debug_msg("Befroe update compression");
+            /* Interpolate the data from the previous forest to the (new) coarsened forest */
+            adapt_data.UpdateCompressionData();
+            //cmc_debug_msg("Befroe repartition");
+            /* Repartition the mesh as well as the data and receive the newly partitioned forest */
+            adapted_forest = adapt_data.RepartitionData(adapted_forest);
+            //cmc_debug_msg("after repartition");
+            /* Free the former forest */
+            t8_forest_unref(&previous_forest);
+            //cmc_debug_msg("Befroe set partitioned mesh");
+            adapt_data.SetCurrentMesh(adapted_forest);
+            //cmc_debug_msg("\n\nNum elems mesh after adaptation: ", t8_forest_get_global_num_elements(adapted_forest), "\n\n");
+            adapt_data.FinalizeCompressionIteration();
+        }
+
+        ac_indications_.emplace_back(adapt_data.TransferIndicationBits());
+        }
+
+    #endif
+}
+
+
+#if 1
+void
+AmrData::CompressByAdaptiveCoarseningWithRegardToInitialData()
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Retrieve all forests which are going to be coarsened. In case of a 'One For All'-compression we will just
+     * receive a single forest on which all variables are defined. However, in case of a 'One for One'-compression,
+     * we will receive multiple forests which need to be coarsened, in particular a single forest for each variable */
+    std::vector<CoarseningSample> meshes_to_be_coarsened = RetrieveMeshesToBeCoarsened(CompressionMode::OneForOne);
+
+    for (auto current_sample = meshes_to_be_coarsened.begin(); current_sample != meshes_to_be_coarsened.end(); ++current_sample)
+    {
+        /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
+        AdaptData adapt_data = CreateAdaptationData(*current_sample, CompressionMode::OneForOne);
+
+        /* Keep the initial data in order to perform the error evaluation regarding the initial data */
+        adapt_data.IndicateToKeepInitialData();
+        /* We need to keep the intial mesh in order to be able to compute the deviations regarding the initial data */
+        adapt_data.IndicateToStoreInitialMesh();
+
         while (adapt_data.IsCompressionProgressing())
         {
             adapt_data.InitializeCompressionIteration();
@@ -720,7 +792,7 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
             t8_forest_ref(previous_forest);
             cmc_debug_msg("Befroe adapt compression");
             /* Perform a coarsening iteration */
-            t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, adapt_data.GetAdaptationFunction(), 0, 0, static_cast<void*>(&adapt_data));
+            t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, PerformAdaptiveCoarseningOneForOneRegardingInitialData, 0, 0, static_cast<void*>(&adapt_data));
             cmc_debug_msg("Befroe update compression");
             /* Interpolate the data from the previous forest to the (new) coarsened forest */
             adapt_data.UpdateCompressionData();
@@ -741,6 +813,7 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
 
     #endif
 }
+#endif
 
 [[nodiscard]] std::vector<AdaptiveCoarseningIndications>
 AmrData::TransferIndicationBits()

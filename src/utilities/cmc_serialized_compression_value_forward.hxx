@@ -1,0 +1,13 @@
+#ifndef CMC_SERIALIZED_COMPRESSION_VALUE_FORWARD_HXX
+#define CMC_SERIALIZED_COMPRESSION_VALUE_FORWARD_HXX
+
+namespace cmc
+{
+
+template<int N>
+class CompressionValue;
+
+}
+
+
+#endif /* !CMC_SERIALIZED_COMPRESSION_VALUE_FORWARD_HXX */

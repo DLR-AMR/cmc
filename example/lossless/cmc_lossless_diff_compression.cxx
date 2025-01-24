@@ -4,8 +4,9 @@
 #include "utilities/cmc_output_variable.hxx"
 #include "netcdf/cmc_netcdf.hxx"
 #include "utilities/cmc_compression_settings.hxx"
-#include "lossless/cmc_prefix_compression.hxx"
-#include "decompression/cmc_prefix_decompression.hxx"
+#include "lossless/cmc_diff_compression.hxx"
+#include "lossless/cmc_residual_compression.hxx"
+#include "lossless/cmc_diff_decompression.hxx"
 #include "utilities/cmc_binary_reader.hxx"
 
 int
@@ -18,33 +19,37 @@ main(void)
     
     #if 0
     const std::string file = "../../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
-    
+    //const std::string file = "../../data/v8.0_FT2022_GHG_CO2_2022_IND_PROCESSES_emi.nc";
     /* Create an object which interatcs with the file and opens it */
     cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
 
     nc_data.SetHintHeightDimension(2); //Set time as height dimension
 
-    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 512),
-                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 512),
+    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
+                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
                              cmc::DimensionInterval(cmc::Dimension::Lev, 0, 1)
                              );
 
+    const std::string var_name = "t2m";
     /* Inquire the hyperslab of data for the given variables */
-    nc_data.InquireVariables(hyperslab, "t2m");
+    nc_data.InquireVariables(hyperslab, std::string(var_name));
 
     /* Close the file, since we have gathered the data we wanted */
     nc_data.CloseFileHandle();
 
     #else
 
-    #if 0
-    const std::string file = "../../data/SDRBENCH-EXASKY-NYX-512x512x512/velocity_x.f32";
+    #if 1
+    const std::string file = "../../data/SDRBENCH-EXASKY-NYX-512x512x512/temperature.f32";
 
     cmc::CmcType type(cmc::CmcType::Float);
-    const std::string name("velocity_x");
+    const std::string var_name("temperature");
     const int id = 0;
-    const size_t num_elements = 512 * 512 * 512;
-    cmc::CmcUniversalType missing_value(static_cast<float>(31866790.000000));
+    const size_t num_elements = 512 * 512 * 256;
+
+    //cmc::CmcUniversalType missing_value(static_cast<float>(31866790.000000)); //velocity_x
+    cmc::CmcUniversalType missing_value(static_cast<float>(4782584.0)); //Temp
+
     cmc::DataLayout layout(cmc::DataLayout::Lev_Lat_Lon);
     cmc::GeoDomain domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 512),
                           cmc::DimensionInterval(cmc::Dimension::Lat, 0, 512),
@@ -53,27 +58,63 @@ main(void)
 
     cmc::bin_reader::Reader binary_reader(file);
 
-    cmc::InputVar variable = binary_reader.CreateVariableFromBinaryData(type, name, id, num_elements, missing_value, layout, domain);
+    cmc::InputVar variable = binary_reader.CreateVariableFromBinaryData(type, var_name, id, num_elements, missing_value, layout, domain);
 
     std::vector<cmc::InputVar> vars;
     vars.emplace_back(std::move(variable));
 
     #else
-    const std::string file = "../../data/SDRBENCH-EXASKY-NYX-512x512x512/temperature.f32";
-    //const std::string file = "../../data/100x500x500/PRECIPf48.bin.f32";
-    cmc::CmcType type(cmc::CmcType::Float);
-    const std::string name("qcloudf_log");
-    const int id = 0;
-    const size_t num_elements = 512 * 512 * 512;
-    
-    //cmc::CmcUniversalType missing_value(static_cast<float>(0.008));
-    cmc::CmcUniversalType missing_value(static_cast<float>(2280.0));
 
+
+    #if 1
+    //const std::string file = "../../data/SDRBENCH-EXASKY-NYX-512x512x512/temperature.f32";
+    const std::string file = "../../data/100x500x500/PRECIPf48.bin.f32";
+    cmc::CmcType type(cmc::CmcType::Float);
+    const std::string name("precipf48log10");
+    const int id = 0;
+    const size_t num_elements = 512 * 512 * 128;
+
+    //Missing Values Hurricane ISABEL Dataset
+
+    //cmc::CmcUniversalType missing_value(static_cast<float>(3224.4)); //P
+    cmc::CmcUniversalType missing_value(static_cast<float>(0.00755)); //PRECIP
+    //cmc::CmcUniversalType missing_value(static_cast<float>(-2.0)); //PRECIPf48.log10
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.007295)); //QGraup
+    //cmc::CmcUniversalType missing_value(static_cast<float>(-2.0)); //QGraup.log10
+    //cmc::CmcUniversalType missing_value(static_cast<float>(-2.0));//QRAINf48.log10
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.0065));//QRAINf48
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.0025));//CLOUD
+    //cmc::CmcUniversalType missing_value(static_cast<float>(-2.5));//CLOUD-log10
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.00205));//QCLOUD
+    //cmc::CmcUniversalType missing_value(static_cast<float>(-2.5));//QCLOUD.log10
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.00085));//QICE
+    //cmc::CmcUniversalType missing_value(static_cast<float>(-3.0));//QICE.log10
+    //cmc::CmcUniversalType missing_value(static_cast<float>(-3.0)); //QSNOW.log10
+    //cmc::CmcUniversalType missing_value(static_cast<float>(30.0)); //QVAPOR
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.000875)); //QSNOW
+    //cmc::CmcUniversalType missing_value(static_cast<float>(29.65)); //TC
+    //cmc::CmcUniversalType missing_value(static_cast<float>(40.0)); //UF
+    //cmc::CmcUniversalType missing_value(static_cast<float>(13.4)); //WF
+    //cmc::CmcUniversalType missing_value(static_cast<float>(48.25)); //VF
+
+
+    //Missing Values NYX Dataset
+    //cmc::CmcUniversalType missing_value(static_cast<float>(4782584.0)); //Temp
+
+
+    #if 0
     cmc::DataLayout layout(cmc::DataLayout::Lev_Lat_Lon);
     cmc::GeoDomain domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 512),
                           cmc::DimensionInterval(cmc::Dimension::Lat, 0, 512),
-                          cmc::DimensionInterval(cmc::Dimension::Lev, 0, 512)
+                          cmc::DimensionInterval(cmc::Dimension::Lev, 0, 128)
                           );
+    #else
+    cmc::DataLayout layout(cmc::DataLayout::Lev_Lat_Lon);
+    cmc::GeoDomain domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 500),
+                          cmc::DimensionInterval(cmc::Dimension::Lat, 0, 500),
+                          cmc::DimensionInterval(cmc::Dimension::Lev, 0, 100)
+                          );
+    #endif
 
     cmc::bin_reader::Reader binary_reader(file);
 
@@ -81,6 +122,8 @@ main(void)
 
     std::vector<cmc::InputVar> vars;
     vars.emplace_back(std::move(variable));
+
+    #endif
 
     #endif
 
@@ -122,31 +165,16 @@ Ordered increasingly + diff
      1011011010001 13
 
 LZC: 29 + (7 one bits induced)
-
-
-
-
-[cmc] DEBUG: Index 3000032 is 0010111110 0100101110111010101111 = 1240751
-[cmc] DEBUG: Index 3000033 is 0010111110 1000011011100100010000 = 2210064
-[cmc] DEBUG: Index 3000034 is 0010111110 1010110001111011000001 = 2825921
-[cmc] DEBUG: Index 3000035 is 0010111110 1100000001100111010100 = 3152340
-[cmc] DEBUG: Index 3000036 is 0010111110 0001100110110111100110 =  421350
-[cmc] DEBUG: Index 3000037 is 0010111110 0011010101100100001000 =  874760
-[cmc] DEBUG: Index 3000038 is 0010111110 0110110110110001111101 = 1797245
-[cmc] DEBUG: Index 3000039 is 0010111110 0110101000110000000100 = 1739780
-
-1111111111111111111111 = 4194303
-
 #endif
 
-
+#if 1
     {
     
     /* Create the compression data */
-    //cmc::prefix::Compressor compression_data(nc_data.TransferData()); //netCDF data
-    cmc::prefix::Compressor compression_data(std::move(vars)); //Binary data
+    //cmc::diff::Compressor compression_data(nc_data.TransferData()); //netCDF data
+    cmc::diff::Compressor compression_data(std::move(vars)); //Binary data
 
-    compression_data.SetSplitVariable(cmc::SplitVariable(cmc::kSplitAllVariables, cmc::Dimension::Lev));
+    //compression_data.SetSplitVariable(cmc::SplitVariable(cmc::kSplitAllVariables, cmc::Dimension::Lev));
 
     /* Setup the example data for the compression */
     compression_data.Setup();
@@ -158,20 +186,21 @@ LZC: 29 + (7 one bits induced)
     cmc::cmc_debug_msg("\n\nCompression is finished\n\n");
 
     cmc::cmc_debug_msg("Write Compressed Data");
-    compression_data.WriteCompressedData("CLOUDf48.bin.f32.new_scheme.cmc", 0);
+    compression_data.WriteCompressedData("PRECIPf48.log10.bin.f32.new_diff_scheme.cmc", 0);
 
     }
+#endif
 
     {
-    #if 0
+    #if 1
     cmc::cmc_debug_msg("\n\nDecompression Start\n\n");
 
     /* Decompress */
-    cmc::prefix::Decompressor decoder("nyx_velocity_x");
+    cmc::diff::Decompressor decoder("PRECIPf48.log10.bin.f32.new_diff_scheme.cmc");
 
     decoder.Setup();
-    decoder.DecompressVariable("velocity_x");
-    
+    //decoder.DecompressVariable("precipf48log10");
+    decoder.DecompressVariable(var_name);
     #endif
     }
 

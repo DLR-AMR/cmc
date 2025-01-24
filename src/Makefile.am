@@ -57,7 +57,15 @@ src/lossy/cmc_patch_amr_compression.hxx \
 src/utilities/cmc_huffman.hxx \
 src/utilities/cmc_binary_reader_forward.hxx \
 src/utilities/cmc_binary_reader.hxx \
-src/lossy/cmc_prefix_compression.hxx
+src/lossy/cmc_prefix_compression.hxx \
+src/lossless/cmc_diff_compression.hxx \
+src/lossless/cmc_residual_compression.hxx \
+src/utilities/cmc_arithmetic_encoder.hxx \
+src/utilities/cmc_ac_model.hxx \
+src/lossy/cmc_full_amr_compression.hxx \
+src/lossless/cmc_diff_decompression.hxx \
+src/utilities/cmc_bytes.hxx \
+src/utilities/cmc_serialized_compression_value_forward.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -97,8 +105,12 @@ src/netcdf/cmc_nc_reader.cxx \
 src/cmc_compression.cxx \
 src/decompression/cmc_prefix_decompression.cxx \
 src/lossless/cmc_prefix_compression.cxx \
+src/lossless/cmc_diff_compression.cxx \
+src/lossless/cmc_residual_compression.cxx \
 src/lossy/cmc_patch_amr_compression.cxx \
-src/lossy/cmc_prefix_compression.cxx
+src/lossy/cmc_prefix_compression.cxx \
+src/lossy/cmc_full_amr_compression.cxx \
+src/lossless/cmc_diff_decompression.cxx
 
 
 if ENABLE_FORTRAN

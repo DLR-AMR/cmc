@@ -14,6 +14,8 @@
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
+#include <t8_schemes/t8_default/t8_default_cxx.hxx> 
+#include <t8_forest/t8_forest_iterate.h> 
 #endif
 
 namespace cmc {
@@ -22,6 +24,11 @@ constexpr int kInitialRefinementLevelIsUnknown = INT_MIN;
 constexpr int kMeshCorrespondsToNoneVariables = INT_MIN;
 constexpr int kMeshCorrespondsToAllVariables = INT_MIN + 1;
 constexpr int kDimensionalityIsUnknown = INT_MIN;
+
+class AmrMesh;
+
+std::vector<DomainIndex>
+GetInitialElementCoverage(AmrMesh& mesh, t8_eclass_scheme_c * ts, const t8_element_t* element);
 
 class AmrMesh
 {
@@ -90,7 +97,7 @@ public:
     bool AreDummyElementsPresent() const;
     t8_forest_t GetMesh() const;
     void SetMesh(t8_forest_t mesh);
-    
+    friend std::vector<DomainIndex> GetInitialElementCoverage(AmrMesh& mesh, t8_eclass_scheme_c * ts, const t8_element_t* element);
 private:
     t8_forest_t mesh_{nullptr};
     int initial_refinement_level_{kInitialRefinementLevelIsUnknown};

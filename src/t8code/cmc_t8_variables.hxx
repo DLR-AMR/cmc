@@ -153,6 +153,8 @@ public:
     std::vector<ErrorCompliance> AreAlternativeValuesErrorCompliant(const std::vector<T>& alternative_values, const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T missing_value) const;
     ErrorCompliance IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const T& missing_value) const;
 
+    ErrorCompliance IsCoarseningErrorCompliantRegardingInitialData(const std::vector<PermittedError>& permitted_errors, const std::vector<T>& initial_data, const std::vector<DomainIndex>& initial_elem_indices, const T interpolated_value, const T missing_value) const;
+    
     void SetInaccuracyStorage(const TrackingOption& tracking_option) {tracking_option_ = tracking_option;};
     void SetUpInaccuracyStorage(const size_t size_hint = kInvalidSizeHintForInaccuracyContainer);
     bool IsInaccuracyStorageAllocated() const {return is_inaccuracy_storage_set_;};
@@ -324,6 +326,61 @@ VariableUtilities<T>::IsCoarseningErrorCompliant(const std::vector<PermittedErro
                     } else if (abs_inaccuracy[index] > max_introduced_error)
                     {
                         max_introduced_error = abs_inaccuracy[index];
+                    }
+                }
+            }
+            break;
+                default:
+                cmc_err_msg("The error specifications hold an unrecognized criterion.");
+                return ErrorCompliance(false, 0.0);
+        }
+    }
+
+    /* If the funciton reaches this point, the interpolated value complies with the permitted errors */
+    return ErrorCompliance(true, max_introduced_error);
+}
+
+template<class T>
+ErrorCompliance 
+VariableUtilities<T>::IsCoarseningErrorCompliantRegardingInitialData(const std::vector<PermittedError>& permitted_errors, const std::vector<T>& initial_data, const std::vector<DomainIndex>& initial_elem_indices, const T interpolated_value, const T missing_value) const 
+{
+    double max_introduced_error = 0.0;
+    //cmc_debug_msg("In IsCoarseningErrorCompliant");
+    //cmc_debug_msg("Size of intial data: ");
+    //cmc_debug_msg(initial_data.size());
+    for (auto pe_iter = permitted_errors.begin(); pe_iter != permitted_errors.end(); ++pe_iter)
+    {
+        switch (pe_iter->criterion)
+        {
+            case CompressionCriterion::AbsoluteErrorThreshold:
+            {
+
+                for (size_t idx = 0; idx < initial_elem_indices.size(); ++idx)
+                {
+                    /* Compute the absolute deviation from the interpolated value to the initial value */
+                    const double abs_error = ComputeSingleAbsoluteDeviation(initial_data[initial_elem_indices[idx]], interpolated_value, missing_value);
+                    if (abs_error > pe_iter->error)
+                    {
+                        return ErrorCompliance(false, 0.0);
+                    } else if (abs_error > max_introduced_error)
+                    {
+                        max_introduced_error = abs_error;
+                    }
+                }
+            }
+            break;
+            case CompressionCriterion::RelativeErrorThreshold:
+            {
+                for (size_t idx = 0; idx < initial_elem_indices.size(); ++idx)
+                {
+                    /* Compute the absolute deviation from the interpolated value to the initial value */
+                    const double rel_error = ComputeSingleRelativeDeviation(initial_data[initial_elem_indices[idx]], interpolated_value, missing_value);
+                    if (rel_error > pe_iter->error)
+                    {
+                        return ErrorCompliance(false, 0.0);
+                    } else if (rel_error > max_introduced_error)
+                    {
+                        max_introduced_error = rel_error;
                     }
                 }
             }

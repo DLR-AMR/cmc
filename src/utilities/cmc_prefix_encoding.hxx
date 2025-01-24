@@ -8,7 +8,8 @@
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_span.hxx"
 #include "utilities/cmc_huffman.hxx"
-
+#include "utilities/cmc_ac_model.hxx"
+#include "utilities/cmc_arithmetic_encoder.hxx"
 #include "utilities/cmc_log_functions.hxx"
 
 #include <vector>
@@ -23,7 +24,7 @@
 namespace cmc
 {
 
-enum SuffixEncoding {Plain, LengthEncoding};
+enum SuffixEncoding {Plain, LengthEncoding, ArithmeticLengthEncoding, EncodeFirstOne};
 
 template <int N> using SuffixEncodingFunc = std::vector<uint8_t> (const std::vector<CompressionValue<N>>&);
 
@@ -80,6 +81,8 @@ public:
 
     std::vector<uint8_t> EncodeLevelData() const;
     std::vector<uint8_t> EncodeLevelData(const huffman::HuffmanTree<int>& huffman_encoder) const;
+
+    std::vector<uint8_t> EncodeLevelDataAsLeadingZeroCount() const;
 
     bit_map::BitMap refinement_indicator;
     bit_map::BitMap prefix_indicator;
@@ -162,6 +165,8 @@ auto GetValueFromByteStream(Iter pos)
     /* Copy the bytes in the correct endianness to the 'value' */
     std::memcpy(static_cast<void*>(&value), static_cast<const void*>(deserialized_value.data()), type_length);
 
+    cmc_debug_msg("Reconstructed Value From Stream: ", value);
+    
     return value;
 }
 
@@ -585,6 +590,8 @@ EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
     /* Iterate over all suffixes and check whether they exist (and have not been fully extracted), 
      * if so, they will be encoded */
     int all_suffix_bits = 0;
+    std::vector<int> null_bits(33,0);
+    int null_bit_counter = 0;
     for (auto suff_iter = suffixes.begin(); suff_iter != suffixes.end(); ++suff_iter)
     {
         /* If the suffix is empty, we indicate this and continue with the next suffix */
@@ -593,7 +600,15 @@ EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
             continue;
         }
 
+        CompressionValue<N> val = *suff_iter;
+        val.NullifyNonSignificantFrontBits();
+        int num_null_bits = val.GetNumberLeadingZeros() - val.GetFrontBit();
    
+        null_bit_counter += num_null_bits;
+        ++null_bits[num_null_bits];
+
+
+
         #if 0
         if constexpr (N == 4)
         {
@@ -649,6 +664,232 @@ EncodePlainSuffixes(const std::vector<CompressionValue<N>>& suffixes)
     PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
 
     /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_encodings.begin(), num_bytes_suffix_encodings, std::back_insert_iterator(serialized_suffix_data));
+
+    for (auto iter = null_bits.begin(); iter != null_bits.end(); ++iter)
+    {
+        cmc_debug_msg("Null bits of length: ", std::distance(null_bits.begin(), iter), " frequency: ", *iter);
+    } 
+    cmc_debug_msg("Num null bits not extracted: ", null_bit_counter);
+    return serialized_suffix_data;
+}
+
+
+template <int N>
+inline
+std::vector<uint8_t>
+EncodeFirstOneInSuffixes(const std::vector<CompressionValue<N>>& suffixes)
+{
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(3 * suffixes.size() + 1);
+
+    int i = 0;
+    /* Iterate over all suffixes and check whether they exist (and have not been fully extracted), 
+     * if so, they will be encoded */
+    int all_suffix_bits = 0;
+
+    std::vector<arithmetic_encoding::Letter> alphabet;
+    const uint32_t alphabet_size = static_cast<uint32_t>(N * bit_vector::kCharBit + 1);
+    alphabet.reserve(alphabet_size);
+
+    /* Construct the alphabet */
+    for (uint32_t letter = 0; letter < alphabet_size; ++letter)
+    {
+        alphabet.emplace_back(arithmetic_encoding::Letter{letter, 1});
+    }
+
+    /* Iterate over all suffixes on this level */
+    for (auto val_iter = suffixes.begin(); val_iter != suffixes.end(); ++val_iter)
+    {
+        /* Get the leading zero count in the suffix */
+        const int lzc_in_suffix = val_iter->GetLeadingZeroCountInSignificantBits();
+
+        /* Increment the counter for the given prefix length */
+        ++(alphabet[lzc_in_suffix].frequency);
+    }
+
+    /* Construct the frequency model from the length information */
+    arithmetic_encoding::StaticFrequencyModel frequency_model(alphabet);
+
+    /* Construct the arithmetic encoder */
+    arithmetic_encoding::Encoder arm_encoder(std::make_unique<cmc::arithmetic_encoding::StaticFrequencyModel>(frequency_model));
+
+    for (auto suff_iter = suffixes.begin(); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        CompressionValue<N> suffix = *suff_iter;
+
+        /* Get the leading zero count in the suffix */
+        const int lzc_in_suffix = suffix.GetLeadingZeroCountInSignificantBits();
+
+        /* The leading zero count is processed by the arithmetic encoder */
+        arm_encoder.EncodeSymbol(lzc_in_suffix);
+
+        /* The remaining suffix is encoded */
+        if (lzc_in_suffix == 0 && not suffix.IsEmpty())
+        {
+            /* Afterwards, the actual prefix itself has to encoded and stored as well */
+            EncodeAndAppendPrefix(suffix_encodings, suffix.GetSignificantBitsInBigEndianOrdering(), suffix.GetCountOfSignificantBits());
+        } else
+        {
+            /* When its greater than zero, we can trim the zeros */
+            suffix.SetFrontBit(suffix.GetFrontBit() + lzc_in_suffix);
+
+            if (not suffix.IsEmpty())
+            {
+                EncodeAndAppendPrefix(suffix_encodings, suffix.GetSignificantBitsInBigEndianOrdering(), suffix.GetCountOfSignificantBits());
+            }
+        }
+
+        all_suffix_bits += suffix.GetCountOfSignificantBits();
+    }
+
+    bit_map::BitMap encoded_lzc_stream = arm_encoder.GetEncodedBitStream();
+
+    const size_t num_bytes_suffix_lzc = encoded_lzc_stream.size_bytes();
+    cmc_debug_msg("num_bytes_suffix_lzc: ", encoded_lzc_stream.size_bytes());
+
+    cmc_debug_msg("\nAll leftover Suffix Bits: ", all_suffix_bits, "\n");
+
+    const size_t num_bytes_suffix_encodings = suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffix_encodings: ", num_bytes_suffix_encodings);
+
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = sizeof(size_t) + num_bytes_suffix_encodings + num_bytes_suffix_lzc;
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(encoded_lzc_stream.begin_bytes(), num_bytes_suffix_lzc, std::back_insert_iterator(serialized_suffix_data));
+    std::copy_n(suffix_encodings.begin(), num_bytes_suffix_encodings, std::back_insert_iterator(serialized_suffix_data));
+
+    //for (auto iter = null_bits.begin(); iter != null_bits.end(); ++iter)
+    //{
+    //    cmc_debug_msg("Null bits of length: ", std::distance(null_bits.begin(), iter), " frequency: ", *iter);
+    //} 
+    //cmc_debug_msg("Num null bits not extracted: ", null_bit_counter);
+    return serialized_suffix_data;
+}
+
+
+template <int N>
+inline
+std::vector<uint8_t>
+EncodeSuffixLengthsArithmeticEncoder(const std::vector<CompressionValue<N>>& suffixes)
+{
+    /* A BitVector to store the encoded suffix lengths */
+    //bit_vector::BitVector suffix_lengths;
+    //suffix_lengths.Reserve(suffixes.size() / 2 + 1);
+    
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(suffixes.size() + 1);
+
+    std::vector<arithmetic_encoding::Letter> alphabet;
+    const uint32_t alphabet_size = static_cast<uint32_t>(N * bit_vector::kCharBit + 1);
+    alphabet.reserve(alphabet_size);
+
+    /* Construct the alphabet */
+    for (uint32_t letter = 0; letter < alphabet_size; ++letter)
+    {
+        alphabet.emplace_back(arithmetic_encoding::Letter{letter, 1});
+    }
+
+    /* Iterate over all suffixes on this level */
+    for (auto val_iter = suffixes.begin(); val_iter != suffixes.end(); ++val_iter)
+    {
+        /* Get the count of significant bits, i.e. the length of the prefix */
+        const int suff_length = val_iter->GetCountOfSignificantBits();
+
+        /* Increment the counter for the given prefix length */
+        ++(alphabet[suff_length].frequency);
+    }
+
+    /* Construct the frequency model from the length information */
+    arithmetic_encoding::StaticFrequencyModel frequency_model(alphabet);
+
+    /* Construct the arithmetic encoder */
+    arithmetic_encoding::Encoder arm_encoder(std::make_unique<cmc::arithmetic_encoding::StaticFrequencyModel>(frequency_model));
+
+    /* Iterate over all suffixes and check whether they exist (and have not been fully extracted), 
+     * if so, they will be encoded */
+    int all_suffix_bits = 0;
+
+    for (auto suff_iter = suffixes.begin(); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        /* If the prefix is not empty, it's length has to be encoded and stored. */
+        uint32_t suffix_length = static_cast<uint32_t>(suff_iter->GetCountOfSignificantBits());
+        
+        /* Encode the suffix length */
+        arm_encoder.EncodeSymbol(suffix_length);
+
+        if (suffix_length > 0)
+        {
+           /* If the suffix is not empty, we can leave the out the last bit of the suffix, because it will be a "one".
+            * Since all zeros at the tail have been truncated by "PerformTailTruncation". */
+           suffix_length -= 1;
+        }
+
+        if (suffix_length != 0)
+        {
+            /* If there is a prefix to encode, we get the prefix and set it in the encoded stream */
+            const std::vector<uint8_t> suffix = suff_iter->GetSignificantBitsInBigEndianOrdering();
+            suffix_encodings.AppendBits(suffix, suffix_length);
+        }
+
+
+        all_suffix_bits += suffix_length;
+    }
+
+    cmc_debug_msg("\nAll leftover Suffix Bits: ", all_suffix_bits, "\n");
+
+    /* We want to add a flag in the prefix lengths, that here (at the end of the process local encodings) is a boundary where we skip to the next byte in the prefix lengths as well as in the prefix encodings */
+    //EncodeAndAppendSuffixLengthByteBoundary(suffix_lengths);
+
+    /* Get the encoded bit stream from the arithmetic encoder */
+    bit_map::BitMap suffix_lengths = arm_encoder.GetEncodedBitStream();
+
+    /* Pack all the data to a single stream */
+    const size_t num_bytes_suffix_length_encodings = suffix_lengths.size_bytes();
+    cmc_debug_msg("num_bytes_suffix_length_encodings: ", num_bytes_suffix_length_encodings);
+    const size_t num_bytes_suffix_encodings = suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffix_encodings: ", num_bytes_suffix_encodings);
+
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = 3 * sizeof(size_t) + sizeof(uint16_t) + num_bytes_suffix_length_encodings + num_bytes_suffix_encodings;
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Afterwards, we store the number of bits for the suffix indicators, the number of bytes for the suffix lengths
+     * and then the number of bytes for the encoding of the actual suffixes */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffix_length_encodings);
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffix_encodings);
+
+    /* Serialioze the huffman tree and store it */
+    //const size_t symbol_size = 6;
+    //bit_vector::BitVector serialized_huffman_tree = huffman_encoder.SerializeHuffmanTree(symbol_size);
+    //cmc_debug_msg("Huffmann tree has been serialized");
+    cmc_debug_msg("Encode alphabet of arithmetic coder and append (however this is only ~100 bytes)");
+
+    //const uint16_t huffman_tree_size = serialized_huffman_tree.size();
+    //PushBackValueToByteStream(serialized_suffix_data, huffman_tree_size);
+    //std::copy_n(serialized_huffman_tree.begin(), huffman_tree_size, std::back_insert_iterator(serialized_suffix_data));
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_lengths.begin_bytes(), num_bytes_suffix_length_encodings, std::back_insert_iterator(serialized_suffix_data));
     std::copy_n(suffix_encodings.begin(), num_bytes_suffix_encodings, std::back_insert_iterator(serialized_suffix_data));
 
     return serialized_suffix_data;
@@ -878,6 +1119,108 @@ EncodeSuffixesXORSchemeNew(const std::vector<CompressionValue<N>>& suffixes)
 }
 
 
+template <int N>
+inline
+std::vector<uint8_t>
+EncodeSuffixesXORSchemeNew2(const std::vector<CompressionValue<N>>& suffixes)
+{
+    /* A BitVector to store the actual encoded suffix */
+    bit_vector::BitVector suffix_encodings;
+    suffix_encodings.Reserve(3 * suffixes.size() + 1);
+
+    //int i = 5000000;
+    std::vector<CompressionValue<N>> xor_suffixes;
+    xor_suffixes.reserve(suffixes.size());
+
+    /* Just copy the first value, since it cannot be xor'ed */
+    xor_suffixes.push_back(suffixes.front());
+    xor_suffixes.back().NullifyNonSignificantFrontBits();
+
+    for (auto suff_iter = std::next(suffixes.begin()); suff_iter != suffixes.end(); ++suff_iter)
+    {
+        const CompressionValue<N>& previous_value = *std::prev(suff_iter);
+        xor_suffixes.push_back(*suff_iter);
+        xor_suffixes.back() ^= previous_value;
+        xor_suffixes.back().NullifyNonSignificantFrontBits();
+    }
+
+    if constexpr (N == 4)
+    {
+        for (int i =12000000; i < 12001000; ++i)
+        {
+            CompressionValue<N> val = xor_suffixes[i];
+            val.NullifyNonSignificantFrontBits();
+            uint32_t int_val = val.template ReinterpretDataAs<uint32_t>();
+
+            cmc_debug_msg("index ", i, " hat xor_suff int: ", std::bitset<32>(int_val), " = ", int_val, " mit num significant bits: ", val.GetCountOfSignificantBits());
+        }
+    }
+    #if 0
+    if constexpr (N == 4)
+    {
+        std::vector<uint32_t> int_suffixes;
+        int_suffixes.reserve(xor_suffixes.size());
+
+        for (int i =12000000; i < 12001000; ++i)
+        {
+            CompressionValue<N> val = suffixes[i];
+            val.NullifyNonSignificantFrontBits();
+            uint32_t int_val = val.template ReinterpretDataAs<uint32_t>();
+
+            cmc_debug_msg("index ", i, " hat suff int: ", std::bitset<32>(int_val), " = ", int_val, " mit num significant bits: ", val.GetCountOfSignificantBits());
+        }
+    }
+    #endif
+
+    bit_vector::BitVector lzc_lengths;
+    lzc_lengths.Reserve(xor_suffixes.size() / 2 + 1);
+
+    cmc_debug_msg("Suffix Encoding begins");
+    /* Iterate over all suffixes and encode them */
+    for (auto suff_iter = xor_suffixes.begin(); suff_iter != xor_suffixes.end(); ++suff_iter)
+    {
+        /* Get the leading zero count in the significant part of the value */
+        uint8_t leading_zero_count = static_cast<uint8_t>(suff_iter->GetLeadingZeroCountInSignificantBits());
+        if (leading_zero_count > 15)
+        {
+            //cmc_debug_msg("LZC of over 15: length: ", leading_zero_count);
+            leading_zero_count = 15;
+        }
+        lzc_lengths.AppendFourBits(leading_zero_count);
+        lzc_lengths.AppendBits(leading_zero_count, 8);
+        suff_iter->SetFrontBit(suff_iter->GetFrontBit() + leading_zero_count);
+        
+        const int significant_bits = suff_iter->GetCountOfSignificantBits();
+        if (significant_bits > 0)
+        {
+            /* Encode the remaining suffix */
+            EncodeAndAppendPrefix(suffix_encodings, suff_iter->GetSignificantBitsInBigEndianOrdering(), significant_bits); 
+        }
+    }
+    cmc_debug_msg("Num suffixes: ", xor_suffixes.size(), " und size lzc vector: ", lzc_lengths.size());
+    FILE* file = fopen("lzc_suffices.bin", "wb");
+    fwrite(lzc_lengths.data(), sizeof(uint8_t), lzc_lengths.size(), file);
+    fclose(file);
+
+    /* Calculate the amount of bytes needed to encode the suffixes */
+    const size_t num_bytes_suffixes = sizeof(size_t) + suffix_encodings.size();
+    cmc_debug_msg("num_bytes_suffixes: ", num_bytes_suffixes);
+    cmc_debug_msg("Num bytes to encode lzc: ", lzc_lengths.size());
+
+    /* Now, we fill a buffer for the suffixes */
+    std::vector<uint8_t> serialized_suffix_data;
+    serialized_suffix_data.reserve(num_bytes_suffixes);
+
+    //TODO: This has to be adapted for parallel gathering of the data 
+    /* At first, we store the number of bytes for the suffix-level */
+    PushBackValueToByteStream(serialized_suffix_data, num_bytes_suffixes);
+
+    /* Copy the serialized data to the buffer */
+    std::copy_n(suffix_encodings.begin(), suffix_encodings.size(), std::back_insert_iterator(serialized_suffix_data));
+
+    return serialized_suffix_data;
+}
+
 
 template <int N>
 inline
@@ -1028,6 +1371,14 @@ EncodeSuffixesBitPlaneRLE(const std::vector<CompressionValue<N>>& suffixes)
     std::copy_n(suffix_encodings.begin(), suffix_encodings.size(), std::back_insert_iterator(serialized_suffix_data));
 
     return serialized_suffix_data;
+}
+
+
+template<typename T>
+std::vector<uint8_t>
+LevelwisePrefixData<T>::EncodeLevelDataAsLeadingZeroCount() const
+{
+    return std::vector<uint8_t>();
 }
 
 

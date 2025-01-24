@@ -1,4 +1,4 @@
-#include "lossless/cmc_prefix_compression.hxx"
+#include "lossless/cmc_diff_compression.hxx"
 #include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_span.hxx"
@@ -17,7 +17,7 @@
 namespace cmc
 {
 
-namespace prefix
+namespace diff
 {
 
 int
@@ -63,13 +63,28 @@ Compressor::Setup()
 
     compression_data_->TransformInputToCompressionVariables();
 
-    compression_data_->FilterDataAsDifferences();
+    //compression_data_->FilterDataAsDifferences();
 
     compression_variables_ = compression_data_->GetByteVariablesForCompression();
 
     compression_data_.reset(nullptr); 
 }
+#if 0
+Things to do: 
+    - Build Difference Pyramid with Mid_range/Arithmetic Mean as predictor
+    - (Adaptively) Encode the residuals by extracting the mid_range/arithmetic mean per family and store the residuals of residuals 
+      (every time a residual is stored, we need to keep a flag to indicate the sign)
+    - How to encode the residuals:
+        - fpzip stores the sign, the position of the first(=k) one and the remaining bits, while the sign and "k" are put in a range coder
+        - pzip conducted research how to encode the residuals smaller (BWT + RangeCoding yielded best results)
+        - direct storage would require 5 bits per residual plus sign = 6 Bits -> 
+        
+    - Build Lorenzo Predictor and compare against the extracted mean (see which approach yields smaller residuals)
+    - if Lorenzo predictor is better; the only option would be to store the "absolute residual" and keep the sign bits sepearate
+    - if the Extracted Mean is a better predictor, everything is fine! This would be a strong argument to utilize the tree structure and boosts the effect of the variational resolutions
 
+
+#endif
 
 void
 Compressor::Compress()
@@ -77,44 +92,72 @@ Compressor::Compress()
     /* Afterwards, we create prefixes in the tree hierachy */
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
     {
+        var_iter->InitializeResidualAlphabet();
         //var_iter->XORConsecutiveValues();
         /* (Try to) release the initial data which already has been transformed */
         var_iter->KeepInitialData(false);
         //var_iter->PrintCompressionValues();
         /* We create the adapt data based on the compression settings, the forest and the variable to consider during the adaptation/coarsening */
-        PrefixAdaptData adapt_data{*var_iter};
+        DiffAdaptData adapt_data{*var_iter};
+
+        //var_iter->WriteDataToVTK_(0);
+
+        /* Write data to file */
+        var_iter->WriteDataToFile("initial_cmc_sfc_data.bin");
 
         /* Iterate until all prefixes have been extracted (up until the the root of the mesh) */
         while (adapt_data.IsCompressionProgressing())
         {
+            //var_iter->WriteDataToFile("initial_cmc_sfc_data_" + std::to_string(adapt_data.GetAdaptationStepCount()) + ".bin");
+
             /* Allocate memory for the prefix extraction and set up evertything needed for the coarsening process */
             adapt_data.InitializeCompressionIteration();
 
             /* Perform a coarsening iteration and find prefix and refinement bits */
-            t8_forest_t adapted_forest = t8_forest_new_adapt(adapt_data.GetCurrentMesh(), ExtractCommonPrefixes, 0, 0, static_cast<void*>(&adapt_data));
+            t8_forest_t adapted_forest = t8_forest_new_adapt(adapt_data.GetCurrentMesh(), ExtractMeanAndLeaveDiffs, 0, 0, static_cast<void*>(&adapt_data));
 
             /* After the prefixes have been extracted and 'stored' on the coarser mesh in this iteration,
              * we update the mesh that they are defined on */
             adapt_data.SetCurrentMesh(adapted_forest);
 
             adapt_data.FinalizeCompressionIteration();
+            cmc_debug_msg("Count adaptation step : ", adapt_data.GetAdaptationStepCount());
+
+            //var_iter->WriteDataToVTK_(adapt_data.GetAdaptationStepCount());
         }
     }
 }
 
+#if 0
+void
+Compressor::TryFittingPyramid()
+{
+
+}
+#endif
 void
 Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
+    #if 1
     NcWriter writer(file_name, NC_NETCDF4);
     writer.ReserveVariables(compression_variables_.size());
     
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
     {
-        writer.AddVariable(var_iter->WriteCompressedData(time_step, SuffixEncoding::Plain));
+        writer.AddVariable(var_iter->WriteCompressedDiffData(time_step));
     }
 
-    writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));
+    writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::DiffCompression))));
     writer.Write();
+
+    #else
+
+    for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
+    {
+        (void) var_iter->WriteCompressedDiffData(time_step);
+    }
+
+    #endif
 }
 
 }

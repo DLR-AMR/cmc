@@ -67,6 +67,16 @@ PerformAdaptiveCoarseningOneForAll (t8_forest_t forest,
                                     t8_element_t * elements[]);
 
 t8_locidx_t
+PerformAdaptiveCoarseningOneForOneRegardingInitialData (t8_forest_t forest,
+                                    [[maybe_unused]] t8_forest_t forest_from,
+                                    [[maybe_unused]] int which_tree,
+                                    int lelement_id_,
+                                    t8_eclass_scheme_c * ts,
+                                    const int is_family,
+                                    const int num_elements,
+                                    t8_element_t * elements[]);
+
+t8_locidx_t
 FindRefinementBits (t8_forest_t forest,
                     t8_forest_t forest_from,
                     int which_tree,
@@ -119,6 +129,46 @@ DecompressSuffixEncoding (t8_forest_t forest,
 
 t8_locidx_t
 DecompressPlainSuffixEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[]);
+
+t8_locidx_t
+ExtractMeanAndLeaveDiffs (t8_forest_t forest,
+                       [[maybe_unused]] t8_forest_t forest_from,
+                       [[maybe_unused]] int which_tree,
+                       int lelement_id,
+                       [[maybe_unused]] t8_eclass_scheme_c * ts,
+                       const int is_family,
+                       const int num_elements,
+                       [[maybe_unused]] t8_element_t * elements[]);
+
+t8_locidx_t
+ExtractMean (t8_forest_t forest,
+                       [[maybe_unused]] t8_forest_t forest_from,
+                       [[maybe_unused]] int which_tree,
+                       int lelement_id,
+                       [[maybe_unused]] t8_eclass_scheme_c * ts,
+                       const int is_family,
+                       const int num_elements,
+                       [[maybe_unused]] t8_element_t * elements[]);
+
+t8_locidx_t
+BuildFittingPyramid (t8_forest_t forest,
+                       [[maybe_unused]] t8_forest_t forest_from,
+                       [[maybe_unused]] int which_tree,
+                       int lelement_id,
+                       [[maybe_unused]] t8_eclass_scheme_c * ts,
+                       const int is_family,
+                       const int num_elements,
+                       [[maybe_unused]] t8_element_t * elements[]);
+
+t8_locidx_t
+DecompressDiffEncoding (t8_forest_t forest,
                           t8_forest_t forest_from,
                           int which_tree,
                           int lelement_id,

@@ -12,10 +12,14 @@
 #include "utilities/cmc_prefix_encoding.hxx"
 #include <t8_forest/t8_forest_vtk.h>
 #include "utilities/cmc_huffman.hxx"
+#include "utilities/cmc_bit_map.hxx"
+#include "utilities/cmc_arithmetic_encoder.hxx"
 
 #include <vector>
 #include <cmath>
 #include <iterator>
+#include <unordered_map>
+#include <bitset>
 
 #ifdef CMC_WITH_NETCDF
 #include "netcdf/cmc_netcdf.hxx"
@@ -60,6 +64,7 @@ public:
 
     void PerformTailTruncation();
     void PerformTailTruncationOnInitialData();
+    void PerformTailTruncationRegardingUncompressedStates();
 
     void InitializeCompressionIteration();
     void FinalizeCompressionIteration();
@@ -68,6 +73,8 @@ public:
     void InitializeDecompressionIteration();
     void FinalizeDecompressionIteration();
     void InitializeSuffixDecompression();
+    void InitializeDiffDecompression();
+    void SetDiffDecompressionRootElementValue(const CmcUniversalType& root_value);
     void WriteDataToVTK_(const int step_id);
 
     /** Compression Routines **/
@@ -111,9 +118,28 @@ public:
 
     void XORConsecutiveValues();
 
+    void ExtractMeanAndLeaveDifferencesFromInitialData(const int elem_start_index, const int num_elements);
+    void ExtractMeanAndLeaveDifferencesFromPreviousMeans(const int elem_start_index, const int num_elements);
+    void LeaveValueUnchangedForNextMeanComputation(const int element_index);
+    NcVariable WriteCompressedDiffData(const int id, const int time_step) const;
+    void InitializeResidualAlphabet();
+
+    void ExtractMeanFromInitialData(const int elem_start_index, const int num_elements);
+    void ExtractMeanFromPreviousMeans(const int elem_start_index, const int num_elements);
+    void LeaveValueUnchanged(const int elem_start_index);
+    void TryFittingPyramid();
+    void TryLZCEncoding();
+    void ApplyResidualAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
+    void StoreElementUnchanged(const int elem_id);
+
+    void WriteDataToFile(const std::string& file_name) const;
 private:
+    void ExtractMeanAndLeaveDifferences(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements);
+    void ExtractMean(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements);
     CompressionValue<sizeof(T)> GetMaximumTailClearedValue(const int, const std::vector<PermittedError>&, const CompressionValue<sizeof(T)>&, const T&) const;
     CompressionValue<sizeof(T)> GetMaximumTailToggledValue(const int, const std::vector<PermittedError>&, const CompressionValue<sizeof(T)>&, const T&) const;
+    CompressionValue<sizeof(T)> GetMaximumTailClearedValueRegardingUncompressedStates(const std::vector<PermittedError>& permitted_errors, const std::vector<DomainIndex>& initial_data_indices, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const;
+    CompressionValue<sizeof(T)> GetMaximumTailToggledValueRegardingUncompressedStates(const std::vector<PermittedError>& permitted_errors, const std::vector<DomainIndex>& initial_data_indices, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const;
     std::vector<PermittedError> GetPermittedError(const int index) const;
     std::vector<PermittedError> GetRemainingMaxAllowedAbsoluteError(const int index) const;
     std::vector<int> GetPrefixLengthFrequency() const;
@@ -128,11 +154,19 @@ private:
     std::vector<CompressionValue<sizeof(T)>> byte_values_;
     std::vector<LevelwisePrefixData<T>> prefixes_;
 
+    std::vector<bit_map::BitMap> interpolation_indications_;
+
+    //std::vector<arithmetic_encoding::Letter> alphabet_;
+    std::unordered_map<uint32_t, uint32_t> alphabet_;
     std::vector<CompressionValue<sizeof(T)>> byte_values_new_;
 
     bool is_initial_data_kept_{true};
-    bool is_initial_mesh_stored_{true};//TODO:revert to false
+    bool is_initial_mesh_stored_{false};
     t8_forest_t initial_mesh_{nullptr};
+
+    AmrMesh uncompressed_mesh_;
+    std::vector<T> uncompressed_data_;
+    bool are_uncompressed_states_stored_{false};
 };
 
 class ByteVar
@@ -165,6 +199,7 @@ public:
     /** Compression Routines **/
     void PerformTailTruncation();
     void PerformTailTruncationOnInitialData();
+    void PerformTailTruncationRegardingUncompressedStates();
     void ExtractCommonPrefixFromInitialData(const int elem_start_index, const int num_elements);
     void ExtractCommonPrefixFromPreviousPrefixes(const int elem_start_index, const int num_elements);
     void ExtractCommonPrefixFromInitialData(const std::vector<int>& element_ids);
@@ -194,6 +229,25 @@ public:
     void KeepInitialData(const bool keep_data);
 
     void XORConsecutiveValues();
+    void ExtractMeanAndLeaveDifferencesFromInitialData(const int elem_start_index, const int num_elements);
+    void ExtractMeanAndLeaveDifferencesFromPreviousMeans(const int elem_start_index, const int num_elements);
+    void LeaveValueUnchangedForNextMeanComputation(const int element_index);
+    NcVariable WriteCompressedDiffData(const int time_step) const;
+
+    void ExtractMeanFromInitialData(const int elem_start_index, const int num_elements);
+    void ExtractMeanFromPreviousMeans(const int elem_start_index, const int num_elements);
+    void LeaveValueUnchanged(const int elem_start_index);
+
+    void InitializeResidualAlphabet();
+    void TryLZCEncoding();
+
+    void InitializeDiffDecompression();
+    void SetDiffDecompressionRootElementValue(const CmcUniversalType& root_value);
+    void ApplyResidualAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
+    void StoreElementUnchanged(const int elem_id);
+
+    void WriteDataToFile(const std::string& file_name) const;
+
 private:
     void SetUpByteVariable(const CmcType type, const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
                       const int global_context_information, const CmcUniversalType missing_value);
@@ -354,6 +408,24 @@ ByteVar::PerformTailTruncationOnInitialData()
 
 inline
 void
+ByteVar::WriteDataToFile(const std::string& file_name) const
+{
+    std::visit([&](auto&& var){
+        var.WriteDataToFile(file_name);
+    }, var_);
+}
+
+inline
+void
+ByteVar::PerformTailTruncationRegardingUncompressedStates()
+{
+    std::visit([](auto&& var){
+        var.PerformTailTruncationRegardingUncompressedStates();
+    }, var_);
+}
+
+inline
+void
 ByteVar::PopLevelwisePrefixEncoding()
 {
     std::visit([](auto&& var){
@@ -458,6 +530,41 @@ ByteVar::FinalizeDecompressionIteration()
     std::visit([](auto&& var){
         var.FinalizeDecompressionIteration();
     }, var_);
+}
+
+inline
+void
+ByteVar::InitializeDiffDecompression()
+{
+    std::visit([](auto&& var){
+        var.InitializeDiffDecompression();
+    }, var_);
+}
+
+inline
+void
+ByteVar::SetDiffDecompressionRootElementValue(const CmcUniversalType& root_value)
+{
+    std::visit([&](auto&& var){
+        var.SetDiffDecompressionRootElementValue(root_value);
+    }, var_);
+}
+
+
+inline NcVariable
+ByteVar::WriteCompressedDiffData(const int time_step) const
+{
+    return std::visit([this, &time_step](auto&& var) -> NcVariable {
+        return var.WriteCompressedDiffData(this->GetID(), time_step);
+    }, var_);
+
+    #if 0
+    return std::visit([this, &time_step](auto&& var) -> NcVariable {
+        return var.WriteCompressedData(this->GetID(), time_step);
+    }, var_);
+    #else
+    return NcVariable();
+    #endif
 }
 
 inline NcVariable
@@ -638,6 +745,78 @@ ByteVar::InitializeSuffixDecompression()
 }
 
 inline
+void
+ByteVar::InitializeResidualAlphabet()
+{
+    std::visit([](auto& var){
+        var.InitializeResidualAlphabet();
+    }, var_);
+}
+
+inline
+void
+ByteVar::TryLZCEncoding()
+{
+    std::visit([](auto& var){
+        var.TryLZCEncoding();
+    }, var_);
+}
+
+inline
+void
+ByteVar::ExtractMeanAndLeaveDifferencesFromInitialData(const int elem_start_index, const int num_elements)
+{
+    std::visit([&](auto& var){
+        var.ExtractMeanAndLeaveDifferencesFromInitialData(elem_start_index, num_elements);
+    }, var_);
+}
+
+inline
+void
+ByteVar::ExtractMeanAndLeaveDifferencesFromPreviousMeans(const int elem_start_index, const int num_elements)
+{
+    std::visit([&](auto& var){
+        var.ExtractMeanAndLeaveDifferencesFromPreviousMeans(elem_start_index, num_elements);
+    }, var_);
+}
+
+inline
+void
+ByteVar::LeaveValueUnchangedForNextMeanComputation(const int elem_start_index)
+{
+    std::visit([&](auto& var){
+        var.LeaveValueUnchangedForNextMeanComputation(elem_start_index);
+    }, var_);
+}
+
+inline
+void
+ByteVar::LeaveValueUnchanged(const int elem_start_index)
+{
+    std::visit([&](auto& var){
+        var.LeaveValueUnchanged(elem_start_index);
+    }, var_);
+}
+
+inline
+void
+ByteVar::ExtractMeanFromInitialData(const int elem_start_index, const int num_elements)
+{
+    std::visit([&](auto& var){
+        var.ExtractMeanFromInitialData(elem_start_index, num_elements);
+    }, var_);
+}
+
+inline
+void
+ByteVar::ExtractMeanFromPreviousMeans(const int elem_start_index, const int num_elements)
+{
+    std::visit([&](auto& var){
+        var.ExtractMeanFromPreviousMeans(elem_start_index, num_elements);
+    }, var_);
+}
+
+inline
 size_t
 ByteVar::GetCountSignificantBits(const int elem_id) const
 {
@@ -645,6 +824,25 @@ ByteVar::GetCountSignificantBits(const int elem_id) const
         return var.GetCountSignificantBits(elem_id);
     }, var_);
 }
+
+inline
+void
+ByteVar::StoreElementUnchanged(const int elem_id)
+{
+    std::visit([&](auto& var){
+        var.StoreElementUnchanged(elem_id);
+    }, var_);
+}
+
+inline
+void
+ByteVar::ApplyResidualAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits)
+{
+    std::visit([&](auto& var){
+        var.ApplyResidualAndStoreElement(elem_id, encoded_lzc, residual_bits);
+    }, var_);
+}
+
 
 template<typename T>
 size_t
@@ -659,6 +857,7 @@ ByteVariable<T>::InitializeSuffixDecompression()
 {
     byte_values_new_.reserve(byte_values_.size());
 }
+
 
 template<typename T>
 void
@@ -775,12 +974,88 @@ ByteVariable<T>::GetMaximumTailClearedValue(const int index, const std::vector<P
     {
         const CompressionValue<sizeof(T)> save_previous_value = cleared_value;
 
-        /* Toggle all ones up until the next unset bit (inclusive) */
+        /* Clear the next set bit from the tail */
         cleared_value.ClearNextSetBitFromTail();
         const T reinterpreted_value = cleared_value.template ReinterpretDataAs<T>();
 
         /* Check if it is error compliant */
         const ErrorCompliance error_evaluation = utilities_.IsValueErrorCompliant(permitted_errors, initial_data_[index], reinterpreted_value, missing_value);
+
+        if (!error_evaluation.is_error_threshold_satisfied)
+        {
+            /* Revert the changes to the value */
+            cleared_value = save_previous_value;
+            is_clearing_progressing = false;
+        }
+
+        ++iteration_count;
+    }
+
+    return cleared_value;
+}
+
+
+template<typename T>
+CompressionValue<sizeof(T)>
+ByteVariable<T>::GetMaximumTailToggledValueRegardingUncompressedStates(const std::vector<PermittedError>& permitted_errors, const std::vector<DomainIndex>& initial_data_indices, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const
+{
+    cmc_assert(are_uncompressed_states_stored_);
+
+    bool is_toogling_progressing = true;
+    CompressionValue<sizeof(T)> toggled_value = initial_serialized_value;
+
+    int iteration_count = 0;
+    const int max_iteration_count = sizeof(T) * CHAR_BIT;
+
+    while (is_toogling_progressing && iteration_count < max_iteration_count)
+    {
+        /* Temporarily store the previous value */
+        const CompressionValue<sizeof(T)> save_previous_value = toggled_value;
+
+        /* Toggle all ones up until the next unset bit (inclusive) */
+        toggled_value.ToggleTailUntilNextUnsetBit();
+        const T reinterpreted_value = toggled_value.template ReinterpretDataAs<T>();
+        //cmc_debug_msg("The toggled value has been reinterpreted, count: ", iteration_count);
+        /* Check if the toggled value complies to the error thresholds */
+        const ErrorCompliance error_evaluation = utilities_.IsCoarseningErrorCompliantRegardingInitialData(permitted_errors, uncompressed_data_, initial_data_indices, reinterpreted_value, missing_value);
+        //cmc_debug_msg("the error has been evaluated: ", error_evaluation.is_error_threshold_satisfied);
+        if (!error_evaluation.is_error_threshold_satisfied)
+        {
+            /* Revert the changes to the value */
+            toggled_value = save_previous_value;
+            is_toogling_progressing = false;
+        }
+
+        ++iteration_count;
+    }
+
+    return toggled_value;
+}
+
+
+template<typename T>
+CompressionValue<sizeof(T)>
+ByteVariable<T>::GetMaximumTailClearedValueRegardingUncompressedStates(const std::vector<PermittedError>& permitted_errors, const std::vector<DomainIndex>& initial_data_indices, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const
+{
+    cmc_assert(are_uncompressed_states_stored_);
+
+    bool is_clearing_progressing = true;
+    CompressionValue<sizeof(T)> cleared_value = initial_serialized_value;
+
+    int iteration_count = 0;
+    const int max_iteration_count = sizeof(T) * CHAR_BIT;
+
+    while (is_clearing_progressing && iteration_count < max_iteration_count)
+    {
+        /* Temporarily store the previous value */
+        const CompressionValue<sizeof(T)> save_previous_value = cleared_value;
+
+        /* Clear the next set bit from the tail */
+        cleared_value.ClearNextSetBitFromTail();
+        const T reinterpreted_value = cleared_value.template ReinterpretDataAs<T>();
+
+        /* Check if it is error compliant */
+        const ErrorCompliance error_evaluation = utilities_.IsCoarseningErrorCompliantRegardingInitialData(permitted_errors, uncompressed_data_, initial_data_indices, reinterpreted_value, missing_value);
 
         if (!error_evaluation.is_error_threshold_satisfied)
         {
@@ -825,11 +1100,11 @@ ByteVariable<T>::PerformTailTruncation()
             /* Replace the initial value with the transformed one */
             if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
             {
-                /* If the toggling approach has been more successfull */
+                /* If the toggling approach has been more successful */
                 *val_iter = toggled_value;
             } else
             {
-                /* If the clearing approach has been more successfull */
+                /* If the clearing approach has been more successful */
                 *val_iter = cleared_value;
             }
 
@@ -844,6 +1119,128 @@ ByteVariable<T>::PerformTailTruncation()
     }
 }
 
+
+//TODO: For load-balancing, we would need a weighted partition of the mesh/data for this functionality 
+template<typename T>
+void
+ByteVariable<T>::PerformTailTruncationRegardingUncompressedStates()
+{
+    cmc_assert(are_uncompressed_states_stored_ == true);
+    cmc_assert(t8_forest_get_local_num_elements(mesh_.GetMesh()) == byte_values_.size());
+    cmc_assert(is_initial_data_kept_ == true);
+
+    /* The misssing value associated with the variable */
+    const T missing_value = attributes_.GetMissingValue();
+    
+    /* Number of local elements/data points*/
+    const t8_locidx_t num_elements = t8_forest_get_local_num_elements(mesh_.GetMesh());
+    
+    /* We need the eclass of the tree as well as the scheme */
+    const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
+    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (mesh_.GetMesh(), eclass);
+
+    cmc_debug_msg("In perform tail truncation before element loop, num elems: ", num_elements);
+    cmc_debug_msg("Size of byte values_: ", byte_values_.size());
+    /* Iterate over all elements/data points */
+    for (t8_locidx_t idx = 0; idx < num_elements; ++idx)
+    {
+        if (idx % 30000 == 0)
+        {
+            cmc_debug_msg("current index in iter : ", idx);
+        }
+        if (!ApproxCompare(byte_values_[idx].template ReinterpretDataAs<T>(), missing_value))
+        {
+            /* Get the permitted error for the current values */
+            const std::vector<PermittedError> permitted_errors = GetPermittedError(idx);
+
+            //cmc_debug_msg("Permitted Error has been accessed");
+            /* Get the current element */
+            const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, idx);
+            //cmc_debug_msg("The element with idx ", idx, " has been accessed");
+
+            /* Get all initial elements indices that are covered by this element */
+            const std::vector<DomainIndex> initial_value_coverage = GetInitialElementCoverage(uncompressed_mesh_, ts, element);
+            if (idx % 30000 == 0)
+            {
+                cmc_debug_msg("Initial value coverage size is: ", initial_value_coverage.size());
+            }
+            //cmc_debug_msg("The initial value coverage has been computed: ", initial_value_coverage.size());
+
+            /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
+            const CompressionValue<sizeof(T)> toggled_value = GetMaximumTailToggledValueRegardingUncompressedStates(permitted_errors, initial_value_coverage, byte_values_[idx], missing_value);
+            //cmc_debug_msg("The toggled value has been computed");
+            /* Get the value which has been transformed by clearing as many of the last set bits as possible */
+            const CompressionValue<sizeof(T)> cleared_value = GetMaximumTailClearedValueRegardingUncompressedStates(permitted_errors, initial_value_coverage, byte_values_[idx], missing_value);
+            //cmc_debug_msg("The cleared value has been computed");
+            /* Check which approach leads to more zero bits at the end */
+            const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
+            const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
+
+            /* Replace the initial value with the transformed one */
+            if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
+            {
+                /* If the toggling approach has been more successful */
+                byte_values_[idx] = toggled_value;
+            } else
+            {
+                /* If the clearing approach has been more successful */
+                byte_values_[idx] = cleared_value;
+            }
+            //cmc_debug_msg("Best approach has beene valuated and assigned");
+            /* Update the tail bit count for the new value */
+            byte_values_[idx].UpdateTrailBitCount();
+            //cmc_debug_msg("Idx: ", idx, ", initial_value_coverage: ", initial_value_coverage.size(), ", toggled trail zeros: ", num_toogled_trailing_zeros, ", cleared trail zeros: ", num_cleared_trailing_zeros);
+        } else
+        {
+            /* In order to not change missing values, we are just able to trim their trailing zeros */
+            byte_values_[idx].UpdateTrailBitCount();
+            //cmc_debug_msg("In else, idx: ", idx);
+        }
+    }
+
+
+
+    /* Iterate through the serialized values and try to emplace as many zeros at the tail as possible (compliant to the error threshold) */
+    int index = 0;
+    for (auto val_iter = byte_values_.begin(); val_iter != byte_values_.end(); ++val_iter, ++index)
+    {
+        if (!ApproxCompare(initial_data_[index], missing_value))
+        {
+            /* Get the permitted error for the current values */
+            //TODO: Revert! Only for now with absolute errors
+            const std::vector<PermittedError> permitted_errors = GetPermittedError(index);
+
+            /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
+            const CompressionValue<sizeof(T)> toggled_value = GetMaximumTailToggledValue(index, permitted_errors, *val_iter, missing_value);
+
+            /* Get the value which has been transformed by clearing as many of the last set bits as possible */
+            const CompressionValue<sizeof(T)> cleared_value = GetMaximumTailClearedValue(index, permitted_errors, *val_iter, missing_value);
+
+            /* Check which approach leads to more zero bits at the end */
+            const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
+            const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
+
+            /* Replace the initial value with the transformed one */
+            if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
+            {
+                /* If the toggling approach has been more successfull */
+                *val_iter = toggled_value;
+            } else
+            {
+                /* If the clearing approach has been more successfull */
+                *val_iter = cleared_value;
+            }
+
+            /* Update the trail bit count for the new value */
+            val_iter->UpdateTrailBitCount();
+            //cmc_debug_msg("Trailing Zeros: Toggled: ", num_toogled_trailing_zeros, ", Cleared: ", num_cleared_trailing_zeros);
+        } else
+        {
+            /* In order to not change missing values, we are just able to trim their trailing zeros */
+            (*val_iter).UpdateTrailBitCount();
+        }
+    }
+}
 
 template<typename T>
 void
@@ -928,6 +1325,12 @@ ByteVariable<T>::GetPermittedError(const int index) const
                 rel_err = ed_iter->GetError();
             }
         }
+    } else
+    {
+        cmc_debug_msg("No permitted error could be associated with the element (Index: ", index, ").");
+        /* In case no error is associated, we state that no error is permitted */
+        is_abs_error_present = true;
+        abs_err = 0.0;
     }
 
     /* Check all additional error domains */
@@ -992,6 +1395,8 @@ ByteVariable<T>::InitializeCompressionIteration()
 {
     /* Emplace a new LevelPrefixData-object which will hold the prefix data of the current iteration of prefix extraction */
     prefixes_.emplace_back(mesh_.GetNumberLocalElements());
+    interpolation_indications_.emplace_back();
+    interpolation_indications_.back().Reserve(mesh_.GetNumberLocalElements());
 }
 
 template<typename T>
@@ -1054,10 +1459,28 @@ ByteVariable<T>::IndicatePrefixFound(const CompressionValue<sizeof(T)>& prefix)
     prefixes_.back().SetPrefix(prefix);
 }
 
+static int tryyyyyycount = 0;
+static int counter_lvlsz = 0;
+
 template<typename T>
 void
 ByteVariable<T>::FinalizeCompressionIteration()
 {
+
+    ++counter_lvlsz;
+    cmc_debug_msg("Size of last prefixes : ", prefixes_.back().prefixes.size(), " on iteration: ", counter_lvlsz);
+    cmc_debug_msg("Call of previous mean extarction: ", tryyyyyycount);
+    if (counter_lvlsz == 9)
+    {
+        if constexpr (std::is_same_v<T,float>)
+        {
+            CompressionValue<4> val = prefixes_.back().prefixes.front();
+        uint32_t intval = val.ReinterpretDataAs<uint32_t>();
+        float res;
+        std::memcpy(&res, &intval, 4);
+        cmc_debug_msg("Overall Mean value is: ", res, " as uint32_t: ", intval);
+        }
+    }
     //TODO:Repartition here the data/prefixes?
     return;
 }
@@ -1076,6 +1499,569 @@ ByteVariable<T>::ExtractCommonPrefixFromInitialData(const int elem_start_index, 
 {
     /* Extract a common prefix from the initial data */
     ExtractCommonPrefix(byte_values_, elem_start_index, num_elements);   
+}
+
+template<typename T>
+void
+ByteVariable<T>::InitializeResidualAlphabet()
+{
+    /* Size of the type of this variable */
+    const size_t type_size = sizeof(T);
+    /* We want to indicate the position of the first 1 in binary represenatation index, e.g. 4 byte type -> [0,32] plus the signum */
+    #if 1
+    const size_t num_residual_codes_wo_sign = type_size * bit_map::kCharBit + 1;
+    const size_t num_residual_codes = 2 * num_residual_codes_wo_sign;
+    #else
+    const size_t num_residual_codes_wo_sign = type_size * bit_map::kCharBit + 1;
+    const size_t num_residual_codes = num_residual_codes_wo_sign;
+    #endif
+
+    /* Allocate memory for the alphabet */
+    alphabet_.reserve(num_residual_codes);
+
+    uint32_t ResidualIndicatorFirstOne = 0;
+
+    //TODO: Try to remove letters from the alphabet that do not occur 
+    //....
+
+    for (size_t i = 0; i < num_residual_codes_wo_sign; ++i, ++ResidualIndicatorFirstOne)
+    {
+        /* Emplace back the index of the first one with a positive and negative signum */
+        //alphabet_.emplace_back{arithmetic_encoding::Letter{ResidualIndicatorFirstOne, 1}};
+        //alphabet_.emplace_back{arithmetic_encoding::Letter{ResidualIndicatorFirstOne + arithmetic_encoding::kMSBBit, 1}};
+        #if 1
+        //alphabet_.insert({ResidualIndicatorFirstOne, 1});
+        //alphabet_.insert({arithmetic_encoding::kMSBBit + ResidualIndicatorFirstOne, 1});
+        #else 
+        alphabet_.insert({ResidualIndicatorFirstOne, 1});
+        #endif
+    }
+}
+
+
+template<typename T>
+void
+ByteVariable<T>::TryLZCEncoding()
+{
+    if constexpr (std::is_same_v<T, float>)
+    {
+        const T missing_value = attributes_.GetMissingValue();
+
+        std::vector<T> lzc_byte_vals;
+        lzc_byte_vals.reserve(byte_values_.size());
+
+        uint32_t sig_bit_counter = 0;
+        for(auto val_iter = byte_values_.begin(); val_iter != byte_values_.end(); ++val_iter)
+        {
+            uint32_t lzc{sizeof(T) * CHAR_BIT};
+
+            T reinterpreted_val = val_iter->template ReinterpretDataAs<T>();
+
+            if (!ApproxCompare(reinterpreted_val, missing_value))
+            {
+                lzc = static_cast<uint32_t>(val_iter->GetNumberLeadingZeros());
+            }
+
+            float flzc;
+            std::memcpy(&flzc, &lzc, 4);
+
+            *val_iter = flzc;
+
+            if (lzc > 0 && lzc < 32)
+            {
+                ++lzc;
+            }
+            sig_bit_counter += (sizeof(T) * CHAR_BIT - lzc);
+
+        }
+
+        cmc_debug_msg("\n\n\n\nNum remaining significant bits are: ", sig_bit_counter, " (in bytes: ", sig_bit_counter / 8, ")");
+    }
+}
+
+template<typename T>
+T
+GetInterpoaltionMaximizingLZC(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements, const T missing_value)
+{
+    if constexpr (std::is_same_v<float, T>)
+    {
+    const std::vector<T> vals = GetCompressionValuesAs<T>(values, elem_start_index, num_elements);
+
+    /* Get a view on the values */
+    //VectorView<uint32_t> value_view(vals.data(), num_elements);
+    const VectorView<T> value_view(vals.data(), num_elements);
+
+    int max_lzc = -1;
+    int index = 0;
+
+    int pred_idx = 0;
+    for (auto pred_iter = value_view.begin(); pred_iter != value_view.end(); ++pred_iter, ++pred_idx)
+    {
+        T current_predictor = *pred_iter;
+        uint32_t cp;
+        std::memcpy(&cp, &current_predictor, 4);
+
+        int lzc_count = 0;
+
+        for (auto val_iter = value_view.begin(); val_iter != value_view.end(); ++val_iter)
+        {
+            T val = *val_iter;
+            uint32_t uiv;
+            std::memcpy(&uiv, &val, 4);
+
+            uint32_t diff = (uiv >= cp ? uiv - cp : cp - uiv);
+
+            CompressionValue<sizeof(T)> crv(diff);
+            lzc_count += crv.GetNumberLeadingZeros();
+        }
+
+        if (lzc_count > max_lzc)
+        {
+            max_lzc = lzc_count;
+            index = pred_idx;
+        }
+    }
+
+    //Try midrange and arithmetic mean as well
+    const T mid_range = InterpolateToMidRange(value_view, num_elements, missing_value);
+    uint32_t ui_mid_range;
+    std::memcpy(&ui_mid_range, &mid_range, 4);
+
+    int lzc_count = 0;
+
+    for (auto val_iter = value_view.begin(); val_iter != value_view.end(); ++val_iter)
+    {
+        T val = *val_iter;
+        uint32_t uiv;
+        std::memcpy(&uiv, &val, 4);
+
+        uint32_t diff = (uiv >= ui_mid_range ? uiv - ui_mid_range : ui_mid_range - uiv);
+
+        CompressionValue<sizeof(T)> crv(diff);
+        lzc_count += crv.GetNumberLeadingZeros();
+    }
+
+    if (lzc_count > max_lzc)
+    {
+        return mid_range;
+    }
+
+    return value_view[index];
+
+    } else
+    {
+        return T(0);
+    }
+}
+
+template<typename T>
+T
+GetInterpoaltionMaximizingLZCwoMissingValue(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements, const T missing_value)
+{
+    if constexpr (std::is_same_v<float, T>)
+    {
+    /* Get all converted values */
+    const std::vector<T> vals = GetCompressionValuesAs<T>(values, elem_start_index, num_elements);
+
+    std::vector<T> non_missing_vals;
+    non_missing_vals.reserve(vals.size());
+
+    /* Extarct all non-missing values */
+    for(auto val_iter = vals.begin(); val_iter != vals.end(); ++val_iter)
+    {
+        if (not ApproxCompare(*val_iter, missing_value))
+        {
+            non_missing_vals.push_back(*val_iter);
+        }
+    }
+
+    /* If only missing values are present, we return a missig value */
+    if (non_missing_vals.empty())
+    {
+        return missing_value;
+    }
+
+    /* Get a view on the values */
+    const VectorView<T> value_view(vals.data(), num_elements);
+
+    int max_lzc = -1;
+    int index = 0;
+
+    int pred_idx = 0;
+
+    /* We choose a non missing value as a predictor in order to have a constructive prediction, but check its effect on all values of the family (i.e. missing values) */
+    for (auto pred_iter = non_missing_vals.begin(); pred_iter != non_missing_vals.end(); ++pred_iter, ++pred_idx)
+    {
+        T current_predictor = *pred_iter;
+        uint32_t cp;
+        std::memcpy(&cp, &current_predictor, 4);
+
+        int lzc_count = 0;
+
+        for (auto val_iter = value_view.begin(); val_iter != value_view.end(); ++val_iter)
+        {
+            T val = *val_iter;
+            uint32_t uiv;
+            std::memcpy(&uiv, &val, 4);
+
+            uint32_t diff = (uiv >= cp ? uiv - cp : cp - uiv);
+
+            CompressionValue<sizeof(T)> crv(diff);
+            lzc_count += crv.GetNumberLeadingZeros();
+        }
+
+        if (lzc_count > max_lzc)
+        {
+            max_lzc = lzc_count;
+            index = pred_idx;
+        }
+    }
+
+    //Try midrange and arithmetic mean as well
+    const T mid_range = InterpolateToMidRange(VectorView<T>(non_missing_vals), static_cast<int>(non_missing_vals.size()), missing_value);
+    uint32_t ui_mid_range;
+    std::memcpy(&ui_mid_range, &mid_range, 4);
+
+    int lzc_count = 0;
+
+    for (auto val_iter = value_view.begin(); val_iter != value_view.end(); ++val_iter)
+    {
+        T val = *val_iter;
+        uint32_t uiv;
+        std::memcpy(&uiv, &val, 4);
+
+        const uint32_t diff = (uiv >= ui_mid_range ? uiv - ui_mid_range : ui_mid_range - uiv);
+
+        CompressionValue<sizeof(T)> crv(diff);
+        lzc_count += crv.GetNumberLeadingZeros();
+    }
+
+    if (lzc_count > max_lzc)
+    {
+        return mid_range;
+    }
+
+    return non_missing_vals[index];
+
+    } else
+    {
+        return T(0);
+    }
+}
+
+template<typename T>
+void
+ByteVariable<T>::ExtractMeanAndLeaveDifferences(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements)
+{
+    if constexpr (std::is_same_v<float, T>)
+    {
+    //TODO UPdate the pasted extarct prefix functionality
+    const std::vector<T> vals = GetCompressionValuesAs<T>(values, elem_start_index, num_elements);
+
+    /* Get a view on the values */
+    //VectorView<uint32_t> value_view(vals.data(), num_elements);
+    VectorView<T> value_view(vals.data(), num_elements);
+
+    const T missing_value = attributes_.GetMissingValue();
+
+    //Choose interpolation fucntion here
+
+    //const T real_interpolation_result = InterpolateToArithmeticMean(value_view, num_elements, missing_value);
+
+    //const T real_interpolation_result = InterpolateToMidRange(value_view, num_elements, missing_value);
+
+    //auto min_iter = std::min_element(vals.begin(), vals.end());
+    //const T real_interpolation_result = *min_iter;
+
+    //auto min_iter = std::max_element(vals.begin(), vals.end());
+    //const T real_interpolation_result = *min_iter;
+
+    #if 0
+    const T real_interpolation_result = GetInterpoaltionMaximizingLZC<T>(values, elem_start_index, num_elements, missing_value);
+    #else
+    const T real_interpolation_result = GetInterpoaltionMaximizingLZCwoMissingValue<T>(values, elem_start_index, num_elements, missing_value);
+    #endif
+
+    uint32_t interpolation_result;
+    std::memcpy(&interpolation_result, &real_interpolation_result, sizeof(T));
+
+    //cmc_debug_msg("Interpolation is: ", real_interpolation_result, ", as uint: ", interpolation_result);
+    //cmc_debug_msg(std::bitset<32>(interpolation_result));
+
+    //uint32_t int_missing_value;
+    //std::memcpy(&int_missing_value, &missing_value, sizeof(T));
+
+    //if (elem_start_index >= 0 && elem_start_index <= 512)
+    //{
+    //    for (size_t i = 0; i < num_elements; ++i)
+    //    {
+    //        cmc_debug_msg("Element ID: ", elem_start_index + i, " has value: ", vals[i]);
+    //    }
+    //}
+
+    //cmc_debug_msg("Fuer elem id: ",elem_start_index, " und num elems: ", num_elements, " ist interpolation: ", real_interpolation_result, " als uint: ", interpolation_result, " und values.size() = ", values.size());
+    #if 0
+    uint32_t int_missing_value;
+    std::memcpy(&int_missing_value, &missing_value, sizeof(T));
+
+    const uint32_t interpolation_result = InterpolateToArithmeticMean(value_view, GetMesh(), elem_start_index, num_elements, int_missing_value);
+    #endif
+    //CompressionValue<4> val = prefixes_.back().prefixes.front();
+    //uint32_t intval = val.ReinterpretDataAs<uint32_t>();
+    //float res;
+    //std::memcpy(&res, &intval, 4);
+
+    //if (values.size() <= 512 )
+    //{
+    //    float result;
+    //    std::memcpy(&result, &interpolation_result, 4);
+    //    cmc_debug_msg("Interpolation of Mean on the coarsest level is: ", result, " size of values: ", values.size());
+    //}
+
+    /* After the interpolation has been calcuated in the correct data type, we reinterpret the data as an integeral value for further computations */
+    //uint32_t reintpr_interpolation_result;
+    //std::memcpy(&reintpr_interpolation_result, &interpolation_result, sizeof(T));
+
+    //std::vector<uint32_t> int_values = ReinterpretValuesAs<T, uint32_t>(vals);
+
+    for (int val_idx = 0; val_idx < num_elements; ++val_idx)
+    {
+        //if (ApproxCompare(vals[val_idx], missing_value))
+        //{
+        //    /* If there is a missing value, we indicate that the difference to the interpolation result is zero */
+        //    values[elem_start_index + val_idx] = CompressionValue<sizeof(T)>(uint32_t{0});
+        //    interpolation_indications_.back().AppendSetBit();
+        //    continue;
+        //}
+
+        uint32_t intval;
+        std::memcpy(&intval, &vals[val_idx], sizeof(T));
+
+        uint32_t encoded_lzc;
+
+        if (interpolation_result >= intval)
+        {
+            const uint32_t diff = interpolation_result - intval;
+
+            values[elem_start_index + val_idx] = CompressionValue<sizeof(T)>(diff);
+            /* Indicate that the interpolation result is greater than the value */
+            interpolation_indications_.back().AppendSetBit();
+            /* Get the encoded LZC in order to model the frequency */
+            encoded_lzc = values[elem_start_index + val_idx].GetNumberLeadingZeros();
+            //cmc_debug_msg("interpolation_result >= intval: -> 1-Bit: LZC: ", encoded_lzc);
+            //cmc_debug_msg("Diff as Bitset: ", std::bitset<32>(diff));
+        } else
+        {
+            const uint32_t diff = intval - interpolation_result;
+            values[elem_start_index + val_idx] = CompressionValue<sizeof(T)>(diff);
+            /* Indicate that the interpolation result is greater than the value */
+            interpolation_indications_.back().AppendUnsetBit();
+            /* Get the encoded LZC in order to model the frequency */
+            encoded_lzc = arithmetic_encoding::kMSBBit + values[elem_start_index + val_idx].GetNumberLeadingZeros();
+            //cmc_debug_msg("interpolation_result >= intval: -> 0-Bit: LZC: ", encoded_lzc - arithmetic_encoding::kMSBBit );
+            //cmc_debug_msg("Diff as Bitset: ", std::bitset<32>(diff));
+        }
+
+        //encoded_lzc = values[elem_start_index + val_idx].GetNumberLeadingZeros();
+
+        /* Increment the counter for the encoded LZC */
+        auto alphaiter = alphabet_.find(encoded_lzc);
+        if (alphaiter == alphabet_.end()) {alphabet_.insert({encoded_lzc, 1});}
+        else{++(alphabet_[encoded_lzc]);}
+    }
+
+    /* After the differences have been calculated and stored in the child elements, we store the interpolation result on the coarser level */
+    prefixes_.back().SetPrefix(CompressionValue<sizeof(T)>(real_interpolation_result));
+
+
+    #if 0
+    const elem_end_id = elem_start_index + num_elements;
+
+    for (int val_idx = elem_start_index; val_idx < elem_end_id; ++val_idx)
+    {
+        if (ApproxCompare(values[val_idx], missing_value))
+        {
+            /* If there is a missing value, we indicate that the difference to the interpolation result is zero */
+            values[val_idx] = CompressionValue<sizeof(T)>(T(0));
+            continue;
+        }
+
+
+        if (reintpr_interpolation_result >= values[val_idx])
+        {
+            const uint32_t diff = reintpr_interpolation_result - values[val_idx];
+            values[val_idx] = CompressionValue<sizeof(T)>(diff);
+            /* Indicate that the interpolation result is greater than the value */
+            interpolation_indications_.back().AppendSetBit();
+        } else
+        {
+            const uint32_t diff = values[val_idx] - reintpr_interpolation_result;
+            values[val_idx] = CompressionValue<sizeof(T)>(diff);
+            /* Indicate that the interpolation result is greater than the value */
+            interpolation_indications_.back().AppendUnsetBit();
+        }
+    }
+    #endif
+
+    } else
+    {
+        cmc_err_msg("Only float compression possible");
+    }
+}
+
+
+template<typename T>
+void
+ByteVariable<T>::ExtractMeanAndLeaveDifferencesFromInitialData(const int elem_start_index, const int num_elements)
+{
+    /* Extract the mean from the initial data */
+    ExtractMeanAndLeaveDifferences(byte_values_, elem_start_index, num_elements);
+}
+
+template<typename T>
+void
+ByteVariable<T>::ExtractMeanAndLeaveDifferencesFromPreviousMeans(const int elem_start_index, const int num_elements)
+{
+    tryyyyyycount += 1;
+    /* Get the previous means */
+    //std::vector<CompressionValue<sizeof(T)>>& prev_means = (*std::prev(prefixes_.end(), 2)).prefixes;
+    //cmc_debug_msg("Size of second to last prefixes: ", (*std::prev(prefixes_.end(), 2)).prefixes.size());
+    /* Extract a common prefix from the initial data */
+    ExtractMeanAndLeaveDifferences((*std::prev(prefixes_.end(), 2)).prefixes, elem_start_index, num_elements);
+}
+
+template<typename T>
+void
+ByteVariable<T>::LeaveValueUnchangedForNextMeanComputation(const int elem_start_index)
+{
+    if constexpr (std::is_same_v<T, float>)
+    {
+    /* Copy the data/prefix to the next 'coarser level' */
+    if (prefixes_.size() >= 2)
+    {
+        /* In any other prefix extraction iteration than the first, we just copy the previous prefix */
+        LevelwisePrefixData<T>& previous_means = (*std::prev(prefixes_.end(), 2));
+        prefixes_.back().SetPrefix(previous_means.prefixes[elem_start_index]);
+        previous_means.prefixes[elem_start_index] = CompressionValue<sizeof(T)>(uint32_t{0});
+    } else
+    {
+        /* In the first prefix extraction iteration, we just keep the initial byte value and consider it in a 'coarser' iteration */
+        prefixes_.back().SetPrefix(byte_values_[elem_start_index]);
+        /* Remove the 'prefix' from the initial data and replace it with an empty 'dummy value' */
+        byte_values_[elem_start_index] = CompressionValue<sizeof(T)>(uint32_t{0});
+    }
+    /* There wont be a residual since, we just drag the value along */
+    interpolation_indications_.back().AppendSetBit();
+    const uint32_t encoded_lzc = sizeof(T) * bit_map::kCharBit;
+    auto alphaiter = alphabet_.find(encoded_lzc);
+    if (alphaiter == alphabet_.end()) {alphabet_.insert({encoded_lzc, 1});}
+    else{++(alphabet_[encoded_lzc]);}
+    }
+}
+
+template<typename T>
+void
+ByteVariable<T>::TryFittingPyramid()
+{
+    //Copy first three levels
+    
+}
+
+template<typename T>
+void
+ByteVariable<T>::StoreElementUnchanged(const int elem_id)
+{
+    /* Just copy the value over to the new vector */
+    byte_values_new_.push_back(byte_values_[elem_id]);
+}
+
+
+template<typename T>
+void
+ByteVariable<T>::ApplyResidualAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits)
+{
+    /* Get the current mean value and add/subtract the residual to/from it */
+    CompressionValue<sizeof(T)> val = byte_values_[elem_id];
+    //cmc_debug_msg("In Apply Residual, elem_id: ", elem_id, ", Current byte value: ", val.template ReinterpretDataAs<T>());
+    val.AddIntegerResidual(encoded_lzc, residual_bits);
+    /* The altered value is stores in the new vetor */
+    byte_values_new_.push_back(val);
+    //cmc_debug_msg(" After apply residual: ", val.template ReinterpretDataAs<T>());
+    //T vv = val.template ReinterpretDataAs<T>();
+    //uint32_t uv;
+    //std::memcpy(&uv, &vv, 4);
+    //cmc_debug_msg("As bitset: ", std::bitset<32>(uv));
+}
+
+template<typename T>
+void
+ByteVariable<T>::ExtractMean(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements)
+{
+    if constexpr (std::is_same_v<float, T>)
+    {
+    //TODO UPdate the pasted extarct prefix functionality
+    const std::vector<T> vals = GetCompressionValuesAs<T>(values, elem_start_index, num_elements);
+
+    /* Get a view on the values */
+    //VectorView<uint32_t> value_view(vals.data(), num_elements);
+    VectorView<T> value_view(vals.data(), num_elements);
+
+    const T missing_value = attributes_.GetMissingValue();
+
+    //const T real_interpolation_result = InterpolateToArithmeticMean(value_view, num_elements, missing_value);
+    const T real_interpolation_result = InterpolateToMidRange(value_view, num_elements, missing_value);
+    //auto min_iter = std::min_element(vals.begin(), vals.end());
+    //const T real_interpolation_result = *min_iter;
+
+    /* After the differences have been calculated and stores in the child elements, we store the interpolation result on the coarser level */
+    prefixes_.back().SetPrefix(CompressionValue<sizeof(T)>(real_interpolation_result));
+
+
+    } else
+    {
+        cmc_err_msg("Only float compression possible");
+    }
+}
+
+
+template<typename T>
+void
+ByteVariable<T>::ExtractMeanFromInitialData(const int elem_start_index, const int num_elements)
+{
+    /* Extract the mean from the initial data */
+    ExtractMean(byte_values_, elem_start_index, num_elements);
+}
+
+template<typename T>
+void
+ByteVariable<T>::ExtractMeanFromPreviousMeans(const int elem_start_index, const int num_elements)
+{
+    tryyyyyycount += 1;
+    /* Get the previous means */
+    //std::vector<CompressionValue<sizeof(T)>>& prev_means = (*std::prev(prefixes_.end(), 2)).prefixes;
+    //cmc_debug_msg("Size of second to last prefixes: ", (*std::prev(prefixes_.end(), 2)).prefixes.size());
+    /* Extract a common prefix from the initial data */
+    ExtractMean((*std::prev(prefixes_.end(), 2)).prefixes, elem_start_index, num_elements);
+}
+
+template<typename T>
+void
+ByteVariable<T>::LeaveValueUnchanged(const int elem_start_index)
+{
+    if constexpr (std::is_same_v<T, float>)
+    {
+    /* Copy the data/prefix to the next 'coarser level' */
+    if (prefixes_.size() >= 2)
+    {
+        /* In any other prefix extraction iteration than the first, we just copy the previous prefix */
+        LevelwisePrefixData<T>& previous_means = (*std::prev(prefixes_.end(), 2));
+        prefixes_.back().SetPrefix(previous_means.prefixes[elem_start_index]);
+    } else
+    {
+        /* In the first prefix extraction iteration, we just keep the initial byte value and consider it in a 'coarser' iteration */
+        prefixes_.back().SetPrefix(byte_values_[elem_start_index]);
+    }
+    }
 }
 
 template<typename T>
@@ -1255,10 +2241,17 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, const Su
     switch (encoding_scheme)
     {
         case SuffixEncoding::Plain:
+            //return WriteCompressedData(id, time_step, EncodeSuffixesXORSchemeNew2);
             return WriteCompressedData(id, time_step, EncodePlainSuffixes);
         break;
         case SuffixEncoding::LengthEncoding:
             return WriteCompressedData(id, time_step, EncodeSuffixLengths);
+        break;
+        case SuffixEncoding::ArithmeticLengthEncoding:
+            return WriteCompressedData(id, time_step, EncodeSuffixLengthsArithmeticEncoder);
+        break;
+        case SuffixEncoding::EncodeFirstOne:
+            return WriteCompressedData(id, time_step, EncodeFirstOneInSuffixes);
         break;
         default:
             cmc_err_msg("An unknown suffix encoding scheme has been supplied.");
@@ -1266,6 +2259,7 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, const Su
     }
 }
 
+#if 0
 template<typename T>
 NcVariable
 ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEncodingFunc<sizeof(T)> suffix_encoder) const
@@ -1348,6 +2342,650 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEn
 
     return NcVariable(std::move(compressed_variable), std::move(attributes));
 }
+#else
+//TEST (to be deleted later)
+template<typename T>
+NcVariable
+ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEncodingFunc<sizeof(T)> suffix_encoder) const
+{
+    /* Declare a vector which will hold the level-wise encoded data */
+    std::vector<std::vector<uint8_t>> buffered_data;
+    buffered_data.reserve(prefixes_.size() + 1);
+
+    size_t num_bytes = 0;
+    /* Encode and retrieve the extracted prefixes */
+    for (auto lw_prefix_iter = prefixes_.rbegin(); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter)
+    {
+        buffered_data.emplace_back(lw_prefix_iter->EncodeLevelData());
+        cmc_debug_msg("Num bytes for level: ", buffered_data.back().size());
+        num_bytes += buffered_data.back().size();
+    }
+
+    /* Encode and append the leftover suffixes (on the finest level) that could not be truncated or extracted */
+    buffered_data.emplace_back(suffix_encoder(byte_values_));
+
+    cmc_debug_msg("Num bytes for suffixes: ", buffered_data.back().size());
+    num_bytes += buffered_data.back().size();
+    cmc_debug_msg("Overall bytes for this variable: ", num_bytes);
+
+    //TODO: Make mechanism for parallel output
+    //The complete global byte size needs to gathered and the level data has to be filled in parallel to it
+
+    /* Generate a (potentially new) context information for the variable */
+    const int global_context_info = (attributes_.GetGlobalContextInformation() != kNoGlobalContext ? attributes_.GetGlobalContextInformation() : 0);
+
+    /* Create a netCDF variable to put out */
+    std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
+    cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
+    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
+    compressed_variable.Reserve(num_bytes);
+
+    /* Put the buffered data into the variable to put out */
+    for (auto lvl_data_iter = buffered_data.begin(); lvl_data_iter != buffered_data.end(); ++lvl_data_iter)
+    {
+        compressed_variable.PushBack(*lvl_data_iter);
+    }
+
+    /* Assign some attributes to it */
+    std::vector<NcAttribute> attributes;
+    attributes.emplace_back("id", id);
+    attributes.emplace_back("time_step", time_step);
+    attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
+    attributes.emplace_back("initial_layout", static_cast<int>(attributes_.GetInitialDataLayout()));
+    attributes.emplace_back("pre_compression_layout", static_cast<int>(attributes_.GetPreCompressionLayout()));
+    attributes.emplace_back("global_context", global_context_info);
+    attributes.emplace_back("data_type", static_cast<int>(ConvertToCmcType<T>()));
+    attributes.emplace_back("missing_value", attributes_.GetMissingValue());
+    //TODO: Check if scaling and offset have been applied, if not we need to add those attributes
+
+    /* Get the global domain of this variable */
+    const GeoDomain& var_domain = GetGlobalDomain();
+
+    /* Write the domain lengths as attributes */
+    if (const int lon = var_domain.GetDimensionLength(Dimension::Lon);
+        lon > 1)
+    {
+        attributes.emplace_back("lon", lon);
+    }
+    if (const int lat = var_domain.GetDimensionLength(Dimension::Lat);
+        lat > 1)
+    {
+        attributes.emplace_back("lat", lat);
+    }
+    if (const int lev = var_domain.GetDimensionLength(Dimension::Lev);
+        lev > 1)
+    {
+        attributes.emplace_back("lev", lev);
+    }
+    if (const int time = var_domain.GetDimensionLength(Dimension::Time);
+        time > 1)
+    {
+        attributes.emplace_back("time", time);
+    }
+
+
+    return NcVariable(std::move(compressed_variable), std::move(attributes));
+}
+#endif
+
+
+template<typename T>
+void
+ByteVariable<T>::WriteDataToFile(const std::string& file_name) const
+{
+    FILE* file = fopen(file_name.c_str(), "wb");
+    std::vector<uint8_t> buffer;
+    buffer.reserve(byte_values_.size() * sizeof(T));
+
+    for (auto val_iter = byte_values_.begin(); val_iter != byte_values_.end(); ++val_iter)
+    {
+        std::copy_n(val_iter->GetMemoryForReading().data(), sizeof(T), std::back_inserter(buffer));
+    }
+
+    fwrite(buffer.data(), sizeof(uint8_t), buffer.size(), file);
+    fclose(file);
+}
+
+
+#if 0
+///
+//Previous Version that works 
+////
+
+template<typename T>
+NcVariable
+ByteVariable<T>::WriteCompressedDiffData(const int id, const int time_step) const
+{
+
+    std::vector<int> freq(33,0);
+
+    std::vector<uint8_t> lzc_vec;
+    lzc_vec.reserve(30000000);
+
+    int overall_lzc = 0;
+
+    for (auto lw_prefix_iter = prefixes_.rbegin(); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter)
+    {
+        for (auto iter = lw_prefix_iter->prefixes.begin(); iter != lw_prefix_iter->prefixes.end(); ++iter)
+        {
+            const CompressionValue<sizeof(T)>& val = *iter;
+            int lzc = val.GetLeadingZeroCountInSignificantBits();
+            lzc_vec.push_back(static_cast<uint8_t>(lzc));
+
+            ++freq[lzc];
+
+            overall_lzc += lzc;
+        }
+    }
+
+    int suffix_lzc = 0;
+    for (auto iter = byte_values_.begin(); iter != byte_values_.end(); ++iter)
+    {
+        const CompressionValue<sizeof(T)>& val = *iter;
+
+        int lzc = val.GetLeadingZeroCountInSignificantBits();
+        lzc_vec.push_back(static_cast<uint8_t>(lzc));
+
+        ++freq[lzc];
+
+        overall_lzc += lzc;
+        suffix_lzc += lzc;
+    }
+
+    for (auto fiter = freq.begin(); fiter != freq.end(); ++fiter)
+    {
+        cmc_debug_msg("LZC: ", std::distance(freq.begin(), fiter), " has frequency: ", *fiter);
+    }
+    cmc_debug_msg("Size of lzc_vec is: ", lzc_vec.size());
+    cmc_debug_msg("Overall LZC is: ", overall_lzc);
+    cmc_debug_msg("Leading Zero Count on suffix level: ", suffix_lzc);
+
+    //FILE* file = fopen("lzc_bytes", "wb");
+    //fwrite(lzc_vec.data(), sizeof(uint8_t), lzc_vec.size(), file);
+    //fclose(file);
+
+    std::vector<arithmetic_encoding::Letter> alphabet;
+    alphabet.reserve(alphabet_.size());
+
+    for (auto al_iter = alphabet_.begin(); al_iter != alphabet_.end(); ++al_iter)
+    {
+        alphabet.emplace_back(arithmetic_encoding::Letter{al_iter->first, al_iter->second});
+    }
+
+    arithmetic_encoding::StaticFrequencyModel frequency_model(alphabet);
+    arithmetic_encoding::Encoder arm_encoder(std::make_unique<cmc::arithmetic_encoding::StaticFrequencyModel>(frequency_model));
+
+    //bit_map::BitMapView residual_sign_indications(interpolation_indications_);
+
+    bit_vector::BitVector encoded_stream;
+    //encoded_stream.Reserve(3 * byte_values_.size());
+    cmc_debug_msg("Size of residual sign indications: ", interpolation_indications_.size());
+
+    size_t residual_index = prefixes_.size();
+#if 1
+    encoded_stream.Reserve(byte_values_.size() * sizeof(T));
+    for (auto lw_prefix_iter = prefixes_.rbegin(); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter, --residual_index)
+    {
+        if (lw_prefix_iter->prefixes.size() == 1)
+        {
+            continue;
+        }
+
+        cmc_debug_msg("Residual indications before prefix: ", residual_index);
+        bit_map::BitMapView residual_sign_indications(interpolation_indications_[residual_index]);
+        cmc_debug_msg("Size of indications: ", interpolation_indications_[residual_index].size());
+        cmc_debug_msg("Size of prefixes: ", lw_prefix_iter->prefixes.size());
+        for (auto iter = lw_prefix_iter->prefixes.begin(); iter != lw_prefix_iter->prefixes.end(); ++iter)
+        {
+            CompressionValue<sizeof(T)> val = *iter;
+            const int signum = (residual_sign_indications.GetNextBit() == true ? 0 : arithmetic_encoding::kMSBBit);
+            //const int signum = 0;
+            //int first_one_bit = val.GetLeadingZeroCountInSignificantBits();
+            const int first_one_bit = val.GetNumberLeadingZeros();
+
+            arm_encoder.EncodeSymbol(signum + first_one_bit);
+
+            val.SetFrontBit(first_one_bit);
+            //val.UpdateFrontBitCount();
+
+            if (not val.IsEmpty())
+            {
+                EncodeAndAppendPrefix(encoded_stream, val.GetSignificantBitsInBigEndianOrdering(), val.GetCountOfSignificantBits());
+            }
+        }
+    }
+#endif
+    cmc_debug_msg("Residual indications before suffixes: ", residual_index);
+    bit_map::BitMapView residual_sign_indications(interpolation_indications_[residual_index]);
+    cmc_debug_msg("Size of indications: ", interpolation_indications_[residual_index].size());
+        cmc_debug_msg("Size of suffixes: ", byte_values_.size());
+    for (auto val_iter = byte_values_.begin(); val_iter != byte_values_.end(); ++val_iter)
+    {
+        CompressionValue<sizeof(T)> val = *val_iter;
+
+        const int first_one_bit = val.GetNumberLeadingZeros();
+
+        const int signum = (residual_sign_indications.GetNextBit() == true ? 0 : arithmetic_encoding::kMSBBit);
+        //const int signum = 0;
+        arm_encoder.EncodeSymbol(signum + first_one_bit);
+
+        val.SetFrontBit(first_one_bit);
+        //val.UpdateFrontBitCount();
+
+        if (not val.IsEmpty())
+        {
+            EncodeAndAppendPrefix(encoded_stream, val.GetSignificantBitsInBigEndianOrdering(), val.GetCountOfSignificantBits());
+        }
+    }
+
+    arm_encoder.FinishEncoding();
+
+    bit_map::BitMap encoded_lzc = arm_encoder.GetEncodedBitStream();
+
+    const size_t last_level_encoded_bytes = encoded_lzc.size_bytes() + encoded_stream.size(); // + interpolation_indications_.size_bytes();
+    
+    cmc_debug_msg("The last level of the variable has been encoded in ", last_level_encoded_bytes, " bytes.");
+
+    return NcVariable();
+
+
+    #if 0
+    //TODO: update
+    /* Declare a vector which will hold the level-wise encoded data */
+    std::vector<std::vector<uint8_t>> buffered_data;
+    buffered_data.reserve(prefixes_.size() + 1);
+
+    size_t num_bytes = 0;
+
+    /* Encode and retrieve the extracted prefixes */
+    for (auto lw_prefix_iter = prefixes_.rbegin(); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter)
+    {
+        buffered_data.emplace_back(lw_prefix_iter->EncodeLevelDataAsLeadingZeroCount());
+        cmc_debug_msg("Num bytes for level: ", buffered_data.back().size());
+        num_bytes += buffered_data.back().size();
+    }
+
+
+
+
+
+    ///////////////////////////////////////////////////////////////////////
+    /* Declare a vector which will hold the level-wise encoded data */
+    std::vector<std::vector<uint8_t>> buffered_data;
+    buffered_data.reserve(prefixes_.size() + 1);
+
+    size_t num_bytes = 0;
+
+    /* Encode and retrieve the extracted prefixes */
+    for (auto lw_prefix_iter = prefixes_.rbegin(); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter)
+    {
+        buffered_data.emplace_back(lw_prefix_iter->EncodeLevelData());
+        cmc_debug_msg("Num bytes for level: ", buffered_data.back().size());
+        num_bytes += buffered_data.back().size();
+    }
+
+    /* Encode and append the leftover suffixes (on the finest level) that could not be truncated or extracted */
+    buffered_data.emplace_back(suffix_encoder(byte_values_));
+
+    cmc_debug_msg("Num bytes for suffixes: ", buffered_data.back().size());
+    num_bytes += buffered_data.back().size();
+    cmc_debug_msg("Overall bytes for this variable: ", num_bytes);
+
+    //TODO: Make mechanism for parallel output
+    //The complete global byte size needs to gathered and the level data has to be filled in parallel to it
+
+    /* Generate a (potentially new) context information for the variable */
+    const int global_context_info = (attributes_.GetGlobalContextInformation() != kNoGlobalContext ? attributes_.GetGlobalContextInformation() : 0);
+
+    /* Create a netCDF variable to put out */
+    std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
+    cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
+    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
+    compressed_variable.Reserve(num_bytes);
+
+    /* Put the buffered data into the variable to put out */
+    for (auto lvl_data_iter = buffered_data.begin(); lvl_data_iter != buffered_data.end(); ++lvl_data_iter)
+    {
+        compressed_variable.PushBack(*lvl_data_iter);
+    }
+
+    /* Assign some attributes to it */
+    std::vector<NcAttribute> attributes;
+    attributes.emplace_back("id", id);
+    attributes.emplace_back("time_step", time_step);
+    attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
+    attributes.emplace_back("initial_layout", static_cast<int>(attributes_.GetInitialDataLayout()));
+    attributes.emplace_back("pre_compression_layout", static_cast<int>(attributes_.GetPreCompressionLayout()));
+    attributes.emplace_back("global_context", global_context_info);
+    attributes.emplace_back("data_type", static_cast<int>(ConvertToCmcType<T>()));
+    attributes.emplace_back("missing_value", attributes_.GetMissingValue());
+    //TODO: Check if scaling and offset have been applied, if not we need to add those attributes
+
+    /* Get the global domain of this variable */
+    const GeoDomain& var_domain = GetGlobalDomain();
+
+    /* Write the domain lengths as attributes */
+    if (const int lon = var_domain.GetDimensionLength(Dimension::Lon);
+        lon > 1)
+    {
+        attributes.emplace_back("lon", lon);
+    }
+    if (const int lat = var_domain.GetDimensionLength(Dimension::Lat);
+        lat > 1)
+    {
+        attributes.emplace_back("lat", lat);
+    }
+    if (const int lev = var_domain.GetDimensionLength(Dimension::Lev);
+        lev > 1)
+    {
+        attributes.emplace_back("lev", lev);
+    }
+    if (const int time = var_domain.GetDimensionLength(Dimension::Time);
+        time > 1)
+    {
+        attributes.emplace_back("time", time);
+    }
+
+
+    return NcVariable(std::move(compressed_variable), std::move(attributes));
+    #endif
+}
+#else
+
+///
+//New try 
+////
+
+template<typename T>
+NcVariable
+ByteVariable<T>::WriteCompressedDiffData(const int id, const int time_step) const
+{
+    std::vector<arithmetic_encoding::Letter> alphabet;
+    alphabet.reserve(alphabet_.size());
+
+    for (auto al_iter = alphabet_.begin(); al_iter != alphabet_.end(); ++al_iter)
+    {
+        alphabet.emplace_back(arithmetic_encoding::Letter{al_iter->first, al_iter->second});
+    }
+
+    arithmetic_encoding::StaticFrequencyModel frequency_model(alphabet);
+    arithmetic_encoding::Encoder arm_encoder(std::make_unique<cmc::arithmetic_encoding::StaticFrequencyModel>(frequency_model));
+
+    /* Levelwise encoded residuals */
+    std::vector<bit_vector::BitVector> encoded_residuals;
+    encoded_residuals.reserve(prefixes_.size());
+
+    /* Levelwise encoded leading zero count of residuals */
+    std::vector<bit_map::BitMap> encoded_residual_lzc;
+    encoded_residual_lzc.reserve(prefixes_.size());
+
+    /* We store the root element's value explicitly and afterwards start the encoding of the residuals */
+    const CompressionValue<sizeof(T)> root_elem_value = prefixes_.back().prefixes.front();
+
+    size_t residual_index = prefixes_.size() - 1;
+
+    /* Encode all residuals on the succeeding refinement levels */
+    for (auto lw_prefix_iter = std::next(prefixes_.rbegin()); lw_prefix_iter != prefixes_.rend(); ++lw_prefix_iter, --residual_index)
+    {
+        cmc_debug_msg("Residual index = ", residual_index, "; Size of prefixes: ", lw_prefix_iter->prefixes.size());
+
+        /* Emplace a new Bit_Vector */
+        encoded_residuals.emplace_back();
+        encoded_residuals.back().Reserve(2 * lw_prefix_iter->prefixes.size());
+
+        cmc_debug_msg("Refinement level: ", prefixes_.size() - residual_index);
+
+        /* Get a view on the interpolation indications, indicating whether the residuals has to be added or subtracted */
+        bit_map::BitMapView residual_sign_indications(interpolation_indications_[residual_index]);
+        //cmc_debug_msg("Size of interpolation indications: ", interpolation_indications_[residual_index].size());
+        /* Iterate over all residuals and encode them */
+        for (auto iter = lw_prefix_iter->prefixes.begin(); iter != lw_prefix_iter->prefixes.end(); ++iter)
+        {
+            /* Get the current residual */
+            CompressionValue<sizeof(T)> val = *iter;
+
+            /* Get the encoded LZC */
+            const uint32_t signum = (residual_sign_indications.GetNextBit() == true ? 0 : arithmetic_encoding::kMSBBit);
+            const uint32_t first_one_bit = val.GetNumberLeadingZeros();
+
+            //T www = val.template ReinterpretDataAs<T>();
+            //uint32_t vvv;
+            //std::memcpy(&vvv, &www, 4);
+            //cmc_debug_msg("Signum: ", signum, ", LZC: ", first_one_bit, ", Residual as bitset: ", std::bitset<32>(vvv));
+
+            /* Encode the LZC */
+            arm_encoder.EncodeSymbol(signum + first_one_bit);
+
+            /* The first one is implicitly given by the leading zero count; therefore we set the "front bit" in order to discard the leading zeros and the following one */
+            val.SetFrontBit(first_one_bit + 1);
+            //val.SetFrontBit(first_one_bit);
+
+            /* If there are remaining bits in the residual, append them to the encoded residuals of this level */
+            if (not val.IsEmpty())
+            {
+                EncodeAndAppendPrefix(encoded_residuals.back(), val.GetSignificantBitsInBigEndianOrdering(), val.GetCountOfSignificantBits());
+            }
+        }
+
+        /* Once we have finished the encoding of this level, we get the current LZC encodings and emplace a new one for the next level */
+        arm_encoder.FinishEncoding();
+        encoded_residual_lzc.push_back(arm_encoder.GetEncodedBitStream());
+        //cmc_debug_msg("Bytes LZC in residual idx: ", residual_index, " are " , encoded_residual_lzc.back().size_bytes());
+        //cmc_debug_msg("Bytes in encoded residual bits: ", encoded_residuals.back().size());
+        
+        arm_encoder.ClearBitStream();
+    }
+
+    if constexpr (std::is_same_v<T, float>)
+    {
+        cmc_debug_msg("The root elem value is: ", root_elem_value.template ReinterpretDataAs<float>());
+    }
+    /* Emplace a new Bit_Vector */
+    encoded_residuals.emplace_back();
+    encoded_residuals.back().Reserve(2 * byte_values_.size());
+
+    /* Get a view on the indication for the residual summation/subtraction */
+    cmc_assert(residual_index == 0);
+    bit_map::BitMapView residual_sign_indications(interpolation_indications_[residual_index]);
+
+    /* Iterate over all suffixes and encode them */
+    for (auto val_iter = byte_values_.begin(); val_iter != byte_values_.end(); ++val_iter)
+    {
+        /* Get the current residual */
+        CompressionValue<sizeof(T)> val = *val_iter;
+
+        /* Get the encoded LZC */
+        const uint32_t signum = (residual_sign_indications.GetNextBit() == true ? 0 : arithmetic_encoding::kMSBBit);
+        const uint32_t first_one_bit = val.GetNumberLeadingZeros();
+        
+        //T www = val.template ReinterpretDataAs<T>();
+        //uint32_t vvv;
+        //std::memcpy(&vvv, &www, 4);
+        //cmc_debug_msg("Signum: ", signum, ", LZC: ", first_one_bit, ", Residual as bitset: ", std::bitset<32>(vvv));
+
+
+        /* Encode the LZC */
+        arm_encoder.EncodeSymbol(signum + first_one_bit);
+
+        /* The first one is implicitly given by the leading zero count; therefore we set the "front bit" in order to discard the leading zeros and the following one */
+        //val.SetFrontBit(first_one_bit + 1);
+        val.SetFrontBit(first_one_bit + 1);
+        /* If there are remaining bits in the residual, append them to the encoded residuals of this level */
+        if (not val.IsEmpty())
+        {
+            EncodeAndAppendPrefix(encoded_residuals.back(), val.GetSignificantBitsInBigEndianOrdering(), val.GetCountOfSignificantBits());
+        }
+    }
+
+    /* Once we have finished the encoding of this level, we get the current LZC encodings and emplace a new one for the next level */
+    arm_encoder.FinishEncoding();
+    encoded_residual_lzc.push_back(arm_encoder.GetEncodedBitStream());
+    arm_encoder.ClearBitStream();
+
+    cmc_assert(encoded_residuals.size() == encoded_residual_lzc.size());
+
+    /* Cout all bytes together and create a single stream of the data */
+    size_t cumulative_byte_count = 0;
+    for (size_t idx = 0; idx < encoded_residuals.size(); ++idx)
+    {
+        cumulative_byte_count += encoded_residuals[idx].size();
+        cumulative_byte_count += encoded_residual_lzc[idx].size_bytes();
+    }
+
+    /* Encode the alphabet */
+    bit_vector::BitVector encoded_arm_alphabet = arm_encoder.EncodeAlphabet();
+    cumulative_byte_count += encoded_arm_alphabet.size();
+
+    /* Additionally to the encoded residuals, we store some "size_t"'s indicating the lenghts of the several streams */
+    cumulative_byte_count += sizeof(size_t) * (2 * encoded_residuals.size() + 1) + sizeof(T);
+
+    cmc_debug_msg("The overall byte count for the variable amounts to: ", cumulative_byte_count, " bytes.");
+
+    /* We allocate memory for the final output */
+    //bit_vector::BitVector encoded_variable_data;
+    //encoded_variable_data.Reserve(cumulative_byte_count);
+
+    std::vector<uint8_t> encoded_byte_stream;
+    encoded_byte_stream.reserve(cumulative_byte_count);
+
+    cmc_debug_msg("After allocation: BitVector size: ", encoded_byte_stream.size());
+
+    /* 1) First, we store the overall bytes */
+    std::array<uint8_t, sizeof(size_t)> serialized_value = SerializeValue(cumulative_byte_count, Endian::Big);
+    std::copy_n(serialized_value.begin(), serialized_value.size(), std::back_inserter(encoded_byte_stream));
+    //encoded_variable_data.AppendBytes<sizeof(size_t)>(serialized_value);
+    cmc_debug_msg("After total byte count: BitVector size: ", encoded_byte_stream.size());
+
+    /* 2) Afterwards, we append the encoded alphabet */
+    //encoded_variable_data.AppendBits(encoded_arm_alphabet);
+    std::copy_n(encoded_arm_alphabet.GetData().begin(), encoded_arm_alphabet.GetData().size(), std::back_inserter(encoded_byte_stream));
+    cmc_debug_msg("After encoded alphabet: BitVector size: ", encoded_byte_stream.size());
+
+    /* 3) Next, we store the root element's value */
+    //cmc_debug_msg("Root Elem value has num significant bits: ", root_elem_value.GetCountOfSignificantBits());
+    const T root_value = root_elem_value.template ReinterpretDataAs<T>();
+    std::array<uint8_t, sizeof(T)> serialized_root_value = SerializeValue(root_value, Endian::Big);
+    std::copy_n(serialized_root_value.begin(), serialized_root_value.size(), std::back_inserter(encoded_byte_stream));
+
+    //encoded_variable_data.AppendBits(root_elem_value.GetSignificantBitsInBigEndianOrdering());
+    //std::copy_n(root_elem_value.GetSignificantBitsInBigEndianOrdering().begin(), sizeof(T), std::back_inserter(encoded_byte_stream));
+
+    cmc_debug_msg("After root value: BitVector size: ", encoded_byte_stream.size());
+    //encoded_variable_data.AddPaddingToFullByte();
+    /* 4) Now, the residual levels are stored/appended in order from coarse to fine, preceeded by
+     * the number of bytes for the encoded LZC and the remaining residual bits */
+    for (size_t idx = 0; idx < encoded_residuals.size(); ++idx)
+    {
+        cmc_debug_msg("Copy of LZC count of level starts at: ", encoded_byte_stream.size());
+        /* a) We start with the leading zero bytes count */
+        serialized_value = SerializeValue(encoded_residual_lzc[idx].size_bytes(), Endian::Big);
+        //encoded_variable_data.AppendBytes<sizeof(size_t)>(serialized_value);
+        std::copy_n(serialized_value.begin(), serialized_value.size(), std::back_inserter(encoded_byte_stream));
+
+        cmc_debug_msg("Copy of residual count of level starts at: ", encoded_byte_stream.size());
+        /* b) Next follows the remaining residual bytes count */
+        serialized_value = SerializeValue(encoded_residuals[idx].size(), Endian::Big);
+        //encoded_variable_data.AppendBytes<sizeof(size_t)>(serialized_value);
+        std::copy_n(serialized_value.begin(), serialized_value.size(), std::back_inserter(encoded_byte_stream));
+
+        /* Now we copy the actual encoded leading zero bytes */
+        //encoded_variable_data.AppendBytes(encoded_residual_lzc[idx].GetByteData());
+        std::copy_n(encoded_residual_lzc[idx].GetByteData().begin(), encoded_residual_lzc[idx].GetByteData().size(), std::back_inserter(encoded_byte_stream));
+
+        //encoded_variable_data.AddPaddingToFullByte();
+
+        /* And afterwards the remaining residual bytes */
+        //encoded_variable_data.AppendBits(encoded_residuals[idx]);
+        std::copy_n(encoded_residuals[idx].begin(), encoded_residuals[idx].size(), std::back_inserter(encoded_byte_stream));
+
+        //encoded_variable_data.AddPaddingToFullByte();
+        cmc_debug_msg("After lvl: ", idx, ", BitVector size: ", encoded_byte_stream.size());
+    }
+
+    cmc_debug_msg("After everything has been added, size of encoded variable byte stream is: ", encoded_byte_stream.size());
+
+
+    //TODO: Make mechanism for parallel output
+    //The complete global byte size needs to gathered and the level data has to be filled in parallel to it
+
+    /* Generate a (potentially new) context information for the variable */
+    const int global_context_info = (attributes_.GetGlobalContextInformation() != kNoGlobalContext ? attributes_.GetGlobalContextInformation() : 0);
+
+    /* Create a netCDF variable to put out */
+    std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
+    cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
+
+    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
+    //compressed_variable.Reserve(encoded_variable_data.size());
+    compressed_variable.Reserve(encoded_byte_stream.size());
+
+    //TODO Move instead of copy encoded byte stream
+    /* Put the buffered data into the variable to put out */
+    compressed_variable.PushBack(encoded_byte_stream);
+
+    /* Assign some attributes to it */
+    std::vector<NcAttribute> attributes;
+    attributes.emplace_back("id", id);
+    attributes.emplace_back("time_step", time_step);
+    attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
+    attributes.emplace_back("initial_layout", static_cast<int>(attributes_.GetInitialDataLayout()));
+    attributes.emplace_back("pre_compression_layout", static_cast<int>(attributes_.GetPreCompressionLayout()));
+    attributes.emplace_back("global_context", global_context_info);
+    attributes.emplace_back("data_type", static_cast<int>(ConvertToCmcType<T>()));
+    attributes.emplace_back("missing_value", attributes_.GetMissingValue());
+    //TODO: Check if scaling and offset have been applied, if not we need to add those attributes
+
+    /* Get the global domain of this variable */
+    const GeoDomain& var_domain = GetGlobalDomain();
+
+    /* Write the domain lengths as attributes */
+    if (const int lon = var_domain.GetDimensionLength(Dimension::Lon);
+        lon > 1)
+    {
+        attributes.emplace_back("lon", lon);
+    }
+    if (const int lat = var_domain.GetDimensionLength(Dimension::Lat);
+        lat > 1)
+    {
+        attributes.emplace_back("lat", lat);
+    }
+    if (const int lev = var_domain.GetDimensionLength(Dimension::Lev);
+        lev > 1)
+    {
+        attributes.emplace_back("lev", lev);
+    }
+    if (const int time = var_domain.GetDimensionLength(Dimension::Time);
+        time > 1)
+    {
+        attributes.emplace_back("time", time);
+    }
+
+
+    return NcVariable(std::move(compressed_variable), std::move(attributes));
+}
+
+#endif
+
+
+template<typename T>
+void
+ByteVariable<T>::InitializeDiffDecompression()
+{
+    byte_values_new_.reserve(byte_values_.size() * std::pow(2, GetGlobalDomain().GetDimensionality()));
+}
+
+template<typename T>
+void
+ByteVariable<T>::SetDiffDecompressionRootElementValue(const CmcUniversalType& root_value)
+{
+    cmc_assert(std::holds_alternative<T>(root_value));
+
+    byte_values_.clear();
+    /* Get the root element value and assign it to the vector */
+    const CompressionValue<sizeof(T)> root_elem_value = CompressionValue<sizeof(T)>(std::get<T>(root_value));
+    byte_values_.push_back(root_elem_value);
+}
+
 
 
 template<typename T>

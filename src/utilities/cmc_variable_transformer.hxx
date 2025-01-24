@@ -60,7 +60,6 @@ TransformerCompressionToOutputVariable::MoveData(OutputVariable<T>& destination,
     destination.data_ = std::move(source.data_);
 }
 
-
 class TransformerCompressionToByteVariable
 {
 public:
@@ -80,6 +79,14 @@ TransformerCompressionToByteVariable::MoveData(ByteVariable<T>& destination, Var
     destination.utilities_ = std::move(source.utilities_);
     destination.initial_data_ = std::move(source.data_);
     destination.mesh_ = std::move(source.mesh_);
+    if (source.is_initial_data_kept_)
+    {
+        cmc_debug_msg("initial data is transferred");
+        cmc_debug_msg("Size of initial data in transformation: ", source.initial_data_.size() );
+        destination.uncompressed_mesh_ = std::move(source.initial_mesh_);
+        destination.uncompressed_data_ = std::move(source.initial_data_);
+        destination.are_uncompressed_states_stored_ = true;
+    }
 }
 
 }
