@@ -50,6 +50,8 @@ public:
     friend bool CompareGeoDomains(const GeoDomain& domain1, const GeoDomain& domain2);
     friend GeoDomain ExtendGeoDomain(const GeoDomain& domain, const DimensionInterval& add_dimension);
     
+    GeoDomain GetZeroOffsetDomain() const;
+    
     bool IsValid() const;
 private:
     void SetupDimension(const DimensionInterval& dimension);

@@ -284,8 +284,7 @@ private:
     template<class T> friend void InputVar::ApplyScaling(const InputVariable<T>&);
     template<class T> friend void InputVar::ApplyOffset(const InputVariable<T>&);
 
-    friend struct bin_reader::ReadData;
-    friend struct bin_reader::Reader;
+    friend class bin_reader::Reader;
 };
 
 CmcType

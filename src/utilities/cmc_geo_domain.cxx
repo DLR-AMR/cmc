@@ -191,5 +191,12 @@ GeoDomain::IsValid() const
     return true;
 }
 
-
+GeoDomain
+GeoDomain::GetZeroOffsetDomain() const
+{
+    return GeoDomain(0, GetDimensionLength(Dimension::Lon),
+                     0, GetDimensionLength(Dimension::Lat),
+                     0, GetDimensionLength(Dimension::Lev),
+                     0, GetDimensionLength(Dimension::Time));
+}
 }
