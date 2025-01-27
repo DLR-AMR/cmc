@@ -33,7 +33,7 @@ public:
     InputVar CreateVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value,
                                           const DataLayout layout, const GeoDomain& domain) const;
 
-    InputVar CreateSubDomainVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value,
+    InputVar CreateSubDomainVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const CmcUniversalType missing_value,
                                                    const DataLayout layout, const GeoDomain& global_domain, const GeoDomain& sub_domain) const;
 private:
     const std::string file_name_;
@@ -141,21 +141,22 @@ private:
 
 template<typename T>
 inline std::vector<T>
-ReadBinaryDataFromSubDomain(const std::string& file_name, const DataLayout data_layout, const Hyperslab& global_domain, const Hyperslab& sub_domain)
+ReadBinaryDataFromSubDomain(const std::string& file_name, const DataLayout data_layout, const Hyperslab& global_domain, const Hyperslab& sub_domain, const T missing_value)
 {
     /* Get the number of elements that will b read */
     const HyperslabIndex num_elements = sub_domain.GetNumberCoordinates();
 
     /* Get a function with determines indices in the linearized global data to extract in order to obtain the data from the sub-domain */
-    LinearIndicesExtractionFn sud_domain_indices_extraction_fn = GetIndicesExtractionFunction(data_layout);
+    LinearIndicesExtractionFn sub_domain_indices_extraction_fn = GetIndicesExtractionFunction(data_layout);
 
     /* Get the indices to extract the correct data */
-    std::vector<HyperslabIndex> sud_domain_indices = sud_domain_indices_extraction_fn(global_domain, sub_domain);
+    std::vector<HyperslabIndex> sub_domain_indices = sub_domain_indices_extraction_fn(global_domain, sub_domain);
 
-    cmc_assert(num_elements == sud_domain_indices.size());
+    cmc_assert(static_cast<size_t>(num_elements) == sub_domain_indices.size());
 
     /* Allocate memory for the data */
-    std::vector<T> values(num_elements);
+    std::vector<T> values;
+    values.reserve(num_elements);
 
     /* Open the file for input */
     std::ifstream in(file_name, std::ios::binary);
@@ -173,21 +174,21 @@ ReadBinaryDataFromSubDomain(const std::string& file_name, const DataLayout data_
     /* Get the data from the file */
     for (HyperslabIndex idx = 0; idx < num_elements; ++idx)
     {
+        /* Check if there is a valid index, if not we set a missing value */
+        if (sub_domain_indices[idx] == kOutsideOfHyperslabDomain)
+        {
+            values.push_back(missing_value);
+            continue;
+        }
+
         /* Move to the position of the index within the file */
-        in.seekg(sud_domain_indices[idx] * type_size, std::ios::beg);
+        in.seekg(sub_domain_indices[idx] * type_size, std::ios::beg);
 
         /* Get the data value at this position */
         in.read(reinterpret_cast<char*>(&value), sizeof(T));
 
         /* Store the value */
         values.push_back(value);
-    }
-
-
-    cmc_debug_msg("The first ten values of the data will be displayed:");
-    for (size_t index = 0; index < 10; ++index)
-    {
-        cmc_debug_msg("Binary Data: Index: ", index, " has value: ", values[index]);
     }
 
     //TODO: Endianness reordering potentially
@@ -205,90 +206,90 @@ public:
     void operator()(InputVariable<int8_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<int8_t> data = ReadBinaryDataFromSubDomain<int8_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<int8_t> data = ReadBinaryDataFromSubDomain<int8_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<char>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<char> data = ReadBinaryDataFromSubDomain<char>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<char> data = ReadBinaryDataFromSubDomain<char>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<int16_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<int16_t> data = ReadBinaryDataFromSubDomain<int16_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<int16_t> data = ReadBinaryDataFromSubDomain<int16_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<int32_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<int32_t> data = ReadBinaryDataFromSubDomain<int32_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<int32_t> data = ReadBinaryDataFromSubDomain<int32_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<float>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<float> data = ReadBinaryDataFromSubDomain<float>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<float> data = ReadBinaryDataFromSubDomain<float>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<double>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<double> data = ReadBinaryDataFromSubDomain<double>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<double> data = ReadBinaryDataFromSubDomain<double>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<uint8_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<uint8_t> data = ReadBinaryDataFromSubDomain<uint8_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<uint8_t> data = ReadBinaryDataFromSubDomain<uint8_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<uint16_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<uint16_t> data = ReadBinaryDataFromSubDomain<uint16_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<uint16_t> data = ReadBinaryDataFromSubDomain<uint16_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<uint32_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<uint32_t> data = ReadBinaryDataFromSubDomain<uint32_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<uint32_t> data = ReadBinaryDataFromSubDomain<uint32_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<int64_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<int64_t> data = ReadBinaryDataFromSubDomain<int64_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<int64_t> data = ReadBinaryDataFromSubDomain<int64_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
     void operator()(InputVariable<uint64_t>& var) {
         const Hyperslab global_domain = TransformGeoDomainToHyperslab(global_domain_);
         Hyperslab sub_domain = TransformGeoDomainToHyperslab(sub_domain_);
-        std::vector<uint64_t> data = ReadBinaryDataFromSubDomain<uint64_t>(file_name_, layout_, global_domain, sub_domain);
+        std::vector<uint64_t> data = ReadBinaryDataFromSubDomain<uint64_t>(file_name_, layout_, global_domain, sub_domain, var.GetMissingValue());
         sub_domain.NullifyStartIndices();
         var.SetDataAndCoordinates(std::move(data), std::vector<Hyperslab>{std::move(sub_domain)});
-        var.SetGlobalDomain(global_domain_.GetZeroOffsetDomain());
+        var.SetGlobalDomain(sub_domain_.GetZeroOffsetDomain());
     }
 private:
     const std::string& file_name_;
@@ -301,7 +302,7 @@ inline InputVar
 Reader::CreateVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value,
                                      const DataLayout layout, const GeoDomain& domain) const
 {
-    if (domain.GetNumberReferenceCoordsCovered() != num_elements)
+    if (static_cast<size_t>(domain.GetNumberReferenceCoordsCovered()) != num_elements)
     {
         cmc_err_msg("The amount of elements to be read does not match the number of (reference) elements in the global domain.");
     }
@@ -318,9 +319,12 @@ Reader::CreateVariableFromBinaryData(const CmcType type, const std::string& name
 }
 
 inline InputVar
-Reader::CreateSubDomainVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value,
+Reader::CreateSubDomainVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const CmcUniversalType missing_value,
                                               const DataLayout layout, const GeoDomain& global_domain, const GeoDomain& sub_domain) const
 {
+    /* Number of elements the variable will hold */
+    const size_t num_elements = sub_domain.GetNumberReferenceCoordsCovered();
+
     /* Create a variable with the given specifications */
     InputVar variable(type, name, id, num_elements, missing_value, layout, sub_domain);
 

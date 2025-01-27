@@ -479,6 +479,10 @@ GetReferenceCoordTrimmingFunction(const DataLayout trimmed_data_layout)
     }
 }
 
+
+/** Extraction of indices for the whole subdomain **/
+/** If indices are outside the global domain, they are flagged with kOutsideOfHyperslabDomain **/
+
 std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLat(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract)
 {
     std::vector<HyperslabIndex> indices;

@@ -151,6 +151,7 @@ std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LonLevLat(const
 std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLatLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
 std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLevLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
 std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLonLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
+
 }
 
 #endif /* !CMC_HYPERSLAB_HXX */

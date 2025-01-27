@@ -118,7 +118,6 @@ SetupInputVar(const CmcType type, const std::string& name, const int id, const s
 InputVar::InputVar(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value, const DataLayout layout, const GeoDomain& domain)
 {
     var_ = SetupInputVar(type, name, id, num_elements, missing_value, layout, domain);
-    cmc_debug_msg("Input Var is created");
 }
 
 struct ObtainCmcType

@@ -17,7 +17,8 @@ test/cmc_bitmap \
 test/cmc_bitvector_view \
 test/cmc_arithmetic_coding \
 test/cmc_initial_mesh_coverage \
-test/cmc_serialize_value
+test/cmc_serialize_value \
+test/cmc_binary_reader
 
 test_cmc_create_compression_settings_SOURCES = test/cmc_create_compression_settings.cxx
 test_cmc_create_input_variables_SOURCES = test/cmc_create_input_variables.cxx
@@ -35,6 +36,7 @@ test_cmc_bitvector_view_SOURCES = test/cmc_bitvector_view.cxx
 test_cmc_arithmetic_coding_SOURCES = test/cmc_arithmetic_coding.cxx
 test_cmc_initial_mesh_coverage_SOURCES = test/cmc_initial_mesh_coverage.cxx
 test_cmc_serialize_value_SOURCES = test/cmc_serialize_value.cxx
+test_cmc_binary_reader_SOURCES = test/cmc_binary_reader.cxx
 
 check_PROGRAMS += $(cmc_test_programs)
 TESTS += $(cmc_test_programs)

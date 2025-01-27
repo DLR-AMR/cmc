@@ -61,12 +61,12 @@ class InputVariable
 public:
     InputVariable() = default;
     InputVariable(const std::string& name, const int id, const DataLayout layout)
-    : name_{name}, id_{id}, initial_layout_{layout}{cmc_debug_msg("Input Variable<T> is created");};
+    : name_{name}, id_{id}, initial_layout_{layout}{};
     InputVariable(std::string&& name, const int id, const DataLayout layout)
     : name_{std::move(name)}, id_{id}, initial_layout_{layout}{};
     InputVariable(const DataLayout layout, const DataFormat format)
     : initial_layout_{layout}, active_format_{format}{};
-    ~InputVariable(){cmc_debug_msg("Input Variable<T> is destroyed");};
+    ~InputVariable() = default;
 
     InputVariable(const InputVariable& other) = default;
     InputVariable& operator=(const InputVariable& other) = default;
@@ -166,6 +166,7 @@ public:
     std::vector<T> GetDataFromHyperslab(const Hyperslab& hyperslab) const;
 
     /* Those functions are only accessible for certain functions */
+    const std::vector<T>& GetDataForReading() const {return data_;};
     const std::vector<T>& GetData([[maybe_unused]] const AccessKey& key) const {return data_;};
     void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {data_ = std::move(data);};
 
@@ -209,7 +210,7 @@ public:
 
     template<typename T> InputVar(InputVariable<T>&& var);
 
-    ~InputVar(){cmc_debug_msg("InputVar is destroyed");};
+    ~InputVar() = default;
 
     InputVar(const InputVar& other) = default;
     InputVar& operator=(const InputVar& other) = default;
