@@ -5,7 +5,7 @@
  */
 
 #include "utilities/cmc_utilities.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 
 namespace cmc
 {

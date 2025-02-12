@@ -4,7 +4,7 @@
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_prefix.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 #include "utilities/cmc_huffman.hxx"
 
 #include <cstdint>

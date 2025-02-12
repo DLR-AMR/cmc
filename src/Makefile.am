@@ -15,7 +15,7 @@ src/t8code/cmc_t8_data_variables_forward.hxx \
 src/t8code/cmc_t8_data_variables.hxx \
 src/t8code/cmc_t8_mesh.hxx \
 src/t8code/cmc_t8_interpolation.hxx \
-src/utilities/cmc_span.hxx \
+src/utilities/cmc_vector_view.hxx \
 src/t8code/cmc_t8_adapt_track_inaccuracy.hxx \
 src/t8code/cmc_t8_adapt.hxx \
 src/utilities/cmc_compression_settings.hxx \

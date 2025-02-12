@@ -1,7 +1,7 @@
 #include "comparison/cmc_test_comparison_compression.hxx"
 #include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "utilities/cmc_geo_domain.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 

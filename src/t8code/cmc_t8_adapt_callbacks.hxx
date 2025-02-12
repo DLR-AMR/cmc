@@ -3,7 +3,7 @@
 
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_domain.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 #include "utilities/cmc_prefix.hxx"
 
 #ifdef CMC_WITH_T8CODE

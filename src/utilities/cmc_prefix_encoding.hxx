@@ -3,10 +3,10 @@
 
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_prefix.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 #include "utilities/cmc_huffman.hxx"
 #include "utilities/cmc_ac_model.hxx"
 #include "utilities/cmc_arithmetic_encoder.hxx"

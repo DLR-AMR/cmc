@@ -8,7 +8,7 @@
 #include "utilities/cmc_prefix.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_variables.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 #include "utilities/cmc_prefix_encoding.hxx"
 #include <t8_forest/t8_forest_vtk.h>
 #include "utilities/cmc_huffman.hxx"

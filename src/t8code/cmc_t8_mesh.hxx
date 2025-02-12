@@ -7,7 +7,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_hyperslab.hxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 
 #include <climits>
 

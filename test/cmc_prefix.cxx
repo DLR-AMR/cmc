@@ -2,7 +2,7 @@
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_prefix.hxx"
 #include "utilities/cmc_prefix_encoding.hxxx"
-#include "utilities/cmc_span.hxx"
+#include "utilities/cmc_vector_view.hxx"
 
 #include <iostream>
 #include <bitset>

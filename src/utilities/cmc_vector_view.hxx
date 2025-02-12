@@ -1,5 +1,5 @@
-#ifndef CMC_SPAN_HXX
-#define CMC_SPAN_HXX
+#ifndef CMC_VECTOR_VIEW_HXX
+#define CMC_VECTOR_VIEW_HXX
 
 #include "cmc_utilities.hxx"
 
@@ -55,4 +55,4 @@ private:
 
 }
 
-#endif /* !CMC_SPAN_HXX */
+#endif /* !CMC_VECTOR_VIEW_HXX */
