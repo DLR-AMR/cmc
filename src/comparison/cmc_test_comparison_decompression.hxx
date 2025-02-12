@@ -1,5 +1,5 @@
-#ifndef CMC_LOSSLESS_DIFF_DECOMPRESSION_HXX
-#define CMC_LOSSLESS_DIFF_DECOMPRESSION_HXX
+#ifndef CMC_COMPARISON_TEST_PCP_DECOMPRESSION_HXX
+#define CMC_COMPARISON_TEST_PCP_DECOMPRESSION_HXX
 
 #include "utilities/cmc_utilities.hxx"
 #include "cmc_compression.hxx"
@@ -7,7 +7,10 @@
 namespace cmc
 {
 
-namespace diff
+namespace test_comparison
+{
+
+namespace light_amr_pcp
 {
 
 struct CompressedVariableInfo;
@@ -55,6 +58,7 @@ struct CompressedVariableInfo
 };
 
 
+}
 }
 
 }

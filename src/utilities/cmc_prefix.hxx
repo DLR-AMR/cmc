@@ -108,6 +108,7 @@ public:
     //std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering_Offset_4_Stride_12() const;
     void ApplyPrefix(const std::vector<uint8_t>& serialized_prefix, const int num_bits);
     void AddIntegerResidual(const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
+    void AddXORResidualWithoutImplicitOneBit(const uint32_t lzc, const std::vector<uint8_t>& residual_bits);
 
     template<typename T> 
     auto ReinterpretDataAs() const
@@ -762,6 +763,43 @@ CompressionValue<N>::AddIntegerResidual(const uint32_t encoded_lzc, const std::v
     {
         this->PerformIntegerSubtraction(residual);
     }
+}
+
+template<int N>
+void
+CompressionValue<N>::AddXORResidualWithoutImplicitOneBit(const uint32_t lzc, const std::vector<uint8_t>& residual_bits)
+{
+    //cmc_assert(not residual_bits.empty());
+    cmc_assert(residual_bits.size() <= static_cast<size_t>(N));
+
+    //cmc_debug_msg("Signum: ", signum, ", lzc: ", lzc);
+    if (lzc >= N * CHAR_BIT)
+    {
+        /* The residual is empty, therefore nothing has to be added */
+        return;
+    }
+
+    std::array<uint8_t, N> serialized_val;
+    serialized_val.fill(uint8_t{0});
+
+    /* Set up an compression value holding the residual in the front bits */
+    CompressionValue<N> residual(serialized_val);
+    residual.SetTailBit(N * CHAR_BIT - lzc);
+    
+
+    const int remaining_bits = N * CHAR_BIT - lzc;
+
+    if (residual.GetTrailBit() > 0)
+    {
+        /* And finally, we combine it with the actual remaining residual bits */
+        residual.ApplyPrefix(residual_bits, remaining_bits);
+    }
+
+    /* Now, we should have a full CompressionValue resembling the residual */
+    cmc_assert(residual.GetFrontBit() == 0 && residual.GetTrailBit() == 0);
+
+    /* Reverse the XOR operation */
+    prefix_ ^= residual.prefix_;
 }
 
 template <typename T>

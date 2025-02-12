@@ -1,4 +1,4 @@
-#include "lossless/cmc_diff_compression.hxx"
+#include "comparison/cmc_test_comparison_compression.hxx"
 #include "t8code/cmc_t8_adapt_callbacks.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_span.hxx"
@@ -17,7 +17,10 @@
 namespace cmc
 {
 
-namespace diff
+namespace test_comparison
+{
+
+namespace light_amr_pcp
 {
 
 int
@@ -63,8 +66,6 @@ Compressor::Setup()
 
     compression_data_->TransformInputToCompressionVariables();
 
-    //compression_data_->FilterDataAsDifferences();
-
     compression_variables_ = compression_data_->GetByteVariablesForCompression();
 
     compression_data_.reset(nullptr); 
@@ -77,14 +78,12 @@ Compressor::Compress()
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
     {
         var_iter->InitializeResidualAlphabet();
-        //var_iter->XORConsecutiveValues();
+
         /* (Try to) release the initial data which already has been transformed */
         var_iter->KeepInitialData(false);
-        //var_iter->PrintCompressionValues();
+
         /* We create the adapt data based on the compression settings, the forest and the variable to consider during the adaptation/coarsening */
         DiffAdaptData adapt_data{*var_iter};
-
-        //var_iter->WriteDataToVTK_(0);
 
         /* Write data to file */
         var_iter->WriteDataToFile("initial_cmc_sfc_data.bin");
@@ -92,13 +91,11 @@ Compressor::Compress()
         /* Iterate until all prefixes have been extracted (up until the the root of the mesh) */
         while (adapt_data.IsCompressionProgressing())
         {
-            //var_iter->WriteDataToFile("initial_cmc_sfc_data_" + std::to_string(adapt_data.GetAdaptationStepCount()) + ".bin");
-
             /* Allocate memory for the prefix extraction and set up evertything needed for the coarsening process */
             adapt_data.InitializeCompressionIteration();
 
             /* Perform a coarsening iteration and find prefix and refinement bits */
-            t8_forest_t adapted_forest = t8_forest_new_adapt(adapt_data.GetCurrentMesh(), ExtractMeanAndLeaveDiffs, 0, 0, static_cast<void*>(&adapt_data));
+            t8_forest_t adapted_forest = t8_forest_new_adapt(adapt_data.GetCurrentMesh(), _TestComparisonExtractPCPLightAMR, 0, 0, static_cast<void*>(&adapt_data));
 
             /* After the prefixes have been extracted and 'stored' on the coarser mesh in this iteration,
              * we update the mesh that they are defined on */
@@ -106,8 +103,6 @@ Compressor::Compress()
 
             adapt_data.FinalizeCompressionIteration();
             cmc_debug_msg("Count adaptation step : ", adapt_data.GetAdaptationStepCount());
-
-            //var_iter->WriteDataToVTK_(adapt_data.GetAdaptationStepCount());
         }
     }
 }
@@ -115,26 +110,18 @@ Compressor::Compress()
 void
 Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
-    #if 1
     NcWriter writer(file_name, NC_NETCDF4);
     writer.ReserveVariables(compression_variables_.size());
     
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
     {
-        writer.AddVariable(var_iter->WriteCompressedDiffData(time_step));
+        writer.AddVariable(var_iter->_WriteCompressedDiffDataPCPLightAMRComparison(time_step));
     }
 
     writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::DiffCompression))));
     writer.Write();
+}
 
-    #else
-
-    for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
-    {
-        (void) var_iter->WriteCompressedDiffData(time_step);
-    }
-
-    #endif
 }
 
 }

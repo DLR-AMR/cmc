@@ -59,25 +59,51 @@ main(void)
     vars.emplace_back(std::move(variable));
 
     #else
-    const std::string file = "../../data/SDRBENCH-EXASKY-NYX-512x512x512/temperature.f32";
+    //const std::string file = "../../data/SDRBENCH-EXASKY-NYX-512x512x512/baryon_density.f32";
+    const std::string file = "../../data/SDRBENCH-CESM-ATM-cleared-1800x3600/CLDLOW_1_1800_3600.dat";
     //const std::string file = "../../data/100x500x500/PRECIPf48.bin.f32";
     cmc::CmcType type(cmc::CmcType::Float);
-    const std::string name("qcloudf_log");
+    const std::string name("velo");
     const int id = 0;
-    const size_t num_elements = 512 * 512 * 512;
-    
-    //cmc::CmcUniversalType missing_value(static_cast<float>(0.008));
-    cmc::CmcUniversalType missing_value(static_cast<float>(2280.0));
+    //const size_t num_elements = 512 * 512 * 256;
+    const size_t num_elements = 3600 * 1800;
 
-    cmc::DataLayout layout(cmc::DataLayout::Lev_Lat_Lon);
-    cmc::GeoDomain domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 512),
-                          cmc::DimensionInterval(cmc::Dimension::Lat, 0, 512),
-                          cmc::DimensionInterval(cmc::Dimension::Lev, 0, 512)
+    //cmc::CmcUniversalType missing_value(static_cast<float>(31866790.000000)); //velocity_x
+    //cmc::CmcUniversalType missing_value(static_cast<float>(4782584.0)); //Temp
+    //cmc::CmcUniversalType missing_value(static_cast<float>(31866787.0)); //velocity_x
+    //cmc::CmcUniversalType missing_value(static_cast<float>(56505650.0)); //velocity_y
+    //cmc::CmcUniversalType missing_value(static_cast<float>(33386285.0)); //velocity_z
+    //cmc::CmcUniversalType missing_value(static_cast<float>(13780.0)); //dark_matter_density.f32
+    //cmc::CmcUniversalType missing_value(static_cast<float>(115864.0)); //baryon_density.f32
+
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.5725));//AEROD_v_1_1800_3600.dat
+    //cmc::CmcUniversalType missing_value(static_cast<float>(0.925));//CLDHGH_1_1800_3600.dat
+    cmc::CmcUniversalType missing_value(static_cast<float>(0.98));//CLDLOW_1_1800_3600.dat
+    
+    
+    cmc::DataLayout layout(cmc::DataLayout::Lat_Lon);
+
+    #if 1
+    cmc::GeoDomain domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 3600),
+                          cmc::DimensionInterval(cmc::Dimension::Lat, 0, 1800)
+                          //cmc::DimensionInterval(cmc::Dimension::Lev, 0, 512)
                           );
+    #endif
+
+    cmc::GeoDomain global_domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 512),
+                                 cmc::DimensionInterval(cmc::Dimension::Lat, 0, 512),
+                                 cmc::DimensionInterval(cmc::Dimension::Lev, 0, 512)
+                                 );
+
+    cmc::GeoDomain sub_domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 512),
+                              cmc::DimensionInterval(cmc::Dimension::Lat, 0, 512),
+                              cmc::DimensionInterval(cmc::Dimension::Lev, 256, 512)
+                              );
 
     cmc::bin_reader::Reader binary_reader(file);
 
     cmc::InputVar variable = binary_reader.CreateVariableFromBinaryData(type, name, id, num_elements, missing_value, layout, domain);
+    //cmc::InputVar variable = binary_reader.CreateSubDomainVariableFromBinaryData(type, name, id, missing_value, layout, global_domain, sub_domain);
 
     std::vector<cmc::InputVar> vars;
     vars.emplace_back(std::move(variable));
@@ -146,7 +172,7 @@ LZC: 29 + (7 one bits induced)
     //cmc::prefix::Compressor compression_data(nc_data.TransferData()); //netCDF data
     cmc::prefix::Compressor compression_data(std::move(vars)); //Binary data
 
-    compression_data.SetSplitVariable(cmc::SplitVariable(cmc::kSplitAllVariables, cmc::Dimension::Lev));
+    //compression_data.SetSplitVariable(cmc::SplitVariable(cmc::kSplitAllVariables, cmc::Dimension::Lev));
 
     /* Setup the example data for the compression */
     compression_data.Setup();

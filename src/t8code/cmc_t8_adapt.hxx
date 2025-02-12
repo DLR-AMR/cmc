@@ -12,7 +12,9 @@
 #include "t8code/cmc_t8_byte_variable.hxx"
 #include "utilities/cmc_prefix_encoding.hxx"
 #include "utilities/cmc_bit_map.hxx"
+#include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_diff_decoder.hxx"
+#include "comparison/cmc_test_comparison_pcp_decoder.hxx"
 
 #include <vector>
 #include <memory>
@@ -223,15 +225,25 @@ public:
     {
         /* Extract an interpolated value from the family of elements indicated by the start_index and the element count
          * and leave the differences behind */
-        //cmc_debug_msg("In Ectract Mean and leave differences: adaptation count: ", count_adaptation_step_);
         if (count_adaptation_step_ > 0)
         {
-            //cmc_debug_msg("Why is this not called?????");
             byte_variable_.ExtractMeanAndLeaveDifferencesFromPreviousMeans(elem_index, num_elements);
         } else
         {
-            //cmc_debug_msg("\n\n\n Wird der FAll hier aufgereufen");
             byte_variable_.ExtractMeanAndLeaveDifferencesFromInitialData(elem_index, num_elements);
+        }
+    }
+
+    void _TestComparisonPCPLightAMR(const int elem_index, const int num_elements)
+    {
+        /* Extract an interpolated value from the family of elements indicated by the start_index and the element count
+         * and leave the differences behind */
+        if (count_adaptation_step_ > 0)
+        {
+            byte_variable_._TestComparisonPCPLightAMRFromPreviousMeans(elem_index, num_elements);
+        } else
+        {
+            byte_variable_._TestComparisonPCPLightAMRFromInitialData(elem_index, num_elements);
         }
     }
 
@@ -621,74 +633,105 @@ private:
     int count_decompression_step{0};
 };
 
-#if 0
-class PrefixAdaptDataEGU
+#if _PERFORM_TEST_COMPARISON
+
+class _TestLightAMRPCPDecompressData
 {
 public:
-    PrefixAdaptDataEGU() = delete;
-    PrefixAdaptDataEGU(ByteVar& variable)
-    : byte_variable_{variable}{
-        new_number_of_elements_ = t8_forest_get_global_num_elements(variable.GetAmrMesh().GetMesh());
+    _TestLightAMRPCPDecompressData() = delete;
+    _TestLightAMRPCPDecompressData(ByteVar& variable, const std::vector<uint8_t>& compressed_byte_stream)
+    : byte_variable_{variable}, byte_stream_{compressed_byte_stream} {
+        decoder_ = std::make_unique<test_comparison::light_amr_pcp::_TestPCPDecoder>(byte_stream_, byte_variable_.GetType());
     };
+    _TestLightAMRPCPDecompressData(ByteVar& variable, std::vector<uint8_t>&& compressed_byte_stream)
+    : byte_variable_{variable}, byte_stream_{std::move(compressed_byte_stream)} {
+        decoder_ = std::make_unique<test_comparison::light_amr_pcp::_TestPCPDecoder>(byte_stream_, byte_variable_.GetType());
+    };
+    ~_TestLightAMRPCPDecompressData() = default;
 
-    void InitializeCompressionIteration()
-    {
-        byte_variable_.InitializeCompressionIteration();
-    }
-
-    bool IsCompressionProgressing()
-    {
-        return (new_number_of_elements_ > 1 ? true : false);
-    }
-
-    void FinalizeCompressionIteration()
-    {
-        new_number_of_elements_ = t8_forest_get_global_num_elements(GetCurrentMesh());
-        byte_variable_.FinalizeCompressionIterationEGU();
-        ++count_adaptation_step_;
-    }
+    /* Get the mesh the data/prefixes of the variable are currently defined on */
     t8_forest_t GetCurrentMesh() const
     {
         return byte_variable_.GetMesh();
     }
+
+    int GetInitialRefinementLevelOfMesh() const
+    {
+        return byte_variable_.GetAmrMesh().GetInitialRefinementLevel();
+    }
+
+    DataLayout GetInitialDataLayout() const
+    {
+        return byte_variable_.GetInitialDataLayout();
+    }
+
+    ByteVar& GetCurrentCompressionVariable() {return byte_variable_;}
+    const ByteVar& GetCurrentCompressionVariable() const {return byte_variable_;}
+
+    /* Update the mesh of the variable (to be called after an adaptation step) */
     void SetCurrentMesh(t8_forest_t mesh)
     {
         byte_variable_.SetMesh(mesh);
     }
 
-    void LeaveCoarsePrefixUnchangedEGU(const int elem_index)
+    void InitializeDiffDecompression()
     {
-        byte_variable_.LeaveCoarsePrefixUnchangedEGU(elem_index);
-    }
-
-    void EvaluateCommonPrefixEGU(const int start_index, const int num_elements)
-    {
-        if (count_adaptation_step_ == 0)
+        cmc_debug_msg("In adapt init diff decompression");
+        if (count_decompression_step == 0)
         {
-            return byte_variable_.EvaluateCommonPrefixFromInitialDataEGU(start_index, num_elements);
-        } else
-        {
-            return byte_variable_.EvaluateCommonPrefixFromPreviousPrefixEGU(start_index, num_elements);
+            cmc_debug_msg("in if");
+            byte_variable_.SetDiffDecompressionRootElementValue(decoder_->GetRootElementValue());
+            cmc_debug_msg("Root elem value is set");
         }
+        cmc_debug_msg("before init byte var diff decompression");
+        byte_variable_.InitializeDiffDecompression();
+        cmc_debug_msg("Before move to next refinement lvl");
+        decoder_->MoveToNextRefinementLevel();
+        cmc_debug_msg("at the end of adapt init diff decomp");
     }
 
-    void PrintNumPrefixIndicationBits() const
+    void FinalizeDiffDecompression()
     {
-        byte_variable_.GetNumberOfSetPrefixIndicationBits();
+        byte_variable_.FinalizeDecompressionIteration();
+        ++count_decompression_step;
+
+        //byte_variable_.WriteDataToVTK_(count_decompression_step);
+        //byte_variable_.PrintCompressionValues();
     }
-    int GetInitialRefinementLevelOfMesh() const
+
+    size_t GetBitCountOfDataType() const
     {
-        return byte_variable_.GetAmrMesh().GetInitialRefinementLevel();
+        return CmcTypeToBytes(byte_variable_.GetType()) * CHAR_BIT;
     }
-    int GetAdaptationStepCount() const
+
+    size_t GetNextEncodedLZC()
     {
-        return count_adaptation_step_;
+        return decoder_->GetNextEncodedLZC();
     }
-private:
+
+    std::vector<uint8_t> GetNextResidualBitSequence(const size_t num_bits)
+    {
+        return decoder_->GetNextResidualBitSequence(num_bits);
+    }
+    
+    void StoreElementUnchanged(const int elem_id)
+    {
+        byte_variable_.StoreElementUnchanged(elem_id);
+    }
+
+    void ApplyResidualAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits)
+    {
+        byte_variable_.ApplyResidualAndStoreElement(elem_id, encoded_lzc, residual_bits);
+    }
+
+private: 
     ByteVar& byte_variable_;
-    t8_gloidx_t new_number_of_elements_{INT16_MAX};
-    int count_adaptation_step_{0};
+    std::vector<uint8_t> byte_stream_;
+    std::unique_ptr<test_comparison::light_amr_pcp::_TestPCPDecoder> decoder_;
+    int count_decompression_step{0};
 };
+
+
 #endif
 
 }

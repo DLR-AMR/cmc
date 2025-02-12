@@ -41,8 +41,8 @@ main(void)
     //const double rel_max_err = 0.01;
     //settings.SetAbsoluteErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
-    const double abs_max_err = 3.0;
-    settings.SetAbsoluteErrorCriterion(abs_max_err, cmc::kErrorCriterionHoldsForAllVariables);
+    const double abs_max_err = 0.05;
+    settings.SetRelativeErrorCriterion(abs_max_err, cmc::kErrorCriterionHoldsForAllVariables);
 
 
     {

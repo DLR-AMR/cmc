@@ -65,7 +65,10 @@ src/utilities/cmc_ac_model.hxx \
 src/lossy/cmc_full_amr_compression.hxx \
 src/lossless/cmc_diff_decompression.hxx \
 src/utilities/cmc_bytes.hxx \
-src/utilities/cmc_serialized_compression_value_forward.hxx
+src/utilities/cmc_serialized_compression_value_forward.hxx \
+src/comparison/cmc_test_comparison_compression.hxx \
+src/comparison/cmc_test_comparison_decompression.hxx \
+src/comparison/cmc_test_comparison_pcp_decoder.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
@@ -110,7 +113,9 @@ src/lossless/cmc_residual_compression.cxx \
 src/lossy/cmc_patch_amr_compression.cxx \
 src/lossy/cmc_prefix_compression.cxx \
 src/lossy/cmc_full_amr_compression.cxx \
-src/lossless/cmc_diff_decompression.cxx
+src/lossless/cmc_diff_decompression.cxx \
+src/comparison/cmc_test_comparison_compression.cxx \
+src/comparison/cmc_test_comparison_decompression.cxx
 
 
 if ENABLE_FORTRAN

@@ -436,6 +436,45 @@ ExtractMeanAndLeaveDiffs (t8_forest_t forest,
 }
 
 
+t8_locidx_t
+_TestComparisonExtractPCPLightAMR (t8_forest_t forest,
+                                  [[maybe_unused]] t8_forest_t forest_from,
+                                  [[maybe_unused]] int which_tree,
+                                  int lelement_id,
+                                  [[maybe_unused]] t8_eclass_scheme_c * ts,
+                                  const int is_family,
+                                  const int num_elements,
+                                  [[maybe_unused]] t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Get the adapt data from the forest */
+    DiffAdaptData* adapt_data = static_cast<DiffAdaptData*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    /* A prefix can only be extarcted from a family of elements. If a single element is passed to the adaptation funciton,
+     * it is stored as prefix and has to wait until it's siblings are present within the mesh in order to then perform
+     * a common prefix evaluation and extraction. */
+    if (is_family == 0)
+    {
+        /* Since, only a single element has been passed, we are dragging it's value along and try to coarsen it's corresponding family later */
+        adapt_data->LeaveValueUnchanged(lelement_id);
+
+        /* The element stays the same, it will not be refined and it cannot be coarsened */
+        return kLeaveElementUnchanged;
+    } else
+    {
+        /* Extract a common prefix of the family */
+        adapt_data->_TestComparisonPCPLightAMR(lelement_id, num_elements);
+
+        /* Therefore, we need to coarsen the mesh at this point */
+        return kCoarsenElements;
+    }
+
+    #else
+    return CMC_ERR;
+    #endif
+}
+
 
 t8_locidx_t
 ExtractMean (t8_forest_t forest,
@@ -500,7 +539,6 @@ BuildFittingPyramid (t8_forest_t forest,
     /* If the element is inside the global domain, it will be refined until the intial refinement level is reached */
     if (IsMeshElementWithinGlobalDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
     {
-        //adapt_data->ComputeBestFitting();//TODO
         return kRefineElement;
     } else
     {
@@ -712,6 +750,70 @@ DecompressDiffEncoding (t8_forest_t forest,
             std::vector<uint8_t> residual_bits = adapt_data->GetNextResidualBitSequence(static_cast<size_t>(residual_length));
         
             compression_variable.ApplyResidualAndStoreElement(lelement_id, encoded_residual_lzc, residual_bits);
+        }
+    }
+
+    return kRefineElement;
+
+    #else
+    return CMC_ERR;
+    #endif
+}
+
+
+
+t8_locidx_t
+_TestDecompressLightAMRPCPEncoding (t8_forest_t forest,
+                          t8_forest_t forest_from,
+                          int which_tree,
+                          int lelement_id,
+                          t8_eclass_scheme_c * ts,
+                          const int is_family,
+                          const int num_elements,
+                          t8_element_t * elements[])
+{
+    #ifdef CMC_WITH_T8CODE
+    /* Get the adapt data from the forest */
+    _TestLightAMRPCPDecompressData* adapt_data = static_cast<_TestLightAMRPCPDecompressData*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    /* Get the current comrpession variable */
+    ByteVar& compression_variable = adapt_data->GetCurrentCompressionVariable();
+
+    /* If the mesh element is not within the domain, the element stays unchanged */
+    if (!IsMeshElementWithinGlobalDomain(elements[0], ts, compression_variable.GetGlobalDomain(), adapt_data->GetInitialRefinementLevelOfMesh(), compression_variable.GetInitialDataLayout()))
+    {
+        compression_variable.StoreElementUnchanged(lelement_id);
+        
+        return kLeaveElementUnchanged;
+    }
+
+    /** In case the element is within the geo domain **/
+
+    /* Get the maximal bit count of the data */
+    const uint32_t max_length_type = CmcTypeToBytes(compression_variable.GetType()) * CHAR_BIT;
+
+    /* Get the leading zero count */
+    const size_t lzc = adapt_data->GetNextEncodedLZC();
+    const uint32_t residual_length = max_length_type - lzc;
+    /* Get the number of children that this element will be refined to */
+    const int num_children = ts->t8_element_num_children(elements[0]);
+
+    /* Create all children elements with their respective value by adding or subtractijng the corresponding residual */
+    for (int elem_id = 0; elem_id < num_children; ++elem_id)
+    {
+        /* Check if the residual has significant btis */
+        const bool is_empty = false;
+        /* If there is no residual, we just copy the value to tne new vector */
+        if (is_empty)
+        {
+            compression_variable.StoreElementUnchanged(lelement_id);
+        } else
+        {
+            /* In case there is a residual, we need to add it to the current value */
+            std::vector<uint8_t> residual_bits = adapt_data->GetNextResidualBitSequence(static_cast<size_t>(residual_length));
+        
+            compression_variable.ApplyResidualWithoutImplicitOneBitAndStoreElement(lelement_id, lzc, residual_bits);
         }
     }
 
