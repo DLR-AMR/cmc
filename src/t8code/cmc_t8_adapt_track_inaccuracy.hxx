@@ -131,6 +131,71 @@ ComputeRelativeDeviation(const VectorView<T>& values, const T& nominal_value, co
     return deviations;
 }
 
+
+template<typename T>
+auto
+ComputeRelativeDeviation(const T value, const T nominal_value, const double previous_absolute_max_deviation, const T missing_value)
+ -> std::enable_if_t<std::is_signed_v<T>, double>
+{
+    if (std::fpclassify(previous_absolute_max_deviation) == FP_ZERO)
+    {
+        if (!ApproxCompare(missing_value, value))
+        {
+            /* Calculate the relative deviation */
+            return (static_cast<double>(std::abs(value - nominal_value)) / static_cast<double>(std::abs(value)));
+        } else
+        {
+            return 0.0;
+        }
+    } else
+    {
+        if (!ApproxCompare(missing_value, value))
+        {
+            /* Estimate the relative deviation */
+            const double zaehler = previous_absolute_max_deviation + std::abs(static_cast<double>(value) - static_cast<double>(nominal_value));
+            const double nenner = std::min(std::initializer_list<double>({static_cast<double>(value), static_cast<double>(value) - previous_absolute_max_deviation, static_cast<double>(value) + previous_absolute_max_deviation}));
+            return (zaehler / nenner);
+        } else
+        {
+            return 0.0;
+        }
+    }
+
+    return 0.0;
+}
+
+
+template<typename T>
+auto
+ComputeRelativeDeviation(const T value, const T nominal_value, const double previous_absolute_max_deviation, const T missing_value)
+ -> std::enable_if_t<std::is_unsigned_v<T>, double>
+{
+        if (std::fpclassify(previous_absolute_max_deviation) == FP_ZERO)
+        {
+            if (!ApproxCompare(missing_value, value))
+            {
+                /* Calculate the relative deviation */
+                return (static_cast<double>((value > nominal_value ? value - nominal_value : nominal_value - value)) / static_cast<double>(value));
+            } else
+            {
+                return 0.0;
+            }
+        } else
+        {
+            if (!ApproxCompare(missing_value, value))
+            {
+                const double zaehler = (value > nominal_value ? static_cast<double>(value) - static_cast<double>(nominal_value) : static_cast<double>(nominal_value) - static_cast<double>(value)) + previous_absolute_max_deviation;
+                const double nenner = std::min(std::initializer_list<double>({static_cast<double>(value), static_cast<double>(value) - previous_absolute_max_deviation, static_cast<double>(value) + previous_absolute_max_deviation}));
+                return (zaehler / nenner);
+            } else
+            {
+                return 0.0;
+            }
+        }
+
+    return 0.0;
+}
+
 template<typename T>
 auto
 ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value, const T& missing_value)
@@ -212,6 +277,36 @@ ComputeAbsoluteDeviation(const VectorView<T>& values, const T& nominal_value, co
     }
 
     return deviations;
+}
+
+template<typename T>
+auto
+ComputeAbsoluteDeviation(const T value, const T nominal_value, const double previous_absolute_max_deviation, const T missing_value)
+ -> std::enable_if_t<std::is_signed_v<T>, double>
+{
+    if (!ApproxCompare(missing_value, value))
+    {
+        /* Calculate the absolute deviation */
+        return (static_cast<double>(std::abs(value - nominal_value)) + previous_absolute_max_deviation);
+    } else
+    {
+        return 0.0;
+    }
+}
+
+template<typename T>
+auto
+ComputeAbsoluteDeviation(const T value, const T nominal_value, const double previous_absolute_max_deviation, const T missing_value)
+ -> std::enable_if_t<std::is_unsigned_v<T>, double>
+{
+    if (!ApproxCompare(missing_value, value))
+    {
+        /* Calculate the absolute deviation */
+        return (static_cast<double>((value > nominal_value ? value - nominal_value : nominal_value - value)) + previous_absolute_max_deviation);
+    } else
+    {
+        return 0.0;
+    }
 }
 
 template<typename T>
