@@ -2,7 +2,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"
-#include "netcdf/cmc_netcdf.hxx"
+#include "input/cmc_netcdf.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 #include "lossy/cmc_amr_compression.hxx"
 #include "decompression/cmc_prefix_decompression.hxx"
@@ -28,7 +28,7 @@ main(void)
     //const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
     
     /* Create an object which interatcs with the file and opens it */
-    cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
+    cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
 
     //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
     //                         cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721)

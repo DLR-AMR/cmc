@@ -15,10 +15,10 @@ namespace light_amr_pcp
     
 [[maybe_unused]]
 static bool
-IsDiffCompressionFormat(const std::vector<NcAttribute>& global_attributes)
+IsDiffCompressionFormat(const std::vector<nc::Attribute>& global_attributes)
 {
     /* Check for a given attribute indicating the compression which has been used */
-    auto comp_scheme_iter = FindAttribute(global_attributes, kCompressionSchemeAttrName);
+    auto comp_scheme_iter = FindAttribute(global_attributes, nc::kCompressionSchemeAttrName);
 
     /* Check if the attribute has been found */
     if (comp_scheme_iter == global_attributes.end())
@@ -27,13 +27,13 @@ IsDiffCompressionFormat(const std::vector<NcAttribute>& global_attributes)
     }
 
     /* Get the attribute and check it's value */
-    const NcAttribute& comp_scheme_attr = *comp_scheme_iter;
+    const nc::Attribute& comp_scheme_attr = *comp_scheme_iter;
 
     /* Get the value of the compression scheme */
-    const CompressionScheme scheme = static_cast<CompressionScheme>(std::get<CompressionSchemeType>(comp_scheme_attr.GetValue()));
+    const nc::CompressionScheme scheme = static_cast<nc::CompressionScheme>(std::get<nc::CompressionSchemeType>(comp_scheme_attr.GetValue()));
 
     /* Check if the compression scheme equals the PrefixExtraction method */
-    if (scheme == CompressionScheme::DiffCompression)
+    if (scheme == nc::CompressionScheme::DiffCompression)
     {
         return true;
     } else
@@ -43,7 +43,7 @@ IsDiffCompressionFormat(const std::vector<NcAttribute>& global_attributes)
 }
 
 static size_t
-EstimateNumberCompressionVariables(const std::vector<NcVariable>& variable_hulls)
+EstimateNumberCompressionVariables(const std::vector<nc::Variable>& variable_hulls)
 {
     //TODO: implement
     return 2;
@@ -64,7 +64,7 @@ TrimAtSecondToLastUnderscore(std::string& name)
 
 static
 std::string
-GetVariableBaseName(const NcVariable& variable)
+GetVariableBaseName(const nc::Variable& variable)
 {
     /* Retrieve the name of the variable */
     std::string base_name = variable.GetName();
@@ -77,7 +77,7 @@ GetVariableBaseName(const NcVariable& variable)
 
 static
 std::vector<CompressedVariableInfo>
-GetCompressionVariableInfo(const std::vector<NcVariable>& variable_hulls)
+GetCompressionVariableInfo(const std::vector<nc::Variable>& variable_hulls)
 {
     std::vector<CompressedVariableInfo> variables;
     variables.reserve(EstimateNumberCompressionVariables(variable_hulls));
@@ -85,7 +85,7 @@ GetCompressionVariableInfo(const std::vector<NcVariable>& variable_hulls)
     for (auto vh_iter = variable_hulls.begin(); vh_iter != variable_hulls.end(); ++vh_iter)
     {
         /* Get the attributes that belong to the variable */
-        const std::vector<NcAttribute>& attributes = vh_iter->GetAttributes();
+        const std::vector<nc::Attribute>& attributes = vh_iter->GetAttributes();
 
         /* Get the base_name of the variable without the appended information */
         const std::string basename = GetVariableBaseName(*vh_iter);
@@ -207,7 +207,7 @@ GetCompressionVariableInfo(const std::vector<NcVariable>& variable_hulls)
 
 static
 std::vector<CompressedVariableInfo>
-EvaluateCompressionVariables(const std::vector<NcVariable>& variable_hulls)
+EvaluateCompressionVariables(const std::vector<nc::Variable>& variable_hulls)
 {
     /* Get Information about the variables that have been compressed */
     std::vector<CompressedVariableInfo> variables = GetCompressionVariableInfo(variable_hulls);
@@ -291,10 +291,10 @@ void
 Decompressor::Setup()
 {
     /* Create a reader for the compressed file */
-    NcReader reader(file_name_);
+    nc::Reader reader(file_name_);
 
     /* Get the global attributes */
-    std::vector<NcAttribute> global_atts = reader.ReadGlobalAttrtibutes();
+    std::vector<nc::Attribute> global_atts = reader.ReadGlobalAttrtibutes();
 
     /* Ensure that the file obeys to the compression norm */
     if (IsDiffCompressionFormat(global_atts) == false)
@@ -303,7 +303,7 @@ Decompressor::Setup()
     }
 
     /* Get the meta data of the variables in order to evaluate which variable corresponds to which feature */
-    std::vector<NcVariable> variable_hulls = reader.ReadVariableMetaData();
+    std::vector<nc::Variable> variable_hulls = reader.ReadVariableMetaData();
 
     /* Check all variables and in particular retrieve the time steps and number of time steps encoded */
     variable_info_ = EvaluateCompressionVariables(variable_hulls);
@@ -419,7 +419,7 @@ Decompressor::DecompressVariable(const std::string& variable_base_name)
     cmc_assert(var_info_iter != variable_info_.end());
 
     /* Create a reader for the compressed file */
-    NcReader reader(file_name_);
+    nc::Reader reader(file_name_);
 
     /* Decompress the variable data by iterating over all time steps and all split variables */
     for (int time_step = 0; time_step < num_time_steps; ++time_step)

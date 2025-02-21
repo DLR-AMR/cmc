@@ -66,12 +66,12 @@ CompressionData::Compress(const CompressionMode compression_mode)
 
     /* Open the file without explicit parallel access */
     err = nc__open("../../data/era5_reanalysis_pressure_lvls_fixed_time.nc", NC_NOWRITE, NULL, &ncid);
-    NcCheckError(err);
+    nc::CheckError(err);
 
     std::vector<short> init_data(data.size(), 0);
 
     err = nc_get_var_short(ncid, 5, init_data.data());
-    NcCheckError(err);
+    nc::CheckError(err);
 
     //short max_err = 0;
 
@@ -114,12 +114,12 @@ CompressionData::Compress(const CompressionMode compression_mode)
 
     /* Open the file without explicit parallel access */
     err = nc__open("../../data/era5_reanalysis_t2m_tc03_13_12_23.nc", NC_NOWRITE, NULL, &ncid);
-    NcCheckError(err);
+    nc::CheckError(err);
 
     std::vector<short> init_data(data.size(), 0);
 
     err = nc_get_var_short(ncid, 4, init_data.data());
-    NcCheckError(err);
+    nc::CheckError(err);
 
     std::vector<float> fdata;
     fdata.reserve(data.size());

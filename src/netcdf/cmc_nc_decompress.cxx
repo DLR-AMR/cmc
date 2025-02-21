@@ -1,9 +1,10 @@
 #include "netcdf/cmc_nc_decompress.hxx"
 #include "utilities/cmc_log_functions.hxx"
 
-namespace cmc
+namespace cmc::nc
 {
 
+#if 0
 
 void
 NcDecompress::NcOpen(const std::string& path_to_file, const NcOpeningMode mode, const MPI_Comm comm)
@@ -55,5 +56,6 @@ void InquireCompressionFile()
     //Inquire global attributes -> Check which Compression has been used
 }
 
+#endif
 
 }

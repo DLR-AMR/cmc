@@ -1,14 +1,14 @@
 #include "netcdf/cmc_nc_writer.hxx"
 
-namespace cmc
+namespace cmc::nc
 {
 
 int
-NcWriter::NcOpen() 
+Writer::Open() 
 {
     if (!file_has_been_created_)
     {
-        return NcCreate();
+        return Create();
     }
 
     int ncid{-1};
@@ -19,20 +19,20 @@ NcWriter::NcOpen()
         /* Open for parallel access */
         const MPI_Info info = MPI_INFO_NULL;
         const int err = nc_open_par(file_name_.c_str(), NC_WRITE, comm_, info, &ncid);
-        NcCheckError(err);
+        CheckError(err);
     } else
 #endif
     {
         /* Otherwise open for serial access */
         const int err = nc__open(file_name_.c_str(), NC_WRITE, NULL, &ncid);
-        NcCheckError(err);
+        CheckError(err);
     }
 
     return ncid;
 }
 
 int
-NcWriter::NcCreate()
+Writer::Create()
 {
     int ncid{-1};
 
@@ -48,13 +48,13 @@ NcWriter::NcCreate()
         /* Open for parallel access */
         const MPI_Info info = MPI_INFO_NULL;
         const int err = nc_create_par(file_name_.c_str(), NC_CLOBBER | NC_WRITE | netcdf_format_, comm_, info, &ncid);
-        NcCheckError(err);
+        CheckError(err);
     } else
 #endif
     {
         /* Otherwise open for serial access */
         const int err = nc_create(file_name_.c_str(), NC_CLOBBER | NC_WRITE | netcdf_format_, &ncid);
-        NcCheckError(err);
+        CheckError(err);
     }
 
     file_has_been_created_ = true;
@@ -63,52 +63,52 @@ NcWriter::NcCreate()
 }
 
 void
-NcWriter::NcClose(const int ncid) const
+Writer::Close(const int ncid) const
 {
     const int err = nc_close(ncid);
-    NcCheckError(err);
+    CheckError(err);
 }
 
 void
-NcWriter::ReserveVariables(const size_t num_variables)
+Writer::ReserveVariables(const size_t num_variables)
 {
     variables_.reserve(num_variables);
 }
 
 void
-NcWriter::AddGlobalAttribute(const NcAttribute& attribute)
+Writer::AddGlobalAttribute(const Attribute& attribute)
 {
     global_attributes_.push_back(attribute);
 }
 
 
 void
-NcWriter::AddGlobalAttribute(NcAttribute&& attribute)
+Writer::AddGlobalAttribute(Attribute&& attribute)
 {
     global_attributes_.push_back(std::move(attribute));
 }
 
 void
-NcWriter::AddVariable(const NcVariable& variable)
+Writer::AddVariable(const Variable& variable)
 {
     variables_.push_back(variable);
 }
 
 void
-NcWriter::AddVariable(NcVariable&& variable)
+Writer::AddVariable(Variable&& variable)
 {
     variables_.push_back(std::move(variable));
 }   
 
 void
-NcWriter::ClearVariablesAndGlobalAttributes()
+Writer::ClearVariablesAndGlobalAttributes()
 {
     variables_.clear();
     global_attributes_.clear();
 }
 
 std::vector<int>
-NcWriter::DefineVariableDimensions(const int ncid, const std::vector<NcDimension>& dimensions)
+Writer::DefineVariableDimensions(const int ncid, const std::vector<Dimension>& dimensions)
 {
     std::vector<int> dim_ids(dimensions.size(), -1);
     int dim_count{0};
@@ -116,7 +116,7 @@ NcWriter::DefineVariableDimensions(const int ncid, const std::vector<NcDimension
     for (auto dim_iter = dimensions.begin(); dim_iter != dimensions.end(); ++dim_iter, ++dim_count)
     {
         const int err = nc_def_dim(ncid, dim_iter->GetName().c_str(), dim_iter->GetLength(), &dim_ids[dim_count]);
-        NcCheckError(err);
+        CheckError(err);
     }
 
     return dim_ids;
@@ -133,60 +133,60 @@ struct WriteAttribute
     {
         const signed char value = static_cast<signed char>(val);
         const int err = nc_put_att_schar(ncid_, var_id_, name_.c_str(), NC_BYTE, 1, &value);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const char val)
     {
         const signed char value = static_cast<signed char>(val);
         const int err = nc_put_att_schar(ncid_, var_id_, name_.c_str(), NC_CHAR, 1, &value);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const int16_t val)
     {
         const int err = nc_put_att_short(ncid_, var_id_, name_.c_str(), NC_SHORT, 1, &val);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const int32_t val)
     {
         const int err = nc_put_att_int(ncid_, var_id_, name_.c_str(), NC_INT, 1, &val);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const float val)
     {
         const int err = nc_put_att_float(ncid_, var_id_, name_.c_str(), NC_FLOAT, 1, &val);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const double val)
     {
         const int err = nc_put_att_double(ncid_, var_id_, name_.c_str(), NC_DOUBLE, 1, &val);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const uint8_t val)
     {
         const int err = nc_put_att_ubyte(ncid_, var_id_, name_.c_str(), NC_UBYTE, 1, &val);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const uint16_t val)
     {
         const int err = nc_put_att_ushort(ncid_, var_id_, name_.c_str(), NC_USHORT, 1, &val);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const uint32_t val)
     {
         const int err = nc_put_att_uint(ncid_, var_id_, name_.c_str(), NC_UINT, 1, &val);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const int64_t val)
     {
         const long long value = static_cast<long long>(val); 
         const int err = nc_put_att_longlong(ncid_, var_id_, name_.c_str(), NC_INT64, 1, &value);
-        NcCheckError(err);
+        CheckError(err);
     }
     void operator()(const uint64_t val)
     {
         const unsigned long long value = static_cast<unsigned long long>(val); 
         const int err = nc_put_att_ulonglong(ncid_, var_id_, name_.c_str(), NC_UINT64, 1, &value);
-        NcCheckError(err);
+        CheckError(err);
     }
 private:
     const int ncid_;
@@ -195,7 +195,7 @@ private:
 };
 
 void 
-NcWriter::DefineAttributes(const int ncid, const int var_id, const std::vector<NcAttribute>& attributes)
+Writer::DefineAttributes(const int ncid, const int var_id, const std::vector<Attribute>& attributes)
 {
     for (auto att_iter = attributes.begin(); att_iter != attributes.end(); ++att_iter)
     {
@@ -204,7 +204,7 @@ NcWriter::DefineAttributes(const int ncid, const int var_id, const std::vector<N
 }
 
 std::vector<int>
-NcWriter::DefineVariables(const int ncid)
+Writer::DefineVariables(const int ncid)
 {
     std::vector<int> var_ids(variables_.size(), -1);
     int var_count{0};
@@ -212,14 +212,14 @@ NcWriter::DefineVariables(const int ncid)
     for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter, ++var_count)
     {
         /* Extract the dimensions from the variable and define them as dimension in the netCDF file */
-        const std::vector<NcDimension> var_dimensions = var_iter->GetDimensionsFromVariable();
+        const std::vector<Dimension> var_dimensions = var_iter->GetDimensionsFromVariable();
 
         /* Define the dimensions of the variable */
         const std::vector<int> dimension_ids = DefineVariableDimensions(ncid, var_dimensions);
 
         /* Define the variable itself */
         const int err = nc_def_var(ncid, var_iter->GetName().c_str(), ConvertCmcTypeToNcType(var_iter->GetCmcType()), static_cast<int>(dimension_ids.size()), dimension_ids.data(), &var_ids[var_count]);
-        NcCheckError(err);
+        CheckError(err);
 
         /* Create an attribute regarding the ID of the variable (since the dimensions are labelled accordingly) */
         var_iter->CreateIDAttribute();
@@ -232,7 +232,7 @@ NcWriter::DefineVariables(const int ncid)
 }
 
 void
-NcWriter::DefineGlobalAttributes(const int ncid)
+Writer::DefineGlobalAttributes(const int ncid)
 {
     for (auto att_iter = global_attributes_.begin(); att_iter != global_attributes_.end(); ++att_iter)
     {
@@ -241,7 +241,7 @@ NcWriter::DefineGlobalAttributes(const int ncid)
 }
 
 void 
-NcWriter::WriteData(const int ncid, const std::vector<int>& variable_ids)
+Writer::WriteData(const int ncid, const std::vector<int>& variable_ids)
 {
     int var_count = 0;
     for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter, ++var_count)
@@ -251,9 +251,9 @@ NcWriter::WriteData(const int ncid, const std::vector<int>& variable_ids)
 }
 
 void
-NcWriter::Write()
+Writer::Write()
 {
-    const int ncid = NcOpen();
+    const int ncid = Open();
 
     const std::vector<int> var_ids = DefineVariables(ncid);
 
@@ -261,10 +261,10 @@ NcWriter::Write()
 
     /* Switch from define to data mode */
     const int err = nc_enddef(ncid);
-    NcCheckError(err);
+    CheckError(err);
 
     WriteData(ncid, var_ids);
 
-    NcClose(ncid);
+    Close(ncid);
 }
 }

@@ -13,28 +13,28 @@
 #include <vector>
 #include <variant>
 
-namespace cmc
+namespace cmc::nc
 {
 
-struct NcDimension;
-class NcAttribute;
+struct Dimension;
+class Attribute;
 template<typename T>
-class NcSpecificVariable;
-class NcVariable;
+class SpecificVariable;
+class Variable;
 
-std::vector<NcAttribute>::const_iterator
-FindAttribute(const std::vector<NcAttribute>& attributes, const std::string& attr_name);
+std::vector<Attribute>::const_iterator
+FindAttribute(const std::vector<Attribute>& attributes, const std::string& attr_name);
 
-class NcDimension
+class Dimension
 {
 public:
-    NcDimension(const std::string& name, const size_t length)
+    Dimension(const std::string& name, const size_t length)
     : name_{name}, length_{length} {};
-    NcDimension(std::string&& name, const size_t length)
+    Dimension(std::string&& name, const size_t length)
     : name_{std::move(name)}, length_{length} {};
-    NcDimension(const std::string& name, const size_t length, const int dim_id)
+    Dimension(const std::string& name, const size_t length, const int dim_id)
     : name_{name}, length_{length}, nc_dim_id{dim_id} {};
-    NcDimension(std::string&& name, const size_t length, const int dim_id)
+    Dimension(std::string&& name, const size_t length, const int dim_id)
     : name_{std::move(name)}, length_{length}, nc_dim_id{dim_id} {};
 
     std::string GetName(){return name_;};
@@ -49,24 +49,24 @@ private:
     int nc_dim_id{-1};
 }; 
 
-class NcAttribute
+class Attribute
 {
 public:
-    NcAttribute() = default;
-    NcAttribute(const std::string& name, const CmcUniversalType& value)
+    Attribute() = default;
+    Attribute(const std::string& name, const CmcUniversalType& value)
     : name_{name}, value_{value}{};
-    NcAttribute(std::string&& name, const CmcUniversalType& value)
+    Attribute(std::string&& name, const CmcUniversalType& value)
     : name_{std::move(name)}, value_{value}{};
-    template<typename T> NcAttribute(const std::string& name, T value)
+    template<typename T> Attribute(const std::string& name, T value)
     : name_{name}, value_{value}{};
-    template<typename T> NcAttribute(std::string&& name, T value)
+    template<typename T> Attribute(std::string&& name, T value)
     : name_{std::move(name)}, value_{value}{};
-    ~NcAttribute() = default;
+    ~Attribute() = default;
 
-    NcAttribute(const NcAttribute& other) = default;
-    NcAttribute& operator=(const NcAttribute& other) = default;
-    NcAttribute(NcAttribute&& other) = default;
-    NcAttribute& operator=(NcAttribute&& other) = default;
+    Attribute(const Attribute& other) = default;
+    Attribute& operator=(const Attribute& other) = default;
+    Attribute(Attribute&& other) = default;
+    Attribute& operator=(Attribute&& other) = default;
 
     const std::string& GetName() const;
     std::string GetName();
@@ -102,29 +102,29 @@ public:
 
 
 template<typename T>
-class NcSpecificVariable
+class SpecificVariable
 {
 public:
-    NcSpecificVariable() = default;
-    NcSpecificVariable(const int id)
+    SpecificVariable() = default;
+    SpecificVariable(const int id)
     : id_{id} {};
-    NcSpecificVariable(const std::string& name)
+    SpecificVariable(const std::string& name)
     : name_{name} {};
-    NcSpecificVariable(const std::string& name, const int id)
+    SpecificVariable(const std::string& name, const int id)
     : name_{name}, id_{id} {};
-    NcSpecificVariable(const std::string& name, const int id, const size_t size_hint)
+    SpecificVariable(const std::string& name, const int id, const size_t size_hint)
     : name_{name}, id_{id} {
         data_ = std::vector<T>(size_hint);
     };
-    ~NcSpecificVariable() = default;
+    ~SpecificVariable() = default;
 
-    NcSpecificVariable(const NcSpecificVariable& other) = default;
-    NcSpecificVariable& operator=(const NcSpecificVariable& other) = default;
-    NcSpecificVariable(NcSpecificVariable&& other) = default;
-    NcSpecificVariable& operator=(NcSpecificVariable&& other) = default;
+    SpecificVariable(const SpecificVariable& other) = default;
+    SpecificVariable& operator=(const SpecificVariable& other) = default;
+    SpecificVariable(SpecificVariable&& other) = default;
+    SpecificVariable& operator=(SpecificVariable&& other) = default;
 
     const std::string& GetName() const;
-    std::vector<NcDimension> GetDimensionsFromVariable() const;
+    std::vector<Dimension> GetDimensionsFromVariable() const;
     CmcType GetCmcType() const;
     int GetID() const;
 
@@ -166,83 +166,83 @@ private:
     bool is_data_stack_full_{false};
 };
 
-using NcGeneralVariable = std::variant<NcSpecificVariable<int8_t>, NcSpecificVariable<char>, NcSpecificVariable<int16_t>, NcSpecificVariable<int32_t>, NcSpecificVariable<float>, NcSpecificVariable<double>,
-                                       NcSpecificVariable<uint8_t>, NcSpecificVariable<uint16_t>, NcSpecificVariable<uint32_t>, NcSpecificVariable<int64_t>, NcSpecificVariable<uint64_t>>;
+using GeneralVariable = std::variant<SpecificVariable<int8_t>, SpecificVariable<char>, SpecificVariable<int16_t>, SpecificVariable<int32_t>, SpecificVariable<float>, SpecificVariable<double>,
+                                       SpecificVariable<uint8_t>, SpecificVariable<uint16_t>, SpecificVariable<uint32_t>, SpecificVariable<int64_t>, SpecificVariable<uint64_t>>;
 
 
-class NcVariable
+class Variable
 {
 public:
-    NcVariable() = default;
-    ~NcVariable() = default;
+    Variable() = default;
+    ~Variable() = default;
 
-    template<class T> NcVariable(const NcSpecificVariable<T>& variable)
+    template<class T> Variable(const SpecificVariable<T>& variable)
     : variable_{variable} {};
-    template<class T> NcVariable(NcSpecificVariable<T>&& variable)
+    template<class T> Variable(SpecificVariable<T>&& variable)
     : variable_{std::move(variable)} {};
-    template<class T> NcVariable(const NcSpecificVariable<T>& variable, const std::vector<NcAttribute>& attributes)
+    template<class T> Variable(const SpecificVariable<T>& variable, const std::vector<Attribute>& attributes)
     : variable_{variable}, attributes_{attributes} {};
-    template<class T> NcVariable(const NcSpecificVariable<T>& variable, std::vector<NcAttribute>&& attributes)
+    template<class T> Variable(const SpecificVariable<T>& variable, std::vector<Attribute>&& attributes)
     : variable_{variable}, attributes_{std::move(attributes)} {};
-    template<class T> NcVariable(NcSpecificVariable<T>&& variable, const std::vector<NcAttribute>& attributes)
+    template<class T> Variable(SpecificVariable<T>&& variable, const std::vector<Attribute>& attributes)
     : variable_{std::move(variable)}, attributes_{attributes} {};
-    template<class T> NcVariable(NcSpecificVariable<T>&& variable, std::vector<NcAttribute>&& attributes)
+    template<class T> Variable(SpecificVariable<T>&& variable, std::vector<Attribute>&& attributes)
     : variable_{std::move(variable)}, attributes_{std::move(attributes)} {};
-    template<class T> NcVariable(const NcSpecificVariable<T>& variable, const NcAttribute& attribute)
+    template<class T> Variable(const SpecificVariable<T>& variable, const Attribute& attribute)
     : variable_{variable} {
         attributes_.push_back(attribute);
     };
-    template<class T> NcVariable(const NcSpecificVariable<T>& variable, NcAttribute&& attribute)
+    template<class T> Variable(const SpecificVariable<T>& variable, Attribute&& attribute)
     : variable_{variable} {
         attributes_.push_back(attribute);
     };
-    template<class T> NcVariable(NcSpecificVariable<T>&& variable, const NcAttribute& attribute)
+    template<class T> Variable(SpecificVariable<T>&& variable, const Attribute& attribute)
     : variable_{std::move(variable)} {
         attributes_.push_back(attribute);
     };
-    template<class T> NcVariable(NcSpecificVariable<T>&& variable, NcAttribute&& attribute)
+    template<class T> Variable(SpecificVariable<T>&& variable, Attribute&& attribute)
     : variable_{std::move(variable)} {
         attributes_.push_back(attribute);
     };
 
-    NcVariable(std::vector<NcAttribute>&& attributes, std::vector<NcDimension>&& dimensions)
+    Variable(std::vector<Attribute>&& attributes, std::vector<Dimension>&& dimensions)
     : attributes_{std::move(attributes)}, dimensions_{std::move(dimensions)} {};
 
-    NcVariable(const NcVariable& other) = default;
-    NcVariable& operator=(const NcVariable& other) = default;
-    NcVariable(NcVariable&& other) = default;
-    NcVariable& operator=(NcVariable&& other) = default;
+    Variable(const Variable& other) = default;
+    Variable& operator=(const Variable& other) = default;
+    Variable(Variable&& other) = default;
+    Variable& operator=(Variable&& other) = default;
     
-    template<class T> void SetSpecificVariable(const NcSpecificVariable<T>& variable);
-    template<class T> void SetSpecificVariable(NcSpecificVariable<T>&& variable);
-    void SetSpecificVariable(const NcGeneralVariable& variable);
-    void SetSpecificVariable(NcGeneralVariable&& variable);
+    template<class T> void SetSpecificVariable(const SpecificVariable<T>& variable);
+    template<class T> void SetSpecificVariable(SpecificVariable<T>&& variable);
+    void SetSpecificVariable(const GeneralVariable& variable);
+    void SetSpecificVariable(GeneralVariable&& variable);
 
     void SetupSpecificVariable(const std::string& var_name, const CmcType type);
 
-    std::vector<NcDimension> GetDimensionsFromVariable() const;
+    std::vector<nc::Dimension> GetDimensionsFromVariable() const;
     const std::string& GetName() const;
     CmcType GetCmcType() const;
     void CreateIDAttribute();
-    const std::vector<NcAttribute>& GetAttributes() const;
+    const std::vector<Attribute>& GetAttributes() const;
     void WriteVariableData(const int ncid, const int var_id) const;
 
-    std::vector<NcDimension> GetDimensions() const;
-    const NcGeneralVariable& GetVariable() const;
-    template<typename T> NcSpecificVariable<T> DetachVariable();
+    std::vector<Dimension> GetDimensions() const;
+    const GeneralVariable& GetVariable() const;
+    template<typename T> SpecificVariable<T> DetachVariable();
 
 private:
-    NcGeneralVariable variable_;
-    std::vector<NcAttribute> attributes_;
-    std::vector<NcDimension> dimensions_;
+    GeneralVariable variable_;
+    std::vector<Attribute> attributes_;
+    std::vector<Dimension> dimensions_;
     int nc_var_id{-1};
 };
 
 template<class T>
-std::vector<NcDimension>
-NcSpecificVariable<T>::GetDimensionsFromVariable() const 
+std::vector<nc::Dimension>
+SpecificVariable<T>::GetDimensionsFromVariable() const 
 {
-    std::vector<NcDimension> nc_dims;
+    std::vector<nc::Dimension> nc_dims;
 
     switch(format_)
     {
@@ -253,7 +253,7 @@ NcSpecificVariable<T>::GetDimensionsFromVariable() const
         break;
         default:
             /* Other representations */
-            std::vector<Dimension> dimensions = GetDimensionVectorFromLayout(layout_);
+            std::vector<cmc::Dimension> dimensions = GetDimensionVectorFromLayout(layout_);
             for (auto dim_iter = dimensions.begin(); dim_iter != dimensions.end(); ++dim_iter)
             {
                 nc_dims.emplace_back(GetDimensionName(*dim_iter), global_domain_.GetDimensionLength(*dim_iter));
@@ -266,56 +266,56 @@ NcSpecificVariable<T>::GetDimensionsFromVariable() const
 
 template<class T>
 const std::string&
-NcSpecificVariable<T>::GetName() const
+SpecificVariable<T>::GetName() const
 {
     return name_;
 }
 
 template<class T>
 int
-NcSpecificVariable<T>::GetID() const
+SpecificVariable<T>::GetID() const
 {
     return id_;
 }
 
 template<class T>
 CmcType
-NcSpecificVariable<T>::GetCmcType() const
+SpecificVariable<T>::GetCmcType() const
 {
     return ConvertToCmcType<T>();
 }
 
 template<class T>
 void
-NcSpecificVariable<T>::Reserve(const size_t num_elements)
+SpecificVariable<T>::Reserve(const size_t num_elements)
 {
     data_.reserve(num_elements);
 };
 
 template<class T>
 const GeoDomain& 
-NcSpecificVariable<T>::GetGlobalDomain() const
+SpecificVariable<T>::GetGlobalDomain() const
 {
     return global_domain_;
 }
 
 template<class T>
 void
-NcSpecificVariable<T>::SetGlobalDomain(const GeoDomain& domain)
+SpecificVariable<T>::SetGlobalDomain(const GeoDomain& domain)
 {
     global_domain_ = domain;
 };
 
 template<class T>
 void
-NcSpecificVariable<T>::SetGlobalDomain(GeoDomain&& domain)
+SpecificVariable<T>::SetGlobalDomain(GeoDomain&& domain)
 {
     global_domain_ = std::move(domain);
 };
 
 template<class T>
 void
-NcSpecificVariable<T>::SetData(const std::vector<T>& values, const Hyperslab& hyperslab)
+SpecificVariable<T>::SetData(const std::vector<T>& values, const Hyperslab& hyperslab)
 {
     if (is_data_stack_full_)
     {
@@ -330,7 +330,7 @@ NcSpecificVariable<T>::SetData(const std::vector<T>& values, const Hyperslab& hy
 
 template<class T>
 void
-NcSpecificVariable<T>::SetData(const std::vector<T>& values, Hyperslab&& hyperslab)
+SpecificVariable<T>::SetData(const std::vector<T>& values, Hyperslab&& hyperslab)
 {
     if (is_data_stack_full_)
     {
@@ -345,7 +345,7 @@ NcSpecificVariable<T>::SetData(const std::vector<T>& values, Hyperslab&& hypersl
 
 template<class T>
 void
-NcSpecificVariable<T>::SetData(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs)
+SpecificVariable<T>::SetData(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs)
 {
     if (is_data_stack_full_)
     {
@@ -363,14 +363,14 @@ NcSpecificVariable<T>::SetData(std::vector<T>&& values, std::vector<Hyperslab>&&
 
 template<class T>
 void
-NcSpecificVariable<T>::PushBack(const std::vector<T>& values)
+SpecificVariable<T>::PushBack(const std::vector<T>& values)
 {
     std::copy_n(values.begin(), values.size(), std::back_insert_iterator(data_));
 }
 
 template<class T>
 void
-NcSpecificVariable<T>::SetData(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs)
+SpecificVariable<T>::SetData(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs)
 {
     if (is_data_stack_full_)
     {
@@ -388,7 +388,7 @@ NcSpecificVariable<T>::SetData(const std::vector<T>& values, const std::vector<H
 
 template<class T>
 void
-NcSpecificVariable<T>::SetData(std::vector<T>&& values, const int global_sfc_offset)
+SpecificVariable<T>::SetData(std::vector<T>&& values, const int global_sfc_offset)
 {
     if (is_data_stack_full_)
     {
@@ -404,7 +404,7 @@ NcSpecificVariable<T>::SetData(std::vector<T>&& values, const int global_sfc_off
 
 template<class T>
 void
-NcSpecificVariable<T>::SetData(const std::vector<T>& values, const int global_sfc_offset)
+SpecificVariable<T>::SetData(const std::vector<T>& values, const int global_sfc_offset)
 {
     if (is_data_stack_full_)
     {
@@ -420,21 +420,21 @@ NcSpecificVariable<T>::SetData(const std::vector<T>& values, const int global_sf
 
 template<class T>
 void
-NcSpecificVariable<T>::SetDataLayout(const DataLayout layout)
+SpecificVariable<T>::SetDataLayout(const DataLayout layout)
 {
     layout_ = layout;
 }
 
 template<class T>
 T
-NcSpecificVariable<T>::GetMissingValue() const
+SpecificVariable<T>::GetMissingValue() const
 {
     return missing_value_;
 }
 
 template<class T>
 void
-NcSpecificVariable<T>::SetMissingValue(const CmcUniversalType& missing_value)
+SpecificVariable<T>::SetMissingValue(const CmcUniversalType& missing_value)
 {
     cmc_assert(std::holds_alternative<T>(missing_value));
     missing_value_ = std::get<T>(missing_value);
@@ -442,14 +442,14 @@ NcSpecificVariable<T>::SetMissingValue(const CmcUniversalType& missing_value)
 
 template<class T>
 void
-NcSpecificVariable<T>::SetMissingValue(const T missing_value)
+SpecificVariable<T>::SetMissingValue(const T missing_value)
 {
     missing_value_ = missing_value;
 }
 
 template<class T>
 void
-NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
+SpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
 {
     switch(format_)
     {
@@ -459,7 +459,7 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
                 const size_t start_val = global_sfc_offset_;
                 const size_t count_val = data_.size();
                 const int err = nc_put_vara(ncid, var_id, &start_val, & count_val, data_.data());
-                NcCheckError(err);
+                CheckError(err);
             }
         break;
         case DataFormat::CartesianFormat:
@@ -468,7 +468,7 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
         case DataFormat::HyperslabFormat:
         {
             /* Iterate over all hyperslabs and emplace the data */
-            const std::vector<Dimension> hs_dims = GetDimensionVectorFromLayout(layout_);
+            const std::vector<cmc::Dimension> hs_dims = GetDimensionVectorFromLayout(layout_);
             const int dim = GetDimensionalityOfDataLayout(layout_);
             std::vector<size_t> start_ptr(dim, 0);
             std::vector<size_t> count_ptr(dim, 1);
@@ -489,7 +489,7 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
 
                 /* Write the data corresponding to the hyperslab to the netCDF file */
                 const int err = nc_put_vara(ncid, var_id, start_ptr.data(), count_ptr.data(), &data_[values_written]);
-                NcCheckError(err);
+                CheckError(err);
 
                 /* Add the number of written values to the offset variable */
                 values_written += hs_iter->GetNumberCoordinates();
@@ -503,19 +503,19 @@ NcSpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
 
 template<class T>
 void
-NcSpecificVariable<T>::OverwriteDataFromFile(const int ncid, const int var_id, const GeneralHyperslab& hyperslab, const size_t start_offset)
+SpecificVariable<T>::OverwriteDataFromFile(const int ncid, const int var_id, const GeneralHyperslab& hyperslab, const size_t start_offset)
 {
     /* The size is already maxed out, since the data is not going to be push_backed, but just plain copied int the already present memory */
     cmc_assert(data_.size() >= hyperslab.GetNumberOfCoveredCoordinates() + start_offset);
 
     /* Overwrite the data with the variable_s data from the netCDF file */
     const int err = nc_get_vara(ncid, var_id, hyperslab.start_values.data(), hyperslab.count_values.data(), &data_[start_offset]);
-    NcCheckError(err);
+    CheckError(err);
 }
 
 template<class T>
 const std::vector<T>&
-NcSpecificVariable<T>::GetData() const
+SpecificVariable<T>::GetData() const
 {
     return data_;
 }
@@ -526,29 +526,29 @@ ConvertCmcTypeToNcType(const CmcType type);
 CmcType
 ConvertNcTypeToCmcType(const nc_type type);
 
-NcGeneralVariable
+GeneralVariable
 CreateSpecificVariable(const nc_type type, const std::string& name, const int var_id, const size_t size_hint = 8);
 
 template<class T>
 void
-NcVariable::SetSpecificVariable(const NcSpecificVariable<T>& variable)
+Variable::SetSpecificVariable(const SpecificVariable<T>& variable)
 {
     variable_ = variable;
 }
 
 template<class T> void
-NcVariable::SetSpecificVariable(NcSpecificVariable<T>&& variable)
+Variable::SetSpecificVariable(SpecificVariable<T>&& variable)
 {
     variable_ = std::move(variable);
 }
 
 template<typename T>
-NcSpecificVariable<T>
-NcVariable::DetachVariable()
+SpecificVariable<T>
+Variable::DetachVariable()
 {
-    NcSpecificVariable<T> var = std::get<NcSpecificVariable<T>>(std::move(variable_));
+    SpecificVariable<T> var = std::get<SpecificVariable<T>>(std::move(variable_));
 
-    variable_ = NcSpecificVariable<T>();
+    variable_ = SpecificVariable<T>();
 
     return var;
 }

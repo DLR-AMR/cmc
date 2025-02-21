@@ -6,7 +6,7 @@
 #include "utilities/cmc_compression_settings.hxx"
 #include "lossy/cmc_amr_lossy_compression.hxx"
 #include "lossy/cmc_amr_compression.hxx"
-#include "netcdf/cmc_netcdf.hxx"
+#include "input/cmc_netcdf.hxx"
 
 #include "t8_cmesh.h"
 #include "t8_forest/t8_forest.h"
@@ -82,7 +82,7 @@ main(void)
 
         /* Create input variables */
         const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
-        cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
+        cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
 
         //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 700, 716),
         //                         cmc::DimensionInterval(cmc::Dimension::Lat, 344, 360)

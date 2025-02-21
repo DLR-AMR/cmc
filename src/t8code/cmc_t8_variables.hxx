@@ -207,7 +207,7 @@ VariableAttributes<T>::SetMissingValueInNCFile(const int ncid, const int var_id,
 {
     #ifdef CMC_WITH_NETCDF
     int err = nc_put_att(ncid, var_id, "mv", nc_type, 1, static_cast<const void*>(&missing_value_));
-    NcCheckError(err);
+    nc::CheckError(err);
     #endif
 }
 

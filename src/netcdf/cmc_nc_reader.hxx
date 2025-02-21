@@ -10,35 +10,35 @@
 #include <vector>
 #include <cstring>
 
-namespace cmc
+namespace cmc::nc
 {
 
-class NcReader
+class Reader
 {
 public:
-    NcReader() = delete;
-    ~NcReader() = default;
+    Reader() = delete;
+    ~Reader() = default;
 
-    NcReader(const NcReader& other) = default;
-    NcReader& operator=(const NcReader& other) = default;
-    NcReader(NcReader&& other) = default;
-    NcReader& operator=(NcReader&& other) = default;
+    Reader(const Reader& other) = default;
+    Reader& operator=(const Reader& other) = default;
+    Reader(Reader&& other) = default;
+    Reader& operator=(Reader&& other) = default;
 
-    NcReader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
+    Reader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
     : file_name_{file_name}, comm_{comm} {};
 
     /* Read a single variable from the file */
-    NcVariable ReadVariable(const std::string& variable_name);
+    Variable ReadVariable(const std::string& variable_name);
 
     /* Read and return the data of a single specified variable */
     template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name);
     template<typename T> std::vector<T> ReadVariableData(const std::string& variable_name, const GeneralHyperslab& hyperslab);
 
     /* Read only the attributes of single variable */
-    std::vector<NcAttribute> ReadVariableAttributes(const std::string& variable_name);
+    std::vector<Attribute> ReadVariableAttributes(const std::string& variable_name);
 
     /* Read and return all global attributes */
-    std::vector<NcAttribute> ReadGlobalAttrtibutes();
+    std::vector<Attribute> ReadGlobalAttrtibutes();
 
     /* Save variable names and hyperslabs which will be read together from the file on calling ReadVariables() */
     void StashVariableForReading(const std::string& variable_name, const std::vector<GeneralHyperslab>& hyperslabs);
@@ -50,16 +50,16 @@ public:
     void ClearStashedVariables();
 
     /* Read and return only the stashed variables and the global attributes */
-    std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariables();
+    std::pair<std::vector<Variable>, std::vector<Attribute>> ReadVariables();
 
     /* Read all the meta data of all variables and return those "variable hulls" */
-    std::vector<NcVariable> ReadVariableMetaData();
+    std::vector<Variable> ReadVariableMetaData();
 
     /* Read all the meta data of all variables and return those "variable hulls". Additionally, read and return all global attributes  */
-    std::pair<std::vector<NcVariable>, std::vector<NcAttribute>> ReadVariableMetaDataAndGlobalAttributes();
+    std::pair<std::vector<Variable>, std::vector<Attribute>> ReadVariableMetaDataAndGlobalAttributes();
 
     /* Get the dimensions of a single variable */
-    std::vector<NcDimension> GetVariableDimensions(const std::string& variable_name);
+    std::vector<Dimension> GetVariableDimensions(const std::string& variable_name);
     
     /* Get the data type of a single variable */
     CmcType GetTypeOfVariable(const std::string& variable_name);
@@ -78,16 +78,16 @@ public:
 private:
     struct StashedVariable;
 
-    int NcOpen();
-    void NcClose(const int ncid);
+    int Open();
+    void Close(const int ncid);
     int FindVariableID(const int ncid, const std::string& variable_name);
     GeneralHyperslab GetDataDomainAsGeneralHyperslab(const std::string& variable_name);
     GeneralHyperslab GetDataDomainAsGeneralHyperslab(const int ncid, const std::string& variable_name);
     void InquireGeneralFileInformation(const int ncid);
-    std::vector<NcAttribute> InquireAttributes(const int ncid, const int var_id);
-    std::vector<NcVariable> InquireVariableMetaData(const int ncid);
-    std::vector<NcDimension> ConvertDimensionIDs(const int ncid, const std::vector<int>& dim_ids);
-    void ReadVariableDataFromFile(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, NcVariable& variable);
+    std::vector<Attribute> InquireAttributes(const int ncid, const int var_id);
+    std::vector<Variable> InquireVariableMetaData(const int ncid);
+    std::vector<Dimension> ConvertDimensionIDs(const int ncid, const std::vector<int>& dim_ids);
+    void ReadVariableDataFromFile(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, Variable& variable);
     
     const std::string file_name_;
     const MPI_Comm comm_;
@@ -98,16 +98,16 @@ private:
     int num_global_attributes_{0};
     std::vector<int> unlimited_dimension_ids_;
 
-    std::vector<NcDimension> dimensions_;
-    std::vector<NcVariable> variables_;
-    std::vector<NcAttribute> global_attributes_;
+    std::vector<Dimension> dimensions_;
+    std::vector<Variable> variables_;
+    std::vector<Attribute> global_attributes_;
 
     std::vector<StashedVariable> variable_stash_;
     bool is_file_opened_{false};
     bool has_general_information_been_inquired_{false};
 };
 
-struct NcReader::StashedVariable
+struct Reader::StashedVariable
 {
     StashedVariable() = delete;
 
@@ -127,10 +127,10 @@ struct NcReader::StashedVariable
 
 template<typename T>
 std::vector<T>
-NcReader::ReadVariableData(const std::string& variable_name, const GeneralHyperslab& hyperslab)
+Reader::ReadVariableData(const std::string& variable_name, const GeneralHyperslab& hyperslab)
 {
     /* Open the file to be read */
-    const int ncid = NcOpen();
+    const int ncid = Open();
 
     InquireGeneralFileInformation(ncid);
 
@@ -141,7 +141,7 @@ NcReader::ReadVariableData(const std::string& variable_name, const GeneralHypers
      * Now, we are able to inquire the data type of the variable */
     nc_type var_type{NC_NAT};
     const int type_err = nc_inq_vartype(ncid, var_id, &var_type);
-    NcCheckError(type_err);
+    CheckError(type_err);
 
     /* Get the Cmc Type of the variable */
     const CmcType type = ConvertNcTypeToCmcType(var_type);
@@ -160,17 +160,17 @@ NcReader::ReadVariableData(const std::string& variable_name, const GeneralHypers
 
     /* Read in the data */
     const int data_err = nc_get_vara(ncid, var_id, hyperslab.start_values.data(), hyperslab.count_values.data(), static_cast<void*>(data.data()));
-    NcCheckError(data_err);
+    CheckError(data_err);
 
     /* Close the file after the reading process is finished */
-    NcClose(ncid);
+    Close(ncid);
 
     return data;
 }
 
 template<typename T>
 std::vector<T>
-NcReader::ReadVariableData(const std::string& variable_name)
+Reader::ReadVariableData(const std::string& variable_name)
 {
     return ReadVariableData<T>(variable_name, GetDataDomainAsGeneralHyperslab(variable_name));
 }

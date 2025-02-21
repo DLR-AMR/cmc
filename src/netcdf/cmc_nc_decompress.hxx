@@ -21,9 +21,10 @@
 #include <vector>
 #include <string>
 
-namespace cmc
+namespace cmc::nc
 {
 
+#if 0
 enum CompressionFormat {UndefinedCompressionFormat = -1, AMR = 0, PrefAMR = 1, CombinedAMR = 2};
 
 class NcDecompress
@@ -31,7 +32,7 @@ class NcDecompress
 public:
     NcDecompress() = delete;
 
-    NcDecompress(const std::string& path_to_file, const NcOpeningMode mode, const MPI_Comm comm = MPI_COMM_WORLD)
+    NcDecompress(const std::string& path_to_file, const OpeningMode mode, const MPI_Comm comm = MPI_COMM_WORLD)
     {
         NcOpen(path_to_file, mode, comm);
     };
@@ -44,7 +45,7 @@ public:
     void CloseFileHandle();
 
 private:
-    void NcOpen(const std::string& path_to_file, const NcOpeningMode mode, const MPI_Comm comm);
+    void NcOpen(const std::string& path_to_file, const OpeningMode mode, const MPI_Comm comm);
     
     int ncid_;
 
@@ -53,6 +54,8 @@ private:
     bool _file_has_been_closed_{false};
     
 };
+
+#endif
 
 }
 

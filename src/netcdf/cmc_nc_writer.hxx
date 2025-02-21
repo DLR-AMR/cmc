@@ -9,43 +9,43 @@
 
 #include <vector>
 
-namespace cmc
+namespace cmc::nc
 {
 
-class NcWriter
+class Writer
 {
 public:
-    NcWriter() = delete;
-    NcWriter(const std::string& file_name, const int netcdf_format, const MPI_Comm comm = MPI_COMM_SELF)
+    Writer() = delete;
+    Writer(const std::string& file_name, const int netcdf_format, const MPI_Comm comm = MPI_COMM_SELF)
     : file_name_{file_name}, netcdf_format_{netcdf_format}, comm_{comm} {};
-    ~NcWriter() = default;
+    ~Writer() = default;
 
-    NcWriter(const NcWriter& other) = default;
-    NcWriter& operator=(const NcWriter& other) = default;
-    NcWriter(NcWriter&& other) = default;
-    NcWriter& operator=(NcWriter&& other) = default;
+    Writer(const Writer& other) = default;
+    Writer& operator=(const Writer& other) = default;
+    Writer(Writer&& other) = default;
+    Writer& operator=(Writer&& other) = default;
 
     void ReserveVariables(const size_t num_variables);
-    void AddGlobalAttribute(const NcAttribute& attribute);
-    void AddGlobalAttribute(NcAttribute&& attribute);
+    void AddGlobalAttribute(const Attribute& attribute);
+    void AddGlobalAttribute(Attribute&& attribute);
 
-    void AddVariable(const NcVariable& variable);
-    void AddVariable(NcVariable&& variable);
-    template<typename T> void AddVariable(const NcSpecificVariable<T>& variable, const std::vector<NcAttribute>& attributes);
-    template<typename T> void AddVariable(const NcSpecificVariable<T>& variable, std::vector<NcAttribute>&&  attributes);
-    template<typename T> void AddVariable(NcSpecificVariable<T>&& variable, const std::vector<NcAttribute>& attributes);
-    template<typename T> void AddVariable(NcSpecificVariable<T>&& variable, std::vector<NcAttribute>&& attributes);
+    void AddVariable(const Variable& variable);
+    void AddVariable(Variable&& variable);
+    template<typename T> void AddVariable(const SpecificVariable<T>& variable, const std::vector<Attribute>& attributes);
+    template<typename T> void AddVariable(const SpecificVariable<T>& variable, std::vector<Attribute>&&  attributes);
+    template<typename T> void AddVariable(SpecificVariable<T>&& variable, const std::vector<Attribute>& attributes);
+    template<typename T> void AddVariable(SpecificVariable<T>&& variable, std::vector<Attribute>&& attributes);
 
     void ClearVariablesAndGlobalAttributes();
 
     void Write();
 
 private:
-    int NcOpen();
-    int NcCreate();
-    void NcClose(const int ncid) const;
-    std::vector<int> DefineVariableDimensions(const int ncid, const std::vector<NcDimension>& dimensions);
-    void DefineAttributes(const int ncid, const int var_id, const std::vector<NcAttribute>& attributes);
+    int Open();
+    int Create();
+    void Close(const int ncid) const;
+    std::vector<int> DefineVariableDimensions(const int ncid, const std::vector<Dimension>& dimensions);
+    void DefineAttributes(const int ncid, const int var_id, const std::vector<Attribute>& attributes);
     std::vector<int> DefineVariables(const int ncid);
     void DefineGlobalAttributes(const int ncid);
     void WriteData(const int ncid, const std::vector<int>& var_ids);
@@ -53,37 +53,37 @@ private:
     const std::string file_name_;
     const int netcdf_format_;
     const MPI_Comm comm_;
-    std::vector<NcVariable> variables_;
-    std::vector<NcAttribute> global_attributes_;
+    std::vector<Variable> variables_;
+    std::vector<Attribute> global_attributes_;
     bool file_has_been_created_{false};
 };
 
 template<typename T>
 void
-NcWriter::AddVariable(const NcSpecificVariable<T>& variable, const std::vector<NcAttribute>& attributes)
+Writer::AddVariable(const SpecificVariable<T>& variable, const std::vector<Attribute>& attributes)
 {
-    AddVariable(NcVariable(variable, attributes));
+    AddVariable(Variable(variable, attributes));
 }
 
 template<typename T>
 void
-NcWriter::AddVariable(const NcSpecificVariable<T>& variable, std::vector<NcAttribute>&&  attributes)
+Writer::AddVariable(const SpecificVariable<T>& variable, std::vector<Attribute>&&  attributes)
 {
-    AddVariable(NcVariable(variable, std::move(attributes)));
+    AddVariable(Variable(variable, std::move(attributes)));
 }
 
 template<typename T>
 void
-NcWriter::AddVariable(NcSpecificVariable<T>&& variable, const std::vector<NcAttribute>& attributes)
+Writer::AddVariable(SpecificVariable<T>&& variable, const std::vector<Attribute>& attributes)
 {
-    AddVariable(NcVariable(std::move(variable), attributes));
+    AddVariable(Variable(std::move(variable), attributes));
 }
 
 template<typename T>
 void
-NcWriter::AddVariable(NcSpecificVariable<T>&& variable, std::vector<NcAttribute>&& attributes)
+Writer::AddVariable(SpecificVariable<T>&& variable, std::vector<Attribute>&& attributes)
 {
-    AddVariable(NcVariable(std::move(variable), std::move(attributes)));
+    AddVariable(Variable(std::move(variable), std::move(attributes)));
 }
 
 }

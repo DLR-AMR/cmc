@@ -2,7 +2,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"
-#include "netcdf/cmc_netcdf.hxx"
+#include "input/cmc_netcdf.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 #include "lossless/cmc_prefix_compression.hxx"
 #include "decompression/cmc_prefix_decompression.hxx"
@@ -20,7 +20,7 @@ main(void)
     const std::string file = "../../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
     
     /* Create an object which interatcs with the file and opens it */
-    cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
+    cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
 
     nc_data.SetHintHeightDimension(2); //Set time as height dimension
 

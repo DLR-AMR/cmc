@@ -1179,7 +1179,7 @@ void AmrData::WriteCompressedData(const std::string& file_name) const
     int ncid;
     /* We need to create a CDF-5 file in order to use unisgned data types (needed for the encoded mesh refinements) */
     int err = nc__create(file_name.c_str(), NC_CLOBBER|NC_CDF5, NC_SIZEHINT_DEFAULT, NULL, &ncid);
-    NcCheckError(err);
+    nc::CheckError(err);
 
     const std::string var_dim_name{"ce"}; // number of 'compressed elements'
     const std::string mesh_dim_name{"rf"}; // number of encoded 'refinements'
@@ -1195,29 +1195,29 @@ void AmrData::WriteCompressedData(const std::string& file_name) const
 
         /* Define a dimension for the comrpessed elements */
         err = nc_def_dim(ncid, var_dimension_name.c_str(), var_dim_length, variable_dim_ids + index);
-        NcCheckError(err);
+        nc::CheckError(err);
 
         const size_t mesh_dim_legnth = (variables_mesh_refinements[index].size() != 0 ? variables_mesh_refinements[index].size() : 1);
 
         /* Define a dimension for the encoded mesh refinements */
         err = nc_def_dim(ncid, mesh_dimension_name.c_str(), mesh_dim_legnth, mesh_dim_ids + index);
-        NcCheckError(err);
+        nc::CheckError(err);
 
         /* Define the variable holding the compressed data */
         err = nc_def_var(ncid, var_iter->GetName().c_str(), CmcTypeToNcType(var_iter->GetType()), 1, &(variable_dim_ids[index]), variable_ids + index);
-        NcCheckError(err);
+        nc::CheckError(err);
 
         /** Define attributes for the variable **/
 
         /* Set the cmc internal ID */
         const int id_ = var_iter->GetID();
         err = nc_put_att(ncid, variable_ids[index], "id", NC_INT, 1, &id_);
-        NcCheckError(err);
+        nc::CheckError(err);
 
         /* Set the data layout */
         const int var_layout = static_cast<int>(var_iter->GetInitialDataLayout());
         err = nc_put_att(ncid, variable_ids[index], "layout", NC_INT, 1, &var_layout);
-        NcCheckError(err);
+        nc::CheckError(err);
 
         /* Store the dimension legnths of the data */
         const GeoDomain& var_domain = var_iter->GetGlobalDomain();
@@ -1226,25 +1226,25 @@ void AmrData::WriteCompressedData(const std::string& file_name) const
             lon > 1)
         {
             err = nc_put_att(ncid, variable_ids[index], "lon", NC_INT, 1, &lon);
-            NcCheckError(err);
+            nc::CheckError(err);
         }
         if (const int lat = var_domain.GetDimensionLength(Dimension::Lat);
             lat > 1)
         {
             err = nc_put_att(ncid, variable_ids[index], "lat", NC_INT, 1, &lat);
-            NcCheckError(err);
+            nc::CheckError(err);
         }
         if (const int lev = var_domain.GetDimensionLength(Dimension::Lev);
             lev > 1)
         {
             err = nc_put_att(ncid, variable_ids[index], "lev", NC_INT, 1, &lev);
-            NcCheckError(err);
+            nc::CheckError(err);
         }
         if (const int time = var_domain.GetDimensionLength(Dimension::Time);
             time > 1)
         {
             err = nc_put_att(ncid, variable_ids[index], "t", NC_INT, 1, &time);
-            NcCheckError(err);
+            nc::CheckError(err);
         }
 
         /* The missing value attribute has to be set */
@@ -1255,7 +1255,7 @@ void AmrData::WriteCompressedData(const std::string& file_name) const
             gci != kGlobalContextInformationNotGiven)
         {
             err = nc_put_att(ncid, variable_ids[index], "gci", NC_INT, 1, &gci);
-            NcCheckError(err);
+            nc::CheckError(err);
         }
         if (const DataLayout pc_layout = var_iter->GetPreCompressionLayout();
             pc_layout != DataLayout::LayoutUndefined)
@@ -1263,19 +1263,19 @@ void AmrData::WriteCompressedData(const std::string& file_name) const
             const int pre_compression_layout = static_cast<int>(pc_layout);
             //err = nc_put_att(ncid, variable_ids[index], "pcl", NC_INT, 1, &pre_compression_layout);
             err = nc_put_att(ncid, variable_ids[index], "p", NC_INT, 1, &pre_compression_layout);
-            NcCheckError(err);
+            nc::CheckError(err);
         }
 
         /* Define the variable holding the mesh refinement of the compressed forest */
         const std::string mesh_name = "m" + std::to_string(index);
         err = nc_def_var(ncid, mesh_name.c_str(), NC_UBYTE, 1, &(mesh_dim_ids[index]), mesh_ids + index);
-        NcCheckError(err);
+        nc::CheckError(err);
     }
 
     /* All dimensions and variables have been defined */
     /* Therefore, we are leaving the 'define-mode' and switch to the data mode */
     err = nc_enddef(ncid);
-    NcCheckError(err);
+    nc::CheckError(err);
 
     int var_index = 0;
     for (auto var_iter = variables_.begin(); var_iter != variables_.end(); ++var_iter, ++var_index)
@@ -1290,18 +1290,18 @@ void AmrData::WriteCompressedData(const std::string& file_name) const
         if (variables_mesh_refinements[var_index].size() > 0)
         {
             err = nc_put_var(ncid, mesh_ids[var_index], static_cast<void*>(variables_mesh_refinements[var_index].data()));
-            NcCheckError(err);
+            nc::CheckError(err);
         } else
         {
             uint8_t placeholder_refinement{0};
             err = nc_put_var(ncid, mesh_ids[var_index], static_cast<void*>(&placeholder_refinement));
-            NcCheckError(err);
+            nc::CheckError(err);
         }
     }
 
     /* All data has been written. Therefore, the file may be closed */
     err = nc_close(ncid);
-    NcCheckError(err);
+    nc::CheckError(err);
 }
 
 

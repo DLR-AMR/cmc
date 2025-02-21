@@ -94,7 +94,7 @@ Compressor::Compress()
 void
 Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
-    NcWriter writer(file_name, NC_NETCDF4);
+    nc::Writer writer(file_name, NC_NETCDF4);
     writer.ReserveVariables(compression_variables_.size());
     
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
@@ -102,7 +102,7 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
         writer.AddVariable(var_iter->WriteCompressedData(time_step, SuffixEncoding::ArithmeticLengthEncoding));
     }
 
-    writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));
+    writer.AddGlobalAttribute(nc::Attribute(nc::kCompressionSchemeAttrName, CmcUniversalType(static_cast<nc::CompressionSchemeType>(nc::CompressionScheme::PrefixExtraction))));
     writer.Write();
 }
 

@@ -32,13 +32,13 @@ void
 Decompressor::Start()
 {
     /* Create a reader for the given file */
-    NcReader reader{file_name_};
+    nc::Reader reader{file_name_};
 
     /* Read the global attributes of the file */
-    std::vector<NcAttribute> global_attributes = reader.ReadGlobalAttrtibutes();
+    std::vector<nc::Attribute> global_attributes = reader.ReadGlobalAttrtibutes();
 
     /* Check for a given attribute indicating the compression which has been used */
-    auto comp_scheme_iter = FindAttribute(global_attributes, kCompressionSchemeAttrName);
+    auto comp_scheme_iter = FindAttribute(global_attributes, nc::kCompressionSchemeAttrName);
 
     /* Check if the attribute has been found */
     if (comp_scheme_iter == global_attributes.end())
@@ -47,20 +47,20 @@ Decompressor::Start()
     } else 
     {
         /* Get the attribute and check it's value */
-        const NcAttribute& comp_scheme_attr = *comp_scheme_iter;
+        const nc::Attribute& comp_scheme_attr = *comp_scheme_iter;
 
         /* Get the value of the compression scheme */
-        const CompressionScheme scheme = static_cast<CompressionScheme>(std::get<CompressionSchemeType>(comp_scheme_attr.GetValue()));
+        const nc::CompressionScheme scheme = static_cast<nc::CompressionScheme>(std::get<nc::CompressionSchemeType>(comp_scheme_attr.GetValue()));
 
         switch (scheme)
         {
-            case CompressionScheme::AdaptiveCoarsening:
+            case nc::CompressionScheme::AdaptiveCoarsening:
                 cmc_err_msg("This decompressor is not yet integrated in the general usage functions");
             break;
-            case CompressionScheme::PrefixExtraction:
+            case nc::CompressionScheme::PrefixExtraction:
                 decompressor_ = std::make_unique<prefix::Decompressor>();
             break;
-            case CompressionScheme::NoCompression:
+            case nc::CompressionScheme::NoCompression:
                 cmc_global_msg("No compression has been applied. Therefore, no decompression is applicable.");
             break;
             default:
@@ -95,13 +95,13 @@ std::vector<OutputVar>
 Decompress(const std::string& file_name)
 {
     /* Create a reader for the given file */
-    NcReader reader{file_name};
+    nc::Reader reader{file_name};
 
     /* Read the global attributes of the file */
-    std::vector<NcAttribute> global_attributes = reader.ReadGlobalAttrtibutes();
+    std::vector<nc::Attribute> global_attributes = reader.ReadGlobalAttrtibutes();
 
     /* Check for a given attribute indicating the compression which has been used */
-    auto comp_scheme_iter = FindAttribute(global_attributes, kCompressionSchemeAttrName);
+    auto comp_scheme_iter = FindAttribute(global_attributes, nc::kCompressionSchemeAttrName);
 
     /* Check if the attribute has been found */
     if (comp_scheme_iter == global_attributes.end())
@@ -111,23 +111,23 @@ Decompress(const std::string& file_name)
     } else 
     {
         /* Get the attribute and check it's value */
-        const NcAttribute& comp_scheme_attr = *comp_scheme_iter;
+        const nc::Attribute& comp_scheme_attr = *comp_scheme_iter;
 
         /* Get the value of the compression scheme */
-        const CompressionScheme scheme = static_cast<CompressionScheme>(std::get<CompressionSchemeType>(comp_scheme_attr.GetValue()));
+        const nc::CompressionScheme scheme = static_cast<nc::CompressionScheme>(std::get<nc::CompressionSchemeType>(comp_scheme_attr.GetValue()));
 
         switch (scheme)
         {
-            case CompressionScheme::AdaptiveCoarsening:
+            case nc::CompressionScheme::AdaptiveCoarsening:
                 return GeneralDecompressionByAdaptiveCoarsening(); 
             break;
-            case CompressionScheme::PrefixExtraction:
+            case nc::CompressionScheme::PrefixExtraction:
                 return GeneralDecompressionByAdaptiveCoarsening();
             break;
-            case CompressionScheme::AdaptiveCoarseningPlusPrefixExtraction:
+            case nc::CompressionScheme::AdaptiveCoarseningPlusPrefixExtraction:
                 return GeneralDecompressionByAdaptiveCoarsening();
             break;
-            case CompressionScheme::NoCompression:
+            case nc::CompressionScheme::NoCompression:
                 cmc_global_msg("No compression has been applied. Therefore, no decompression is applicable.");
                 return std::vector<OutputVar>();
             break;

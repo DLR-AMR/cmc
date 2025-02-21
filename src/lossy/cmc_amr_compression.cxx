@@ -103,7 +103,7 @@ Compressor::Compress()
 }
 
 static
-NcVariable
+nc::Variable
 CreateRefinementBitsVariable(const ByteVar& var, const int time_step, const std::vector<bit_map::BitMap>& levelwise_indication_bits)
 {
     /* Generate a (potentially new) context information for the variable */
@@ -122,7 +122,7 @@ CreateRefinementBitsVariable(const ByteVar& var, const int time_step, const std:
     /* We add a size_t for each refinement level indicating the number of bits encoded */
     num_bytes += sizeof(size_t) * levelwise_indication_bits.size();
 
-    NcSpecificVariable<uint8_t> indication_bits {var_name, var.GetID()};
+    nc::SpecificVariable<uint8_t> indication_bits {var_name, var.GetID()};
     indication_bits.Reserve(num_bytes);
 
     /* We store a size_t of the number of bits in a stream */
@@ -145,18 +145,18 @@ CreateRefinementBitsVariable(const ByteVar& var, const int time_step, const std:
     }
 
     /* Assign some attributes to it */
-    std::vector<NcAttribute> attributes;
+    std::vector<nc::Attribute> attributes;
     attributes.emplace_back("id", var.GetID());
     attributes.emplace_back("time_step", time_step);
     attributes.emplace_back("add_refinements", static_cast<int>(levelwise_indication_bits.size()));
 
-    return NcVariable(std::move(indication_bits), std::move(attributes));
+    return nc::Variable(std::move(indication_bits), std::move(attributes));
 }
 
 void
 Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
-    NcWriter writer(file_name, NC_NETCDF4); //oder NC_CDF5
+    nc::Writer writer(file_name, NC_NETCDF4); //oder NC_CDF5
     writer.ReserveVariables(2 * compression_variables_.size());
 
     int ac_bits_index = 0;
@@ -168,7 +168,7 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
         //writer.AddVariable(CreateRefinementBitsVariable(*var_iter, time_step, ac_indications_[ac_bits_index].ac_indicator_bits));
     }
 
-    writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));
+    writer.AddGlobalAttribute(nc::Attribute(nc::kCompressionSchemeAttrName, CmcUniversalType(static_cast<nc::CompressionSchemeType>(nc::CompressionScheme::PrefixExtraction))));
     writer.Write();
 }
 

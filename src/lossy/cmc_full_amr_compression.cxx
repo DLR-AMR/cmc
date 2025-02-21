@@ -112,7 +112,7 @@ Compressor::Compress()
 void
 Compressor::WriteCompressedData(const std::string& file_name, const int time_step) const
 {
-    NcWriter writer(file_name, NC_NETCDF4); //oder NC_CDF5
+    nc::Writer writer(file_name, NC_NETCDF4); //oder NC_CDF5
     writer.ReserveVariables(2 * compression_variables_.size());
 
     int ac_bits_index = 0;
@@ -124,7 +124,7 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
         //writer.AddVariable(CreateRefinementBitsVariable(*var_iter, time_step, ac_indications_[ac_bits_index].ac_indicator_bits));
     }
 
-    writer.AddGlobalAttribute(NcAttribute(kCompressionSchemeAttrName, CmcUniversalType(static_cast<CompressionSchemeType>(CompressionScheme::PrefixExtraction))));
+    writer.AddGlobalAttribute(nc::Attribute(nc::kCompressionSchemeAttrName, CmcUniversalType(static_cast<nc::CompressionSchemeType>(nc::CompressionScheme::PrefixExtraction))));
     writer.Write();
 }
 

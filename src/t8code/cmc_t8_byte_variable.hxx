@@ -97,8 +97,8 @@ public:
     void ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& element_ids);
     void IndicatePrefixFound(const CompressionValue<sizeof(T)>& prefix);
     void IndicateNoPrefixFound();
-    NcVariable WriteCompressedData(const int id, const int time_step, const SuffixEncoding encoding_scheme) const;
-    NcVariable WriteCompressedData(const int id, const int time_step, SuffixEncodingFunc<sizeof(T)> suffix_encoder) const;
+    cmc::nc::Variable WriteCompressedData(const int id, const int time_step, const SuffixEncoding encoding_scheme) const;
+    cmc::nc::Variable WriteCompressedData(const int id, const int time_step, SuffixEncodingFunc<sizeof(T)> suffix_encoder) const;
 
     /** De-Compression Routines **/
     void AssignCompressionValueForDecompressionStart();
@@ -130,7 +130,7 @@ public:
     void ExtractMeanAndLeaveDifferencesFromPreviousMeans(const int elem_start_index, const int num_elements);
 
     void LeaveValueUnchangedForNextMeanComputation(const int element_index);
-    NcVariable WriteCompressedDiffData(const int id, const int time_step) const;
+    cmc::nc::Variable WriteCompressedDiffData(const int id, const int time_step) const;
     void InitializeResidualAlphabet();
 
     void ExtractMeanFromInitialData(const int elem_start_index, const int num_elements);
@@ -146,7 +146,7 @@ public:
     void _TestComparisonPCPLightAMRFromInitialData(const int elem_start_index, const int num_elements);
     void _TestComparisonPCPLightAMRFromPreviousMeans(const int elem_start_index, const int num_elements);
     void _TestComparisonPCPLightAMR(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements);
-    NcVariable _WriteCompressedDiffDataPCPLightAMRComparison(const int id, const int time_step) const;    
+    cmc::nc::Variable _WriteCompressedDiffDataPCPLightAMRComparison(const int id, const int time_step) const;    
     void ApplyResidualWithoutImplicitOneBitAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
 private:
     void ExtractMeanAndLeaveDifferences(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements);
@@ -226,7 +226,7 @@ public:
     void ExtractCommonPrefixFromInitialData(const std::vector<int>& element_ids);
     void ExtractCommonPrefixFromPreviousPrefixes(const std::vector<int>& element_ids);
     void LeaveCoarsePrefixUnchanged(const int elem_index);
-    NcVariable WriteCompressedData(const int time_step, const SuffixEncoding encoding_scheme) const;
+    cmc::nc::Variable WriteCompressedData(const int time_step, const SuffixEncoding encoding_scheme) const;
     
     /** De-Compression Routines **/
     void AssignCompressionValueForDecompressionStart();
@@ -253,7 +253,7 @@ public:
     void ExtractMeanAndLeaveDifferencesFromInitialData(const int elem_start_index, const int num_elements);
     void ExtractMeanAndLeaveDifferencesFromPreviousMeans(const int elem_start_index, const int num_elements);
     void LeaveValueUnchangedForNextMeanComputation(const int element_index);
-    NcVariable WriteCompressedDiffData(const int time_step) const;
+    cmc::nc::Variable WriteCompressedDiffData(const int time_step) const;
 
     void ExtractMeanFromInitialData(const int elem_start_index, const int num_elements);
     void ExtractMeanFromPreviousMeans(const int elem_start_index, const int num_elements);
@@ -270,7 +270,7 @@ public:
     void WriteDataToFile(const std::string& file_name) const;
     void _TestComparisonPCPLightAMRFromInitialData(const int elem_start_index, const int num_elements);
     void _TestComparisonPCPLightAMRFromPreviousMeans(const int elem_start_index, const int num_elements);
-    NcVariable _WriteCompressedDiffDataPCPLightAMRComparison(const int time_step) const;  
+    cmc::nc::Variable _WriteCompressedDiffDataPCPLightAMRComparison(const int time_step) const;  
     void ApplyResidualWithoutImplicitOneBitAndStoreElement(const int elem_id, const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
 private:
     void SetUpByteVariable(const CmcType type, const std::string& name, const GeoDomain domain, const DataLayout layout, const DataLayout pre_compression_layout,
@@ -564,31 +564,31 @@ ByteVar::SetDiffDecompressionRootElementValue(const CmcUniversalType& root_value
 }
 
 
-inline NcVariable
+inline nc::Variable
 ByteVar::WriteCompressedDiffData(const int time_step) const
 {
-    return std::visit([this, &time_step](auto&& var) -> NcVariable {
+    return std::visit([this, &time_step](auto&& var) -> nc::Variable {
         return var.WriteCompressedDiffData(this->GetID(), time_step);
     }, var_);
 }
 
-inline NcVariable
+inline nc::Variable
 ByteVar::_WriteCompressedDiffDataPCPLightAMRComparison(const int time_step) const
 {
     #if _PERFORM_TEST_COMPARISON
-    return std::visit([this, &time_step](auto&& var) -> NcVariable {
+    return std::visit([this, &time_step](auto&& var) -> nc::Variable {
         return var._WriteCompressedDiffDataPCPLightAMRComparison(this->GetID(), time_step);
     }, var_);
     #else
-    return NcVariable();
+    return nc::Variable();
     #endif
 }
 
 
-inline NcVariable
+inline nc::Variable
 ByteVar::WriteCompressedData(const int time_step, const SuffixEncoding encoding_scheme) const
 {
-    return std::visit([this, &time_step, &encoding_scheme](auto&& var) -> NcVariable {
+    return std::visit([this, &time_step, &encoding_scheme](auto&& var) -> nc::Variable {
         return var.WriteCompressedData(this->GetID(), time_step, encoding_scheme);
     }, var_);
 }
@@ -2520,7 +2520,7 @@ int
 DetermineForestRefinementBits(std::vector<uint8_t>& serialized_variable, t8_forest_t forest);
 
 template<typename T>
-inline NcVariable
+inline nc::Variable
 ByteVariable<T>::WriteCompressedData(const int id, const int time_step, const SuffixEncoding encoding_scheme) const
 {
     switch (encoding_scheme)
@@ -2540,12 +2540,12 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, const Su
         break;
         default:
             cmc_err_msg("An unknown suffix encoding scheme has been supplied.");
-            return NcVariable();
+            return nc::Variable();
     }
 }
 
 template<typename T>
-NcVariable
+nc::Variable
 ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEncodingFunc<sizeof(T)> suffix_encoder) const
 {
     /* Declare a vector which will hold the level-wise encoded data */
@@ -2577,7 +2577,7 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEn
     /* Create a netCDF variable to put out */
     std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
     cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
-    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
+    nc::SpecificVariable<uint8_t> compressed_variable{var_name, id};
     compressed_variable.Reserve(num_bytes);
 
     /* Put the buffered data into the variable to put out */
@@ -2587,7 +2587,7 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEn
     }
 
     /* Assign some attributes to it */
-    std::vector<NcAttribute> attributes;
+    std::vector<nc::Attribute> attributes;
     attributes.emplace_back("id", id);
     attributes.emplace_back("time_step", time_step);
     attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
@@ -2624,7 +2624,7 @@ ByteVariable<T>::WriteCompressedData(const int id, const int time_step, SuffixEn
     }
 
 
-    return NcVariable(std::move(compressed_variable), std::move(attributes));
+    return nc::Variable(std::move(compressed_variable), std::move(attributes));
 }
 
 template<typename T>
@@ -2645,7 +2645,7 @@ ByteVariable<T>::WriteDataToFile(const std::string& file_name) const
 }
 
 template<typename T>
-NcVariable
+nc::Variable
 ByteVariable<T>::WriteCompressedDiffData(const int id, const int time_step) const
 {
     std::vector<arithmetic_encoding::Letter> alphabet;
@@ -2847,7 +2847,7 @@ ByteVariable<T>::WriteCompressedDiffData(const int id, const int time_step) cons
     std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
     cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
 
-    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
+    nc::SpecificVariable<uint8_t> compressed_variable{var_name, id};
     compressed_variable.Reserve(encoded_byte_stream.size());
 
     //TODO Move instead of copy encoded byte stream
@@ -2855,7 +2855,7 @@ ByteVariable<T>::WriteCompressedDiffData(const int id, const int time_step) cons
     compressed_variable.PushBack(encoded_byte_stream);
 
     /* Assign some attributes to it */
-    std::vector<NcAttribute> attributes;
+    std::vector<nc::Attribute> attributes;
     attributes.emplace_back("id", id);
     attributes.emplace_back("time_step", time_step);
     attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
@@ -2892,13 +2892,13 @@ ByteVariable<T>::WriteCompressedDiffData(const int id, const int time_step) cons
     }
 
 
-    return NcVariable(std::move(compressed_variable), std::move(attributes));
+    return nc::Variable(std::move(compressed_variable), std::move(attributes));
 }
 
 
 
 template<typename T>
-NcVariable
+nc::Variable
 ByteVariable<T>::_WriteCompressedDiffDataPCPLightAMRComparison(const int id, const int time_step) const
 {
     #if _PERFORM_TEST_COMPARISON
@@ -2976,7 +2976,7 @@ ByteVariable<T>::_WriteCompressedDiffDataPCPLightAMRComparison(const int id, con
     std::string var_name = GetName() + "_" + std::to_string(global_context_info) + "_" + std::to_string(time_step);
     cmc_debug_msg("WriteComrpessed: Var_name: ", var_name);
 
-    NcSpecificVariable<uint8_t> compressed_variable{var_name, id};
+    nc::SpecificVariable<uint8_t> compressed_variable{var_name, id};
     //compressed_variable.Reserve(encoded_variable_data.size());
     compressed_variable.Reserve(encoded_byte_stream.size());
 
@@ -2985,7 +2985,7 @@ ByteVariable<T>::_WriteCompressedDiffDataPCPLightAMRComparison(const int id, con
     compressed_variable.PushBack(encoded_byte_stream);
 
     /* Assign some attributes to it */
-    std::vector<NcAttribute> attributes;
+    std::vector<nc::Attribute> attributes;
     attributes.emplace_back("id", id);
     attributes.emplace_back("time_step", time_step);
     attributes.emplace_back("initial_refinement_level", mesh_.GetInitialRefinementLevel());
@@ -3022,9 +3022,9 @@ ByteVariable<T>::_WriteCompressedDiffDataPCPLightAMRComparison(const int id, con
     }
 
 
-    return NcVariable(std::move(compressed_variable), std::move(attributes));
+    return nc::Variable(std::move(compressed_variable), std::move(attributes));
     #else
-    return NcVariable();
+    return nc::Variable();
     #endif
 }
 

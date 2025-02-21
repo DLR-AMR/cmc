@@ -468,13 +468,13 @@ Variable<T>::SetVariableDataInNCFile(const int ncid, const int var_id) const
     if (data_.size() > 0)
     {
         int err = nc_put_var(ncid, var_id, static_cast<const void*>(data_.data()));
-        NcCheckError(err);
+        nc::CheckError(err);
     } else
     {
         /* We set a single missing value within the file (in order to not define a unlimited dimension for the variable) */
         T missing_val = attributes_.GetMissingValue();
         int err = nc_put_var(ncid, var_id, static_cast<const void*>(&missing_val));
-        NcCheckError(err);
+        nc::CheckError(err);
     }
     #endif
 }

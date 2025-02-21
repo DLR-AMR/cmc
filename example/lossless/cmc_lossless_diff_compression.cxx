@@ -2,7 +2,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"
-#include "netcdf/cmc_netcdf.hxx"
+#include "input/cmc_netcdf.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 #include "lossless/cmc_diff_compression.hxx"
 #include "lossless/cmc_residual_compression.hxx"
@@ -19,20 +19,22 @@ main(void)
     
     {
     
-    #if 0
-    const std::string file = "../../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
+    #if 1
+    //const std::string file = "../../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
+    const std::string file = "../../data/mptrac_era5_2021_07_01_00.nc";
     //const std::string file = "../../data/v8.0_FT2022_GHG_CO2_2022_IND_PROCESSES_emi.nc";
     /* Create an object which interatcs with the file and opens it */
-    cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
+    cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
 
-    nc_data.SetHintHeightDimension(2); //Set time as height dimension
+    //nc_data.SetHintHeightDimension(2); //Set time as height dimension
+    nc_data.SetHintHeightDimension(6); //Set time as height dimension
 
-    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
-                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
-                             cmc::DimensionInterval(cmc::Dimension::Lev, 0, 1)
+    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1200),
+                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 601),
+                             cmc::DimensionInterval(cmc::Dimension::Lev, 0, 137)
                              );
 
-    const std::string var_name = "t2m";
+    const std::string var_name = "t";
     /* Inquire the hyperslab of data for the given variables */
     nc_data.InquireVariables(hyperslab, std::string(var_name));
 
@@ -227,9 +229,10 @@ LZC: 29 + (7 one bits induced)
     {
     
     /* Create the compression data */
-    //cmc::diff::Compressor compression_data(nc_data.TransferData()); //netCDF data
+    cmc::diff::Compressor compression_data(nc_data.TransferData()); //netCDF data
     //cmc::diff::Compressor compression_data(std::move(vars)); //Binary data
-    cmc::test_comparison::light_amr_pcp::Compressor compression_data(std::move(vars)); //Binary data
+    
+    //cmc::test_comparison::light_amr_pcp::Compressor compression_data(std::move(vars)); //Binary data
 
     //compression_data.SetSplitVariable(cmc::SplitVariable(cmc::kSplitAllVariables, cmc::Dimension::Lev));
 

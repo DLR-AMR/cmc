@@ -2,7 +2,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable.hxx"
 #include "utilities/cmc_output_variable.hxx"
-#include "netcdf/cmc_netcdf.hxx"
+#include "input/cmc_netcdf.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 #include "lossy/cmc_amr_lossy_compression.hxx"
 
@@ -20,7 +20,7 @@ main(void)
 #if 0
     #if 0
     const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
-    cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
+    cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
 
     cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
                              cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721),
@@ -54,7 +54,7 @@ main(void)
     //const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
 
     /* Create an object which interatcs with the file and opens it */
-    cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
+    cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
 
     /* Define a hyperlsab corresponding to the data we want to read */
     //cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
@@ -99,7 +99,7 @@ main(void)
     //const std::string file = "../../data/era5_reanalysis_pressure_lvls_fixed_time.nc";
 
     /* Create an object which interatcs with the file and opens it */
-    cmc::NcData nc_data(file, cmc::NcOpeningMode::Serial);
+    cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
 
     nc_data.SetHintHeightDimension(6); //Set plev as height dimension
 
