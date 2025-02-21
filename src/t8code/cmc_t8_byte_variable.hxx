@@ -153,6 +153,8 @@ private:
     void ExtractMean(std::vector<CompressionValue<sizeof(T)>>& values, const int elem_start_index, const int num_elements);
     CompressionValue<sizeof(T)> GetMaximumTailClearedValue(const int, const std::vector<PermittedError>&, const CompressionValue<sizeof(T)>&, const T&) const;
     CompressionValue<sizeof(T)> GetMaximumTailToggledValue(const int, const std::vector<PermittedError>&, const CompressionValue<sizeof(T)>&, const T&) const;
+    CompressionValue<sizeof(T)> GetMaximumTailClearedValue(const std::vector<PermittedError>& permitted_errors, const double previous_abs_deviation, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const;
+    CompressionValue<sizeof(T)> GetMaximumTailToggledValue(const std::vector<PermittedError>& permitted_errors, const double previous_abs_deviation, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const;
     CompressionValue<sizeof(T)> GetMaximumTailClearedValueRegardingUncompressedStates(const std::vector<PermittedError>& permitted_errors, const std::vector<DomainIndex>& initial_data_indices, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const;
     CompressionValue<sizeof(T)> GetMaximumTailToggledValueRegardingUncompressedStates(const std::vector<PermittedError>& permitted_errors, const std::vector<DomainIndex>& initial_data_indices, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const;
     std::vector<PermittedError> GetPermittedError(const int index) const;
@@ -1007,6 +1009,79 @@ ByteVariable<T>::GetMaximumTailToggledValue(const int index, const std::vector<P
 
 template<typename T>
 CompressionValue<sizeof(T)>
+ByteVariable<T>::GetMaximumTailToggledValue(const std::vector<PermittedError>& permitted_errors, const double previous_abs_deviation, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const
+{
+    bool is_toogling_progressing = true;
+    CompressionValue<sizeof(T)> toggled_value = initial_serialized_value;
+
+    const T initial_value = initial_serialized_value.template ReinterpretDataAs<T>();
+
+    int iteration_count = 0;
+    const int max_iteration_count = sizeof(T) * CHAR_BIT;
+
+    while (is_toogling_progressing && iteration_count < max_iteration_count)
+    {
+        const CompressionValue<sizeof(T)> save_previous_value = toggled_value;
+
+        /* Toggle all ones up until the next unset bit (inclusive) */
+        toggled_value.ToggleTailUntilNextUnsetBit();
+        const T reinterpreted_value = toggled_value.template ReinterpretDataAs<T>();
+
+        /* Check if it is error compliant */
+        const ErrorCompliance error_evaluation = utilities_.IsValueErrorCompliantRegardingPreviousDeviations(permitted_errors, initial_value, reinterpreted_value, previous_abs_deviation, missing_value);
+
+        if (!error_evaluation.is_error_threshold_satisfied)
+        {
+            /* Revert the changes to the value */
+            toggled_value = save_previous_value;
+            is_toogling_progressing = false;
+        }
+
+        ++iteration_count;
+    }
+
+    return toggled_value;
+}
+
+
+template<typename T>
+CompressionValue<sizeof(T)>
+ByteVariable<T>::GetMaximumTailClearedValue(const std::vector<PermittedError>& permitted_errors, const double previous_abs_deviation, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const
+{
+    bool is_clearing_progressing = true;
+    CompressionValue<sizeof(T)> cleared_value = initial_serialized_value;
+
+    const T initial_value = initial_serialized_value.template ReinterpretDataAs<T>();
+
+    int iteration_count = 0;
+    const int max_iteration_count = sizeof(T) * CHAR_BIT;
+
+    while (is_clearing_progressing && iteration_count < max_iteration_count)
+    {
+        const CompressionValue<sizeof(T)> save_previous_value = cleared_value;
+
+        /* Clear the next set bit from the tail */
+        cleared_value.ClearNextSetBitFromTail();
+        const T reinterpreted_value = cleared_value.template ReinterpretDataAs<T>();
+
+        /* Check if it is error compliant */
+        const ErrorCompliance error_evaluation = utilities_.IsValueErrorCompliantRegardingPreviousDeviations(permitted_errors, initial_value, reinterpreted_value, previous_abs_deviation, missing_value);
+
+        if (!error_evaluation.is_error_threshold_satisfied)
+        {
+            /* Revert the changes to the value */
+            cleared_value = save_previous_value;
+            is_clearing_progressing = false;
+        }
+
+        ++iteration_count;
+    }
+
+    return cleared_value;
+}
+
+template<typename T>
+CompressionValue<sizeof(T)>
 ByteVariable<T>::GetMaximumTailClearedValue(const int index, const std::vector<PermittedError>& permitted_errors, const CompressionValue<sizeof(T)>& initial_serialized_value, const T& missing_value) const
 {
     bool is_clearing_progressing = true;
@@ -1115,6 +1190,7 @@ ByteVariable<T>::GetMaximumTailClearedValueRegardingUncompressedStates(const std
     return cleared_value;
 }
 
+#if 0
 template<typename T>
 void
 ByteVariable<T>::PerformTailTruncation()
@@ -1163,7 +1239,61 @@ ByteVariable<T>::PerformTailTruncation()
         }
     }
 }
+#endif
 
+
+template<typename T>
+void
+ByteVariable<T>::PerformTailTruncation()
+{
+    const T missing_value = attributes_.GetMissingValue();
+
+    /* Iterate through the serialized values and try to emplace as many zeros at the tail as possible (compliant to the error threshold) */
+    int index = 0;
+    for (auto val_iter = byte_values_.begin(); val_iter != byte_values_.end(); ++val_iter, ++index)
+    {
+        if (!ApproxCompare(initial_data_[index], missing_value))
+        {
+            /* Get the permitted error for the current values */
+            //TODO: Revert! Only for now with absolute errors
+            //const std::vector<PermittedError> permitted_errors = GetRemainingMaxAllowedAbsoluteError(index);
+            const std::vector<PermittedError> permitted_errors = GetPermittedError(index);
+            //const double current_abs_deviation = utilities_.GetPreviousDeviation(index);
+            const double current_abs_deviation = 0.0;
+
+            /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
+            const CompressionValue<sizeof(T)> toggled_value = GetMaximumTailToggledValue(permitted_errors, current_abs_deviation, *val_iter, missing_value);
+
+            /* Get the value which has been transformed by clearing as many of the last set bits as possible */
+            const CompressionValue<sizeof(T)> cleared_value = GetMaximumTailClearedValue(permitted_errors, current_abs_deviation, *val_iter, missing_value);
+
+            /* Check which approach leads to more zero bits at the end */
+            const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
+            const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
+
+            /* Replace the initial value with the transformed one */
+            if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
+            {
+                /* If the toggling approach has been more successful */
+                *val_iter = toggled_value;
+            } else
+            {
+                /* If the clearing approach has been more successful */
+                *val_iter = cleared_value;
+            }
+
+            /* Update the trail bit count for the new value */
+            val_iter->UpdateTrailBitCount();
+            
+            //if (index % 12000 == 0)
+                //cmc_debug_msg("Trailing Zeros: Toggled: ", num_toogled_trailing_zeros, ", Cleared: ", num_cleared_trailing_zeros);
+        } else
+        {
+            /* In order to not chenge missing values, we are just able to trim their trailing zeros */
+            (*val_iter).UpdateTrailBitCount();
+        }
+    }
+}
 
 //TODO: For load-balancing, we would need a weighted partition of the mesh/data for this functionality 
 template<typename T>

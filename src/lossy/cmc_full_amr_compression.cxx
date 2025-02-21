@@ -47,8 +47,6 @@ Compressor::Setup()
 }
 
 
-
-
 void
 Compressor::Compress()
 {
@@ -79,7 +77,9 @@ Compressor::Compress()
     /* Perform trail truncation until the error trhesholds are exhausted */
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter)
     {
-        var_iter->PerformTailTruncationRegardingUncompressedStates();
+        //var_iter->PerformTailTruncationRegardingUncompressedStates();
+        var_iter->PerformTailTruncationOnInitialData();
+        //var_iter->PerformTailTruncation();
     }
     cmc_debug_msg("\n\nTail truncation has been applied\n\n");
 
@@ -119,7 +119,7 @@ Compressor::WriteCompressedData(const std::string& file_name, const int time_ste
     for (auto var_iter = compression_variables_.begin(); var_iter != compression_variables_.end(); ++var_iter, ++ac_bits_index)
     {
         /* Write the compressed byte variable */
-        writer.AddVariable(var_iter->WriteCompressedData(time_step, SuffixEncoding::LengthEncoding));
+        writer.AddVariable(var_iter->WriteCompressedData(time_step, SuffixEncoding::ArithmeticLengthEncoding));
         /* Write the refinement bits from the adaptive coarsening steps */
         //writer.AddVariable(CreateRefinementBitsVariable(*var_iter, time_step, ac_indications_[ac_bits_index].ac_indicator_bits));
     }

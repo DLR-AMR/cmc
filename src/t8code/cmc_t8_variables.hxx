@@ -152,7 +152,7 @@ public:
     ErrorCompliance IsCoarseningErrorCompliant(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value, const T missing_value) const;
     std::vector<ErrorCompliance> AreAlternativeValuesErrorCompliant(const std::vector<T>& alternative_values, const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T missing_value) const;
     ErrorCompliance IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const T& missing_value) const;
-
+    ErrorCompliance IsValueErrorCompliantRegardingPreviousDeviations(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const double previous_abs_deviation, const T& missing_value) const;
     ErrorCompliance IsCoarseningErrorCompliantRegardingInitialData(const std::vector<PermittedError>& permitted_errors, const std::vector<T>& initial_data, const std::vector<DomainIndex>& initial_elem_indices, const T interpolated_value, const T missing_value) const;
     
     void SetInaccuracyStorage(const TrackingOption& tracking_option) {tracking_option_ = tracking_option;};
@@ -434,6 +434,48 @@ VariableUtilities<T>::IsValueErrorCompliant(const std::vector<PermittedError>& p
 
     /* If the funciton reaches this point, the interpolated value complies with the permitted errors */
     return ErrorCompliance(true, abs_inaccuracy);
+}
+
+
+template<class T>
+ErrorCompliance
+VariableUtilities<T>::IsValueErrorCompliantRegardingPreviousDeviations(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const double previous_abs_deviation, const T& missing_value) const
+{
+    /* Get the absolute inaccuracy for all values (the absolute error is needed in any case) */
+    const double abs_inaccuracy = ComputeAbsoluteDeviation(initial_value, nominal_value, previous_abs_deviation, missing_value);
+
+    for (auto pe_iter = permitted_errors.begin(); pe_iter != permitted_errors.end(); ++pe_iter)
+    {
+        switch (pe_iter->criterion)
+        {
+            case CompressionCriterion::AbsoluteErrorThreshold:
+            {
+                /* Check if it is compliant with the permitted error */
+                if (abs_inaccuracy > pe_iter->error)
+                {
+                    return ErrorCompliance(false, 0.0);
+                }
+            }
+            break;
+            case CompressionCriterion::RelativeErrorThreshold:
+            {
+                /* Get the relative inaccuracy for all values */
+                const double rel_inaccuracy = ComputeRelativeDeviation(initial_value, nominal_value, previous_abs_deviation, missing_value);
+                /* Check if it is compliant with the permitted error */
+                if (rel_inaccuracy > pe_iter->error)
+                {
+                    return ErrorCompliance(false, 0.0);
+                }
+            }
+            break;
+                default:
+                cmc_err_msg("The error specifications hold an unrecognized criterion.");
+                return ErrorCompliance(false, 0.0);
+        }
+    }
+
+    /* If the function reaches this point, the interpolated value complies with the permitted errors */
+    return ErrorCompliance(true, previous_abs_deviation + abs_inaccuracy);
 }
 
 template<class T>

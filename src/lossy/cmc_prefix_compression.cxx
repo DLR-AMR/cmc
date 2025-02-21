@@ -68,8 +68,8 @@ Compressor::Compress()
         var_iter->KeepInitialData(true);
 
         /* Perform trail truncation until the error trhesholds are exhausted */
-        var_iter->PerformTailTruncationOnInitialData();
-
+        //var_iter->PerformTailTruncationOnInitialData();
+        var_iter->PerformTailTruncation();
         /* We create the adapt data based on the compression settings, the forest and the variable to consider during the adaptation/coarsening */
         PrefixAdaptData adapt_data{*var_iter};
 
