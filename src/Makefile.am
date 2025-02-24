@@ -72,7 +72,9 @@ src/comparison/cmc_test_comparison_pcp_decoder.hxx \
 src/input/cmc_netcdf.hxx \
 src/lossy/cmc_iface_adaptive_coarsening_variable.hxx \
 src/utilities/cmc_variable_utilities.hxx \
-src/utilities/cmc_error_domain.hxx
+src/utilities/cmc_error_domain.hxx \
+src/lossy/cmc_ac_compression_variable.hxx
+
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
