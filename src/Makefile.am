@@ -69,7 +69,8 @@ src/utilities/cmc_serialized_compression_value_forward.hxx \
 src/comparison/cmc_test_comparison_compression.hxx \
 src/comparison/cmc_test_comparison_decompression.hxx \
 src/comparison/cmc_test_comparison_pcp_decoder.hxx \
-src/input/cmc_netcdf.hxx
+src/utilities/cmc_variable_utilities.hxx \
+src/utilities/cmc_error_domain.hxx
 
 if ENABLE_FORTRAN
 include_HEADERS += src/fortran_interfaces/cmcc.h \
