@@ -136,92 +136,10 @@ Data::InquireCoordinateDimensions()
     }
 
     cmc_debug_msg("The following geo-spatial coordinate dimensions were retrieved from the netCDF file:");
-    cmc_debug_msg("LON: ", coordinate_lengths_[Dimension::Lon], ", Lat: ", coordinate_lengths_[Dimension::Lat], ", LEV: ", coordinate_lengths_[Dimension::Lev], ", T: ", coordinate_lengths_[Dimension::Time]);
+    cmc_debug_msg("Lon: ", coordinate_lengths_[Dimension::Lon], ", Lat: ", coordinate_lengths_[Dimension::Lat], ", Lev: ", coordinate_lengths_[Dimension::Lev], ", Time: ", coordinate_lengths_[Dimension::Time]);
     
     #endif
 }
-
-#if 0
-//Currently, there is nothing done with cooridnate variables.
-//Only the data dimensions are interesting for the compression
-//TODO: Add is anytime later
-void
-InquireCoordinateVariables()
-{
-    #ifdef CMC_WITH_NETCDF
-    int err, var_type;
-
-    /* Allocate a struct for the global coordinate system information */
-    nc_data.coordinates = new cmc_global_coordinate_system();
-
-    /* Loop over all possibly-considered coordinate variables (latitude, longitude, leverage, time) */
-    for (int coord_ids{0}; coord_ids < CMC_NUM_COORD_IDS; ++coord_ids)
-    {
-        /* Check if the considered coordinate variable/dimension is supplied within the netCDF file */
-        if (nc_data.coord_dim_ids[coord_ids] != CMC_COORDINATE_NOT_CONSIDERED)
-        {
-            /* Coordinate variables have a concerning coordinate dimension; the name of the dimension coincides with the name of the variable and is only dependent on "its own dimension" */
-            /* Get the id of the coordinate variable */
-            err = nc_inq_varid(nc_data.get_ncid(), nc_data.dimension_names[nc_data.coord_dim_ids[coord_ids]].c_str(), &(nc_data.coord_var_ids[coord_ids]));
-            cmc_nc_check_err(err);
-
-            /* Get the type of coordinate variables (e.g. float) */
-            err = nc_inq_vartype(nc_data.get_ncid(), nc_data.coord_var_ids[coord_ids], &(var_type));
-            cmc_nc_check_err(err);
-
-            /* Allocate space for each (geo-spatial) coordinate variable */
-            nc_data.coordinates->coords.create_and_push_back(static_cast<size_t>(nc_data.coord_lengths[coord_ids]), static_cast<cmc_type>(var_type));
-            cmc_debug_msg("Information about ", get_coord_name(static_cast<CMC_COORD_IDS>(coord_ids)), " was inquired.");
-        } else
-        {
-            /* Push back a placeholder in order to retain the internal used coordinate order */
-            nc_data.coordinates->coords.push_back_placeholder();
-        }
-    }
-    #endif
-}
-
-/** Store the geo-spatial coordinate data (latitude, longitude, leverage, time) */
-static void
-InquireCoordinateData(cmc_nc_data& nc_data)
-{
-    #ifdef CMC_WITH_NETCDF
-    int err{0};
-
-    /* Inquire the data of the latitude variable */
-    if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_LAT] != CMC_COORDINATE_NOT_CONSIDERED)
-    {
-        err = nc_get_var(nc_data.get_ncid(), nc_data.coord_var_ids[CMC_COORD_IDS::CMC_LAT], nc_data.coordinates->coords[CMC_COORD_IDS::CMC_LAT].get_initial_data_ptr());
-        cmc_nc_check_err(err);
-        cmc_debug_msg("Coordinate data of variable ", get_coord_name(CMC_LAT), " has been inquired.");
-    }
-
-    /* Inquire the data of the longitude variable */
-    if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_LON] != CMC_COORDINATE_NOT_CONSIDERED)
-    {
-        err = nc_get_var(nc_data.get_ncid(), nc_data.coord_var_ids[CMC_COORD_IDS::CMC_LON], nc_data.coordinates->coords[CMC_COORD_IDS::CMC_LON].get_initial_data_ptr());
-        cmc_nc_check_err(err);
-        cmc_debug_msg("Coordinate data of variable ", get_coord_name(CMC_LON), " has been inquired.");
-    }
-
-    /* Inquire the data of the leverage variable */
-    if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_LEV] != CMC_COORDINATE_NOT_CONSIDERED)
-    {
-        err = nc_get_var(nc_data.get_ncid(), nc_data.coord_var_ids[CMC_COORD_IDS::CMC_LEV], nc_data.coordinates->coords[CMC_COORD_IDS::CMC_LEV].get_initial_data_ptr());
-        cmc_nc_check_err(err);
-        cmc_debug_msg("Coordinate data of variable ", get_coord_name(CMC_LEV), " has been inquired.");
-    }
-
-    /* Inquire the data of the time variable */
-    if (nc_data.coord_dim_ids[CMC_COORD_IDS::CMC_TIME] != CMC_COORDINATE_NOT_CONSIDERED)
-    {
-        err = nc_get_var(nc_data.get_ncid(), nc_data.coord_var_ids[CMC_COORD_IDS::CMC_TIME], nc_data.coordinates->coords[CMC_COORD_IDS::CMC_TIME].get_initial_data_ptr());
-        cmc_nc_check_err(err);
-        cmc_debug_msg("Coordinate data of variable ", get_coord_name(CMC_TIME), " has been inquired.");
-    }
-    #endif
-}
-#endif
 
 void
 Data::InquireCoordinates()
@@ -231,14 +149,10 @@ Data::InquireCoordinates()
     int err = nc_inq(ncid_, &num_dimensions_, NULL, &num_global_attributes_, &id_unlimited_dimension_);
     nc::CheckError(err);
 
-    //TODO: When the coordinates are read in. Thex need to be adjusted to the given hyperslab later
     InquireCoordinateDimensions();
-    //InquireCoordinateVariables();
-    //InquireCoordinateData();
 
     #endif
 }
-
 
 static
 int 
