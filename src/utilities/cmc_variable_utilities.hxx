@@ -19,16 +19,12 @@ namespace cmc
 template<class T>
 class VariableUtilities
 {
-public:
-    using ed_iterator = std::vector<VariableErrorDomains>::iterator;
-    using ed_const_iterator = std::vector<VariableErrorDomains>::const_iterator;
-    
+public:    
     VariableUtilities() = default;
     ~VariableUtilities() = default;
 
     VariableUtilities(const VariableUtilities& other)
      : interpolate_{other.interpolate_},
-       error_domains_(other.error_domains_),
        is_inaccuracy_storage_set_{other.is_inaccuracy_storage_set_},
        tracking_option_{other.tracking_option_} {
         	if (other.inaccuracy_storage_ != nullptr)
@@ -38,7 +34,6 @@ public:
        };
     VariableUtilities(VariableUtilities&& other)
      : interpolate_{std::move(other.interpolate_)},
-       error_domains_(std::move(other.error_domains_)),
        is_inaccuracy_storage_set_{std::move(other.is_inaccuracy_storage_set_)},
        tracking_option_{std::move(other.tracking_option_)} {
             if (other.inaccuracy_storage_ != nullptr)
@@ -53,9 +48,8 @@ public:
     void SetInterpolation(Interpolate2<T> interpolate_function) {interpolate_ = interpolate_function;};
     InterpolationFunctional2<T>& GetInterpolation() {return interpolate_;};
 
-    void SetUpVariableErrorDomains(const CompressionSpecifications& variable_specifications, const GeoDomain& variable_global_domain);
-
     T Interpolate(const VectorView<T>& values, const t8_forest_t previous_mesh, const t8_locidx_t start_index, const int num_elements, const T missing_value) const;
+    
     ErrorCompliance IsCoarseningErrorCompliant(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value, const T missing_value) const;
     std::vector<ErrorCompliance> AreAlternativeValuesErrorCompliant(const std::vector<T>& alternative_values, const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T missing_value) const;
     ErrorCompliance IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const T& missing_value) const;
@@ -78,15 +72,6 @@ public:
 
     void RepartitionInaccuracyData(t8_forest_t initial_forest, t8_forest_t partitioned_forest);
 
-    ed_iterator GetErrorDomainsBegin() { return error_domains_.begin(); };
-    ed_iterator GetErrorDomainsEnd() { return error_domains_.end(); };
-
-    ed_const_iterator GetErrorDomainsBegin() const { return error_domains_.begin(); };
-    ed_const_iterator GetErrorDomainsEnd() const { return error_domains_.end(); };
-
-    ed_const_iterator GetErrorDomainsCBegin() const { return error_domains_.cbegin(); };
-    ed_const_iterator GetErrorDomainsCEnd() const { return error_domains_.cend(); };
-
     friend class TransformerInputToCompressionVariable;
     friend class TransformerCompressionToOutputVariable;
 
@@ -97,8 +82,6 @@ private:
 
     InaccuracyComputer<T> compute_absolute_inaccuracy_{ComputeAbsoluteDeviation, ComputeSingleAbsoluteDeviation};
     InaccuracyComputer<T> compute_relative_inaccuracy_{ComputeRelativeDeviation, ComputeSingleRelativeDeviation};
-    
-    std::vector<VariableErrorDomains> error_domains_;
 
     bool is_inaccuracy_storage_set_{false};
     TrackingOption tracking_option_{TrackingOption::TrackFullInaccuracy};
@@ -111,7 +94,6 @@ VariableUtilities<T>&
 VariableUtilities<T>::operator=(const VariableUtilities& other)
 {
     interpolate_ = other.interpolate_;
-    error_domains_ = other.error_domains_;
     is_inaccuracy_storage_set_ = other.is_inaccuracy_storage_set_;
     tracking_option_ = other.tracking_option_;
     inaccuracy_storage_.reset(other.inaccuracy_storage_->clone());
@@ -123,7 +105,6 @@ VariableUtilities<T>&
 VariableUtilities<T>::operator=(VariableUtilities&& other)
 {
     interpolate_ = std::move(other.interpolate_);
-    error_domains_ = std::move(other.error_domains_);
     is_inaccuracy_storage_set_ = std::move(other.is_inaccuracy_storage_set_);
     tracking_option_ = std::move(other.tracking_option_);
     inaccuracy_storage_ = std::move(other.inaccuracy_storage_);
@@ -154,21 +135,6 @@ VariableUtilities<T>::SetUpInaccuracyStorage(const size_t size_hint)
     }
 }
 
-/* Create the variable error domains for the variable. The general criterion considered on the whole domain is always put first within the 
-vector of error domains */
-template<class T>
-void
-VariableUtilities<T>::SetUpVariableErrorDomains(const CompressionSpecifications& variable_specifications, const GeoDomain& variable_global_domain)
-{
-    /* Create the general error domain */
-    error_domains_.emplace_back(variable_specifications.general_max_error, variable_global_domain, variable_specifications.general_compression_criterion);
-    
-    /* Create all specific error domains */
-    for (auto ed_iter = variable_specifications.specific_error_domains.begin(); ed_iter != variable_specifications.specific_error_domains.end(); ++ed_iter)
-    {
-        error_domains_.emplace_back(ed_iter->allowed_error, ed_iter->domain, ed_iter->compression_criterion);
-    }
-};
 
 template<class T>
 T
