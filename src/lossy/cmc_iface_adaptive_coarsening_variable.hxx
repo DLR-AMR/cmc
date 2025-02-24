@@ -10,13 +10,14 @@ namespace cmc::lossy
 class AbstractAdaptiveCoarseningVariable
 {
 public:
-    void Setup() final;
+    virtual void Setup() final;
 
 protected: 
     AbstractAdaptiveCoarseningVariable() = default;
     void SplitVariables(){};
     void CheckConsistencyOfInputVariables(){};
     void BuildInitialMesh(){};
+    void DistributeDataOnInitialMesh(){};
     void ApplyScalingAndOffset(){};
     void SetupCompressionFeatures(){};
 };
