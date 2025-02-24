@@ -70,6 +70,7 @@ src/comparison/cmc_test_comparison_compression.hxx \
 src/comparison/cmc_test_comparison_decompression.hxx \
 src/comparison/cmc_test_comparison_pcp_decoder.hxx \
 src/input/cmc_netcdf.hxx \
+src/lossy/cmc_iface_adaptive_coarsening_variable.hxx \
 src/utilities/cmc_variable_utilities.hxx \
 src/utilities/cmc_error_domain.hxx
 
