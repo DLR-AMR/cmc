@@ -168,7 +168,7 @@ VariableUtilities<T>::IsCoarseningErrorCompliantSkipMissingValues(const std::vec
     double max_introduced_error = 0.0;
 
     /* Get the absolute inaccuracy for all values (the absolute error is needed in any case) */
-    const std::vector<double> abs_inaccuracy = compute_absolute_inaccuracy_(previous_values, interpolated_value, previous_deviations, missing_value);
+    const std::vector<double> abs_inaccuracy = compute_absolute_inaccuracy_skip_missing_values_(previous_values, interpolated_value, previous_deviations, missing_value);
 
     for (auto pe_iter = permitted_errors.begin(); pe_iter != permitted_errors.end(); ++pe_iter)
     {
@@ -192,7 +192,7 @@ VariableUtilities<T>::IsCoarseningErrorCompliantSkipMissingValues(const std::vec
             case CompressionCriterion::RelativeErrorThreshold:
             {
                 /* Get the relative inaccuracy for all values */
-                const std::vector<double> rel_inaccuracy = compute_relative_inaccuracy_(previous_values, interpolated_value, previous_deviations, missing_value);
+                const std::vector<double> rel_inaccuracy = compute_relative_inaccuracy_skip_missing_values_(previous_values, interpolated_value, previous_deviations, missing_value);
                 /* Check if it is compliant with the permitted error */
                 int index = 0;
                 for (auto iacc_iter = rel_inaccuracy.begin(); iacc_iter != rel_inaccuracy.end(); ++iacc_iter, ++index)
