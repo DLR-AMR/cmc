@@ -15,56 +15,112 @@ enum TrackingOption {TrackFullInaccuracy = 0, TrackMinimalWorkingInaccuracy};
 constexpr size_t kInvalidSizeHintForInaccuracyContainer = 0;
 
 template<typename T>
-using ComputeInaccuracy = std::vector<double>(*)(const VectorView<T>& values, const T& interpolated_value, const std::vector<double>& previous_absolute_max_deviation, const T& missing_value);
+using ComputeInaccuracySkipMissingValues = std::vector<double>(*)(const VectorView<T>& values, const T& interpolated_value, const std::vector<double>& previous_absolute_max_deviation, const T& missing_value);
 
 template<typename T>
-using ComputeSingleInaccuracy = double(*)(const T value, const T interpolated_value, const T& missing_value);
+using ComputeSingleInaccuracySkipMissingValues = double(*)(const T value, const T interpolated_value, const T& missing_value);
+
+template<typename T>
+using ComputeInaccuracy = std::vector<double>(*)(const VectorView<T>& values, const T& interpolated_value, const std::vector<double>& previous_absolute_max_deviation);
+
+template<typename T>
+using ComputeSingleInaccuracy = double(*)(const T value, const T interpolated_value);
+
+
+template<class T>
+class InaccuracyComputerSkipMissingValues;
 
 template<class T>
 class InaccuracyComputer;
 
+
 template<typename T>
 auto
-ComputeRelativeDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
+ComputeRelativeDeviationSkipMissingValues(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
  -> std::enable_if_t<std::is_signed_v<T>, std::vector<double>>;
 
 
 template<typename T>
 auto
-ComputeRelativeDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
+ComputeRelativeDeviationSkipMissingValues(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
  -> std::enable_if_t<std::is_unsigned_v<T>, std::vector<double>>;
 
 
 template<typename T>
 auto
-ComputeAbsoluteDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
+ComputeAbsoluteDeviationSkipMissingValues(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
  -> std::enable_if_t<std::is_signed_v<T>, std::vector<double>>;
 
 template<typename T>
 auto
-ComputeAbsoluteDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
+ComputeAbsoluteDeviationSkipMissingValues(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation, const T& missing_value)
  -> std::enable_if_t<std::is_unsigned_v<T>, std::vector<double>>;
 
 
 template<typename T>
 auto
-ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value, const T& missing_value)
+ComputeSingleRelativeDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
  -> std::enable_if_t<std::is_signed_v<T>, double>;
 
 template<typename T>
 auto
-ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value, const T& missing_value)
+ComputeSingleRelativeDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
  -> std::enable_if_t<std::is_unsigned_v<T>, double>;
 
 
 template<typename T>
 auto
-ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value, const T& missing_value)
+ComputeSingleAbsoluteDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
  -> std::enable_if_t<std::is_signed_v<T>, double>;
 
 template<typename T>
 auto
-ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value, const T& missing_value)
+ComputeSingleAbsoluteDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
+ -> std::enable_if_t<std::is_unsigned_v<T>, double>;
+
+
+template<typename T>
+auto
+ComputeRelativeDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation)
+ -> std::enable_if_t<std::is_signed_v<T>, std::vector<double>>;
+
+
+template<typename T>
+auto
+ComputeRelativeDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation)
+ -> std::enable_if_t<std::is_unsigned_v<T>, std::vector<double>>;
+
+
+template<typename T>
+auto
+ComputeAbsoluteDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation)
+ -> std::enable_if_t<std::is_signed_v<T>, std::vector<double>>;
+
+template<typename T>
+auto
+ComputeAbsoluteDeviation(const VectorView<T>& values, const T& nominal_value, const double previous_absolute_max_deviation)
+ -> std::enable_if_t<std::is_unsigned_v<T>, std::vector<double>>;
+
+
+template<typename T>
+auto
+ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value)
+ -> std::enable_if_t<std::is_signed_v<T>, double>;
+
+template<typename T>
+auto
+ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value)
+ -> std::enable_if_t<std::is_unsigned_v<T>, double>;
+
+
+template<typename T>
+auto
+ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value)
+ -> std::enable_if_t<std::is_signed_v<T>, double>;
+
+template<typename T>
+auto
+ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value)
  -> std::enable_if_t<std::is_unsigned_v<T>, double>;
 
 class InaccuracyContainer;

@@ -45,16 +45,23 @@ public:
     VariableUtilities& operator=(const VariableUtilities& other);
     VariableUtilities& operator=(VariableUtilities&& other);
 
-    void SetInterpolation(Interpolate2<T> interpolate_function) {interpolate_ = interpolate_function;};
-    InterpolationFunctional2<T>& GetInterpolation() {return interpolate_;};
+    void SetInterpolation(Interpolate<T> interpolate_function) {interpolate_ = interpolate_function;};
+    InterpolationFunctional<T>& GetInterpolation() {return interpolate_;};
 
-    T Interpolate(const VectorView<T>& values, const t8_forest_t previous_mesh, const t8_locidx_t start_index, const int num_elements, const T missing_value) const;
+    void SetInterpolation(InterpolateSkipMissingValues<T> interpolate_function) {interpolate_skip_missing_values_ = interpolate_function;};
+    InterpolateSkipMissingValues<T>& GetInterpolationSkipMissingValues() {return interpolate_skip_missing_values_;};
     
-    ErrorCompliance IsCoarseningErrorCompliant(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value, const T missing_value) const;
-    std::vector<ErrorCompliance> AreAlternativeValuesErrorCompliant(const std::vector<T>& alternative_values, const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T missing_value) const;
-    ErrorCompliance IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const T& missing_value) const;
-    ErrorCompliance IsValueErrorCompliantRegardingPreviousDeviations(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const double previous_abs_deviation, const T& missing_value) const;
-    ErrorCompliance IsCoarseningErrorCompliantRegardingInitialData(const std::vector<PermittedError>& permitted_errors, const std::vector<T>& initial_data, const std::vector<DomainIndex>& initial_elem_indices, const T interpolated_value, const T missing_value) const;
+    T Interpolation(const VectorView<T>& values, const t8_forest_t previous_mesh, const int tree_id, const t8_locidx_t start_index, const int num_element) const;
+    T Interpolation(const VectorView<T>& values, const t8_forest_t previous_mesh, const int tree_id, const t8_locidx_t start_index, const int num_elements, const T missing_value) const;
+    
+
+    ErrorCompliance IsCoarseningErrorCompliantSkipMissingValues(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value, const T missing_value) const;
+    ErrorCompliance IsCoarseningErrorCompliant(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value) const;
+
+    //std::vector<ErrorCompliance> AreAlternativeValuesErrorCompliant(const std::vector<T>& alternative_values, const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T missing_value) const;
+    //ErrorCompliance IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const T& missing_value) const;
+    //ErrorCompliance IsValueErrorCompliantRegardingPreviousDeviations(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const double previous_abs_deviation, const T& missing_value) const;
+    //ErrorCompliance IsCoarseningErrorCompliantRegardingInitialData(const std::vector<PermittedError>& permitted_errors, const std::vector<T>& initial_data, const std::vector<DomainIndex>& initial_elem_indices, const T interpolated_value, const T missing_value) const;
     
     void SetInaccuracyStorage(const TrackingOption& tracking_option) {tracking_option_ = tracking_option;};
     void SetUpInaccuracyStorage(const size_t size_hint = kInvalidSizeHintForInaccuracyContainer);
@@ -76,9 +83,13 @@ public:
     friend class TransformerCompressionToOutputVariable;
 
 private:
-    const InaccuracyComputer<T>& CompressionCriterionToInaccuracyComputer(const CompressionCriterion criterion) const;
+    const InaccuracyComputerSkipMissingValues<T>& CompressionCriterionToInaccuracyComputerSkipMissingValues(const CompressionCriterion criterion) const;
 
-    InterpolationFunctional2<T> interpolate_{InterpolateToArithmeticMean};
+    Interpolate<T> interpolate_{InterpolateToArithmeticMean};
+    InterpolateSkipMissingValues<T> interpolate_skip_missing_values_{InterpolateToArithmeticMeanSkipMissingValues};
+
+    InaccuracyComputerSkipMissingValues<T> compute_absolute_inaccuracy_skip_missing_values_{ComputeAbsoluteDeviationSkipMissingValues, ComputeSingleAbsoluteDeviationSkipMissingValues};
+    InaccuracyComputerSkipMissingValues<T> compute_relative_inaccuracy_skip_missing_values_{ComputeRelativeDeviationSkipMissingValues, ComputeSingleRelativeDeviationSkipMissingValues};
 
     InaccuracyComputer<T> compute_absolute_inaccuracy_{ComputeAbsoluteDeviation, ComputeSingleAbsoluteDeviation};
     InaccuracyComputer<T> compute_relative_inaccuracy_{ComputeRelativeDeviation, ComputeSingleRelativeDeviation};
@@ -138,14 +149,21 @@ VariableUtilities<T>::SetUpInaccuracyStorage(const size_t size_hint)
 
 template<class T>
 T
-VariableUtilities<T>::Interpolate(const VectorView<T>& values, const t8_forest_t previous_mesh, const t8_locidx_t start_index, const int num_elements, const T missing_value) const
+VariableUtilities<T>::Interpolation(const VectorView<T>& values, const t8_forest_t previous_mesh, const int tree_id, const t8_locidx_t start_index, const int num_elements, const T missing_value) const
 {
-    return interpolate_(values, previous_mesh, start_index, num_elements, missing_value);
+    return interpolate_skip_missing_values_(values, previous_mesh, tree_id, start_index, num_elements, missing_value);
 };
 
 template<class T>
+T
+VariableUtilities<T>::Interpolation(const VectorView<T>& values, const t8_forest_t previous_mesh, const int tree_id, const t8_locidx_t start_index, const int num_elements) const
+{
+    return interpolate_(values, previous_mesh, tree_id, start_index, num_elements);
+}
+
+template<class T>
 ErrorCompliance 
-VariableUtilities<T>::IsCoarseningErrorCompliant(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value, const T missing_value) const
+VariableUtilities<T>::IsCoarseningErrorCompliantSkipMissingValues(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value, const T missing_value) const
 {
     double max_introduced_error = 0.0;
 
@@ -198,6 +216,112 @@ VariableUtilities<T>::IsCoarseningErrorCompliant(const std::vector<PermittedErro
     /* If the funciton reaches this point, the interpolated value complies with the permitted errors */
     return ErrorCompliance(true, max_introduced_error);
 }
+
+
+template<class T>
+ErrorCompliance 
+VariableUtilities<T>::IsCoarseningErrorCompliant(const std::vector<PermittedError>& permitted_errors, const VectorView<T>& previous_values, const std::vector<double>& previous_deviations, const T interpolated_value) const
+{
+    double max_introduced_error = 0.0;
+
+    /* Get the absolute inaccuracy for all values (the absolute error is needed in any case) */
+    const std::vector<double> abs_inaccuracy = compute_absolute_inaccuracy_(previous_values, interpolated_value, previous_deviations);
+
+    for (auto pe_iter = permitted_errors.begin(); pe_iter != permitted_errors.end(); ++pe_iter)
+    {
+        switch (pe_iter->criterion)
+        {
+            case CompressionCriterion::AbsoluteErrorThreshold:
+            {
+                /* Check if it is compliant with the permitted error */
+                for (auto iacc_iter = abs_inaccuracy.begin(); iacc_iter != abs_inaccuracy.end(); ++iacc_iter)
+                {
+                    if (*iacc_iter > pe_iter->error)
+                    {
+                        return ErrorCompliance(false, 0.0);
+                    } else if (*iacc_iter > max_introduced_error)
+                    {
+                        max_introduced_error = *iacc_iter;
+                    }
+                }
+            }
+            break;
+            case CompressionCriterion::RelativeErrorThreshold:
+            {
+                /* Get the relative inaccuracy for all values */
+                const std::vector<double> rel_inaccuracy = compute_relative_inaccuracy_(previous_values, interpolated_value, previous_deviations);
+                /* Check if it is compliant with the permitted error */
+                int index = 0;
+                for (auto iacc_iter = rel_inaccuracy.begin(); iacc_iter != rel_inaccuracy.end(); ++iacc_iter, ++index)
+                {
+                    if (*iacc_iter > pe_iter->error)
+                    {
+                        return ErrorCompliance(false, 0.0);
+                    } else if (abs_inaccuracy[index] > max_introduced_error)
+                    {
+                        max_introduced_error = abs_inaccuracy[index];
+                    }
+                }
+            }
+            break;
+                default:
+                cmc_err_msg("The error specifications hold an unrecognized criterion.");
+                return ErrorCompliance(false, 0.0);
+        }
+    }
+
+    /* If the funciton reaches this point, the interpolated value complies with the permitted errors */
+    return ErrorCompliance(true, max_introduced_error);
+}
+
+template<typename T>
+std::vector<double> 
+VariableUtilities<T>::GetPreviousDeviations(const int start_index, const int num_elements) const
+{
+    cmc_assert(inaccuracy_storage_ != nullptr);
+    return inaccuracy_storage_->GetInaccuracyForRange(start_index, num_elements);
+}
+
+template<typename T>
+double
+VariableUtilities<T>::GetPreviousDeviation(const int index) const
+{
+    return inaccuracy_storage_->GetInaccuracy(index);
+}
+
+template<typename T>
+const InaccuracyComputerSkipMissingValues<T>&
+VariableUtilities<T>::CompressionCriterionToInaccuracyComputerSkipMissingValues(const CompressionCriterion criterion) const
+{
+    switch (criterion)
+    {
+        case CompressionCriterion::RelativeErrorThreshold:
+            return compute_relative_inaccuracy_skip_missing_values_;
+        break;
+        case CompressionCriterion::AbsoluteErrorThreshold:
+            return compute_absolute_inaccuracy_skip_missing_values_;
+        break;
+        default:
+            cmc_err_msg("The supplied compression criterion does not correspond to an inaccuracy computation funciton.");
+            return compute_absolute_inaccuracy_skip_missing_values_;
+    }
+}
+
+template<typename T>
+void
+VariableUtilities<T>::RepartitionInaccuracyData(t8_forest_t initial_forest, t8_forest_t partitioned_forest)
+{
+    cmc_assert(is_inaccuracy_storage_set_);
+    cmc_assert(inaccuracy_storage_ != nullptr);
+
+    /* Repartition the tracked deviations compliant to the new partitioned forest */
+    inaccuracy_storage_->RepartitionDeviations(initial_forest, partitioned_forest);
+}
+
+
+#if 0
+
+
 
 template<class T>
 ErrorCompliance 
@@ -350,50 +474,8 @@ VariableUtilities<T>::AreAlternativeValuesErrorCompliant(const std::vector<T>& a
 }
 
 
-template<typename T>
-std::vector<double> 
-VariableUtilities<T>::GetPreviousDeviations(const int start_index, const int num_elements) const
-{
-    cmc_assert(inaccuracy_storage_ != nullptr);
-    return inaccuracy_storage_->GetInaccuracyForRange(start_index, num_elements);
-}
 
-template<typename T>
-double
-VariableUtilities<T>::GetPreviousDeviation(const int index) const
-{
-    return inaccuracy_storage_->GetInaccuracy(index);
-}
-
-template<typename T>
-const InaccuracyComputer<T>&
-VariableUtilities<T>::CompressionCriterionToInaccuracyComputer(const CompressionCriterion criterion) const
-{
-    switch (criterion)
-    {
-        case CompressionCriterion::RelativeErrorThreshold:
-            return compute_relative_inaccuracy_;
-        break;
-        case CompressionCriterion::AbsoluteErrorThreshold:
-            return compute_absolute_inaccuracy_;
-        break;
-        default:
-            cmc_err_msg("The supplied compression criterion does not correspond to an inaccuracy computation funciton.");
-            return compute_absolute_inaccuracy_;
-    }
-}
-
-template<typename T>
-void
-VariableUtilities<T>::RepartitionInaccuracyData(t8_forest_t initial_forest, t8_forest_t partitioned_forest)
-{
-    cmc_assert(is_inaccuracy_storage_set_);
-    cmc_assert(inaccuracy_storage_ != nullptr);
-
-    /* Repartition the tracked deviations compliant to the new partitioned forest */
-    inaccuracy_storage_->RepartitionDeviations(initial_forest, partitioned_forest);
-}
-
+#endif
 
 }
 

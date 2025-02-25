@@ -115,7 +115,7 @@ public:
     void SetAddOffset(const CmcUniversalType& add_offset);
     void SetAddOffset(const T add_offset);
 
-    void SetInterpolation(const Interpolate2<T>& interpolation_function);
+    void SetInterpolation(const InterpolateSkipMissingValues<T>& interpolation_function);
     void SetInaccuracyTrackingOption(const TrackingOption tracking_option);
 
     int GetGlobalContextInformation() const;
@@ -191,7 +191,7 @@ private:
     GeoDomain global_domain_;
 
     TrackingOption inaccuracy_tracking_{TrackingOption::TrackFullInaccuracy};
-    InterpolationFunctional2<T> interpolation_{InterpolateToArithmeticMean<T>};
+    InterpolationFunctionalSkipMissingValues<T> interpolation_{InterpolateToArithmeticMeanSkipMissingValues<T>};
 
     int intern_id_{kNoInternalIDSet};
     int global_context_information_{kNoGlobalContext};
@@ -719,7 +719,7 @@ InputVariable<T>::GetType() const
 
 template<class T>
 void
-InputVariable<T>::SetInterpolation(const Interpolate2<T>& interpolation_function)
+InputVariable<T>::SetInterpolation(const InterpolateSkipMissingValues<T>& interpolation_function)
 {
     interpolation_.SetInterpolation(interpolation_function);
 }
