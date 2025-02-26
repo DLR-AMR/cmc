@@ -83,11 +83,16 @@ private:
     const IsElementInDomainFn* is_inside_domain_check_;
 };
 
+namespace error_domain_fn
+{
+
 inline bool
 GeneralErrorCriterion([[maybe_unused]] t8_forest_t forest, [[maybe_unused]] int tree_id, [[maybe_unused]] int first_lelement_id,
                       [[maybe_unused]] t8_eclass_scheme_c* ts, [[maybe_unused]] const t8_element_t * element)
 {
     return true;
+}
+
 }
 
 }

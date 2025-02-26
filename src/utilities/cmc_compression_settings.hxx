@@ -16,7 +16,7 @@ class CompressionSettings
 public:
     void SetGeneralErrorCriterion(const CompressionCriterion criterion, const double permitted_error)
     {
-        error_domains_.emplace_back(PermittedError{criterion, permitted_error}, GeneralErrorCriterion);
+        error_domains_.emplace_back(PermittedError{criterion, permitted_error}, error_domain_fn::GeneralErrorCriterion);
     }
     void SetErrorDomain(const ErrorDomain& error_domain){error_domains_.push_back(error_domain);};
     void SetErrorDomain(ErrorDomain&& error_domain){error_domains_.push_back(std::move(error_domain));};
