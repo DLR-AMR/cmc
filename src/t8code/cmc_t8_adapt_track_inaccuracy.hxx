@@ -606,7 +606,7 @@ public:
 
     double GetInaccuracy(const int id) override
     {
-        if (previous_deviations_.size() > 0)
+        if (not previous_deviations_.empty())
         {
             return previous_deviations_[id];
         } else
@@ -620,9 +620,15 @@ public:
         std::vector<double> deviations;
         deviations.reserve(num_elements);
 
-        for (int iter = start_index; iter < start_index + num_elements; ++iter)
+        if (not previous_deviations_.empty())
         {
-            deviations.push_back(previous_deviations_[iter]);
+            for (int iter = start_index; iter < start_index + num_elements; ++iter)
+            {
+                deviations.push_back(previous_deviations_[iter]);
+            }
+        } else
+        {
+            std::fill_n(std::back_inserter(deviations), num_elements, 0.0);
         }
 
         return deviations;
@@ -663,12 +669,6 @@ public:
     void RepartitionDeviations(t8_forest_t initial_forest, t8_forest_t partitioned_forest) override
     {
         /* Create an sc_array_t wrapper of the current tracked deviations */
-        //sc_array_t in_data;
-        //in_data.elem_size = sizeof(double);
-        //in_data.elem_count = previous_deviations_.size();
-        //in_data.byte_alloc = static_cast<ssize_t>(in_data.elem_size * in_data.elem_count);
-        //in_data.array = reinterpret_cast<char*>(previous_deviations_.data());
-
         sc_array_t* in_data = sc_array_new_data (static_cast<void*>(previous_deviations_.data()), sizeof(double), previous_deviations_.size());
 
         /* Allocate memory for the partitioned data */
@@ -676,12 +676,6 @@ public:
         deviations_ = std::vector<double>(new_num_elems);
 
         /* Create a wrapper for the freshly allocated partitioned deviations */
-        //sc_array_t out_data;
-        //out_data.elem_size = sizeof(double);
-        //out_data.elem_count = deviations_.size();
-        //out_data.byte_alloc = static_cast<ssize_t>(out_data.elem_size * out_data.elem_count);
-        //out_data.array = reinterpret_cast<char*>(deviations_.data());
-
         sc_array_t* out_data = sc_array_new_data (static_cast<void*>(deviations_.data()), sizeof(double), deviations_.size());
 
         /* Partition the deviations compliant to the new partitioned forest */
