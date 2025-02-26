@@ -7,6 +7,7 @@
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_variable_utilities.hxx"
+#include "utilities/cmc_compression_settings.hxx"
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
@@ -36,17 +37,23 @@ public:
     virtual cmc::t8::AdaptationFn GetAdaptationFunction() = 0;
     virtual int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors) = 0;
     virtual int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors, const CmcUniversalType missing_value) = 0;
+    virtual int LeaveElementUnchanged(const int tree_id, const int elem_id) = 0;
+
+    virtual ~IAdaptData(){};
 };
 
 template<typename T>
-using AdaptCreator = std::function<IAdaptData*(AbstractCompressionVariable<T>*)>;
+using AdaptCreator = std::function<IAdaptData*(AbstractCompressionVariable<T>*,const CompressionSettings&)>;
+
+template<typename T>
+using AdaptDestructor = std::function<void(IAdaptData*)>;
 
 template <typename T>
 class AbstractCompressionVariable
 {
 public:
 
-    virtual void Compress() final;
+    virtual void Compress(const CompressionSettings& settings) final;
 
     /* Overrideable hook during the compression */
     void CustomCompressionSetup() {};
@@ -71,32 +78,34 @@ public:
 
     virtual int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors) final;
     virtual int EvaluateCoarseningSkipMissingValues(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors, const T missing_value) final;
+
+    virtual int LeaveElementUnchanged(const int tree_id, const int elem_id) final;
+
+    virtual ~AbstractCompressionVariable(){};
 protected:
     AbstractCompressionVariable() = default;
-
-private:
-    virtual bool IsValidForCompression() const final;
-    virtual void AllocateCoarseningIteration() final {data_new_.reserve(mesh_.GetNumberLocalElements() / (2 << mesh_.GetDimensionality()) + 8);}
-    virtual void SwitchToAdaptedData() final {data_.swap(data_new_); data_new_.clear();};
-    virtual IAdaptData* CreateAdaptData() final {return adaptation_creator(this);};
-    virtual t8_forest_t RepartitionMesh(t8_forest_t adapted_forest) final;
-    virtual void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest) final;
-
-
-
 
     std::string name_; //!< The name of the variable
     std::vector<T> data_; //!< The actual data of the variable
     std::vector<T> data_new_; //!< A helper variable for the adaptation
     AmrMesh mesh_; //!< The mesh on which the variable is defined
     VariableUtilities<T> utilities_; //!< Utilities that are needed in order to track the errors
-    AdaptCreator<T> adaptation_creator; //!< A function pointer which is used to create the wished adaptation structure
+    AdaptCreator<T> adaptation_creator_; //!< A function pointer which is used to create the wished adaptation structure
+    AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure
+
+private:
+    virtual bool IsValidForCompression() const final;
+    virtual void AllocateCoarseningIteration() final {data_new_.reserve(mesh_.GetNumberLocalElements() / (2 << mesh_.GetDimensionality()) + 8);}
+    virtual void SwitchToAdaptedData() final {data_.swap(data_new_); data_new_.clear();};
+    virtual IAdaptData* CreateAdaptData(const CompressionSettings& settings) final {return adaptation_creator_(this, settings);};
+    virtual t8_forest_t RepartitionMesh(t8_forest_t adapted_forest) final;
+    virtual void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest) final;
 };
 
 
 template <typename T>
 inline void
-AbstractCompressionVariable<T>::Compress()
+AbstractCompressionVariable<T>::Compress(const CompressionSettings& settings)
 {
     cmc_debug_msg("Compression of variable ", this->name_, " (by the means of adaptive coarsening) starts...");
 
@@ -107,7 +116,7 @@ AbstractCompressionVariable<T>::Compress()
     this->CustomCompressionSetup();
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
-    IAdaptData* adapt_data = this->CreateAdaptData(this);
+    IAdaptData* adapt_data = this->CreateAdaptData(settings);
 
     while (adapt_data->IsCompressionProgressing())
     {
@@ -123,10 +132,11 @@ AbstractCompressionVariable<T>::Compress()
 
         /* Perform a coarsening iteration */
         t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, adapt_data->GetAdaptationFunction(), 0, 0, static_cast<void*>(adapt_data));
-        cmc_debug_msg("The mesh adaptation step is finished with ", t8_forest_get_global_num_elements(adapted_forest), " global elements");
+        cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_elements(adapted_forest), " global elements");
 
-        /* Complete the interpolation step */
+        /* Complete the interpolation step by storing the newly computed adapted data alongside its deviations */
         this->SwitchToAdaptedData();
+        utilities_.SwitchDeviations();
         adapt_data->CompleteInterpolation(previous_forest, adapted_forest);
 
         /* Free the former forest */
@@ -136,7 +146,7 @@ AbstractCompressionVariable<T>::Compress()
         t8_forest_t partitioned_forest = RepartitionMesh(adapted_forest);
 
         /* Repartition the data */
-        this->RepartitionData();
+        this->RepartitionData(adapted_forest, partitioned_forest);
         adapt_data->RepartitionData(adapted_forest, partitioned_forest);
 
         cmc_debug_msg("The mesh and the data has been re-partitioned.");
@@ -152,7 +162,7 @@ AbstractCompressionVariable<T>::Compress()
     }
 
     /* Free the adapt data structure */
-    delete adapt_data;
+    this->adaptation_destructor_(adapt_data);
     cmc_debug_msg("Compression of variable ", this->name_, " is finished.");
 }
 
@@ -195,6 +205,9 @@ AbstractCompressionVariable<T>::RepartitionData(t8_forest_t adapted_forest, t8_f
 
     /* Create a wrapper for the freshly allocated partitioned data */
     sc_array_t* out_data = sc_array_new_data (static_cast<void*>(data_new_.data()), sizeof(T), data_new_.size());
+
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)) == data_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(partitioned_forest)) == data_new_.size());
 
     /* Partition the variables data */
     t8_forest_partition_data(adapted_forest, partitioned_forest, in_data, out_data);
@@ -261,7 +274,7 @@ AbstractCompressionVariable<T>::EvaluateCoarseningSkipMissingValues(const int tr
     const std::vector<double> previous_deviations = utilities_.GetPreviousDeviations(elem_id, num_elements);
 
     /* Evaluate whether the interpolation is error-bound-conformal */
-    const ErrorCompliance evaluation = utilities_.IsCoarseningErrorCompliant(permitted_errors, values, previous_deviations, interpolated_value, missing_value);
+    const ErrorCompliance evaluation = utilities_.IsCoarseningErrorCompliantSkipMissingValues(permitted_errors, values, previous_deviations, interpolated_value, missing_value);
 
     if (evaluation.is_error_threshold_satisfied)
     {
@@ -274,6 +287,32 @@ AbstractCompressionVariable<T>::EvaluateCoarseningSkipMissingValues(const int tr
         utilities_.TransferPreviousDeviation(elem_id);
         return t8::kLeaveElementUnchanged;
     }
+}
+
+template <typename T>
+inline int
+AbstractCompressionVariable<T>::LeaveElementUnchanged(const int tree_id, const int local_elem_id) 
+{
+    /* Compute the local element id in the data array */
+    const int elem_id = t8_forest_get_tree_element_offset(mesh_.GetMesh(), tree_id) + local_elem_id;
+    
+    /* Get the value */
+    const T value = data_[elem_id];
+
+    /* Store the unchanged value in the new data vector */
+    data_new_.push_back(value);
+
+    /* Transfer the previous inaccuracy */
+    utilities_.TransferPreviousDeviation(elem_id);
+
+    return t8::kLeaveElementUnchanged;
+}
+
+template <typename T>
+inline bool
+AbstractCompressionVariable<T>::IsValidForCompression() const 
+{
+    return true;
 }
 
 template <typename T>
