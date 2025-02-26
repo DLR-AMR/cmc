@@ -73,7 +73,11 @@ public:
     }
 
     inline PermittedError GetPermittedError() const {return error_criterion_;};
-                            
+    
+    inline CompressionCriterion GetCompressionCriterion() const {return error_criterion_.criterion;};
+
+    inline double GetErrorThreshold() const {return error_criterion_.error;};
+
 private:
     const PermittedError error_criterion_;
     const IsElementInDomainFn* is_inside_domain_check_;
