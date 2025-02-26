@@ -11,9 +11,6 @@
 
 namespace cmc {
 
-enum CompressionMode {CompressionModeUndefined, OneForAll, OneForOne};
-
-
 class CompressionSettings
 {
 public:
