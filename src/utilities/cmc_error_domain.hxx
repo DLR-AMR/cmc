@@ -1,13 +1,19 @@
 #ifndef CMC_ERROR_DOMAIN_HXX
 #define CMC_ERROR_DOMAIN_HXX
 
-#include "utilities/cmc_log_functions.hxx"
-#include "utilities/cmc_geo_domain.hxx"
+#include "t8code/cmc_t8_mesh.hxx"
 
 #include <vector>
+#include <utility>
 
 namespace cmc
 {
+
+enum CompressionCriterion {CriterionUndefined, RelativeErrorThreshold, AbsoluteErrorThreshold};
+
+typedef bool IsElementInDomainFn(t8_forest_t forest, int tree_id, int lelement_id,
+                                 t8_eclass_scheme_c* ts, const t8_element_t * element);
+
 
 struct PermittedError
 {
@@ -19,16 +25,66 @@ struct PermittedError
     const double error{0.0};
 };
 
-struct ErrorCompliance
+class ErrorDomain
 {
-    ErrorCompliance() = delete;
-    ErrorCompliance(const bool is_error_threshold_fulfilled, const double max_error)
-    : is_error_threshold_satisfied{is_error_threshold_fulfilled}, max_introduced_error{max_error}{};
+public:
+    ErrorDomain() = delete;
 
-    const bool is_error_threshold_satisfied;
-    const double max_introduced_error;
+    ErrorDomain(const PermittedError& error_criterion, const IsElementInDomainFn* is_inside_domain_check)
+    : error_criterion_{error_criterion}, is_inside_domain_check_{is_inside_domain_check}{};
+    
+    inline bool
+    IsElementWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
+                          t8_eclass_scheme_c* ts, const t8_element_t* element) const
+    {
+        return is_inside_domain_check_(forest, tree_id, lelement_id, ts, element);
+    }
+    
+    inline bool
+    IsAnyElementWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
+                             t8_eclass_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+    {
+        for (int idx = 0; idx < num_elements; ++idx)
+        {
+            const bool is_inside = is_inside_domain_check_(forest, tree_id, lelement_id + idx, ts, elements[idx]);
+
+            if (is_inside == true)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline bool
+    AreAllElementsWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
+                              t8_eclass_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+    {
+        for (int idx = 0; idx < num_elements; ++idx)
+        {
+            const bool is_inside = is_inside_domain_check_(forest, tree_id, lelement_id + idx, ts, elements[idx]);
+
+            if (is_inside == false)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    inline PermittedError GetPermittedError() const {return error_criterion_;};
+                            
+private:
+    const PermittedError error_criterion_;
+    const IsElementInDomainFn* is_inside_domain_check_;
 };
 
+inline bool
+GeneralErrorCriterion([[maybe_unused]] t8_forest_t forest, [[maybe_unused]] int tree_id, [[maybe_unused]] int first_lelement_id,
+                      [[maybe_unused]] t8_eclass_scheme_c* ts, [[maybe_unused]] const int num_elements, [[maybe_unused]] t8_element_t * elements[])
+{
+    return true;
+}
 
 }
 
