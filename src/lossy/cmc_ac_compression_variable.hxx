@@ -102,17 +102,6 @@ private:
     virtual void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest) final;
 };
 
-
-struct ErrorCompliance
-{
-    ErrorCompliance() = delete;
-    ErrorCompliance(const bool is_error_threshold_fulfilled, const double max_error)
-    : is_error_threshold_satisfied{is_error_threshold_fulfilled}, max_introduced_error{max_error}{};
-
-    const bool is_error_threshold_satisfied;
-    const double max_introduced_error;
-};
-
 template <typename T>
 inline void
 AbstractCompressionVariable<T>::Compress(const CompressionSettings& settings)
