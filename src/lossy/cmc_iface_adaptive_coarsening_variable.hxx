@@ -11,7 +11,8 @@ class AbstractAdaptiveCoarseningVariable
 {
 public:
     virtual void Setup() final;
-
+    virtual ~AbstractAdaptiveCoarseningVariable(){};
+     
 protected: 
     AbstractAdaptiveCoarseningVariable() = default;
     void SplitVariables(){};
