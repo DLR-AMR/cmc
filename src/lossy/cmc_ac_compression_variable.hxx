@@ -52,34 +52,30 @@ template <typename T>
 class AbstractCompressionVariable
 {
 public:
+    void Compress(const CompressionSettings& settings);
 
-    virtual void Compress(const CompressionSettings& settings) final;
+    void WriteVTKFile(const std::string& file_name);
 
-    /* Overrideable hook during the compression */
-    void CustomCompressionSetup() {};
+    void SetName(const std::string& name) {name_ = name;};
+    const std::string& GetName() const {return name_;};
 
-    virtual void WriteVTKFile(const std::string& file_name) final;
+    size_t Size() const {return data_.size();};
+    void PushBack(const T& value) {data_.push_back(value);};
+    void PushBack(T&& value) {data_.push_back(std::move(value));};
 
-    virtual void SetName(const std::string& name) final {name_ = name;};
-    virtual const std::string& GetName() const final {return name_;};
+    AmrMesh& GetAmrMesh() {return mesh_;};
+    const AmrMesh& GetAmrMesh() const {return mesh_;};
 
-    virtual size_t size() const final {return data_.size();};
-    virtual void push_back(const T& value) final {data_.push_back(value);};
-    virtual void push_back(T&& value) final {data_.push_back(std::move(value));};
+    VariableUtilities<T>& GetVariableUtilities() {return utilities_;};
+    const VariableUtilities<T>& GetVariableUtilities() const {return utilities_;};
 
-    virtual AmrMesh& GetAmrMesh() final {return mesh_;};
-    virtual const AmrMesh& GetAmrMesh() const final {return mesh_;};
+    void SetInterpolation(Interpolate<T> interpolation_function) {utilities_.SetInterpolation(interpolation_function);};
+    void SetInterpolationSkipMissingValues(InterpolateSkipMissingValues<T> interpolation_function) {utilities_.SetInterpolation(interpolation_function);};
 
-    virtual VariableUtilities<T>& GetVariableUtilities() final {return utilities_;};
-    virtual const VariableUtilities<T>& GetVariableUtilities() const final {return utilities_;};
+    int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors);
+    int EvaluateCoarseningSkipMissingValues(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors, const T missing_value);
 
-    virtual void SetInterpolation(Interpolate<T> interpolation_function) final {utilities_.SetInterpolation(interpolation_function);};
-    virtual void SetInterpolationSkipMissingValues(InterpolateSkipMissingValues<T> interpolation_function) final {utilities_.SetInterpolation(interpolation_function);};
-
-    virtual int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors) final;
-    virtual int EvaluateCoarseningSkipMissingValues(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors, const T missing_value) final;
-
-    virtual int LeaveElementUnchanged(const int tree_id, const int elem_id) final;
+    int LeaveElementUnchanged(const int tree_id, const int elem_id);
 
     virtual ~AbstractCompressionVariable(){};
 protected:
@@ -94,12 +90,12 @@ protected:
     AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure
 
 private:
-    virtual bool IsValidForCompression() const final;
-    virtual void AllocateCoarseningIteration() final {data_new_.reserve(mesh_.GetNumberLocalElements() / (2 << mesh_.GetDimensionality()) + 8);}
-    virtual void SwitchToAdaptedData() final {data_.swap(data_new_); data_new_.clear();};
-    virtual IAdaptData* CreateAdaptData(const CompressionSettings& settings) final {return adaptation_creator_(this, settings);};
-    virtual t8_forest_t RepartitionMesh(t8_forest_t adapted_forest) final;
-    virtual void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest) final;
+    bool IsValidForCompression() const;
+    void AllocateCoarseningIteration() {data_new_.reserve(mesh_.GetNumberLocalElements() / (2 << mesh_.GetDimensionality()) + 8);}
+    void SwitchToAdaptedData() {data_.swap(data_new_); data_new_.clear();};
+    IAdaptData* CreateAdaptData(const CompressionSettings& settings) {return adaptation_creator_(this, settings);};
+    t8_forest_t RepartitionMesh(t8_forest_t adapted_forest);
+    void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
 };
 
 template <typename T>
@@ -110,9 +106,6 @@ AbstractCompressionVariable<T>::Compress(const CompressionSettings& settings)
 
     /* Set up the inaccuracy storage */
     utilities_.SetUpInaccuracyStorage(mesh_.GetNumberLocalElements());
-
-    /* Perform a potential custom setup */
-    this->CustomCompressionSetup();
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
     IAdaptData* adapt_data = this->CreateAdaptData(settings);
