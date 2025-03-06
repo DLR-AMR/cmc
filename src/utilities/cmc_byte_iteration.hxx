@@ -7,6 +7,8 @@
 namespace cmc
 {
 
+constexpr int kByteIterationError = -1;
+
 template<typename T>
 static inline
 int GetMSBytePosition(const T& value)
@@ -22,7 +24,7 @@ int GetMSBytePosition(const T& value)
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -41,10 +43,11 @@ int GetLSBytePosition(const T& value)
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
+#if 0
 template<int N>
 inline
 constexpr int GetMSBByteStart([[maybe_unused]] const Serialized<N>& prefix)
@@ -60,7 +63,7 @@ constexpr int GetMSBByteStart([[maybe_unused]] const Serialized<N>& prefix)
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -79,7 +82,7 @@ constexpr int GetMSBByteEnd([[maybe_unused]] const Serialized<N>& prefix)
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -134,7 +137,7 @@ constexpr int GetLSBByteStart([[maybe_unused]] const Serialized<N>& prefix)
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -153,7 +156,7 @@ constexpr int GetLSBByteEnd([[maybe_unused]] const Serialized<N>& prefix)
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -192,7 +195,7 @@ bool LSBContinueIteration(const int iterator, [[maybe_unused]] const Serialized<
         return false;
     }
 }
-
+#endif
 template<int N>
 inline
 constexpr int GetMSBByteStart()
@@ -208,7 +211,7 @@ constexpr int GetMSBByteStart()
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -227,7 +230,7 @@ constexpr int GetMSBByteEnd()
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -255,11 +258,11 @@ bool MSBContinueIteration(const int iterator)
     if constexpr (IsLittleEndian)
     {
         /* If little endian */
-        return iterator >= GetMSBByteEnd();
+        return iterator >= GetMSBByteEnd<N>();
     } else if constexpr (IsBigEndian)
     {
         /* If big endian */
-        return iterator <= GetMSBByteEnd();
+        return iterator <= GetMSBByteEnd<N>();
     } else
     {
         cmc_err_msg("The native endianness is not supported");
@@ -283,7 +286,7 @@ constexpr int GetLSBByteStart()
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -302,7 +305,7 @@ constexpr int GetLSBByteEnd()
     } else
     {
         cmc_err_msg("The native endianness is not supported");
-        return kByteError;
+        return kByteIterationError;
     }
 }
 
@@ -330,11 +333,11 @@ bool LSBContinueIteration(const int iterator)
     if constexpr (IsLittleEndian)
     {
         /* If little endian */
-        return iterator <= GetLSBByteEnd();
+        return iterator <= GetLSBByteEnd<N>();
     } else if constexpr (IsBigEndian)
     {
         /* If big endian */
-        return iterator >= GetLSBByteEnd();
+        return iterator >= GetLSBByteEnd<N>();
     } else
     {
         cmc_err_msg("The native endianness is not supported");

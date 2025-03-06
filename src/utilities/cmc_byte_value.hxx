@@ -1,8 +1,8 @@
-#ifndef CMC_BYTES_HXX
-#define CMC_BYTES_HXX
+#ifndef CMC_BYTE_VALUE_HXX
+#define CMC_BYTE_VALUE_HXX
 
-#include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_endian.hxx"
+#include "utilities/cmc_byte_iteration.hxx"
 #include "utilities/cmc_log_functions.hxx"
 
 #include <array>
@@ -243,4 +243,4 @@ ReconstructSerializedValue(Iter pos, const Endian endianness_of_bytes)
 
 }
 
-#endif /* !CMC_BYTES_HXX */
+#endif /* !CMC_BYTE_VALUE_HXX */
