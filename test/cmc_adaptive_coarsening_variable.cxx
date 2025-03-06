@@ -24,20 +24,21 @@ main(void)
     t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);
     t8_eclass_scheme_c* ts = t8_forest_get_eclass_scheme(forest, t8_forest_get_eclass(forest, 0));
 
+    /* Create a variable for containing a value for each element */
     const t8_locidx_t num_elements = t8_forest_get_local_num_elements(forest);
-
     std::vector<float> data(num_elements);
-
     std::iota(data.begin(), data.end(), 0.0);
 
+    /* Allocate the compression settings */
     cmc::CompressionSettings settings;
 
+    /* Set a relative error criterion */
     const double rel_max_err = 0.01;
+    settings.SetGeneralErrorCriterion(cmc::CompressionCriterion::RelativeErrorThreshold, rel_max_err);
 
-    settings.SetRelativeErrorCriterion(rel_max_err, cmc::kErrorCriterionHoldsForAllVariables);
-
-
+    /* Compress the data */
     cmc::lossy::CompressionVariable variable("test_var", forest, data);
+
 
     variable.Compress(settings);
 
