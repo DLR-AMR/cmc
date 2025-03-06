@@ -27,6 +27,7 @@ src/utilities/cmc_variable_utilities.hxx \
 src/utilities/cmc_error_domain.hxx \
 src/utilities/cmc_geo_utilities.hxx \
 src/utilities/cmc_error_domain_functions.hxx \
+src/utilities/cmc_iface_compression_adapt_data.hxx \
 src/mpi/cmc_mpi_io.hxx \
 src/mpi/cmc_mpi.hxx \
 src/mpi/cmc_mpi_data.hxx \

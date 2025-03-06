@@ -8,6 +8,7 @@
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_variable_utilities.hxx"
 #include "utilities/cmc_compression_settings.hxx"
+#include "utilities/cmc_iface_compression_adapt_data.hxx"
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
@@ -26,27 +27,12 @@ namespace cmc::lossy
 template <typename T>
 class AbstractCompressionVariable;
 
-class ICompressionAdaptData
-{
-public:
-    virtual bool IsCompressionProgressing() = 0;
-    virtual void InitializeCompressionIteration() = 0;
-    virtual void FinalizeCompressionIteration() = 0;
-    virtual void CompleteInterpolation(const t8_forest_t previous_forest, const t8_forest_t adapted_forest) = 0;
-    virtual void RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest) = 0;
-    virtual cmc::t8::AdaptationFn GetAdaptationFunction() = 0;
-    virtual int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors) = 0;
-    virtual int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors, const CmcUniversalType missing_value) = 0;
-    virtual int LeaveElementUnchanged(const int tree_id, const int elem_id) = 0;
-
-    virtual ~ICompressionAdaptData(){};
-};
-
 template<typename T>
 using AdaptCreator = std::function<ICompressionAdaptData*(AbstractCompressionVariable<T>*,const CompressionSettings&)>;
 
 template<typename T>
 using AdaptDestructor = std::function<void(ICompressionAdaptData*)>;
+
 
 template <typename T>
 class AbstractCompressionVariable

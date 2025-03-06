@@ -3,6 +3,7 @@
 
 #include "lossy/cmc_ac_compression_variable.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
+#include "utilities/cmc_iface_compression_adapt_data.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 #include "utilities/cmc_log_functions.hxx"
 
@@ -103,9 +104,6 @@ public:
         AbstractCompressionVariable<T>::adaptation_creator_ = CreateAdaptationClass<T>;
         AbstractCompressionVariable<T>::adaptation_destructor_ = DestroyAdaptationClass;
     };
-
-private:
-
 };
 
 template <typename T>
@@ -134,14 +132,14 @@ template <typename T>
 void
 DefaultAdaptData<T>::CompleteInterpolation(const t8_forest_t previous_forest, const t8_forest_t adapted_forest)
 {
-
+    //Nothing to be done here!
 }
 
 template <typename T>
 void
 DefaultAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
 {
-
+    //Nothing to be done here!
 }
 
 template <typename T>
@@ -150,7 +148,6 @@ DefaultAdaptData<T>::GetAdaptationFunction()
 {
     return DefaultAdaptiveCoarsening<T>;
 }
-
 
 template <typename T>
 int
