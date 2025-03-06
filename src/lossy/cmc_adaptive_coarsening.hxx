@@ -12,7 +12,7 @@ namespace cmc::lossy
 {
 
 template<typename T>
-class DefaultAdaptData : public IAdaptData
+class DefaultAdaptData : public ICompressionAdaptData
 {
 public:
     DefaultAdaptData() = delete;
@@ -38,14 +38,14 @@ protected:
 };
 
 template <typename T>
-inline IAdaptData*
+inline ICompressionAdaptData*
 CreateAdaptationClass(AbstractCompressionVariable<T>* abstract_var, const CompressionSettings& settings)
 {
     return new DefaultAdaptData<T>(abstract_var, settings);
 }
 
 inline void
-DestroyAdaptationClass(IAdaptData* iadapt_data)
+DestroyAdaptationClass(ICompressionAdaptData* iadapt_data)
 {
     delete iadapt_data;
 }
@@ -62,7 +62,7 @@ DefaultAdaptiveCoarsening (t8_forest_t forest,
                            t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
-    IAdaptData* _adapt_data = static_cast<IAdaptData*>(t8_forest_get_user_data(forest));
+    ICompressionAdaptData* _adapt_data = static_cast<ICompressionAdaptData*>(t8_forest_get_user_data(forest));
     cmc_assert(_adapt_data != nullptr);
 
     /* Cast the base-class pointer back to the derived type in order to use DefaultAdaptData<T>'s member functions */

@@ -26,7 +26,7 @@ namespace cmc::lossy
 template <typename T>
 class AbstractCompressionVariable;
 
-class IAdaptData
+class ICompressionAdaptData
 {
 public:
     virtual bool IsCompressionProgressing() = 0;
@@ -39,14 +39,14 @@ public:
     virtual int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors, const CmcUniversalType missing_value) = 0;
     virtual int LeaveElementUnchanged(const int tree_id, const int elem_id) = 0;
 
-    virtual ~IAdaptData(){};
+    virtual ~ICompressionAdaptData(){};
 };
 
 template<typename T>
-using AdaptCreator = std::function<IAdaptData*(AbstractCompressionVariable<T>*,const CompressionSettings&)>;
+using AdaptCreator = std::function<ICompressionAdaptData*(AbstractCompressionVariable<T>*,const CompressionSettings&)>;
 
 template<typename T>
-using AdaptDestructor = std::function<void(IAdaptData*)>;
+using AdaptDestructor = std::function<void(ICompressionAdaptData*)>;
 
 template <typename T>
 class AbstractCompressionVariable
@@ -93,7 +93,7 @@ private:
     bool IsValidForCompression() const;
     void AllocateCoarseningIteration() {data_new_.reserve(mesh_.GetNumberLocalElements() / (2 << mesh_.GetDimensionality()) + 8);}
     void SwitchToAdaptedData() {data_.swap(data_new_); data_new_.clear();};
-    IAdaptData* CreateAdaptData(const CompressionSettings& settings) {return adaptation_creator_(this, settings);};
+    ICompressionAdaptData* CreateAdaptData(const CompressionSettings& settings) {return adaptation_creator_(this, settings);};
     t8_forest_t RepartitionMesh(t8_forest_t adapted_forest);
     void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
 };
@@ -108,7 +108,7 @@ AbstractCompressionVariable<T>::Compress(const CompressionSettings& settings)
     utilities_.SetUpInaccuracyStorage(mesh_.GetNumberLocalElements());
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
-    IAdaptData* adapt_data = this->CreateAdaptData(settings);
+    ICompressionAdaptData* adapt_data = this->CreateAdaptData(settings);
 
     while (adapt_data->IsCompressionProgressing())
     {
