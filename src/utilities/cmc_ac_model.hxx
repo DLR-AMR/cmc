@@ -5,6 +5,7 @@
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_bytes.hxx"
+#include "utilities/cmc_entropy_alphabet.hxx"
 
 #include <vector>
 #include <algorithm>
@@ -27,12 +28,6 @@ public:
     virtual uint32_t GetSymbolFromCumulativeFrequency(const uint32_t value) = 0;
     virtual bool SymbolExistsInAlphabet(const uint32_t symbol) const = 0;
     virtual ~IACModel(){};
-};
-
-struct Letter
-{
-    uint32_t symbol;
-    uint32_t frequency;
 };
 
 class StaticFrequencyModel;
