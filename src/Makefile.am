@@ -23,6 +23,7 @@ src/utilities/cmc_binary_reader_forward.hxx \
 src/utilities/cmc_binary_reader.hxx \
 src/utilities/cmc_arithmetic_encoder.hxx \
 src/utilities/cmc_ac_model.hxx \
+src/utilities/cmc_entropy_alphabet.hxx \
 src/utilities/cmc_variable_utilities.hxx \
 src/utilities/cmc_error_domain.hxx \
 src/utilities/cmc_geo_utilities.hxx \
