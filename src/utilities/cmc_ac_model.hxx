@@ -42,11 +42,11 @@ class StaticFrequencyModel : public IACModel
 {
 public:
     StaticFrequencyModel() = delete;
-    StaticFrequencyModel(std::vector<Letter> alphabet)
+    StaticFrequencyModel(std::vector<cmc::entropy_coding::Letter> alphabet)
     : alphabet_{alphabet}
     {
         /* The alphabet is sorted lexicographically by the symbols */
-        std::sort(alphabet_.begin(), alphabet_.end(), [](const Letter& val1, const Letter& val2){return val1.symbol < val2.symbol;});
+        std::sort(alphabet_.begin(), alphabet_.end(), [](const cmc::entropy_coding::Letter& val1, const cmc::entropy_coding::Letter& val2){return val1.symbol < val2.symbol;});
 
         size_t total_count_frequencies = 0;
 
@@ -166,7 +166,7 @@ public:
     template <typename Iter> friend std::pair<StaticFrequencyModel, size_t> DecodeStaticFrequencyAlphabet(Iter pos);
 private:
     struct Decoding{};
-    StaticFrequencyModel(std::vector<Letter>&& alphabet, [[maybe_unused]] Decoding&&)
+    StaticFrequencyModel(std::vector<cmc::entropy_coding::Letter>&& alphabet, [[maybe_unused]] Decoding&&)
     : alphabet_{std::move(alphabet)}
     {
         /* Accumulate the frequencies */
@@ -187,9 +187,9 @@ private:
         }
     };
 
-    inline std::vector<Letter>::const_iterator GetIteratorToSymbol(const uint32_t symbol) const 
+    inline std::vector<cmc::entropy_coding::Letter>::const_iterator GetIteratorToSymbol(const uint32_t symbol) const 
     {
-        std::vector<Letter>::const_iterator symbol_iter = std::lower_bound(alphabet_.begin(), alphabet_.end(), Letter{symbol, 0}, [](const Letter& val1, const Letter& val2){return val1.symbol < val2.symbol;});
+        std::vector<cmc::entropy_coding::Letter>::const_iterator symbol_iter = std::lower_bound(alphabet_.begin(), alphabet_.end(), cmc::entropy_coding::Letter{symbol, 0}, [](const cmc::entropy_coding::Letter& val1, const cmc::entropy_coding::Letter& val2){return val1.symbol < val2.symbol;});
         return symbol_iter;
     }
     
@@ -200,7 +200,7 @@ private:
         return std::distance(alphabet_.begin(), symbol_iter);
     }
 
-    std::vector<Letter> alphabet_;
+    std::vector<cmc::entropy_coding::Letter> alphabet_;
     std::vector<uint32_t> cumulative_frequencies_;
 };
 
@@ -225,7 +225,7 @@ DecodeStaticFrequencyAlphabet(Iter pos)
 
     offset += sizeof(uint32_t);
 
-    std::vector<Letter> alphabet;
+    std::vector<cmc::entropy_coding::Letter> alphabet;
     alphabet.reserve(count_letters);
 
     for (uint32_t idx = 0; idx < count_letters; ++idx)
