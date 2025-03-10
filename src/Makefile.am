@@ -33,6 +33,9 @@ src/utilities/cmc_endian.hxx \
 src/utilities/cmc_byte_iteration.hxx \
 src/utilities/cmc_byte_value.hxx \
 src/utilities/cmc_byte_compression_values.hxx \
+src/utilities/cmc_arithmetic_encoding_frequency_model.hxx \
+src/utilities/cmc_entropy_coder.hxx \
+src/utilities/cmc_arithmetic_encoding.hxx \
 src/mpi/cmc_mpi_io.hxx \
 src/mpi/cmc_mpi.hxx \
 src/mpi/cmc_mpi_data.hxx \
