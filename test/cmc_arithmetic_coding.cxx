@@ -1,6 +1,7 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_ac_model.hxx"
+#include "utilities/cmc_entropy_alphabet.hxx"
 #include "utilities/cmc_arithmetic_encoder.hxx"
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_log_functions.hxx"
@@ -22,15 +23,15 @@ main(void)
     const size_t num_symbols_in_message = uncompressed_message.size();
 
     /* The alphabet and the letter probabilities of the message */
-    std::vector<cmc::arithmetic_encoding::Letter> alphabet;
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{0, 3});
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{1, 2});
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{2, 7});
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{3, 4});
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{4, 3});
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{5, 9});
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{6, 5});
-    alphabet.emplace_back(cmc::arithmetic_encoding::Letter{7, 3});
+    std::vector<cmc::entropy_coding::Letter> alphabet;
+    alphabet.emplace_back(cmc::entropy_coding::Letter{0, 3});
+    alphabet.emplace_back(cmc::entropy_coding::Letter{1, 2});
+    alphabet.emplace_back(cmc::entropy_coding::Letter{2, 7});
+    alphabet.emplace_back(cmc::entropy_coding::Letter{3, 4});
+    alphabet.emplace_back(cmc::entropy_coding::Letter{4, 3});
+    alphabet.emplace_back(cmc::entropy_coding::Letter{5, 9});
+    alphabet.emplace_back(cmc::entropy_coding::Letter{6, 5});
+    alphabet.emplace_back(cmc::entropy_coding::Letter{7, 3});
 
     /* Construct a frequency model based on the alphabet and the probabilities of the symbols in the message */
     cmc::arithmetic_encoding::StaticFrequencyModel frequency_model(alphabet);
