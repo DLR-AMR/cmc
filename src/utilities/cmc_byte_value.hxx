@@ -109,7 +109,7 @@ int
 Serialized<N>::GetNumberLeadingZeros() const
 {
     int num_leading_zeros = 0;
-    for (int byte_id = GetMSBByteStart(*this); MSBContinueIteration(byte_id, *this); MSBByteIncrement(byte_id))
+    for (int byte_id = GetMSBByteStart<N>(*this); MSBContinueIteration<N>(byte_id, *this); MSBByteIncrement(byte_id))
     {
         /* Check whether the full byte is zero */
         if (bytes_[byte_id] == kZeroByte)
@@ -138,7 +138,7 @@ int
 Serialized<N>::GetNumberTrailingZeros() const
 {
     int num_trailing_zeros = 0;
-    for (int byte_id = GetLSBByteStart(*this); LSBContinueIteration(byte_id, *this); LSBByteIncrement(byte_id))
+    for (int byte_id = GetLSBByteStart<N>(*this); LSBContinueIteration<N>(byte_id, *this); LSBByteIncrement(byte_id))
     {
         /* Check whether the full byte is zero */
         if (bytes_[byte_id] == kZeroByte)
@@ -185,13 +185,13 @@ SerializeValue(const T& value, const Endian desired_endianness = Endian::Big)
     switch (desired_endianness)
     {
         case Endian::Big:
-            for (int byte_id = GetMSBByteStart(value_), index = 0; MSBContinueIteration(byte_id, value_); MSBByteIncrement(byte_id), ++index)
+            for (int byte_id = GetMSBByteStart<sizeof(T)>(), index = 0; MSBContinueIteration<sizeof(T)>(byte_id); MSBByteIncrement(byte_id), ++index)
             {
                 serialized_value[index] = value_[byte_id];
             }
         break;
         case Endian::Little:
-            for (int byte_id = GetLSBByteStart(value_), index = 0; LSBContinueIteration(byte_id, value_); LSBByteIncrement(byte_id), ++index)
+            for (int byte_id = GetLSBByteStart<sizeof(T)>(), index = 0; LSBContinueIteration<sizeof(T)>(byte_id); LSBByteIncrement(byte_id), ++index)
             {
                 serialized_value[index] = value_[byte_id];
             }
