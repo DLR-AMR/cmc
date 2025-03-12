@@ -2,6 +2,7 @@
 #define CMC_VECTOR_VIEW_HXX
 
 #include "cmc_utilities.hxx"
+#include "utilities/cmc_log_functions.hxx"
 
 #include <vector>
 
@@ -48,8 +49,28 @@ public:
         return (size_ == 0);
     };
     
+    constexpr T front() const
+    {
+        if (empty())
+        {
+            cmc_err_msg("Accessing an empty VectorView is prohibited.");
+            return T();
+        }
+        return *data_;
+    };
+
+    constexpr T back() const
+    {
+        if (empty())
+        {
+            cmc_err_msg("Accessing an empty VectorView is prohibited.");
+            return T();
+        }
+        return *(data_ + size_ - 1);
+    };
+
 private:
-    const T* data_;
+    const T* const data_;
     std::size_t size_;
 };
 
