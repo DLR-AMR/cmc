@@ -1,6 +1,7 @@
 #ifndef CMC_ENTROPY_CODER_HXX
 #define CMC_ENTROPY_CODER_HXX
 
+#include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_entropy_alphabet.hxx"
 #include "utilities/cmc_arithmetic_encoding_frequency_model.hxx"
 
@@ -23,6 +24,8 @@ public:
     virtual bit_map::BitMap GetEncodedBitStream() const = 0;
     virtual void ClearEncodedBitStream() = 0;
 
+    virtual void Reset() = 0;
+    
     virtual ~IEntropyCoder(){};
 protected:
     std::unique_ptr<IEntropyAlphabet> alphabet_;
