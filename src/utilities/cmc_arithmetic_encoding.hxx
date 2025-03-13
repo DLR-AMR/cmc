@@ -75,11 +75,10 @@ private:
 class Encoder : public IEntropyCoder
 {
 public:
-    Encoder(){
-        alphabet_ = std::make_unique<ArithmeticEncoderAlphabet>();
-    };
+    Encoder() = default;
 
     void InitializeAlphabet(const size_t type_size_in_bytes = 2) override {
+        alphabet_ = std::make_unique<ArithmeticEncoderAlphabet>();
         alphabet_->InitializeSymbols(type_size_in_bytes);
     };
 
@@ -110,13 +109,21 @@ public:
 
     bit_map::BitMap GetEncodedBitStream() const override {return encoded_stream_;}
 
-    void ClearEncodedBitStream() override {
+    void ClearEncodedBitStream() override
+    {
         lower_ = 0;
         higher_ = 0x7FFFFFFF;
         step_ = 0;
         scale_ = 0;
         encoded_stream_ = bit_map::BitMap();
-        };
+    };
+
+    void Reset() override
+    {
+        this->ClearEncodedBitStream();
+        alphabet_.reset(nullptr);
+        frequency_model_.reset(nullptr);
+    };
 
 private:
     void Encode(const Uint32_t low, const Uint32_t high, const Uint32_t total);
