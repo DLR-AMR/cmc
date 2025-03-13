@@ -53,7 +53,8 @@ src/t8code/cmc_t8_mpi.hxx \
 src/lossy/cmc_iface_adaptive_coarsening_variable.hxx \
 src/lossy/cmc_ac_compression_variable.hxx \
 src/lossy/cmc_adaptive_coarsening.hxx \
-src/lossless/cmc_byte_compression_variable.hxx
+src/lossless/cmc_byte_compression_variable.hxx \
+src/lossless/cmc_prefix_extraction_compression.hxx
 
 
 
