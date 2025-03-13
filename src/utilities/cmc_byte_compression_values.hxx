@@ -102,6 +102,16 @@ public:
 
     void PerformIntegerSubtraction(const SerializedCompressionValue& residual);
     void PerformIntegerAddition(const SerializedCompressionValue& residual);
+
+    friend SerializedCompressionValue operator^(const SerializedCompressionValue& val1, const SerializedCompressionValue& val2)
+    {
+        SerializedCompressionValue xor_val = val1;
+        for (int i = 0; i < N; ++i)
+        {
+            xor_val[i] ^= val2.bytes_[i];
+        }
+        return xor_val;
+    };
 private:
     std::array<uint8_t, N> bytes_;
     SignificantBitsIndicator<N> indicators_;
@@ -409,8 +419,8 @@ template<int N>
 template<typename T>
 SerializedCompressionValue<N>::SerializedCompressionValue(const T& value)
 {
-    cmc_assert(N == static_cast<int>(sizeof(value)));
-    std::memcpy(this->bytes_.data(), &value, sizeof(value));
+    cmc_assert(N == static_cast<int>(sizeof(T)));
+    std::memcpy(this->bytes_.data(), &value, sizeof(T));
 
     indicators_.front_bit_ = 0;
     indicators_.tail_bit_ = 0;
