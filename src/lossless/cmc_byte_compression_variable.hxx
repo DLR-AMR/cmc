@@ -102,6 +102,14 @@ public:
 
     virtual ~AbstractByteCompressionVariable(){};
 
+    void MoveEncodedDataInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_data)
+    {
+        vec_to_hold_encoded_levelwise_data = std::move(buffered_encoded_data_);
+        buffered_encoded_data_ = std::vector<std::vector<uint8_t>>();
+    };
+
+    std::vector<std::vector<uint8_t>> GetEncodedData() const {return buffered_encoded_data_;};
+
     friend ICompressionAdaptData<T>;
 protected:
     AbstractByteCompressionVariable() = default;
