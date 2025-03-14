@@ -140,14 +140,14 @@ SerializedCompressionValue<N>::GetLeadingZeroCountInSignificantBits() const
     //TODO: Only iterate until tail bit is reached
 
     if (this->IsEmpty()) {return 0;}
-    cmc_assert(indicators_.tail_bit_ == 0);
+    cmc_assert(indicators_.tail_bit_ < N * CHAR_BIT);
     
     int num_leading_zeros = 0;
     int front_bit = indicators_.front_bit_;
 
     int counter = indicators_.front_bit_;
 
-    for (int byte_id = GetMSBByteStart<N>(), iter = 0, vec_index = 0;
+    for (int byte_id = GetMSBByteStart<N>(), iter = 0;
          MSBContinueIteration<N>(byte_id);
          MSBByteIncrement(byte_id), ++iter)
     {
