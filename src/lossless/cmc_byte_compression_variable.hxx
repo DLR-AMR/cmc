@@ -92,24 +92,17 @@ template <typename T>
 class AbstractByteCompressionVariable
 {
 public:
-
     void Compress();
 
     const std::string& GetName() const {return name_;};
 
     size_t Size() const {return data_.size();};
 
-    AmrMesh& GetAmrMesh() {return mesh_;};
     const AmrMesh& GetAmrMesh() const {return mesh_;};
-
-    VectorView<CompressionValue<T>> GetView(const int start_index, const int count) const;
-    VectorView<CompressionValue<T>> GetView(const int tree_id, const int lelement_index, const int count) const;
-
-    void StoreExtractedValues(const int tree_id, const int lelement_id, const int num_elements, const ExtractionData<T>& extracted_values);
-    void StoreUnchangedElement(const int tree_id, const int lelement_id, const UnchangedData<T>& extracted_value);
 
     virtual ~AbstractByteCompressionVariable(){};
 
+    friend ICompressionAdaptData<T>;
 protected:
     AbstractByteCompressionVariable() = default;
 
@@ -124,6 +117,12 @@ protected:
     AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure
 
 private:
+    VectorView<CompressionValue<T>> GetView(const int start_index, const int count) const;
+    VectorView<CompressionValue<T>> GetView(const int tree_id, const int lelement_index, const int count) const;
+
+    void StoreExtractedValues(const int tree_id, const int lelement_id, const int num_elements, const ExtractionData<T>& extracted_values);
+    void StoreUnchangedElement(const int tree_id, const int lelement_id, const UnchangedData<T>& extracted_value);
+
     bool IsValidForCompression() const;
     void AllocateExtractionIteration() {data_new_.reserve(mesh_.GetNumberLocalElements() / (2 << mesh_.GetDimensionality()) + 8);}
     void SwitchToExtractedData() {data_.swap(data_new_); data_new_.clear();};
