@@ -2,6 +2,7 @@
 #define CMC_BYTE_COMPRESSION_VALUES_HXX
 
 #include "utilities/cmc_utilities.hxx"
+#include "utilities/cmc_vector_view.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_iteration.hxx"
@@ -15,6 +16,12 @@
 
 namespace cmc
 {
+
+template<int N>
+class SerializedCompressionValue;
+
+template<typename T>
+std::vector<T> ConvertCompressionValues(const VectorView<SerializedCompressionValue<sizeof(T)>>& compression_values);
 
 template<int N>
 struct SignificantBitsIndicator
@@ -743,7 +750,6 @@ SerializedCompressionValue<8>::PerformIntegerSubtraction(const SerializedCompres
     bytes_ = SerializeIntegerValueNatively<8, uint64_t>(value);
 }
 
-
 #if 0
 template<int N>
 void
@@ -832,6 +838,24 @@ SerializedCompressionValue<N>::AddXORResidualWithoutImplicitOneBit(const uint32_
 }
 
 #endif
+
+/* Convert a view of ComrpessionValues to a vector of values of a certain data type */
+template<typename T>
+std::vector<T>
+ConvertCompressionValues(const VectorView<SerializedCompressionValue<sizeof(T)>>& compression_values)
+{
+    std::vector<T> vals;
+    vals.reserve(compression_values.size()); 
+
+    for (auto val_iter = compression_values.begin(); val_iter != compression_values.end(); ++val_iter)
+    {
+        vals.emplace_back(val_iter->template ReinterpretDataAs<T>());
+    }
+
+    return vals;
+}
+
+
 }
 
 #endif /* !CMC_BYTE_COMPRESSION_VALUES_HXX */
