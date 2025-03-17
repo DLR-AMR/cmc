@@ -36,6 +36,7 @@ src/utilities/cmc_byte_compression_values.hxx \
 src/utilities/cmc_arithmetic_encoding_frequency_model.hxx \
 src/utilities/cmc_entropy_coder.hxx \
 src/utilities/cmc_arithmetic_encoding.hxx \
+src/utilities/cmc_interpolation_fn.hxx \
 src/mpi/cmc_mpi_io.hxx \
 src/mpi/cmc_mpi.hxx \
 src/mpi/cmc_mpi_data.hxx \
@@ -54,7 +55,9 @@ src/lossy/cmc_iface_adaptive_coarsening_variable.hxx \
 src/lossy/cmc_ac_compression_variable.hxx \
 src/lossy/cmc_adaptive_coarsening.hxx \
 src/lossless/cmc_byte_compression_variable.hxx \
-src/lossless/cmc_prefix_extraction_compression.hxx
+src/lossless/cmc_prefix_extraction_compression.hxx \
+src/lossless/cmc_multi_res_extraction_compression.hxx \
+src/lossless/cmc_multi_res_extraction_residual_computation.hxx
 
 
 
