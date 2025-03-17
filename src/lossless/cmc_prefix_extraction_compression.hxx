@@ -18,7 +18,7 @@ namespace cmc::lossless::prefix
 
 /* A typedef for the sake of brevity */
 template <typename T>
-using CompressionValue = CompressionValue<T>;
+using CompressionValue = SerializedCompressionValue<sizeof(T)>;
 
 template<typename T>
 class PrefixAdaptData : public ICompressionAdaptData<T>
@@ -259,7 +259,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
         /* The remaining bits in the value are encoded/stored */
         if (lzc == 0 && not current_val.IsEmpty())
         {
-            /* In case there is no LZC the whol value need to be stored */
+            /* In case there is no LZC the whole value need to be stored */
             encoding.AppendBits(current_val.GetSignificantBitsInBigEndianOrdering(), current_val.GetCountOfSignificantBits());
         } else
         {
