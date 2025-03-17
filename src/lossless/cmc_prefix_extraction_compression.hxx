@@ -201,7 +201,7 @@ PushBackValueToByteStream(std::vector<uint8_t>& byte_stream, const T& value)
     /* Serialize the value to a collection of bytes (in big endian order) */
     const std::array<uint8_t, sizeof(T)> serialized_value = SerializeValue(value, Endian::Big);
 
-    /* Append the the bytes to the byte stream */
+    /* Append the bytes to the byte stream */
     std::copy_n(serialized_value.begin(), sizeof(T), std::back_insert_iterator(byte_stream));
 }
 
@@ -226,7 +226,6 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     cmc::bit_vector::BitVector encoding;
     encoding.Reserve(3 * level_byte_values.size());
 
-    /* If we are on the last level*/
     /* Reset the entropy coder and initialize the alphabet */
     ICompressionAdaptData<T>::entropy_coder_->Reset();
     ICompressionAdaptData<T>::entropy_coder_->InitializeAlphabet(sizeof(T));
@@ -234,11 +233,11 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     /* Collect the symbol frequencies */
     for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
     {
-        /* Get the leading zero count in the suffix (which is equivalent to the position of the fist "one-bit") */
-        const uint32_t lzc = static_cast<uint32_t>(val_iter->GetLeadingZeroCountInSignificantBits());
+        /* Get the length of this prefix */
+        const uint32_t pref_length = static_cast<uint32_t>(val_iter->GetCountOfSignificantBits());
 
         /* Update the frequency */
-        ICompressionAdaptData<T>::entropy_coder_->UpdateSymbolFrequency(lzc);
+        ICompressionAdaptData<T>::entropy_coder_->UpdateSymbolFrequency(pref_length);
     }
 
     /* Setup the interior structure for encoding */
@@ -251,27 +250,16 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
         CompressionValue<T> current_val = *val_iter;
 
         /* Get the leading zero count in the suffix (which is equivalent to the position of the fist "one-bit") */
-        const int lzc = current_val.GetLeadingZeroCountInSignificantBits();
+        const int pref_length = current_val.GetCountOfSignificantBits();
 
-        /* Encode the leading zero count which equals the first "one-bit" position */
-        ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(static_cast<uint32_t>(lzc));
+        /* Encode the prefix length */
+        ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(static_cast<uint32_t>(pref_length));
 
-        /* The remaining bits in the value are encoded/stored */
-        if (lzc == 0 && not current_val.IsEmpty())
+        /* In case there is a prefix, the actual bits of the prefix will be stored */
+        if (pref_length > 0)
         {
-            /* In case there is no LZC the whole value need to be stored */
             encoding.AppendBits(current_val.GetSignificantBitsInBigEndianOrdering(), current_val.GetCountOfSignificantBits());
-        } else
-        {
-            /* When its greater than zero, we can trim the zeros */
-            current_val.SetFrontBit(current_val.GetFrontBit() + lzc);
-
-            if (not current_val.IsEmpty())
-            {
-                encoding.AppendBits(current_val.GetSignificantBitsInBigEndianOrdering(), current_val.GetCountOfSignificantBits());
-            }
         }
-
     }
 
     /* Indicate that the encoding has been finished and flush all pending encodings */
@@ -315,7 +303,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     std::copy_n(encoded_lzc_stream.begin_bytes(), encoded_lzc_stream_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoding.begin(), reamaining_value_bytes, std::back_insert_iterator(encoded_stream));
 
-    cmc_debug_msg("The entropy encoder of the prefix ectraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
+    cmc_debug_msg("The entropy encoder of the prefix exctraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
     return encoded_stream;
 }
 
