@@ -23,7 +23,8 @@ test/cmc_adaptive_coarsening_variable \
 test/cmc_compression_settings \
 test/cmc_byte_compression_value \
 test/cmc_arithmetic_encoding \
-test/cmc_prefix_compression_variable
+test/cmc_prefix_compression_variable \
+test/cmc_multi_res_compression_variable
 
 test_cmc_create_compression_settings_SOURCES = test/cmc_create_compression_settings.cxx
 test_cmc_create_input_variables_SOURCES = test/cmc_create_input_variables.cxx
@@ -47,6 +48,7 @@ test_cmc_compression_settings_SOURCES = test/cmc_compression_settings.cxx
 test_cmc_byte_compression_value_SOURCES = test/cmc_byte_compression_value.cxx
 test_cmc_arithmetic_encoding_SOURCES = test/cmc_arithmetic_encoding.cxx
 test_cmc_prefix_compression_variable_SOURCES = test/cmc_prefix_compression_variable.cxx
+test_cmc_multi_res_compression_variable_SOURCES = test/cmc_multi_res_compression_variable.cxx
 
 check_PROGRAMS += $(cmc_test_programs)
 TESTS += $(cmc_test_programs)
