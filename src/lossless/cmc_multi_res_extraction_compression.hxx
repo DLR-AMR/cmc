@@ -390,6 +390,11 @@ public:
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
     };
+
+    CompressionSchema GetCompressionSchema() const override
+    {
+        return CompressionSchema::MultiResExtraction;
+    }
 };
 
 }

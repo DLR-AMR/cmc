@@ -8,6 +8,7 @@
 #include "utilities/cmc_entropy_coder.hxx"
 #include "utilities/cmc_arithmetic_encoding.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
+#include "utilities/cmc_compression_schema.hxx"
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
@@ -109,6 +110,8 @@ public:
     };
 
     std::vector<std::vector<uint8_t>> GetEncodedData() const {return buffered_encoded_data_;};
+
+    virtual CompressionSchema GetCompressionSchema() const = 0;
 
     friend ICompressionAdaptData<T>;
 protected:
