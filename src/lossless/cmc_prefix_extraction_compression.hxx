@@ -249,7 +249,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
         /* Get the current value */
         CompressionValue<T> current_val = *val_iter;
 
-        /* Get the leading zero count in the suffix (which is equivalent to the position of the fist "one-bit") */
+        /* Get the length of the prefix */
         const int pref_length = current_val.GetCountOfSignificantBits();
 
         /* Encode the prefix length */
@@ -258,7 +258,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
         /* In case there is a prefix, the actual bits of the prefix will be stored */
         if (pref_length > 0)
         {
-            encoding.AppendBits(current_val.GetSignificantBitsInBigEndianOrdering(), current_val.GetCountOfSignificantBits());
+            encoding.AppendBits(current_val.GetSignificantBitsInBigEndianOrdering(), pref_length);
         }
     }
 
@@ -269,10 +269,10 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     cmc::bit_vector::BitVector encoded_alphabet = ICompressionAdaptData<T>::entropy_coder_->EncodeAlphabet();
 
     /* Get the encoded LZC, respectivel first "one-bit" positions */
-    cmc::bit_map::BitMap encoded_lzc_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
+    cmc::bit_map::BitMap encoded_prefix_length_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
 
     /* Collect the overall bytes for the encoding */
-    const size_t overall_level_bytes = 5 * sizeof(size_t) + refinement_indications_.size_bytes() + encoded_alphabet.size() + encoded_lzc_stream.size_bytes() + encoding.size();
+    const size_t overall_level_bytes = 5 * sizeof(size_t) + refinement_indications_.size_bytes() + encoded_alphabet.size() + encoded_prefix_length_stream.size_bytes() + encoding.size();
 
     /* Now everything is put together to a single stream */
     std::vector<uint8_t> encoded_stream;
@@ -290,17 +290,17 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     PushBackValueToByteStream(encoded_stream, encoded_alphabet_bytes);
 
     /* Push back the byte count for the encoded first "one-bit" positions */
-    const size_t encoded_lzc_stream_bytes = encoded_lzc_stream.size_bytes();
-    PushBackValueToByteStream(encoded_stream, encoded_lzc_stream_bytes);
+    const size_t encoded_prefix_length_stream_bytes = encoded_prefix_length_stream.size_bytes();
+    PushBackValueToByteStream(encoded_stream, encoded_prefix_length_stream_bytes);
 
     /* Push back the byte count for the remaining bits of the prefixes */
     const size_t reamaining_value_bytes = encoding.size();
     PushBackValueToByteStream(encoded_stream, reamaining_value_bytes);
 
-    /* Push back the refinement_indications, the encoded alphabet, the encoded LZC and the remaining bits in the given order */
+    /* Push back the refinement_indications, the encoded alphabet, the encoded prefix length and the remaining bits in the given order */
     std::copy_n(refinement_indications_.begin_bytes(), refinement_indications_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoded_alphabet.begin(), encoded_alphabet_bytes, std::back_insert_iterator(encoded_stream));
-    std::copy_n(encoded_lzc_stream.begin_bytes(), encoded_lzc_stream_bytes, std::back_insert_iterator(encoded_stream));
+    std::copy_n(encoded_prefix_length_stream.begin_bytes(), encoded_prefix_length_stream_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoding.begin(), reamaining_value_bytes, std::back_insert_iterator(encoded_stream));
 
     cmc_debug_msg("The entropy encoder of the prefix exctraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
