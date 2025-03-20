@@ -4,7 +4,7 @@
 namespace cmc
 {
 
-enum CompressionSchema = {AdaptiveCoarsening, PrefixExtraction, MultiResExtraction};
+enum CompressionSchema {AdaptiveCoarsening, PrefixExtraction, MultiResExtraction};
 
 }
 
