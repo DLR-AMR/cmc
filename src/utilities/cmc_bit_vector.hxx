@@ -113,6 +113,9 @@ public:
     BitVectorView(const uint8_t* data, const size_t num_bytes)
     : data_{data}, num_bytes_{num_bytes} {};
 
+    const uint8_t* begin() { return data_; };
+    const uint8_t* end() { return data_ + num_bytes_; };
+
     void MoveToStartBit(const size_t byte_position, const size_t bit_position)
     {
         byte_position_ = byte_position;
@@ -157,8 +160,6 @@ public:
         const size_t num_bytes = num_bytes_ + (num_bits_ != 0 ? 1 : 0);
         std::vector<uint8_t> bit_sequence(num_bytes, 0);
 
-
-        #if 1
         const int bit_shift_to_front = kBitIndexStart - bit_position_;
         const int bit_shift_to_back = kCharBitInteger - bit_shift_to_front;
 
@@ -197,64 +198,6 @@ public:
         }
 
         return bit_sequence;
-        #endif
-        #if 0
-
-        //const int bit_shift_to_front = (bit_position_ == 0 ? 0 : kBitIndexStart - bit_position_);
-        const int bit_shift_to_front = kBitIndexStart - bit_position_;
-
-        const int bit_shift_to_back =  kCharBitInteger - bit_shift_to_front;
-
-        for (int num_bits_extracted = 0, byte_id = 0; num_bits_extracted < num_bits; ++byte_id)
-        {
-            if (byte_id > 0 && bit_shift_to_front > 0)
-            {
-                /* Need to shift the bits to the back of the previous byte */
-                bit_sequence[byte_id - 1] |=  (data_[byte_position_] >> bit_shift_to_back);
-                num_bits_extracted += (kCharBitInteger - bit_shift_to_back);
-
-                /* If all bits are already extracted, we need to break here */
-                if (num_bits_extracted >= num_bits)
-                {
-                    break;
-                }
-            }
-
-            /* Shift the bits to the front of the current byte */
-            bit_sequence[byte_id] |= (data_[byte_position_] << bit_shift_to_front);
-
-            /* Add the extracted bits to the counter */
-            num_bits_extracted += (kCharBitInteger - bit_shift_to_front);
-
-            /* Increment to the next byte for the extraction */
-            ++byte_position_;
-        }
-
-        /* The byte position needs to be potentially adjusted */
-        byte_position_ = starting_byte_position + num_bytes_ + (bit_position_ <= num_bits_ ? 1 : 0);
-
-        /* The correct bit_position needs to be set (to the beginning of the next sequence) */
-        const int& byte_remainder = num_bits_;
-        if (byte_remainder > bit_position_)
-        {
-            bit_position_ = kCharBit - (byte_remainder - bit_position_);
-        } else
-        {
-            bit_position_ = bit_position_ - byte_remainder;
-        }
-
-        //cmc_debug_msg("new byte pos: ", byte_position_, " and bit pos: ", bit_position_);
-
-        /* Potentially, we need to erase the lower bits from the last extracted byte */
-        if (num_bits % kCharBitInteger != 0)
-        {
-            const int bits_to_nullify = kCharBitInteger - num_bits_;
-            bit_sequence.back() &= GetNullifyBitMaskLSB(bits_to_nullify);
-        }
-
-        return bit_sequence;
-
-        #endif
     }
 
 private:
@@ -509,30 +452,6 @@ BitVector::AppendBits(const std::vector<uint8_t>& bytes, const int num_bits)
         }
     }
 }
-
-#if 0
-
-inline
-void
-BitVector::IncrementBitPosition(size_t& iterator, const int diff)
-{
-    iterator -= diff;
-}
-
-inline
-size_t
-BitVector::GetFirstBitPositionOfByte() const
-{
-    return kBitIndexStart;
-}
-
-inline
-bool
-BitVector::IsEndOfByteReached(size_t& iterator) const
-{
-    return (iterator == 0 ? true : false);
-}
-#endif
 
 template<int N>
 inline void
