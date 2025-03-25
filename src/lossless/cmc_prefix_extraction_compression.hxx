@@ -7,6 +7,8 @@
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "lossless/cmc_byte_compression_variable.hxx"
 #include "utilities/cmc_arithmetic_encoding.hxx"
+#include "utilities/cmc_serialization.hxx"
+#include "mesh_compression/cmc_mesh_encoder.hxx"
 
 #include <utility>
 #include <vector>
@@ -36,38 +38,22 @@ public:
     void RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest) override;
 
     std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const override;
-    
+    std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
+
 protected:
     ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) override;
     UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
 
 private:
-    void IndicateCoarsening();
-    void IndicateElementStaysUnchanged();
 
-    bit_map::BitMap refinement_indications_;
     int count_adaptation_step_{0};
 };
-
-template<typename T>
-inline void
-PrefixAdaptData<T>::IndicateCoarsening()
-{
-    refinement_indications_.AppendSetBit();
-}
-
-template<typename T>
-inline void
-PrefixAdaptData<T>::IndicateElementStaysUnchanged()
-{
-    refinement_indications_.AppendUnsetBit();
-}
 
 template <typename T>
 void
 PrefixAdaptData<T>::InitializeExtractionIteration()
 {
-    refinement_indications_ = bit_map::BitMap();
+    //There is currently nothing to be done here!
 }
 
 template <typename T>
@@ -138,12 +124,10 @@ template <typename T>
 ExtractionData<T>
 PrefixAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, [[maybe_unused]] const int num_elements, const VectorView<CompressionValue<T>> values)
 {
-    /* Since we perform an extraction, a family of elements is coarsened */
-    IndicateCoarsening();
-
     /* Evaluate whether there is a common prefix to extract */
     auto [is_prefix_found, prefix] = EvaluateCommonPrefix<T>(values);
 
+    cmc_debug_msg("Found prefix: ", is_prefix_found, " it has length: ", prefix.GetCountOfSignificantBits());
     if (is_prefix_found)
     {
         std::vector<CompressionValue<T>> fine_values;
@@ -178,31 +162,10 @@ template <typename T>
 UnchangedData<T>
 PrefixAdaptData<T>::ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value)
 {
-    /* In case the element stays unchanged, we indicate that no coarsening is possible */
-    IndicateElementStaysUnchanged();
-
     /* We drag this value along to the "coarser level" until it this element is passed with its siblings
      *  as a family of elements into the adaptation callback. Moreover, we leave an empty value 
      * on the "finer level" */
     return UnchangedData<T>(value, CompressionValue<T>());
-}
-
-/**
- * @brief Pushes a value byte-wise in Big-Endian ordering back to a vector
- * 
- * @tparam T The data type of the \a value
- * @param byte_stream The stream to which the value is byte-wise appended
- * @param value The value to be pushed back
- */
-template <typename T>
-void
-PushBackValueToByteStream(std::vector<uint8_t>& byte_stream, const T& value)
-{
-    /* Serialize the value to a collection of bytes (in big endian order) */
-    const std::array<uint8_t, sizeof(T)> serialized_value = SerializeValue(value, Endian::Big);
-
-    /* Append the bytes to the byte stream */
-    std::copy_n(serialized_value.begin(), sizeof(T), std::back_insert_iterator(byte_stream));
 }
 
 /**
@@ -272,7 +235,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     cmc::bit_map::BitMap encoded_prefix_length_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
 
     /* Collect the overall bytes for the encoding */
-    const size_t overall_level_bytes = 5 * sizeof(size_t) + refinement_indications_.size_bytes() + encoded_alphabet.size() + encoded_prefix_length_stream.size_bytes() + encoding.size();
+    const size_t overall_level_bytes = 4 * sizeof(size_t) + encoded_alphabet.size() + encoded_prefix_length_stream.size_bytes() + encoding.size();
 
     /* Now everything is put together to a single stream */
     std::vector<uint8_t> encoded_stream;
@@ -280,10 +243,6 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     
     /* Push back the overall byte count for the level */
     PushBackValueToByteStream(encoded_stream, overall_level_bytes);
-
-    /* Push back the refinement indications */
-    const size_t refinement_indications_bytes = refinement_indications_.size_bytes();
-    PushBackValueToByteStream(encoded_stream, refinement_indications_bytes);
 
     /* Push back the byte count for the encoded alphabet */
     const size_t encoded_alphabet_bytes = encoded_alphabet.size();
@@ -297,13 +256,24 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     const size_t reamaining_value_bytes = encoding.size();
     PushBackValueToByteStream(encoded_stream, reamaining_value_bytes);
 
-    /* Push back the refinement_indications, the encoded alphabet, the encoded prefix length and the remaining bits in the given order */
-    std::copy_n(refinement_indications_.begin_bytes(), refinement_indications_bytes, std::back_insert_iterator(encoded_stream));
+    /* Push back the encoded alphabet, the encoded prefix length and the remaining bits in the given order */
     std::copy_n(encoded_alphabet.begin(), encoded_alphabet_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoded_prefix_length_stream.begin_bytes(), encoded_prefix_length_stream_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoding.begin(), reamaining_value_bytes, std::back_insert_iterator(encoded_stream));
 
     cmc_debug_msg("The entropy encoder of the prefix exctraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
+    return encoded_stream;
+}
+
+template <typename T>
+std::vector<uint8_t>
+PrefixAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
+{
+    cmc_debug_msg("The encoding of the root level values of the prefix compression starts.");
+
+    const std::vector<uint8_t> encoded_stream = EncodeLevelData(root_level_values);
+
+    cmc_debug_msg("The entropy encoder of the prefix exctraction compression stored the root-level CompressionValues within ", encoded_stream.size(), " bytes.");
     return encoded_stream;
 }
 
@@ -325,6 +295,8 @@ template<class T>
 class CompressionVariable : public AbstractByteCompressionVariable<T>
 {
 public:
+    CompressionVariable() = delete;
+
     CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<T>& variable_data)
     : AbstractByteCompressionVariable<T>()
     {
@@ -338,6 +310,7 @@ public:
         this->SetData(variable_data);
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 
     CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<CompressionValue<T>>& variable_data)
@@ -353,6 +326,7 @@ public:
         this->SetData(variable_data);
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();
     };
 
     CompressionVariable(const std::string& name, t8_forest_t initial_mesh, std::vector<CompressionValue<T>>&& variable_data)
@@ -368,6 +342,7 @@ public:
         this->SetData(std::move(variable_data));
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();
     };
 
     CompressionSchema GetCompressionSchema() const override

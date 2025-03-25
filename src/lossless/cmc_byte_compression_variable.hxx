@@ -9,6 +9,7 @@
 #include "utilities/cmc_arithmetic_encoding.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_compression_schema.hxx"
+#include "mesh_compression/cmc_mesh_encoder.hxx"
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
@@ -72,14 +73,11 @@ class AbstractByteCompressionVariable;
 template <typename T>
 class ICompressionAdaptData;
 
-
-#if 1
 template<typename T>
 using AdaptCreator = std::function<ICompressionAdaptData<T>*(AbstractByteCompressionVariable<T>*)>;
 
 template<typename T>
 using AdaptDestructor = std::function<void(ICompressionAdaptData<T>*)>;
-#endif
 
 /**
  * @brief The Interface/Template for a variable that performs lossless compression on the serialized data
@@ -109,7 +107,13 @@ public:
         buffered_encoded_data_ = std::vector<std::vector<uint8_t>>();
     };
 
-    std::vector<std::vector<uint8_t>> GetEncodedData() const {return buffered_encoded_data_;};
+    void MoveEncodedMeshInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_mesh)
+    {
+        vec_to_hold_encoded_levelwise_mesh = std::move(buffered_encoded_mesh_);
+        buffered_encoded_data_ = std::vector<std::vector<uint8_t>>();
+    };
+
+    const std::vector<std::vector<uint8_t>>& GetEncodedData() const {return buffered_encoded_mesh_;};
 
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
@@ -126,13 +130,17 @@ protected:
 
     AdaptCreator<T> adaptation_creator_; //!< A function pointer which is used to create the wished adaptation structure
     AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure
-
+    
+    std::unique_ptr<mesh_compression::IMeshEncoder> mesh_encoder_{nullptr}; 
 private:
     VectorView<CompressionValue<T>> GetView(const int start_index, const int count) const;
     VectorView<CompressionValue<T>> GetView(const int tree_id, const int lelement_index, const int count) const;
 
     void StoreExtractedValues(const int tree_id, const int lelement_id, const int num_elements, const ExtractionData<T>& extracted_values);
     void StoreUnchangedElement(const int tree_id, const int lelement_id, const UnchangedData<T>& extracted_value);
+
+    void IndicateElementStaysUnchanged() {mesh_encoder_->IndicateElementStaysUnchanged();};
+    void IndicateCoarsening() {mesh_encoder_->IndicateCoarsening();};
 
     bool IsValidForCompression() const;
     void AllocateExtractionIteration() {data_new_.reserve(mesh_.GetNumberLocalElements() / (2 << mesh_.GetDimensionality()) + 8);}
@@ -147,6 +155,7 @@ private:
     std::vector<CompressionValue<T>> data_new_; //!< A helper variable for the adaptation
 
     std::vector<std::vector<uint8_t>> buffered_encoded_data_; //!< Level-wise storage for the encoded data
+    std::vector<std::vector<uint8_t>> buffered_encoded_mesh_; //!< Level-wwise storage for the encoded mesh
 };
 
 
@@ -174,6 +183,7 @@ public:
     int LeaveElementUnchanged(const int which_tree, const int lelement_id);
 
     virtual std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
+    virtual std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
     
     virtual ~ICompressionAdaptData(){};
 
@@ -182,7 +192,6 @@ protected:
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
 
     std::unique_ptr<entropy_coding::IEntropyCoder> entropy_coder_{nullptr}; //!< The entropy coder to use in order to encode information
-
 private:
     AbstractByteCompressionVariable<T>* const base_variable_{nullptr};
 };
@@ -222,6 +231,9 @@ ICompressionAdaptData<T>::ExtractValue(const int which_tree, const int lelement_
     cmc_assert(which_tree >= 0 && lelement_id >= 0);
     cmc_assert(num_elements > 1);
 
+    /* We indicate to that a coarsening is applied to the family of elements */
+    base_variable_->IndicateCoarsening();
+
     /* Get the corresponding values */
     const VectorView<CompressionValue<T>> values = base_variable_->GetView(which_tree, lelement_id, num_elements);
 
@@ -250,6 +262,9 @@ int
 ICompressionAdaptData<T>::LeaveElementUnchanged(const int which_tree, const int lelement_id)
 {
     cmc_assert(which_tree >= 0 && lelement_id >= 0);
+
+     /* We indicate to that the element stays unchanged */
+    base_variable_->IndicateElementStaysUnchanged();
 
     /* Get the corresponding value */
     const VectorView<CompressionValue<T>> value = base_variable_->GetView(which_tree, lelement_id, 1);
@@ -316,6 +331,7 @@ AbstractByteCompressionVariable<T>::Compress()
         /* Initialize/Allocate for a coarsening iteration */
         this->AllocateExtractionIteration();
         adapt_data->InitializeExtractionIteration();
+        mesh_encoder_->IntializeCompressionIteration(mesh_.GetNumberLocalElements());
 
         /* Get and indicate to keep the 'previous forest' after the adaptation step */
         t8_forest_t previous_forest = mesh_.GetMesh();
@@ -331,9 +347,13 @@ AbstractByteCompressionVariable<T>::Compress()
         /* Free the former forest */
         t8_forest_unref(&previous_forest);
 
-        /* Encode the data of this level and store it wihtin a buffer */
-        const std::vector<uint8_t> encoded_data = adapt_data->EncodeLevelData(data_);
+        /* Encode the data of this level and store it within a buffer */
+        std::vector<uint8_t> encoded_data = adapt_data->EncodeLevelData(data_);
         buffered_encoded_data_.push_back(std::move(encoded_data));
+
+        /* Get the encoded the mesh adapatations */
+        std::vector<uint8_t> encoded_mesh_data = mesh_encoder_->GetEncodedLevelData();
+        buffered_encoded_mesh_.push_back(std::move(encoded_mesh_data));
 
         /* Once the data is buffered, we can overwrite it with the adapted data */
         this->SwitchToExtractedData();
@@ -353,9 +373,17 @@ AbstractByteCompressionVariable<T>::Compress()
 
         /* Finalize the comrpession iteration */
         adapt_data->FinalizeExtractionIteration();
-
+        mesh_encoder_->FinalizeCompressionIteration();
         cmc_debug_msg("The coarsening iteration is finished.");
     }
+
+    /* At last, we need to encode the root level data */
+    std::vector<uint8_t> encoded_root_data = adapt_data->EncodeRootLevelData(data_);
+    buffered_encoded_data_.push_back(std::move(encoded_root_data));
+
+    /* At last, we need to encode the root level of the mesh */
+    std::vector<uint8_t> encoded_root_mesh = mesh_encoder_->EncodeRootLevelMesh(mesh_.GetMesh());
+    buffered_encoded_mesh_.push_back(std::move(encoded_root_mesh));
 
     /* Free the adapt data structure */
     this->adaptation_destructor_(adapt_data);

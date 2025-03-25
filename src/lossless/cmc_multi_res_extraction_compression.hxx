@@ -9,6 +9,7 @@
 #include "utilities/cmc_arithmetic_encoding.hxx"
 #include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
+#include "utilities/cmc_serialization.hxx"
 
 #include <utility>
 #include <vector>
@@ -34,7 +35,8 @@ public:
     void RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest) override;
 
     std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const override;
-    
+    std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
+
 protected:
     ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) override;
     UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
@@ -194,23 +196,6 @@ MultiResAdaptData<T>::ElementStaysUnchanged([[maybe_unused]] const int which_tre
     return UnchangedData<T>(value, CompressionValue<T>());
 }
 
-/**
- * @brief Pushes a value byte-wise in Big-Endian ordering back to a vector
- * 
- * @tparam T The data type of the \a value
- * @param byte_stream The stream to which the value is byte-wise appended
- * @param value The value to be pushed back
- */
-template <typename T>
-void
-PushBackValueToByteStream(std::vector<uint8_t>& byte_stream, const T& value)
-{
-    /* Serialize the value to a collection of bytes (in big endian order) */
-    const std::array<uint8_t, sizeof(T)> serialized_value = SerializeValue(value, Endian::Big);
-
-    /* Append the bytes to the byte stream */
-    std::copy_n(serialized_value.begin(), sizeof(T), std::back_insert_iterator(byte_stream));
-}
 
 /**
  * @brief  We use an arithmetic encoder to encode the position of the first "one-bit" in the compression value
@@ -327,6 +312,14 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     cmc_debug_msg("The entropy encoder of the prefix ectraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
     return encoded_stream;
 }
+
+template <typename T>
+std::vector<uint8_t>
+MultiResAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
+{
+    cmc_err_msg("Implement MultiRes EncodeRootLevelData");
+}
+
 
 template <typename T>
 inline ICompressionAdaptData<T>*
