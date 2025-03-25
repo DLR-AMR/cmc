@@ -100,7 +100,7 @@ public:
     size_t size_bytes() const {return vector_.size();};
 
     const std::vector<uint8_t>& GetByteData() const {return vector_;};
-
+    void MoveDataInto(std::vector<uint8_t>& vector);
     friend class BitMapView;
 private:
     size_t bit_position_{0};
@@ -322,6 +322,13 @@ inline bool
 BitMap::IsBitSet(const size_t global_bit_position) const
 {
     return IsBitSet(global_bit_position / kCharBit, global_bit_position % kCharBit);
+}
+
+inline void
+BitMap::MoveDataInto(std::vector<uint8_t>& vector)
+{
+    vector  = std::move(vector_);
+    *this = BitMap();
 }
 
 }
