@@ -39,6 +39,7 @@ src/utilities/cmc_arithmetic_encoding.hxx \
 src/utilities/cmc_interpolation_fn.hxx \
 src/utilities/cmc_compression_schema.hxx \
 src/utilities/cmc_serialization.hxx \
+src/utilities/cmc_multi_res_extraction_util.hxx \
 src/mpi/cmc_mpi_io.hxx \
 src/mpi/cmc_mpi.hxx \
 src/mpi/cmc_mpi_data.hxx \
