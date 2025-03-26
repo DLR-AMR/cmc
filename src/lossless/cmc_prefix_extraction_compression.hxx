@@ -127,7 +127,6 @@ PrefixAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[m
     /* Evaluate whether there is a common prefix to extract */
     auto [is_prefix_found, prefix] = EvaluateCommonPrefix<T>(values);
 
-    cmc_debug_msg("Found prefix: ", is_prefix_found, " it has length: ", prefix.GetCountOfSignificantBits());
     if (is_prefix_found)
     {
         std::vector<CompressionValue<T>> fine_values;
