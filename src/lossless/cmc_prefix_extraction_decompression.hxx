@@ -44,13 +44,11 @@ protected:
     cmc::decompression::UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
 
 private:
-    //bool GetNextRefinementIndicatorBit();
     uint32_t GetNextPrefixLength();
     std::vector<uint8_t> GetNextPrefixBitSequence(const size_t num_bits);
     CompressionValue<T> GetNextSuffixedValue(const CompressionValue<T>& value);
 
     size_t level_byte_offset_{0};
-    //bit_map::BitMapView refinement_indications_;
     bit_vector::BitVectorView alphabet_;
     bit_map::BitMapView encoded_prefix_length_;
     bit_vector::BitVectorView prefix_bits_;
@@ -66,15 +64,6 @@ PrefixDecompressionAdaptData<T>::IsDecompressionProgressing() const
 {
     return (level_byte_offset_ < cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.size());
 }
-
-#if 0
-template<typename T>
-inline bool
-PrefixDecompressionAdaptData<T>::GetNextRefinementIndicatorBit()
-{
-    return refinement_indications_.GetNextBit();
-}
-#endif
 
 template<typename T>
 inline uint32_t
@@ -99,70 +88,6 @@ PrefixDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num_local_roo
     cmc_debug_msg("The setup of the root level values is performed.");
 
     return std::vector<CompressionValue<T>>(num_local_root_values);
-
-    #if 0
-    /* Create a vector of local root element values */
-    std::vector<CompressionValue<T>> root_values;
-    root_values.reserve(num_local_root_values);
-
-    constexpr size_t offset = sizeof(size_t);
-
-    size_t processed_bytes = level_byte_offset_;
-    
-    /* Get a pointer to the beginning of the encoded data stream */
-    const auto data_start_ptr = cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.data();
-
-    /* Get the amount of relevant bytes for this decompression level */
-    const size_t current_level_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
-    processed_bytes += offset;
-
-    cmc_debug_msg("The current refinement level is described by ", current_level_bytes, " bytes.");
-
-    /* Get the bytes for the encoded alphabet */
-    const size_t alphabet_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
-    processed_bytes += offset;
-    cmc_debug_msg("alphabet_bytes size: ", alphabet_bytes);
-
-    /* Get the bytes for the encoded prefix lengths */
-    const size_t encoded_prefix_length_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
-    processed_bytes += offset;
-    cmc_debug_msg("encoded_prefix_length_bytes size: ", encoded_prefix_length_bytes);
-
-    /* Get the bytes for the remaining bits */
-    const size_t prefix_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
-    processed_bytes += offset;
-    cmc_debug_msg("prefix_bytes size: ", prefix_bytes);
-
-    /* Set the view on the alphabet */
-    alphabet_ = bit_vector::BitVectorView(data_start_ptr + processed_bytes, alphabet_bytes);
-    processed_bytes += alphabet_bytes;
-
-    /* Set the view on the encoded prefix lengths */
-    encoded_prefix_length_ = bit_map::BitMapView(data_start_ptr + processed_bytes, bit_map::kCharBit * encoded_prefix_length_bytes);
-    processed_bytes += encoded_prefix_length_bytes;
-
-    /* Set the view on the remaining bits */
-    prefix_bits_ = bit_vector::BitVectorView(data_start_ptr + processed_bytes, prefix_bytes);
-    processed_bytes += prefix_bytes;
-
-    /* Update the byte count */
-    level_byte_offset_ = processed_bytes;
-
-    cmc_debug_msg("Processed bytes: ", level_byte_offset_);
-    /* Decode the alphabet */
-    [[maybe_unused]] auto [frequency_model, num_alphabet_bytes] = cmc::entropy_coding::arithmetic_coding::DecodeStaticFrequencyAlphabet(alphabet_.begin());
-
-    /* Setup the entropy decoder for the prefix lengths */
-    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Decoder>(std::make_unique<cmc::entropy_coding::arithmetic_coding::StaticFrequencyModel>(frequency_model), encoded_prefix_length_);
-
-    /* Fill the root values */
-    for (auto idx = 0; idx < num_local_root_values; ++idx)
-    {
-        root_values.push_back(GetNextSuffixedValue(CompressionValue<T>()));
-    }
-
-    return root_values;
-    #endif
 }
 
 template <typename T>
@@ -184,13 +109,6 @@ PrefixDecompressionAdaptData<T>::InitializeDecompressionIteration()
 
     cmc_debug_msg("The current refinement level is described by ", current_level_bytes, " bytes.");
     
-    #if 0
-    //movec to mesh decoder
-    /* Get the refinement indication bytes */
-    const size_t refinement_indication_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
-    processed_bytes += offset;
-    cmc_debug_msg("Refinement_indications size: ", refinement_indication_bytes);
-    #endif
     /* Get the bytes for the encoded alphabet */
     const size_t alphabet_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
@@ -206,11 +124,6 @@ PrefixDecompressionAdaptData<T>::InitializeDecompressionIteration()
     processed_bytes += offset;
     cmc_debug_msg("prefix_bytes size: ", prefix_bytes);
 
-    #if 0
-    /* Set the view on the refinement indications */
-    refinement_indications_ = bit_map::BitMapView(data_start_ptr + processed_bytes, bit_map::kCharBit * refinement_indication_bytes);
-    processed_bytes += refinement_indication_bytes;
-    #endif
     /* Set the view on the alphabet */
     alphabet_ = bit_vector::BitVectorView(data_start_ptr + processed_bytes, alphabet_bytes);
     processed_bytes += alphabet_bytes;
