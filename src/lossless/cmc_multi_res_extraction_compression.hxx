@@ -10,6 +10,7 @@
 #include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
 #include "utilities/cmc_serialization.hxx"
+#include "utilities/cmc_multi_res_extraction_util.hxx"
 
 #include <utility>
 #include <vector>
@@ -42,33 +43,14 @@ protected:
     UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
 
 private:
-    void IndicateCoarsening();
-    void IndicateElementStaysUnchanged();
-
-    bit_map::BitMap refinement_indications_;
     bit_map::BitMap resdiual_order_indications_;
     int count_adaptation_step_{0};
 };
-
-template<typename T>
-inline void
-MultiResAdaptData<T>::IndicateCoarsening()
-{
-    refinement_indications_.AppendSetBit();
-}
-
-template<typename T>
-inline void
-MultiResAdaptData<T>::IndicateElementStaysUnchanged()
-{
-    refinement_indications_.AppendUnsetBit();
-}
 
 template <typename T>
 void
 MultiResAdaptData<T>::InitializeExtractionIteration()
 {
-    refinement_indications_ = bit_map::BitMap();
     resdiual_order_indications_ = bit_map::BitMap();
 }
 
@@ -210,7 +192,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
 {
     //TODO: Rework for parallel usage
 
-    cmc_debug_msg("The encoding of the CompressionValues after the prefix extraction iteration starts...");
+    cmc_debug_msg("The encoding of the CompressionValues after the multi-resolution extraction iteration starts...");
     
     cmc_assert(ICompressionAdaptData<T>::entropy_coder_ != nullptr);
 
@@ -232,7 +214,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = (residual_flags.GetNextBit() == true ? 0 : cmc::entropy_coding::arithmetic_coding::kMSBBit);
+        const uint32_t signum = GetSignumForEncoding(residual_flags.GetNextBit());
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
         /* Update this symbol for encoding */
@@ -252,7 +234,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = (residual_flags.GetNextBit() == true ? 0 : cmc::entropy_coding::arithmetic_coding::kMSBBit);
+        const uint32_t signum = GetSignumForEncoding(residual_flags.GetNextBit());
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
         /* Encode the LZC and the residual fflag together */
@@ -278,7 +260,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     cmc::bit_map::BitMap encoded_lzc_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
 
     /* Collect the overall bytes for the encoding */
-    const size_t overall_level_bytes = 5 * sizeof(size_t) + refinement_indications_.size_bytes() + encoded_alphabet.size() + encoded_lzc_stream.size_bytes() + encoding.size();
+    const size_t overall_level_bytes = 4 * sizeof(size_t) + encoded_alphabet.size() + encoded_lzc_stream.size_bytes() + encoding.size();
 
     /* Now everything is put together to a single stream */
     std::vector<uint8_t> encoded_stream;
@@ -286,10 +268,6 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     
     /* Push back the overall byte count for the level */
     PushBackValueToByteStream(encoded_stream, overall_level_bytes);
-
-    /* Push back the refinement indications */
-    const size_t refinement_indications_bytes = refinement_indications_.size_bytes();
-    PushBackValueToByteStream(encoded_stream, refinement_indications_bytes);
 
     /* Push back the byte count for the encoded alphabet */
     const size_t encoded_alphabet_bytes = encoded_alphabet.size();
@@ -304,12 +282,11 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     PushBackValueToByteStream(encoded_stream, reamaining_value_bytes);
 
     /* Push back the refinement_indications, the encoded alphabet, the encoded LZC and the remaining bits in the given order */
-    std::copy_n(refinement_indications_.begin_bytes(), refinement_indications_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoded_alphabet.begin(), encoded_alphabet_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoded_lzc_stream.begin_bytes(), encoded_lzc_stream_bytes, std::back_insert_iterator(encoded_stream));
     std::copy_n(encoding.begin(), reamaining_value_bytes, std::back_insert_iterator(encoded_stream));
 
-    cmc_debug_msg("The entropy encoder of the prefix ectraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
+    cmc_debug_msg("The entropy encoder of the multi-resolution extraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
     return encoded_stream;
 }
 
