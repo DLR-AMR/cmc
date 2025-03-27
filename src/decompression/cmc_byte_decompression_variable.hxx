@@ -378,34 +378,6 @@ AbstractByteDecompressionVariable<T>::Decompress()
         cmc_debug_msg("The decompression iteration is finished.");
     }
 
-    cmc_debug_msg("The last decompression adaptation step on the leaves is initialized.");
-#if 0
-    /** Apply the last decompression step on the leaf level **/
-    /* Initialize the last decompression step */
-    adapt_data->InitializeDecompressionIteration();
-
-    /* Get and indicate to keep the 'previous forest' after the adaptation step */
-    t8_forest_t previous_forest = mesh_.GetMesh();
-    t8_forest_ref(previous_forest);
-
-    /* Perform a decompression iteration */
-    t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, ByteVariableLastDecompressionAdaptation<T>, 0, 0, static_cast<void*>(adapt_data));
-
-    /* Complete the interpolation step by storing the newly computed adapted data alongside its deviations */
-    adapt_data->CompleteDecompressionIteration(previous_forest, adapted_forest);
-
-    /* Free the former forest */
-    t8_forest_unref(&previous_forest);
-
-    /* Switch to the decompressed data */
-    this->SwitchToDecompressedData();
-    mesh_.SetMesh(adapted_forest);
-
-    /* Finalize the last decompression step */
-    adapt_data->FinalizeDecompressionIteration();
-#endif
-    cmc_debug_msg("The last decompression adaptation step on the leaves is finished.");
-    
     /* Free the adapt data structure */
     this->adaptation_destructor_(adapt_data);
     cmc_debug_msg("Decompression of variable ", this->name_, " is finished.");
@@ -556,11 +528,6 @@ AbstractByteDecompressionVariable<T>::IsValidForDecompression() const
 {
     return true;
 }
-
-
-
-
-
 
 }
 
