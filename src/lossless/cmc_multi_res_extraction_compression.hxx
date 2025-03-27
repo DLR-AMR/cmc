@@ -137,9 +137,6 @@ template <typename T>
 ExtractionData<T>
 MultiResAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, [[maybe_unused]] const int num_elements, const VectorView<CompressionValue<T>> values)
 {
-    /* Since we perform an extraction, a family of elements is coarsened */
-    IndicateCoarsening();
-
     /* Get the coarse approximation for these values which maximizes the cumulative residual LZC */
     const T coarse_approximation = GetCoarseApproximationMaximizingResidualsLZC<T>(values);
 
@@ -166,9 +163,6 @@ template <typename T>
 UnchangedData<T>
 MultiResAdaptData<T>::ElementStaysUnchanged([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, const CompressionValue<T>& value)
 {
-    /* In case the element stays unchanged, we indicate that no coarsening is possible */
-    IndicateElementStaysUnchanged();
-
     /* Since the residual is zero, we indicate that with an unset bit (although it is not of relevance, since the residual will be empty) */
     resdiual_order_indications_.AppendUnsetBit();
 
@@ -214,7 +208,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = GetSignumForEncoding(residual_flags.GetNextBit());
+        const uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
         /* Update this symbol for encoding */
@@ -234,7 +228,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = GetSignumForEncoding(residual_flags.GetNextBit());
+        const uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
         /* Encode the LZC and the residual fflag together */
@@ -294,7 +288,20 @@ template <typename T>
 std::vector<uint8_t>
 MultiResAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
 {
-    cmc_err_msg("Implement MultiRes EncodeRootLevelData");
+    cmc_debug_msg("The encoding of the root level values of the multi-resolution compression starts.");
+
+    std::vector<uint8_t> encoded_stream;
+    encoded_stream.reserve(root_level_values.size() * sizeof(T));
+
+    for (auto val_iter = root_level_values.begin(); val_iter != root_level_values.end(); ++val_iter)
+    {
+        const T val = val_iter->template ReinterpretDataAs<T>();
+
+        PushBackValueToByteStream(encoded_stream, val);
+    }
+
+    cmc_debug_msg("The entropy encoder of the multi-resolution extraction compression stored the root-level CompressionValues within ", encoded_stream.size(), " bytes.");
+    return encoded_stream;
 }
 
 
@@ -316,6 +323,8 @@ template<class T>
 class CompressionVariable : public AbstractByteCompressionVariable<T>
 {
 public:
+    CompressionVariable() = delete;
+
     CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<T>& variable_data)
     : AbstractByteCompressionVariable<T>()
     {
@@ -329,6 +338,7 @@ public:
         this->SetData(variable_data);
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 
     CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<CompressionValue<T>>& variable_data)
@@ -344,6 +354,7 @@ public:
         this->SetData(variable_data);
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 
     CompressionVariable(const std::string& name, t8_forest_t initial_mesh, std::vector<CompressionValue<T>>&& variable_data)
@@ -359,6 +370,7 @@ public:
         this->SetData(std::move(variable_data));
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 
     CompressionSchema GetCompressionSchema() const override

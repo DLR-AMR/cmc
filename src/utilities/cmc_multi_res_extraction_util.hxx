@@ -5,7 +5,7 @@
 #include <utility>
 #include <cstddef>
 
-namespace cmc::lossless::multi::res::util
+namespace cmc::lossless::multi_res::util
 {
 
 constexpr uint32_t kMSBBit = 0x80000000;

@@ -260,7 +260,7 @@ ComputeResidual(const T& approximation, const CompressionValue<T>& real_value)
     const bool is_approximation_greater = (unsigned_approximation >= unsigned_real_value);
 
     /* Compute the residual */
-    const uint32_t diff = (unsigned_real_value >= unsigned_approximation ? unsigned_real_value - unsigned_approximation : unsigned_approximation - unsigned_real_value);
+    const uint32_t diff = (unsigned_approximation >= unsigned_real_value ? unsigned_approximation - unsigned_real_value : unsigned_real_value - unsigned_approximation);
 
     /* Convert the difference to a CompressionValue */
     const CompressionValue<T> diff_compression_val(diff);
@@ -289,7 +289,7 @@ ComputeResidual(const T& approximation, const CompressionValue<T>& real_value)
     const bool is_approximation_greater = (unsigned_approximation >= unsigned_real_value);
 
     /* Compute the residual */
-    const uint8_t diff = (unsigned_real_value >= unsigned_approximation ? unsigned_real_value - unsigned_approximation : unsigned_approximation - unsigned_real_value);
+    const uint8_t diff = (unsigned_approximation >= unsigned_real_value ? unsigned_approximation - unsigned_real_value : unsigned_real_value - unsigned_approximation);
 
     /* Convert the difference to a CompressionValue */
     const CompressionValue<T> diff_compression_val(diff);
@@ -317,7 +317,7 @@ ComputeResidual(const T& approximation, const CompressionValue<T>& real_value)
     const bool is_approximation_greater = (unsigned_approximation >= unsigned_real_value);
 
     /* Compute the residual */
-    const uint16_t diff = (unsigned_real_value >= unsigned_approximation ? unsigned_real_value - unsigned_approximation : unsigned_approximation - unsigned_real_value);
+    const uint16_t diff = (unsigned_approximation >= unsigned_real_value ? unsigned_approximation - unsigned_real_value : unsigned_real_value - unsigned_approximation);
 
     /* Convert the difference to a CompressionValue */
     const CompressionValue<T> diff_compression_val(diff);
@@ -345,7 +345,7 @@ ComputeResidual(const T& approximation, const CompressionValue<T>& real_value)
     const bool is_approximation_greater = (unsigned_approximation >= unsigned_real_value);
 
     /* Compute the residual */
-    const uint64_t diff = (unsigned_real_value >= unsigned_approximation ? unsigned_real_value - unsigned_approximation : unsigned_approximation - unsigned_real_value);
+    const uint64_t diff = (unsigned_approximation >= unsigned_real_value ? unsigned_approximation - unsigned_real_value : unsigned_real_value - unsigned_approximation);
 
     /* Convert the difference to a CompressionValue */
     const CompressionValue<T> diff_compression_val(diff);
