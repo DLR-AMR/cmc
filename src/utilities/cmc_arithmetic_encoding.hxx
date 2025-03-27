@@ -354,33 +354,6 @@ Decoder::AdvanceDecoder(const Uint32_t low, const Uint32_t high, const Uint32_t 
     }
 }
 
-inline uint32_t
-GetLeadingZeroCount(const uint32_t encoded_lzc)
-{
-    if(kMSBBit > encoded_lzc)
-    {
-        return encoded_lzc;
-    } else
-    {
-        return encoded_lzc - kMSBBit;
-    }
-}
-
-enum ResidualOperation {IntegerAddition, IntegerSubtraction};
-
-inline
-std::pair<ResidualOperation, uint32_t>
-DecodeLZC(const uint32_t encoded_lzc)
-{
-    if(kMSBBit > encoded_lzc)
-    {
-        return std::make_pair(ResidualOperation::IntegerAddition, encoded_lzc);
-    } else
-    {
-        return std::make_pair(ResidualOperation::IntegerSubtraction, encoded_lzc - kMSBBit);
-    }
-}
-
 }
 
 #endif /* !CMC_ARITHMETIC_ENCODING_HXX */
