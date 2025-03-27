@@ -87,7 +87,21 @@ PrefixDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num_local_roo
 {
     cmc_debug_msg("The setup of the root level values is performed.");
 
-    return std::vector<CompressionValue<T>>(num_local_root_values);
+    std::vector<CompressionValue<T>> root_values;
+    root_values.reserve(num_local_root_values);
+
+    this->InitializeDecompressionIteration();
+
+    for (t8_locidx_t idx = 0; idx < num_local_root_values; ++idx)
+    {
+        /* Get the next suffixed value */
+        const CompressionValue<T> suffixed_value = GetNextSuffixedValue(CompressionValue<T>());
+        root_values.push_back(suffixed_value);
+    }
+
+    this->FinalizeDecompressionIteration();
+
+    return root_values;
 }
 
 template <typename T>
@@ -196,11 +210,18 @@ template <typename T>
 cmc::decompression::RefinementData<T>
 PrefixDecompressionAdaptData<T>::PerformRefinement(const int which_tree, const int lelement_id, const CompressionValue<T> value, const int num_refined_elements)
 {
-    /* Get the netx suffixed value */
-    const CompressionValue<T> suffixed_value = GetNextSuffixedValue(value);
+    /* Create the refinement data to return */
+    cmc::decompression::RefinementData<T> refinement_data;
+    refinement_data.fine_values.reserve(num_refined_elements);
 
-    /* Fill the refinement data */
-    return cmc::decompression::RefinementData<T>(std::vector<CompressionValue<T>>(num_refined_elements, suffixed_value));
+    /* Apply all children residuals */
+    for (int idx = 0; idx < num_refined_elements; ++idx)
+    {
+        /* Get the next value with the applied residual and store it wihtin the refinement data */
+        refinement_data.fine_values.emplace_back(this->GetNextSuffixedValue(value));
+    }
+
+    return refinement_data;
 }
 
 template <typename T>
@@ -243,9 +264,6 @@ public:
     };
 };
 
-
 }
-
-
 
 #endif /* !CMC_PREFIX_EXTRACTION_DECOMPRESSION_HXX */

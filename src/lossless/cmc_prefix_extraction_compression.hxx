@@ -271,7 +271,7 @@ PrefixAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& 
     cmc_debug_msg("The encoding of the root level values of the prefix compression starts.");
 
     const std::vector<uint8_t> encoded_stream = EncodeLevelData(root_level_values);
-
+    
     cmc_debug_msg("The entropy encoder of the prefix exctraction compression stored the root-level CompressionValues within ", encoded_stream.size(), " bytes.");
     return encoded_stream;
 }
@@ -350,10 +350,6 @@ public:
     }
 };
 
-
-
 }
-
-
 
 #endif /* !CMC_PREFIX_EXTRACTION_COMPRESSION_HXX */
