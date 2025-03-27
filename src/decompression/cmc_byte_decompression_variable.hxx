@@ -41,6 +41,7 @@ using CompressionValue = SerializedCompressionValue<sizeof(T)>;
 template<typename T>
 struct RefinementData
 {
+    RefinementData() = default;
     RefinementData(std::vector<CompressionValue<T>>&& fine_vals)
     : fine_values(std::move(fine_vals)) {};
     RefinementData(const std::vector<CompressionValue<T>>& fine_vals)
@@ -377,7 +378,8 @@ AbstractByteDecompressionVariable<T>::Decompress()
         cmc_debug_msg("The decompression iteration is finished.");
     }
 
-    cmc_debug_msg("The last decompression adaptation step is initialized.");
+    cmc_debug_msg("The last decompression adaptation step on the leaves is initialized.");
+#if 0
     /** Apply the last decompression step on the leaf level **/
     /* Initialize the last decompression step */
     adapt_data->InitializeDecompressionIteration();
@@ -401,7 +403,8 @@ AbstractByteDecompressionVariable<T>::Decompress()
 
     /* Finalize the last decompression step */
     adapt_data->FinalizeDecompressionIteration();
-    cmc_debug_msg("The last decompression adaptation step is finished.");
+#endif
+    cmc_debug_msg("The last decompression adaptation step on the leaves is finished.");
     
     /* Free the adapt data structure */
     this->adaptation_destructor_(adapt_data);
