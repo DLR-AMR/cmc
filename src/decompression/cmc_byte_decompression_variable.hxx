@@ -290,30 +290,6 @@ ByteVariableDecompressionAdaptation (t8_forest_t forest,
     }
 }
 
-/**
- * @brief The adaptation function to use during the last decompression step after the mesh has been decoded completely
- * but the encoding of the initial/fine level values has not been applied
- */
-template<typename T>
-inline t8_locidx_t
-ByteVariableLastDecompressionAdaptation (t8_forest_t forest,
-                                     t8_forest_t forest_from,
-                                     t8_locidx_t which_tree,
-                                     t8_locidx_t lelement_id,
-                                     t8_eclass_scheme_c * ts,
-                                     [[maybe_unused]] const int is_family,
-                                     [[maybe_unused]] const int num_elements,
-                                     t8_element_t * elements[])
-{
-    /* Retrieve the adapt_data */
-    IDecompressionAdaptData<T>* adapt_data = static_cast<IDecompressionAdaptData<T>*>(t8_forest_get_user_data(forest));
-    cmc_assert(adapt_data != nullptr);
-
-    /* If the element stays unchanged */
-    const int ret_val = adapt_data->LeaveElementUnchanged(which_tree, lelement_id);
-    return ret_val;
-}
-
 template <typename T>
 inline void
 AbstractByteDecompressionVariable<T>::Decompress()
