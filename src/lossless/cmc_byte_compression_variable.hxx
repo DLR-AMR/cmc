@@ -187,6 +187,7 @@ public:
     
     virtual ~ICompressionAdaptData(){};
 
+    bool IsValidForCompression() const;
 protected:
     virtual ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) = 0;
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
@@ -195,6 +196,24 @@ protected:
 private:
     AbstractByteCompressionVariable<T>* const base_variable_{nullptr};
 };
+
+template <typename T>
+inline bool
+ICompressionAdaptData<T>::IsValidForCompression() const
+{
+    if (base_variable_ == nullptr)
+    {
+        cmc_err_msg("The pointer to the base variable is not set. Therefore, no compression can be applied.");
+        return false;
+    }
+    if (entropy_coder_ == nullptr)
+    {
+        cmc_err_msg("The entropy coder is not set. Therefore, no compression can be applied.");
+        return false;
+    }
+
+    return true;
+}
 
 /**
  * @brief This function indicates whether the compression continues or not.
@@ -323,6 +342,8 @@ AbstractByteCompressionVariable<T>::Compress()
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
     ICompressionAdaptData<T>* adapt_data = this->CreateAdaptData();
+
+    cmc_assert(adapt_data->IsValidForCompression());
 
     while (adapt_data->IsCompressionProgressing())
     {
@@ -540,13 +561,29 @@ template <typename T>
 inline bool
 AbstractByteCompressionVariable<T>::IsValidForCompression() const 
 {
+    if (name_.empty())
+    {
+        cmc_err_msg("The variable needs a name in order to store the compressed output. Therefore, no compression can be applied.");
+        return false;
+    }
+    if (data_.empty())
+    {
+        cmc_err_msg("There is no data attached to the variable. Therefore, no compression can be applied.");
+        return false;
+    }
+    if (not mesh_.IsValid())
+    {
+        cmc_err_msg("The mesh is not valid. Therefore, no compression can be applied.");
+        return false;
+    }
+    if (mesh_encoder_ == nullptr)
+    {
+        cmc_err_msg("The mesh encoder is not set. Therefore, no compression can be applied.");
+        return false;
+    }
+
     return true;
 }
-
-
-
-
-
 
 }
 
