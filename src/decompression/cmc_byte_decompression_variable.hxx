@@ -175,6 +175,8 @@ public:
     bool WillNextElementBeRefined();
     virtual ~IDecompressionAdaptData(){};
 
+    bool IsValidForDeompression() const;
+
 private:
     AbstractByteDecompressionVariable<T>* const base_variable_{nullptr};
 
@@ -184,6 +186,24 @@ protected:
 
     const std::vector<uint8_t>& encoded_data_byte_stream_;
 };
+
+template <typename T>
+inline bool
+IDecompressionAdaptData<T>::IsValidForDeompression() const
+{
+    if (base_variable_ == nullptr)
+    {
+        cmc_err_msg("The pointer to the base variable is not set. Therefore, no decompression can be applied.");
+        return false;
+    }
+    if (encoded_data_byte_stream_.empty())
+    {
+        cmc_err_msg("The encoded data is emtpy. Therefore, no compression can be applied.");
+        return false;
+    }
+
+    return true;
+}
 
 template <typename T>
 inline bool
@@ -502,6 +522,27 @@ template <typename T>
 inline bool
 AbstractByteDecompressionVariable<T>::IsValidForDecompression() const 
 {
+    if (name_.empty())
+    {
+        cmc_err_msg("The variable needs a name. Therefore, no decompression can be applied.");
+        return false;
+    }
+    if (encoded_data_byte_stream_.empty())
+    {
+        cmc_err_msg("There is no compressed data attached to the variable. Therefore, no decompression can be applied.");
+        return false;
+    }
+    if (encoded_mesh_byte_stream_.empty())
+    {
+        cmc_err_msg("There is no compressed mesh attached to the variable. Therefore, no decompression can be applied.");
+        return false;
+    }
+    if (mesh_decoder_ == nullptr)
+    {
+        cmc_err_msg("The mesh decoder is not set. Therefore, no decompression can be applied.");
+        return false;
+    }
+
     return true;
 }
 
