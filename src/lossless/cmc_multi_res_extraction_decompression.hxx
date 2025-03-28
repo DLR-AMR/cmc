@@ -91,9 +91,11 @@ MultiResDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num_local_r
     std::vector<CompressionValue<T>> root_values;
     root_values.reserve(num_local_root_values);
 
+    const size_t offset = sizeof(T);
+
     for (t8_locidx_t idx = 0; idx < num_local_root_values; ++idx)
     {
-        const T val = GetValueFromByteStream<T>(cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.data());
+        const T val = GetValueFromByteStream<T>(cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.data() + offset * idx);
         cmc_debug_msg("Root level value: ", val, ", fuer idx: ", idx);
         root_values.emplace_back(CompressionValue<T>(val));
     }
