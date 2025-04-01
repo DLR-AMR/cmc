@@ -4,6 +4,8 @@
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_log_functions.hxx"
 
+#include "mpi/cmc_mpi.hxx"
+
 #include <cstddef>
 #include <vector>
 #include <memory>
@@ -22,7 +24,7 @@ main(void)
 
 
     /* Create the arithmetic encoder with a static dictionary */
-    cmc::entropy_coding::arithmetic_coding::Encoder encoder;
+    cmc::entropy_coding::arithmetic_coding::Encoder<uint32_t> encoder;
 
     /* Initilaize the alphabet */
     encoder.InitializeAlphabet();
@@ -34,7 +36,7 @@ main(void)
     }
 
     /* Setup the interior structures for encoding once the frequencies for the static dictionary have been collected */
-    encoder.SetupEncoding();
+    encoder.SetupEncoding(MPI_COMM_SELF);
 
     /* Encode each symbol of the message */
     for (size_t symbol_idx = 0; symbol_idx < num_symbols_in_message; ++symbol_idx)

@@ -29,7 +29,7 @@ public:
     PrefixAdaptData() = delete;
     PrefixAdaptData(AbstractByteCompressionVariable<T>* variable)
     : ICompressionAdaptData<T>(variable) {
-        ICompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Encoder>();
+        ICompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Encoder<T>>();
     };
 
     void InitializeExtractionIteration() override;
@@ -203,7 +203,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     }
 
     /* Setup the interior structure for encoding */
-    ICompressionAdaptData<T>::entropy_coder_->SetupEncoding();
+    ICompressionAdaptData<T>::entropy_coder_->SetupEncoding(this->GetMPIComm());
 
     /* Iterate over all values and encode them */
     for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
@@ -223,6 +223,9 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
             encoding.AppendBits(current_val.GetSignificantBitsInBigEndianOrdering(), pref_length);
         }
     }
+
+    /* We set an indicaton symbol that the process local end of the values have been reached */
+    ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(entropy_coding::arithmetic_coding::kSymbolJumpToNextByte);
 
     /* Indicate that the encoding has been finished and flush all pending encodings */
     ICompressionAdaptData<T>::entropy_coder_->FinishEncoding();
@@ -307,6 +310,7 @@ public:
         this->SetName(name);
         this->SetAmrMesh(AmrMesh(initial_mesh));
         this->SetData(variable_data);
+        StoreMeshMPIComm();
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
@@ -323,6 +327,7 @@ public:
         this->SetName(name);
         this->SetAmrMesh(AmrMesh(initial_mesh));
         this->SetData(variable_data);
+        StoreMeshMPIComm();
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();
@@ -339,6 +344,7 @@ public:
         this->SetName(name);
         this->SetAmrMesh(AmrMesh(initial_mesh));
         this->SetData(std::move(variable_data));
+        StoreMeshMPIComm();
         AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();
@@ -348,6 +354,10 @@ public:
     {
         return CompressionSchema::PrefixExtraction;
     }
+
+private:
+    void StoreMeshMPIComm(){this->SetMPIComm(t8_forest_get_mpicomm(this->GetAmrMesh().GetMesh()));};
+
 };
 
 }

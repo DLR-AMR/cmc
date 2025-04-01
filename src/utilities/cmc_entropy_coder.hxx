@@ -5,6 +5,8 @@
 #include "utilities/cmc_entropy_alphabet.hxx"
 #include "utilities/cmc_arithmetic_encoding_frequency_model.hxx"
 
+#include "mpi/cmc_mpi.hxx"
+
 #include <memory>
 
 namespace cmc::entropy_coding
@@ -17,7 +19,7 @@ public:
     virtual void UpdateSymbolFrequency(const uint32_t symbol) = 0;
     virtual bit_vector::BitVector EncodeAlphabet() const = 0;
 
-    virtual void SetupEncoding() = 0;
+    virtual void SetupEncoding(const MPI_Comm comm) = 0;
     virtual void EncodeSymbol(const uint32_t symbol) = 0;
     virtual void FinishEncoding() = 0;
 
