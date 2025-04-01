@@ -11,6 +11,8 @@
 #include "utilities/cmc_compression_schema.hxx"
 #include "mesh_compression/cmc_mesh_encoder.hxx"
 
+#include "mpi/cmc_mpi.hxx"
+
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
@@ -115,6 +117,8 @@ public:
 
     const std::vector<std::vector<uint8_t>>& GetEncodedData() const {return buffered_encoded_mesh_;};
 
+    MPI_Comm GetMPIComm() const {return comm_;};
+
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
     friend ICompressionAdaptData<T>;
@@ -127,6 +131,7 @@ protected:
     void SetData(const std::vector<T>& initial_data);
     void SetData(const std::vector<SerializedCompressionValue<sizeof(T)>>& initial_data);
     void SetData(std::vector<SerializedCompressionValue<sizeof(T)>>&& initial_data);
+    void SetMPIComm(const MPI_Comm comm) {comm_ = comm;};
 
     AdaptCreator<T> adaptation_creator_; //!< A function pointer which is used to create the wished adaptation structure
     AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure
@@ -156,6 +161,8 @@ private:
 
     std::vector<std::vector<uint8_t>> buffered_encoded_data_; //!< Level-wise storage for the encoded data
     std::vector<std::vector<uint8_t>> buffered_encoded_mesh_; //!< Level-wwise storage for the encoded mesh
+
+    MPI_Comm comm_{MPI_COMM_NULL}; //!< The MPI communicator to use
 };
 
 
@@ -185,6 +192,8 @@ public:
     virtual std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
     virtual std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
     
+    MPI_Comm GetMPIComm() const {return base_variable_->GetMPIComm();};
+
     virtual ~ICompressionAdaptData(){};
 
     bool IsValidForCompression() const;
@@ -307,13 +316,13 @@ ICompressionAdaptData<T>::LeaveElementUnchanged(const int which_tree, const int 
 template<typename T>
 inline t8_locidx_t
 LosslessByteCompression (t8_forest_t forest,
-                            [[maybe_unused]] t8_forest_t forest_from,
-                            t8_locidx_t which_tree,
-                            t8_locidx_t lelement_id,
-                            [[maybe_unused]] t8_eclass_scheme_c * ts,
-                            const int is_family,
-                            const int num_elements,
-                            [[maybe_unused]] t8_element_t * elements[])
+                         [[maybe_unused]] t8_forest_t forest_from,
+                         t8_locidx_t which_tree,
+                         t8_locidx_t lelement_id,
+                         [[maybe_unused]] t8_eclass_scheme_c * ts,
+                         const int is_family,
+                         const int num_elements,
+                         [[maybe_unused]] t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
     ICompressionAdaptData<T>* adapt_data = static_cast<ICompressionAdaptData<T>*>(t8_forest_get_user_data(forest));
@@ -489,7 +498,7 @@ AbstractByteCompressionVariable<T>::StoreUnchangedElement(const int tree_id, con
 {
     cmc_assert(tree_id >= 0 && tree_id < t8_forest_get_num_local_trees(mesh_.GetMesh()));
 
-    /* Get the element id in the contiguus array of all local elements */
+    /* Get the element id in the contiguous array of all local elements */
     const int elem_id = t8_forest_get_tree_element_offset (mesh_.GetMesh(), tree_id) + lelement_id;
     
     cmc_assert(elem_id >= 0 && static_cast<size_t>(elem_id) < data_.size());
@@ -581,6 +590,26 @@ AbstractByteCompressionVariable<T>::IsValidForCompression() const
         cmc_err_msg("The mesh encoder is not set. Therefore, no compression can be applied.");
         return false;
     }
+
+#if CMC_ENABLE_MPI
+    if (comm_ == MPI_COMM_NULL)
+    {
+        cmc_err_msg("The MPI-Communicator is not set. Therefore, no compression can be applied.");
+        return false;
+    }
+
+    MPI_Comm mesh_comm = t8_forest_get_mpicomm(mesh_.GetMesh());
+    int are_mpi_comms_equal{0};
+    const int ret_val_comm_compare = MPI_Comm_compare(comm_, mesh_comm, &are_mpi_comms_equal);
+    MPICheckError(ret_val_comm_compare);
+    
+    if (are_mpi_comms_equal != MPI_IDENT)
+    {
+        cmc_err_msg("The MPI-Communicator of the mesh and the variable differs. Therefore, no compression can be applied.");
+        return false;
+    }
+
+#endif
 
     return true;
 }
