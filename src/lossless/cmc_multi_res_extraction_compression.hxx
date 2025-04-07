@@ -6,7 +6,6 @@
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "lossless/cmc_byte_compression_variable.hxx"
-//#include "utilities/cmc_arithmetic_encoding.hxx"
 #include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
 #include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
