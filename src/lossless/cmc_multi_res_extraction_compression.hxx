@@ -216,7 +216,6 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     int ret_val = MPI_Comm_rank(this->GetMPIComm(), &rank);
     MPICheckError(ret_val);
 
-
     /* Define the root rank */
     const int root_rank = 0;
 
@@ -311,7 +310,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         /* Push back the byte count for the remaining significant bits */
         PushBackValueToByteStream(encoded_stream, static_cast<size_t>(global_bytes[1]));
 
-        /* Afterwards, we encode the local data */
+        /* Afterwards, we store the encoded alphabet */
         std::copy_n(encoded_alphabet.begin(), encoded_alphabet_num_bytes, std::back_insert_iterator(encoded_stream));
     } else
     {
