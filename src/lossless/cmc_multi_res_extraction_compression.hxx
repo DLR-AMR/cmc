@@ -6,7 +6,8 @@
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "lossless/cmc_byte_compression_variable.hxx"
-#include "utilities/cmc_arithmetic_encoding.hxx"
+//#include "utilities/cmc_arithmetic_encoding.hxx"
+#include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
 #include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
 #include "utilities/cmc_serialization.hxx"
@@ -43,6 +44,8 @@ protected:
     UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
 
 private:
+    void CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const;
+
     bit_map::BitMap resdiual_order_indications_;
     int count_adaptation_step_{0};
 };
@@ -172,32 +175,10 @@ MultiResAdaptData<T>::ElementStaysUnchanged([[maybe_unused]] const int which_tre
     return UnchangedData<T>(value, CompressionValue<T>());
 }
 
-
-/**
- * @brief  We use an arithmetic encoder to encode the position of the first "one-bit" in the compression value
- * 
- * @tparam T The original data type of the underlying data (e.g. float)
- * @param level_byte_values The remaining "fine compression" values after an extraction iteration
- * @return std::vector<uint8_t> The encoded data stream
- */
 template <typename T>
-std::vector<uint8_t>
-MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
+void
+MultiResAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const
 {
-    //TODO: Rework for parallel usage
-
-    cmc_debug_msg("The encoding of the CompressionValues after the multi-resolution extraction iteration starts...");
-    
-    cmc_assert(ICompressionAdaptData<T>::entropy_coder_ != nullptr);
-
-    /* The encoded data will be stored in a BitVector */
-    cmc::bit_vector::BitVector encoding;
-    encoding.Reserve(3 * level_byte_values.size());
-
-    /* Reset the entropy coder and initialize the alphabet */
-    ICompressionAdaptData<T>::entropy_coder_->Reset();
-    ICompressionAdaptData<T>::entropy_coder_->InitializeAlphabet(sizeof(T));
-
     /* Get a view on the bitmap storing the residual addition/subtraction flags */
     bit_map::BitMapView residual_flags(resdiual_order_indications_);
 
@@ -214,16 +195,53 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         /* Update this symbol for encoding */
         ICompressionAdaptData<T>::entropy_coder_->UpdateSymbolFrequency(signum + first_one_bit);
     }
+}
+
+/**
+ * @brief  We use an arithmetic encoder to encode the position of the first "one-bit" in the compression value
+ * 
+ * @tparam T The original data type of the underlying data (e.g. float)
+ * @param level_byte_values The remaining "fine compression" values after an extraction iteration
+ * @return std::vector<uint8_t> The encoded data stream
+ */
+template <typename T>
+std::vector<uint8_t>
+MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
+{
+    cmc_debug_msg("The encoding of the CompressionValues after the multi-resolution extraction iteration starts...");
+    
+    cmc_assert(ICompressionAdaptData<T>::entropy_coder_ != nullptr);
+
+    /* Get the rank of the mpi process within the communicator */
+    int rank{0};
+    int ret_val = MPI_Comm_rank(this->GetMPIComm(), &rank);
+    MPICheckError(ret_val);
+
+
+    /* Define the root rank */
+    const int root_rank = 0;
+
+    /* The encoded data will be stored in a BitVector */
+    cmc::bit_vector::BitVector encoding;
+    encoding.Reserve(3 * level_byte_values.size());
+
+    /* Reset the entropy coder and initialize the alphabet */
+    ICompressionAdaptData<T>::entropy_coder_->Reset();
+    ICompressionAdaptData<T>::entropy_coder_->InitializeAlphabet(sizeof(T));
+
+    /* Collect the symbols and their frequencies for the entropy coder */
+    CollectSymbolFrequenciesForEntropyCoding(level_byte_values);
 
     /* Setup the interior structure for encoding */
     ICompressionAdaptData<T>::entropy_coder_->SetupEncoding(this->GetMPIComm());
 
-    /* Reset the residual flag view */
-    residual_flags = bit_map::BitMapView(resdiual_order_indications_);
+    /* Get a view on the residual flags */
+    bit_map::BitMapView residual_flags(resdiual_order_indications_);
     
     /* Iterate over all values and encode them */
     for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
     {
+        //cmc_debug_msg("in val iter");
         /* Get the current value */
         CompressionValue<T> val = *val_iter;
 
@@ -231,7 +249,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         const uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
-        /* Encode the LZC and the residual fflag together */
+        /* Encode the LZC and the residual flag together */
         ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(signum + first_one_bit);
 
         /* The first one is implicitly given by the leading zero count; therefore we set the "front bit" in order to discard the leading zeros and the following one */
@@ -245,45 +263,72 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     }
 
     /* We set an indicaton symbol that the process local end of the values have been reached */
-    ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(entropy_coding::arithmetic_coding::kSymbolJumpToNextByte);
+    ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte);
 
     /* Indicate that the encoding has been finished and flush all pending encodings */
     ICompressionAdaptData<T>::entropy_coder_->FinishEncoding();
 
-    /* Get the encoded alphabet */
-    cmc::bit_vector::BitVector encoded_alphabet = ICompressionAdaptData<T>::entropy_coder_->EncodeAlphabet();
+    /* Get the local encoded LZC, respectively the encoded first "one-bit" positions */
+    cmc::bit_map::BitMap local_encoded_lzc_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
+    const size_t local_encoded_lzc_stream_num_bytes = local_encoded_lzc_stream.size_bytes();
 
-    /* Get the encoded LZC, respectivel first "one-bit" positions */
-    cmc::bit_map::BitMap encoded_lzc_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
+    /* Get the local remaining significant bits */
+    const size_t local_remaining_significant_bits_num_bytes = encoding.size();
 
-    /* Collect the overall bytes for the encoding */
-    const size_t overall_level_bytes = 4 * sizeof(size_t) + encoded_alphabet.size() + encoded_lzc_stream.size_bytes() + encoding.size();
+    /* We need exchange the encoded lengths */
+    const std::vector<uint64_t> local_bytes{static_cast<uint64_t>(local_encoded_lzc_stream_num_bytes), static_cast<uint64_t>(local_remaining_significant_bits_num_bytes)};
+    std::vector<uint64_t> global_bytes{0, 0};
 
-    /* Now everything is put together to a single stream */
+    ret_val = MPI_Reduce(local_bytes.data(), global_bytes.data(), 2, MPI_UINT64_T, MPI_SUM, root_rank, this->GetMPIComm());
+    MPICheckError(ret_val);
+
+    /* Declare the buffer for the encoded data */
     std::vector<uint8_t> encoded_stream;
-    encoded_stream.reserve(overall_level_bytes);
+
+    /* Only the root rank needs to encode the encoded sizes */
+    if (rank == root_rank)
+    {
+        /* Get the encoded alphabet */
+        cmc::bit_vector::BitVector encoded_alphabet = ICompressionAdaptData<T>::entropy_coder_->EncodeAlphabet();
+        const size_t encoded_alphabet_num_bytes = encoded_alphabet.size();
+
+        /* Calculate the overall amount of bytes on the root rank */
+        const size_t num_locally_encoded_bytes = 4 * sizeof(size_t) + encoded_alphabet_num_bytes + local_encoded_lzc_stream_num_bytes + local_remaining_significant_bits_num_bytes;
+
+        /* Allocate memory for the encoded data */
+        encoded_stream.reserve(num_locally_encoded_bytes);
+        
+        /** We store global information about the encoded level **/
+        /* Push back the overall byte count for the level */
+        const size_t num_global_bytes_encoded_level = 4 * sizeof(size_t) + encoded_alphabet_num_bytes + global_bytes[0] + global_bytes[1];
+        PushBackValueToByteStream(encoded_stream, num_global_bytes_encoded_level);
+
+        /* Push back the byte count for the encoded alphabet */
+        PushBackValueToByteStream(encoded_stream, encoded_alphabet_num_bytes);
+
+        /* Push back the byte count for the encoded first "one-bit" positions */
+        PushBackValueToByteStream(encoded_stream, static_cast<size_t>(global_bytes[0]));
+
+        /* Push back the byte count for the remaining significant bits */
+        PushBackValueToByteStream(encoded_stream, static_cast<size_t>(global_bytes[1]));
+
+        /* Afterwards, we encode the local data */
+        std::copy_n(encoded_alphabet.begin(), encoded_alphabet_num_bytes, std::back_insert_iterator(encoded_stream));
+    } else
+    {
+        /* Non-root ranks encode only the LZC and the significant bits */
+        const size_t num_locally_encoded_bytes = local_encoded_lzc_stream_num_bytes + local_remaining_significant_bits_num_bytes;
+
+        /* Allocate memory for the encoded data */
+        encoded_stream.reserve(num_locally_encoded_bytes);
+    }
+
+    /* Encode the local data */
+    std::copy_n(local_encoded_lzc_stream.begin_bytes(), local_encoded_lzc_stream_num_bytes, std::back_insert_iterator(encoded_stream));
+    std::copy_n(encoding.begin(), local_remaining_significant_bits_num_bytes, std::back_insert_iterator(encoded_stream));
     
-    /* Push back the overall byte count for the level */
-    PushBackValueToByteStream(encoded_stream, overall_level_bytes);
 
-    /* Push back the byte count for the encoded alphabet */
-    const size_t encoded_alphabet_bytes = encoded_alphabet.size();
-    PushBackValueToByteStream(encoded_stream, encoded_alphabet_bytes);
-
-    /* Push back the byte count for the encoded first "one-bit" positions */
-    const size_t encoded_lzc_stream_bytes = encoded_lzc_stream.size_bytes();
-    PushBackValueToByteStream(encoded_stream, encoded_lzc_stream_bytes);
-
-    /* Push back the byte count for the remaining bits of the prefixes */
-    const size_t reamaining_value_bytes = encoding.size();
-    PushBackValueToByteStream(encoded_stream, reamaining_value_bytes);
-
-    /* Push back the refinement_indications, the encoded alphabet, the encoded LZC and the remaining bits in the given order */
-    std::copy_n(encoded_alphabet.begin(), encoded_alphabet_bytes, std::back_insert_iterator(encoded_stream));
-    std::copy_n(encoded_lzc_stream.begin_bytes(), encoded_lzc_stream_bytes, std::back_insert_iterator(encoded_stream));
-    std::copy_n(encoding.begin(), reamaining_value_bytes, std::back_insert_iterator(encoded_stream));
-
-    cmc_debug_msg("The entropy encoder of the multi-resolution extraction compression stored the CompressionValues of this iteration within ", overall_level_bytes, " bytes.");
+    cmc_debug_msg("The entropy encoder of the multi-resolution extraction compression completed the encoding of the CompressionValues of this iteration.");
     return encoded_stream;
 }
 

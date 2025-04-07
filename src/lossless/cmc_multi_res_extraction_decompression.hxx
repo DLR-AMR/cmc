@@ -7,7 +7,8 @@
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "decompression/cmc_byte_decompression_variable.hxx"
-#include "utilities/cmc_arithmetic_encoding.hxx"
+//#include "utilities/cmc_arithmetic_encoding.hxx"
+#include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_mesh_decoder.hxx"
 
@@ -47,6 +48,7 @@ private:
     uint32_t GetNextEncodedResidualLength();
     std::vector<uint8_t> GetNextResidualBitSequence(const size_t num_bits);
     CompressionValue<T> GetNextResidualAppliedValue(const CompressionValue<T>& value);
+    uint32_t ApplyProcessBoundarySymbol();
 
     size_t level_byte_offset_{0};
     bit_vector::BitVectorView alphabet_;
@@ -157,10 +159,11 @@ MultiResDecompressionAdaptData<T>::InitializeDecompressionIteration()
     cmc_debug_msg("Processed bytes: ", level_byte_offset_);
 
     /* Decode the alphabet */
-    [[maybe_unused]] auto [frequency_model, num_alphabet_bytes] = cmc::entropy_coding::arithmetic_coding::DecodeStaticFrequencyAlphabet(alphabet_.begin());
+    [[maybe_unused]] auto [frequency_model, num_alphabet_bytes] = cmc::entropy_coding::arithmetic_coding::DecodeByteCompressionStaticFrequencyAlphabet<T>(alphabet_.begin());
 
     /* Setup the entropy decoder for the prefix lengths */
-    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Decoder>(std::make_unique<cmc::entropy_coding::arithmetic_coding::StaticFrequencyModel>(frequency_model), encoded_lzcs_);
+    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Decoder>(std::make_unique<cmc::entropy_coding::arithmetic_coding::ByteCompressionStaticFrequencyModel<T>>(frequency_model), encoded_lzcs_);
+    entropy_decoder_->SetupDecoding();
 }
 
 template <typename T>
@@ -186,13 +189,47 @@ MultiResDecompressionAdaptData<T>::RepartitionData(const t8_forest_t adapted_for
 }
 
 template <typename T>
+inline uint32_t
+MultiResDecompressionAdaptData<T>::ApplyProcessBoundarySymbol()
+{
+    bool is_process_boundary = true;
+    uint32_t next_symbol;
+
+    /* Iterate until we have cleared (all subsequent) process boundaries */
+    while (is_process_boundary)
+    {
+        /* Reset the decoder */
+        entropy_decoder_->ResetAfterProcessBoundary();
+        next_symbol = this->GetNextEncodedResidualLength();
+
+        if (next_symbol != entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte)
+        {
+            is_process_boundary = false;
+        }
+    }
+
+    /* Move the encoded signifcant bits view to the next byte as well */
+    residual_bits_.MoveToNextByte();
+
+    /* Return the newly obtained symbol */
+    return next_symbol;
+}
+
+template <typename T>
 CompressionValue<T>
 MultiResDecompressionAdaptData<T>::GetNextResidualAppliedValue(const CompressionValue<T>& coarse_value)
 {
     CompressionValue<T> value = coarse_value;
 
     /* Get the LZC of the next residual */
-    const uint32_t encoded_lzc = this->GetNextEncodedResidualLength();
+    uint32_t encoded_lzc = this->GetNextEncodedResidualLength();
+
+    /* Check if a process-boundary symbol has been encoded */
+    if (encoded_lzc == entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte)
+    {
+        /* Apply the symbol an get the next 'unequal' symbol */
+        encoded_lzc = this->ApplyProcessBoundarySymbol();
+    }
 
     /* Get the actual LZC of the residual */
     auto [residual_operation, lzc] = cmc::lossless::multi_res::util::DecodeLZC(encoded_lzc);
