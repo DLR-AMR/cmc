@@ -2,8 +2,8 @@
 #define CMC_ENTROPY_CODER_HXX
 
 #include "utilities/cmc_bit_map.hxx"
-#include "utilities/cmc_entropy_alphabet.hxx"
-#include "utilities/cmc_arithmetic_encoding_frequency_model.hxx"
+#include "utilities/cmc_iface_entropy_alphabet.hxx"
+#include "utilities/cmc_iface_arithmetic_encoding_freq_model.hxx"
 
 #include "mpi/cmc_mpi.hxx"
 

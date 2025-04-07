@@ -6,7 +6,7 @@
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_arithmetic_encoding_frequency_model.hxx"
-#include "utilities/cmc_entropy_alphabet.hxx"
+#include "utilities/cmc_iface_entropy_alphabet.hxx"
 #include "utilities/cmc_entropy_coder.hxx"
 
 #include "mpi/cmc_mpi.hxx"
@@ -68,7 +68,7 @@ public:
             ++(alphabet_[symbol]);
         }
     };
-    Alphabet GetSymbolFrequencies() override
+    Alphabet GetSymbolFrequencies()
     {
         return alphabet_;
     }
@@ -350,7 +350,7 @@ Encoder<T>::CommunicateSymbolFrequencies(const MPI_Comm comm)
     std::vector<Letter> vectorized_alphabet;
 
     /* And we create a new alphabt which will hold be updated frequencies */
-    Alphabet updated_alphabet = alphabet_->GetSymbolFrequencies();
+    Alphabet updated_alphabet = alphabet->GetSymbolFrequencies();
 
     /* Declare an MPI_Request object for the send */
     MPI_Request send_req;
@@ -512,6 +512,22 @@ public:
         buffer_ = 0;
         encoded_stream_ = new_encoded_stream;
 
+        /* Fill the buffer initially with the new stream */
+        for (size_t i = kNumWorkingBits; i > 0; --i)
+        {
+            buffer_ |= (GetNextBit() << (i - 1));
+        }
+    }
+
+    void ResetAfterProcessBoundary()
+    {
+        lower_ = 0;
+        higher_ = 0x7FFFFFFF;
+        step_ = 0;
+        scale_ = 0;
+        buffer_ = 0;
+        encoded_stream_.MoveToNextByte();
+        
         /* Fill the buffer initially with the new stream */
         for (size_t i = kNumWorkingBits; i > 0; --i)
         {

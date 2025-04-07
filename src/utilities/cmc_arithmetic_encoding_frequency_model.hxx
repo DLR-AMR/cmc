@@ -5,29 +5,13 @@
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
-#include "utilities/cmc_entropy_alphabet.hxx"
+#include "utilities/cmc_iface_entropy_alphabet.hxx"
+#include "utilities/cmc_iface_arithmetic_encoding_freq_model.hxx"
 
 #include <vector>
 #include <algorithm>
 
-namespace cmc::entropy_coding
-{
-
-class IACModel
-{
-public:
-    virtual uint32_t GetFrequencyCountOf(const uint32_t symbol) = 0;
-    virtual uint32_t GetTotalSymbolFrequencyCount() = 0;
-    virtual uint32_t GetCumulativeCountOfAllSymbolFrequenciesLowerThan(const uint32_t symbol) = 0;
-    virtual uint32_t GetCumulativeCountOfAllSymbolFrequenciesIncluding(const uint32_t symbol) = 0;
-    virtual uint32_t GetAlphabetSize() const = 0;
-    virtual bit_vector::BitVector EncodeAlphabet() const = 0;
-    virtual uint32_t GetSymbolFromCumulativeFrequency(const uint32_t value) = 0;
-    virtual bool SymbolExistsInAlphabet(const uint32_t symbol) const = 0;
-    virtual ~IACModel(){};
-};
-
-namespace arithmetic_coding
+namespace cmc::entropy_coding::arithmetic_coding
 {
 
 class StaticFrequencyModel;
@@ -247,7 +231,6 @@ DecodeStaticFrequencyAlphabet(Iter pos)
     return std::make_pair(StaticFrequencyModel(std::move(alphabet), StaticFrequencyModel::Decoding()), decoded_byte_count);
 }
 
-}
 }
 
 #endif /* !CMC_ARITHMETIC_ENCODING_FREQUENCY_MODEL_HXX */

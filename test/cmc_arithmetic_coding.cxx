@@ -1,7 +1,7 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "utilities/cmc_ac_model.hxx"
-#include "utilities/cmc_entropy_alphabet.hxx"
+#include "utilities/cmc_iface_entropy_alphabet.hxx"
 #include "utilities/cmc_arithmetic_encoder.hxx"
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_log_functions.hxx"
