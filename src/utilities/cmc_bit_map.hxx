@@ -125,6 +125,8 @@ public:
 
     bool GetNextBit();
 
+    void MoveToNextByte();
+
 private:
     const uint8_t* data_;
     std::size_t byte_position_{0};
@@ -150,6 +152,12 @@ BitMapView::GetNextBit()
         bit_position_ = 1;
         return next_bit;
     }
+}
+inline void
+BitMapView::MoveToNextByte()
+{
+    ++byte_position_;
+    bit_position_ = 0;
 }
 
 inline void
