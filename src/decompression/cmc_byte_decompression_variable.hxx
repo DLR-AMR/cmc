@@ -6,7 +6,7 @@
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_entropy_coder.hxx"
-#include "utilities/cmc_arithmetic_encoding.hxx"
+#include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_compression_schema.hxx"
 #include "mesh_compression/cmc_iface_mesh_decoder.hxx"
