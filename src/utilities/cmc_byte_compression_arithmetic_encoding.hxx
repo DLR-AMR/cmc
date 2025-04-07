@@ -325,21 +325,19 @@ Decoder::DecodeNextSymbol()
 {
     /* Get the total frequency count of all letters */
     const uint32_t total_count = frequency_model_->GetTotalSymbolFrequencyCount();
-    cmc_debug_msg("Total count: ",total_count );
+
     /* Compute the uniform split of the number range */
     step_ = (higher_ - lower_ + 1) / total_count;
-    cmc_debug_msg("step: ", step_);
+
     /* Get the symbol from the buffer */
     const Uint32_t decoded_symbol_value = (buffer_ - lower_) / step_;
-    cmc_debug_msg("decoded symbol val: ", decoded_symbol_value);
+
     /* Get the actual symbol from the alphabet of the model */
     const uint32_t symbol = frequency_model_->GetSymbolFromCumulativeFrequency(decoded_symbol_value);
 
     /* Get the cumulative and total frequency counts */
     const uint32_t low_count = frequency_model_->GetCumulativeCountOfAllSymbolFrequenciesLowerThan(symbol);
     const uint32_t high_count = frequency_model_->GetCumulativeCountOfAllSymbolFrequenciesIncluding(symbol);
-
-    cmc_debug_msg("Low count: ", low_count, ", high count: ", high_count);
 
     /* Advance the decoder */
     AdvanceDecoder(low_count, high_count, total_count);
