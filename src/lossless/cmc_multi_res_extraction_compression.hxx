@@ -5,12 +5,13 @@
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
-#include "lossless/cmc_byte_compression_variable.hxx"
-#include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
-#include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
 #include "utilities/cmc_serialization.hxx"
+#include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
+#include "lossless/cmc_byte_compression_variable.hxx"
+#include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
+
 
 #include <utility>
 #include <vector>
@@ -27,7 +28,7 @@ public:
     MultiResAdaptData() = delete;
     MultiResAdaptData(AbstractByteCompressionVariable<T>* variable)
     : ICompressionAdaptData<T>(variable) {
-        ICompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Encoder<T>>();
+        ICompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResEncoder<T>>();
     };
 
     void InitializeExtractionIteration() override;
@@ -224,7 +225,7 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     encoding.Reserve(3 * level_byte_values.size());
 
     /* Reset the entropy coder and initialize the alphabet */
-    ICompressionAdaptData<T>::entropy_coder_->Reset();
+    ICompressionAdaptData<T>::entropy_coder_->Reset(std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResCompressionAlphabet<T>>());
     ICompressionAdaptData<T>::entropy_coder_->InitializeAlphabet(sizeof(T));
 
     /* Collect the symbols and their frequencies for the entropy coder */
@@ -353,14 +354,14 @@ MultiResAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>
 
 template <typename T>
 inline ICompressionAdaptData<T>*
-CreatePrefixExtractionAdaptationClass(AbstractByteCompressionVariable<T>* abstract_var)
+CreateMultiResExtractionAdaptationClass(AbstractByteCompressionVariable<T>* abstract_var)
 {
     return new MultiResAdaptData<T>(abstract_var);
 }
 
 template <typename T>
 inline void
-DestroyPrefixExtractionAdaptationClass(ICompressionAdaptData<T>* iadapt_data)
+DestroyMultiResExtractionAdaptationClass(ICompressionAdaptData<T>* iadapt_data)
 {
     delete iadapt_data;
 }
@@ -383,8 +384,8 @@ public:
         this->SetAmrMesh(AmrMesh(initial_mesh));
         this->SetData(variable_data);
         StoreMeshMPIComm();
-        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
-        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreateMultiResExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyMultiResExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 
@@ -400,8 +401,8 @@ public:
         this->SetAmrMesh(AmrMesh(initial_mesh));
         this->SetData(variable_data);
         StoreMeshMPIComm();
-        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
-        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreateMultiResExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyMultiResExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 
@@ -417,8 +418,8 @@ public:
         this->SetAmrMesh(AmrMesh(initial_mesh));
         this->SetData(std::move(variable_data));
         StoreMeshMPIComm();
-        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
-        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreateMultiResExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyMultiResExtractionAdaptationClass<T>;
         AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 

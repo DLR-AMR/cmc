@@ -1,7 +1,7 @@
 #ifndef CMC_MULTI_RES_EXTRACTION_UTIL_HXX
 #define CMC_MULTI_RES_EXTRACTION_UTIL_HXX
 
-#include "utilities/cmc_byte_compression_entropy_alphabet.hxx"
+#include "utilities/cmc_multi_res_compression_entropy_alphabet.hxx"
 
 #include <utility>
 #include <cstddef>

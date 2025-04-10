@@ -7,7 +7,6 @@
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "decompression/cmc_byte_decompression_variable.hxx"
-//#include "utilities/cmc_arithmetic_encoding.hxx"
 #include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_mesh_decoder.hxx"
@@ -129,17 +128,14 @@ MultiResDecompressionAdaptData<T>::InitializeDecompressionIteration()
     /* Get the bytes for the encoded alphabet */
     const size_t alphabet_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
-    cmc_debug_msg("alphabet_bytes size: ", alphabet_bytes);
 
     /* Get the bytes for the encoded prefix lengths */
     const size_t encoded_lzc_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
-    cmc_debug_msg("encoded_lzc_bytes size: ", encoded_lzc_bytes);
 
     /* Get the bytes for the remaining bits */
     const size_t residual_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
-    cmc_debug_msg("residual_bytes size: ", residual_bytes);
 
     /* Set the view on the alphabet */
     alphabet_ = bit_vector::BitVectorView(data_start_ptr + processed_bytes, alphabet_bytes);
@@ -156,14 +152,9 @@ MultiResDecompressionAdaptData<T>::InitializeDecompressionIteration()
     /* Update the byte count */
     level_byte_offset_ = processed_bytes;
 
-    cmc_debug_msg("Processed bytes: ", level_byte_offset_);
-
-    /* Decode the alphabet */
-    [[maybe_unused]] auto [frequency_model, num_alphabet_bytes] = cmc::entropy_coding::arithmetic_coding::DecodeByteCompressionStaticFrequencyAlphabet<T>(alphabet_.begin());
-
-    /* Setup the entropy decoder for the prefix lengths */
-    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Decoder>(std::make_unique<cmc::entropy_coding::arithmetic_coding::ByteCompressionStaticFrequencyModel<T>>(frequency_model), encoded_lzcs_);
-    entropy_decoder_->SetupDecoding();
+    /* Setup the entropy decoder */
+    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResDecoder<T>>(alphabet_.begin(), encoded_lzcs_);
+    entropy_decoder_->SetupDecoding(); 
 }
 
 template <typename T>
