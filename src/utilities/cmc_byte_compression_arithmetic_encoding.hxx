@@ -5,7 +5,7 @@
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
-#include "utilities/cmc_byte_compression_entropy_alphabet.hxx"
+#include "utilities/cmc_iface_entropy_alphabet.hxx"
 #include "utilities/cmc_byte_compression_arithmetic_encoding_frequency_model.hxx"
 #include "utilities/cmc_entropy_coder.hxx"
 
@@ -14,7 +14,6 @@
 #include <cstddef>
 #include <memory>
 #include <vector>
-#include <array>
 
 namespace cmc::entropy_coding::arithmetic_coding
 {
@@ -33,8 +32,6 @@ namespace cmc::entropy_coding::arithmetic_coding
     }
 */
 
-constexpr int kSymbolFrequencyMPITag = 0x01;
-
 /* It works on the least 31 significant bits of an uint32_t */
 const size_t kNumWorkingBits = sizeof(Uint32_t) * bit_map::kCharBit - 1;
 
@@ -46,29 +43,35 @@ const Uint32_t kMid =  0x40000000;
 const Uint32_t kThirdQ =  0x60000000;
 
 template <typename T>
-class Encoder : public IEntropyCoder
+class Encoder : public IByteCompressionEntropyCoder
 {
 public:
-    const int N = sizeof(T);
-
-    Encoder() = default;
+    Encoder(std::unique_ptr<IByteCompressionEntropyAlphabet> alphabet)
+    {
+        alphabet_ = std::move(alphabet);
+    }
 
     void InitializeAlphabet(const size_t type_size_in_bytes = sizeof(T)) override {
-        alphabet_ = std::make_unique<ByteCompressionAlphabet<T>>();
+        cmc_assert(!is_setup_complete_);
         alphabet_->InitializeSymbols(type_size_in_bytes);
     };
 
     void UpdateSymbolFrequency(const uint32_t symbol) override {
+        cmc_assert(!is_setup_complete_);
         alphabet_->UpdateSymbol(symbol);
     };
 
     void SetupEncoding(const MPI_Comm comm) override
     {
         /* Communicate the alphabet */
-        const std::array<uint32_t, ByteCompressionAlphabet<T>::N> global_symbol_frequencies = this->CommunicateSymbolFrequencies(comm);
+        const std::vector<uint32_t> global_symbol_frequencies = alphabet_->CommunicateSymbolFrequencies(comm);
         
         /* Create the frequency model */ 
-        frequency_model_ = std::make_unique<ByteCompressionStaticFrequencyModel<T>>(global_symbol_frequencies);
+        frequency_model_ = std::make_unique<ByteCompressionStaticFrequencyModel<T>>(std::move(alphabet_), global_symbol_frequencies);
+
+        /* Set the flag that the frequences have been fixed */
+        is_setup_complete_ = true;
+        alphabet_ = nullptr;
     }
 
     void EncodeSymbol(const uint32_t symbol) override;
@@ -87,16 +90,16 @@ public:
         encoded_stream_ = bit_map::BitMap();
     };
 
-    void Reset() override
+    void Reset(std::unique_ptr<IByteCompressionEntropyAlphabet> alphabet) override
     {
         this->ClearEncodedBitStream();
-        alphabet_.reset(nullptr);
+        alphabet_ = std::move(alphabet);
         frequency_model_.reset(nullptr);
+        is_setup_complete_ = false;
     };
 
 private:
     void Encode(const Uint32_t low, const Uint32_t high, const Uint32_t total);
-    std::array<uint32_t, ByteCompressionAlphabet<T>::N> CommunicateSymbolFrequencies(const MPI_Comm comm);
 
     /* Initial maximum range spans 31 bits -> [0x00000000, 0x7FFFFFFF) */
     Uint32_t lower_{0};
@@ -105,6 +108,7 @@ private:
     Uint32_t scale_{0};
 
     bit_map::BitMap encoded_stream_;
+    bool is_setup_complete_{false};
 };
 
 template <typename T>
@@ -213,50 +217,7 @@ Encoder<T>::FinishEncoding()
     cmc_debug_msg("The arithmetic encoder encoded the message in ", encoded_stream_.size(), " bits (=> ", encoded_stream_.size_bytes(), " bytes).");
 }
 
-/**
- * @brief The collected symbol frequencies are exchanged, such that each process holds the same frequencies.
- * This is important, because the decompression can be performed with a different amount of processes/distributions.
- * 
- * @param comm The communicator to use in order to exhcange the symbol frequencies 
- */
-template <typename T>
-inline std::array<uint32_t, ByteCompressionAlphabet<T>::N>
-Encoder<T>::CommunicateSymbolFrequencies(const MPI_Comm comm)
-{
-#if CMC_ENABLE_MPI
-
-    cmc_debug_msg("The symbol frequencies of the entropy coding alphabet will be exchanged.");
-
-    /* Cast the base pointer to the actual implementation to construct the needed vectorized alphabet */
-    const ByteCompressionAlphabet<T>* const  alphabet = dynamic_cast<ByteCompressionAlphabet<T>*>(alphabet_.get());
-    
-    /* Get the local symbol frequencies */
-    const std::array<uint32_t, ByteCompressionAlphabet<T>::N>& local_symbol_frequencies = alphabet->GetSymbolFrequencies();
-
-    /* Allocate the global frequencies */
-    std::array<uint32_t, ByteCompressionAlphabet<T>::N> global_symbol_frequencies;
-
-    /* Exchange the symbol frequencies */
-    const int ret_val = MPI_Allreduce(local_symbol_frequencies.data(), global_symbol_frequencies.data(), ByteCompressionAlphabet<T>::N, MPI_UINT32_T, MPI_SUM, comm);
-    MPICheckError(ret_val);
-
-    cmc_debug_msg("The symbol frequencies of the entropy coding alphabet have been successfully exchanged.");
-
-    return global_symbol_frequencies;
-#else
-    cmc_warn_msg("MPI-Communication of the entropy alphabet is called although cmc is not linked against MPI. However, the serial function call is perfomed.");
-
-    /* Cast the base pointer to the actual implementation to construct the needed vectorized alphabet */
-    const ByteCompressionAlphabet<T>* const  alphabet = dynamic_cast<ByteCompressionAlphabet<T>*>(alphabet_.get());
-    
-    /* Get the symbol frequencies and return them */
-    const std::array<uint32_t, ByteCompressionAlphabet<T>::N> symbol_frequencies = alphabet->GetSymbolFrequencies();
-
-    return symbol_frequencies;
-#endif
-}
-
-
+//TODO: Define an interface for the decoder 
 class Decoder
 {
 public:

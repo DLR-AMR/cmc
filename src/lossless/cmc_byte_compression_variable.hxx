@@ -200,7 +200,7 @@ protected:
     virtual ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) = 0;
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
 
-    std::unique_ptr<entropy_coding::IEntropyCoder> entropy_coder_{nullptr}; //!< The entropy coder to use in order to encode information
+    std::unique_ptr<entropy_coding::IByteCompressionEntropyCoder> entropy_coder_{nullptr}; //!< The entropy coder to use in order to encode information
 private:
     AbstractByteCompressionVariable<T>* const base_variable_{nullptr};
 };
