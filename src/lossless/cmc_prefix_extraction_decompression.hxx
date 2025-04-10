@@ -7,7 +7,7 @@
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "decompression/cmc_byte_decompression_variable.hxx"
-#include "utilities/cmc_arithmetic_encoding.hxx"
+#include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_mesh_decoder.hxx"
 
@@ -47,6 +47,7 @@ private:
     uint32_t GetNextPrefixLength();
     std::vector<uint8_t> GetNextPrefixBitSequence(const size_t num_bits);
     CompressionValue<T> GetNextSuffixedValue(const CompressionValue<T>& value);
+    uint32_t ApplyProcessBoundarySymbol();
 
     size_t level_byte_offset_{0};
     bit_vector::BitVectorView alphabet_;
@@ -69,6 +70,7 @@ template<typename T>
 inline uint32_t
 PrefixDecompressionAdaptData<T>::GetNextPrefixLength()
 {
+    cmc_debug_msg("GetNEXTPrefixLength is called");
     cmc_assert(entropy_decoder_ != nullptr);
     return entropy_decoder_->DecodeNextSymbol();
 }
@@ -153,12 +155,9 @@ PrefixDecompressionAdaptData<T>::InitializeDecompressionIteration()
     /* Update the byte count */
     level_byte_offset_ = processed_bytes;
 
-    cmc_debug_msg("Processed bytes: ", level_byte_offset_);
-    /* Decode the alphabet */
-    [[maybe_unused]] auto [frequency_model, num_alphabet_bytes] = cmc::entropy_coding::arithmetic_coding::DecodeStaticFrequencyAlphabet(alphabet_.begin());
-
-    /* Setup the entropy decoder for the prefix lengths */
-    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::Decoder>(std::make_unique<cmc::entropy_coding::arithmetic_coding::StaticFrequencyModel>(frequency_model), encoded_prefix_length_);
+    /* Setup the entropy decoder */
+    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::PrefixDecoder<T>>(alphabet_.begin(), encoded_prefix_length_);
+    entropy_decoder_->SetupDecoding(); 
 }
 
 template <typename T>
@@ -183,6 +182,34 @@ PrefixDecompressionAdaptData<T>::RepartitionData(const t8_forest_t adapted_fores
     //Currently, nothing to be done here!
 }
 
+
+template <typename T>
+inline uint32_t
+PrefixDecompressionAdaptData<T>::ApplyProcessBoundarySymbol()
+{
+    bool is_process_boundary = true;
+    uint32_t next_symbol;
+
+    /* Iterate until we have cleared (all subsequent) process boundaries */
+    while (is_process_boundary)
+    {
+        /* Reset the decoder */
+        entropy_decoder_->ResetAfterProcessBoundary();
+        next_symbol = this->GetNextPrefixLength();
+
+        if (next_symbol != entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte)
+        {
+            is_process_boundary = false;
+        }
+    }
+
+    /* Move the encoded signifcant bits view to the next byte as well */
+    prefix_bits_.MoveToNextByte();
+
+    /* Return the newly obtained symbol */
+    return next_symbol;
+}
+
 template <typename T>
 CompressionValue<T>
 PrefixDecompressionAdaptData<T>::GetNextSuffixedValue(const CompressionValue<T>& value)
@@ -190,9 +217,17 @@ PrefixDecompressionAdaptData<T>::GetNextSuffixedValue(const CompressionValue<T>&
     CompressionValue<T> suffixed_value = value;
 
     /* Get the length of the suffix to be appended */
-    const int suffix_length = static_cast<int>(this->GetNextPrefixLength());
+    uint32_t encoded_suffix_length = this->GetNextPrefixLength();
+    cmc_debug_msg("encoded suffix length: ",encoded_suffix_length );
+    /* Check if a process-boundary symbol has been encoded */
+    if (encoded_suffix_length == entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte)
+    {
+        /* Apply the symbol an get the next 'unequal' symbol */
+        encoded_suffix_length = this->ApplyProcessBoundarySymbol();
+    }
 
-    cmc_debug_msg("Next suffix length: ", suffix_length);
+    const int suffix_length = static_cast<int>(encoded_suffix_length);
+
     if (suffix_length > 0)
     {
         /* Get the actual suffix */
@@ -214,7 +249,7 @@ PrefixDecompressionAdaptData<T>::PerformRefinement(const int which_tree, const i
     cmc::decompression::RefinementData<T> refinement_data;
     refinement_data.fine_values.reserve(num_refined_elements);
 
-    /* Apply all children residuals */
+    /* Apply all children suffixes */
     for (int idx = 0; idx < num_refined_elements; ++idx)
     {
         /* Get the next value with the applied residual and store it wihtin the refinement data */
