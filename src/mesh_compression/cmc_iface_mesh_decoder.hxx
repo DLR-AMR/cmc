@@ -67,7 +67,6 @@ IMeshDecoder::DecodeRootMesh()
 inline void
 IMeshDecoder::IntializeDecompressionIteration()
 {
-    cmc_debug_msg("Offset: ", processed_bytes_);
     /* Get a pointer to the beginning of the encoded data stream */
     const auto data_start_ptr = encoded_mesh_.data();
 
