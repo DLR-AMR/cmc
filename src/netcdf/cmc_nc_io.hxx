@@ -28,6 +28,7 @@ FindAttribute(const std::vector<Attribute>& attributes, const std::string& attr_
 class Dimension
 {
 public:
+    Dimension() = default;
     Dimension(const std::string& name, const size_t length)
     : name_{name}, length_{length} {};
     Dimension(std::string&& name, const size_t length)
@@ -100,6 +101,18 @@ public:
     std::vector<size_t> count_values;
 };
 
+template <typename T>
+struct DataSlab
+{
+    DataSlab() = default;
+    DataSlab(const std::vector<T>& data_, const uint64_t global_byte_offset_)
+    : data(data_), global_byte_offset{global_byte_offset_} {};
+    DataSlab(std::vector<T>&& data_, const uint64_t global_byte_offset_)
+    : data(std::move(data_)), global_byte_offset{global_byte_offset_} {};
+
+    std::vector<T> data;
+    uint64_t global_byte_offset{0};
+};
 
 template<typename T>
 class SpecificVariable
@@ -114,7 +127,7 @@ public:
     : name_{name}, id_{id} {};
     SpecificVariable(const std::string& name, const int id, const size_t size_hint)
     : name_{name}, id_{id} {
-        data_ = std::vector<T>(size_hint);
+        this->Reserve(size_hint);
     };
     ~SpecificVariable() = default;
 
@@ -124,46 +137,29 @@ public:
     SpecificVariable& operator=(SpecificVariable&& other) = default;
 
     const std::string& GetName() const;
+
+    void SetGlobalDimensionLength(const uint64_t global_dim_length);
     std::vector<Dimension> GetDimensionsFromVariable() const;
+
     CmcType GetCmcType() const;
     int GetID() const;
 
-    void Reserve(const size_t num_elements);
+    void Reserve(const size_t num_data_slabs);
 
-    const GeoDomain& GetGlobalDomain() const;
-    void SetGlobalDomain(const GeoDomain& domain);
-    void SetGlobalDomain(GeoDomain&& domain);
+    void SetData(const std::vector<T>& values, const uint64_t global_byte_offset);
+    void SetData(std::vector<T>&& values, const uint64_t global_byte_offset);
 
-    void SetDataLayout(const DataLayout layout);
-
-    void SetData(const std::vector<T>& values, const Hyperslab& hyperslab);
-    void SetData(const std::vector<T>& values, Hyperslab&& hyperslab);
-    void SetData(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs);
-    void SetData(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs);
-    void SetData(const std::vector<T>& values, const int global_sfc_offset);
-    void SetData(std::vector<T>&& values, const int global_sfc_offset);
-
-    void PushBack(const std::vector<T>& values);
-
+    //TODO:Rework
     void OverwriteDataFromFile(const int ncid, const int var_id, const GeneralHyperslab& hyperslab, const size_t start_offset = 0);
 
-    const std::vector<T>& GetData() const;
-    T GetMissingValue() const;
-    void SetMissingValue(const CmcUniversalType& missing_value);
-    void SetMissingValue(const T missing_value);
+    const std::vector<DataSlab<T>>& GetData() const;
 
     void WriteVariableData(const int ncid, const int var_id) const;
 private:
     std::string name_;
     int id_;
-    std::vector<T> data_;
-    T missing_value_;
-    DataLayout layout_;
-    DataFormat format_{DataFormat::LinearFormat};
-    std::vector<Hyperslab> hyperslabs_;
-    LinearIndex global_sfc_offset_{0};
-    GeoDomain global_domain_;
-    bool is_data_stack_full_{false};
+    Dimension dimension_;
+    std::vector<DataSlab<T>> data_;
 };
 
 using GeneralVariable = std::variant<SpecificVariable<int8_t>, SpecificVariable<char>, SpecificVariable<int16_t>, SpecificVariable<int32_t>, SpecificVariable<float>, SpecificVariable<double>,
@@ -239,27 +235,17 @@ private:
 };
 
 template<class T>
+void
+SpecificVariable<T>::SetGlobalDimensionLength(const uint64_t global_dim_length)
+{
+    dimension_ = Dimension(GetName() + "_lin_index", global_dim_length);
+}
+
+template<class T>
 std::vector<nc::Dimension>
 SpecificVariable<T>::GetDimensionsFromVariable() const 
 {
-    std::vector<nc::Dimension> nc_dims;
-
-    switch(format_)
-    {
-        case DataFormat::LinearFormat:
-            /* For example SFC indices */
-            nc_dims.emplace_back(GetName() + "_lin_index", data_.size());
-            nc_dims.back().AppendNumToName(id_);
-        break;
-        default:
-            /* Other representations */
-            std::vector<cmc::Dimension> dimensions = GetDimensionVectorFromLayout(layout_);
-            for (auto dim_iter = dimensions.begin(); dim_iter != dimensions.end(); ++dim_iter)
-            {
-                nc_dims.emplace_back(GetDimensionName(*dim_iter), global_domain_.GetDimensionLength(*dim_iter));
-                nc_dims.back().AppendNumToName(id_);
-            }
-    }
+    std::vector<nc::Dimension> nc_dims{this->dimension_};
 
     return nc_dims;
 }
@@ -287,217 +273,35 @@ SpecificVariable<T>::GetCmcType() const
 
 template<class T>
 void
-SpecificVariable<T>::Reserve(const size_t num_elements)
+SpecificVariable<T>::Reserve(const size_t num_data_slabs)
 {
-    data_.reserve(num_elements);
-};
-
-template<class T>
-const GeoDomain& 
-SpecificVariable<T>::GetGlobalDomain() const
-{
-    return global_domain_;
-}
-
-template<class T>
-void
-SpecificVariable<T>::SetGlobalDomain(const GeoDomain& domain)
-{
-    global_domain_ = domain;
+    data_.reserve(num_data_slabs);
 };
 
 template<class T>
 void
-SpecificVariable<T>::SetGlobalDomain(GeoDomain&& domain)
+SpecificVariable<T>::SetData(std::vector<T>&& values, const uint64_t global_byte_offset)
 {
-    global_domain_ = std::move(domain);
-};
-
-template<class T>
-void
-SpecificVariable<T>::SetData(const std::vector<T>& values, const Hyperslab& hyperslab)
-{
-    if (is_data_stack_full_)
-    {
-        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
-        return;
-    }
-    std::copy(values.begin(), values.end(), std::back_inserter(data_));
-    hyperslabs_.push_back(hyperslab);
-
-    format_ = DataFormat::HyperslabFormat;
-};
-
-template<class T>
-void
-SpecificVariable<T>::SetData(const std::vector<T>& values, Hyperslab&& hyperslab)
-{
-    if (is_data_stack_full_)
-    {
-        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
-        return;
-    }
-    std::copy(values.begin(), values.end(), std::back_inserter(data_));
-    hyperslabs_.push_back(std::move(hyperslab));
-
-    format_ = DataFormat::HyperslabFormat;
-};
-
-template<class T>
-void
-SpecificVariable<T>::SetData(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs)
-{
-    if (is_data_stack_full_)
-    {
-        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
-        return;
-    }
-
-    data_ = std::move(values);
-    hyperslabs_ = std::move(hyperslabs);
-
-    format_ = DataFormat::HyperslabFormat;
-
-    is_data_stack_full_ = true;
+    data_.emplace_back(std::move(values), global_byte_offset);
 }
 
 template<class T>
 void
-SpecificVariable<T>::PushBack(const std::vector<T>& values)
+SpecificVariable<T>::SetData(const std::vector<T>& values, const uint64_t global_byte_offset)
 {
-    std::copy_n(values.begin(), values.size(), std::back_insert_iterator(data_));
-}
-
-template<class T>
-void
-SpecificVariable<T>::SetData(const std::vector<T>& values, const std::vector<Hyperslab>& hyperslabs)
-{
-    if (is_data_stack_full_)
-    {
-        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
-        return;
-    }
-
-    data_ = values;
-    hyperslabs_ = hyperslabs;
-
-    format_ = DataFormat::HyperslabFormat;
-
-    is_data_stack_full_ = true;
-}
-
-template<class T>
-void
-SpecificVariable<T>::SetData(std::vector<T>&& values, const int global_sfc_offset)
-{
-    if (is_data_stack_full_)
-    {
-        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
-        return;
-    }
-
-    data_ = std::move(values);
-    global_sfc_offset_ = global_sfc_offset;
-    format_ = DataFormat::LinearFormat;
-    is_data_stack_full_ = true;   
-}
-
-template<class T>
-void
-SpecificVariable<T>::SetData(const std::vector<T>& values, const int global_sfc_offset)
-{
-    if (is_data_stack_full_)
-    {
-        cmc_err_msg("The data could not be push backed, since it would overwrite the previous set data.");
-        return;
-    }
-
-    data_ = values;
-    global_sfc_offset_ = global_sfc_offset;
-    format_ = DataFormat::LinearFormat;
-    is_data_stack_full_ = true;   
-}
-
-template<class T>
-void
-SpecificVariable<T>::SetDataLayout(const DataLayout layout)
-{
-    layout_ = layout;
-}
-
-template<class T>
-T
-SpecificVariable<T>::GetMissingValue() const
-{
-    return missing_value_;
-}
-
-template<class T>
-void
-SpecificVariable<T>::SetMissingValue(const CmcUniversalType& missing_value)
-{
-    cmc_assert(std::holds_alternative<T>(missing_value));
-    missing_value_ = std::get<T>(missing_value);
-}
-
-template<class T>
-void
-SpecificVariable<T>::SetMissingValue(const T missing_value)
-{
-    missing_value_ = missing_value;
+    data_.emplace_back(values, global_byte_offset);
 }
 
 template<class T>
 void
 SpecificVariable<T>::WriteVariableData(const int ncid, const int var_id) const
 {
-    switch(format_)
+    for (auto data_slab_iter = data_.begin(); data_slab_iter != data_.end(); ++data_slab_iter)
     {
-        case DataFormat::LinearFormat:
-            /* Emplace the Linear/SFC data */
-            {
-                const size_t start_val = global_sfc_offset_;
-                const size_t count_val = data_.size();
-                const int err = nc_put_vara(ncid, var_id, &start_val, & count_val, data_.data());
-                CheckError(err);
-            }
-        break;
-        case DataFormat::CartesianFormat:
-            cmc_err_msg("The CartesianFormat is not yet supported.");
-        break;
-        case DataFormat::HyperslabFormat:
-        {
-            /* Iterate over all hyperslabs and emplace the data */
-            const std::vector<cmc::Dimension> hs_dims = GetDimensionVectorFromLayout(layout_);
-            const int dim = GetDimensionalityOfDataLayout(layout_);
-            std::vector<size_t> start_ptr(dim, 0);
-            std::vector<size_t> count_ptr(dim, 1);
-
-            /* Keep track of the values that have already been written by previous hyperslabs */
-            HyperslabIndex values_written = 0;
-
-            /* Iterate over all local hyperslabs */
-            for (auto hs_iter = hyperslabs_.begin(); hs_iter != hyperslabs_.end(); ++hs_iter)
-            {
-                /* Iterate over all diemnsions and fill the corresponding start and count ptr for writing the hyperslab data */
-                int index = 0;
-                for (auto hs_dim_iter = hs_dims.begin(); hs_dim_iter != hs_dims.end(); ++hs_dim_iter, ++index)
-                {
-                    start_ptr[index] = static_cast<size_t>(hs_iter->GetDimensionStart(*hs_dim_iter));
-                    count_ptr[index] = static_cast<size_t>(hs_iter->GetDimensionLength(*hs_dim_iter));
-                }
-
-                /* Write the data corresponding to the hyperslab to the netCDF file */
-                const int err = nc_put_vara(ncid, var_id, start_ptr.data(), count_ptr.data(), &data_[values_written]);
-                CheckError(err);
-
-                /* Add the number of written values to the offset variable */
-                values_written += hs_iter->GetNumberCoordinates();
-            }
-        }
-        break;
-        default:
-            cmc_err_msg("An unspecified or unknown DataFormat is stored within the variable.");
+        const size_t start_val = static_cast<size_t>(data_slab_iter->global_byte_offset);
+        const size_t count_val = data_slab_iter->data.size();
+        const int err = nc_put_vara(ncid, var_id, &start_val, &count_val, data_slab_iter->data.data());
+        CheckError(err);
     }
 }
 
@@ -514,7 +318,7 @@ SpecificVariable<T>::OverwriteDataFromFile(const int ncid, const int var_id, con
 }
 
 template<class T>
-const std::vector<T>&
+const std::vector<DataSlab<T>>&
 SpecificVariable<T>::GetData() const
 {
     return data_;
