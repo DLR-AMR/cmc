@@ -67,13 +67,17 @@ src/lossy/cmc_adaptive_coarsening.hxx \
 src/lossless/cmc_byte_compression_variable.hxx \
 src/lossless/cmc_prefix_extraction_compression.hxx \
 src/lossless/cmc_multi_res_extraction_compression.hxx \
+src/lossless/cmc_multi_res_extraction_decompression.hxx \
 src/lossless/cmc_multi_res_extraction_residual_computation.hxx\
 src/lossless/cmc_prefix_extraction_decompression.hxx \
 src/decompression/cmc_byte_decompression_variable.hxx \
 src/mesh_compression/cmc_iface_mesh_encoder.hxx \
 src/mesh_compression/cmc_mesh_encoder.hxx \
 src/mesh_compression/cmc_iface_mesh_decoder.hxx \
-src/mesh_compression/cmc_mesh_decoder.hxx
+src/mesh_compression/cmc_mesh_decoder.hxx \
+src/compression_io/cmc_compression_output.hxx \
+src/compression_io/cmc_compression_attr_names.hxx \
+src/compression_io/cmc_decompression_input.hxx
 
 
 
