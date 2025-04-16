@@ -102,6 +102,12 @@ public:
 
     virtual ~AbstractByteCompressionVariable(){};
 
+    void MoveEncodedEntropyCodesInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_entropy_codes)
+    {
+        vec_to_hold_encoded_levelwise_entropy_codes = std::move(buffered_entropy_codes_);
+        buffered_entropy_codes_ = std::vector<std::vector<uint8_t>>();
+    };
+
     void MoveEncodedDataInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_data)
     {
         vec_to_hold_encoded_levelwise_data = std::move(buffered_encoded_data_);
@@ -111,10 +117,12 @@ public:
     void MoveEncodedMeshInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_mesh)
     {
         vec_to_hold_encoded_levelwise_mesh = std::move(buffered_encoded_mesh_);
-        buffered_encoded_data_ = std::vector<std::vector<uint8_t>>();
+        buffered_encoded_mesh_ = std::vector<std::vector<uint8_t>>();
     };
 
-    const std::vector<std::vector<uint8_t>>& GetEncodedData() const {return buffered_encoded_mesh_;};
+    const std::vector<std::vector<uint8_t>>& GetEncodedEntropyCodes() const {return buffered_entropy_codes_;}
+    const std::vector<std::vector<uint8_t>>& GetEncodedData() const {return buffered_encoded_data_;};
+    const std::vector<std::vector<uint8_t>>& GetEncodedMesh() const {return buffered_encoded_mesh_;};
 
     MPI_Comm GetMPIComm() const {return comm_;};
 
@@ -158,6 +166,7 @@ private:
     std::vector<CompressionValue<T>> data_; //!< The current data of the variable 
     std::vector<CompressionValue<T>> data_new_; //!< A helper variable for the adaptation
 
+    std::vector<std::vector<uint8_t>> buffered_entropy_codes_; //!< Level-wise storage of the entropy codes, e.g. LZC or prefix lengths
     std::vector<std::vector<uint8_t>> buffered_encoded_data_; //!< Level-wise storage for the encoded data
     std::vector<std::vector<uint8_t>> buffered_encoded_mesh_; //!< Level-wwise storage for the encoded mesh
 
@@ -188,8 +197,8 @@ public:
     int ExtractValue(const int which_tree, const int lelement_id, const int num_elements);
     int LeaveElementUnchanged(const int which_tree, const int lelement_id);
 
-    virtual std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
-    virtual std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
+    virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
+    virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
     
     MPI_Comm GetMPIComm() const {return base_variable_->GetMPIComm();};
 
@@ -377,18 +386,19 @@ AbstractByteCompressionVariable<T>::Compress()
         t8_forest_unref(&previous_forest);
 
         /* Encode the data of this level and store it within a buffer */
-        std::vector<uint8_t> encoded_data = adapt_data->EncodeLevelData(data_);
+        auto [encoded_entropy_codes, encoded_data] = adapt_data->EncodeLevelData(data_);
+        buffered_entropy_codes_.push_back(std::move(encoded_entropy_codes));
         buffered_encoded_data_.push_back(std::move(encoded_data));
-
-        /* Get the encoded the mesh adapatations */
-        std::vector<uint8_t> encoded_mesh_data = mesh_encoder_->GetEncodedLevelData();
-        buffered_encoded_mesh_.push_back(std::move(encoded_mesh_data));
 
         /* Once the data is buffered, we can overwrite it with the adapted data */
         this->SwitchToExtractedData();
 
         /* Repartition the mesh */
         t8_forest_t partitioned_forest = RepartitionMesh(adapted_forest);
+
+        /* Get the encoded the mesh adapatations */
+        std::vector<uint8_t> encoded_mesh_data = mesh_encoder_->GetPartitionedEncodedLevelData(adapted_forest, partitioned_forest, this->GetMPIComm());
+        buffered_encoded_mesh_.push_back(std::move(encoded_mesh_data));
 
         /* Repartition the data */
         this->RepartitionData(adapted_forest, partitioned_forest);
@@ -407,7 +417,8 @@ AbstractByteCompressionVariable<T>::Compress()
     }
 
     /* At last, we need to encode the root level data */
-    std::vector<uint8_t> encoded_root_data = adapt_data->EncodeRootLevelData(data_);
+    auto [encoded_root_entropy_codes, encoded_root_data] = adapt_data->EncodeRootLevelData(data_);
+    buffered_entropy_codes_.push_back(std::move(encoded_root_entropy_codes));
     buffered_encoded_data_.push_back(std::move(encoded_root_data));
 
     /* At last, we need to encode the root level of the mesh */
