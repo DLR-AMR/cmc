@@ -69,6 +69,8 @@ public:
 
     void AddPaddingToFullByte();
 
+    void MoveDataInto(std::vector<uint8_t>& vector);
+
     #if 0
     void IncrementBitPosition(size_t& iterator, const int diff = 1);
     size_t GetFirstBitPositionOfByte() const;
@@ -482,6 +484,14 @@ BitVector::AddPaddingToFullByte()
         ++byte_position_;
     }
 }
+
+inline void
+BitVector::MoveDataInto(std::vector<uint8_t>& vector)
+{
+    vector  = std::move(vector_);
+    *this = BitVector();
+}
+
 
 }
 
