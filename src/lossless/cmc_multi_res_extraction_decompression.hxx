@@ -7,7 +7,8 @@
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "decompression/cmc_byte_decompression_variable.hxx"
-#include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
+#include "utilities/cmc_multi_res_entropy_coder.hxx"
+#include "utilities/cmc_multi_res_extraction_util.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_mesh_decoder.hxx"
 
@@ -120,21 +121,21 @@ MultiResDecompressionAdaptData<T>::InitializeDecompressionIteration()
     const auto data_start_ptr = cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.data();
 
     /* Get the amount of relevant bytes for this decompression level */
-    const size_t current_level_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t current_level_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
 
     cmc_debug_msg("The current refinement level is described by ", current_level_bytes, " bytes.");
     
     /* Get the bytes for the encoded alphabet */
-    const size_t alphabet_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t alphabet_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
 
     /* Get the bytes for the encoded prefix lengths */
-    const size_t encoded_lzc_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t encoded_lzc_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
 
     /* Get the bytes for the remaining bits */
-    const size_t residual_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t residual_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
 
     /* Set the view on the alphabet */
@@ -153,7 +154,7 @@ MultiResDecompressionAdaptData<T>::InitializeDecompressionIteration()
     level_byte_offset_ = processed_bytes;
 
     /* Setup the entropy decoder */
-    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResDecoder<T>>(alphabet_.begin(), encoded_lzcs_);
+    entropy_decoder_ = std::make_unique<typename cmc::entropy_coding::arithmetic_coding::MultiResDecoder<T>>(alphabet_.begin(), encoded_lzcs_);
     entropy_decoder_->SetupDecoding(); 
 }
 
