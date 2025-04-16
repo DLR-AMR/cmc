@@ -91,7 +91,6 @@ ByteCompressionStaticFrequencyModel<T>::EncodeAlphabet() const
     /* We store the cumulative frequencies in the given order afterwards */
     for (auto cumul_freq_iter = cumulative_frequencies_.begin(); cumul_freq_iter != cumulative_frequencies_.end(); ++cumul_freq_iter)
     {
-        cmc_debug_msg(*cumul_freq_iter);
         serialized_value = SerializeValue(*cumul_freq_iter, Endian::Big);
         encoded_alphabet.AppendBytes<sizeof(uint32_t)>(serialized_value);
     }
@@ -205,7 +204,6 @@ DecodeByteCompressionStaticFrequencyAlphabet(Iter pos, std::unique_ptr<IByteComp
         serialized_value = DeserializeValue<frequency_type_t>(pos + offset, Endian::Big);
         std::memcpy(static_cast<void*>(&cumulative_symbol_frequencies[sym_idx]), static_cast<const void*>(serialized_value.data()), frequency_type_length);
         offset += frequency_type_length;
-        cmc_debug_msg(cumulative_symbol_frequencies[sym_idx]);
     }
 
     typename ByteCompressionStaticFrequencyModel<T>::Decoding decoding_flag;
