@@ -36,8 +36,8 @@ public:
     void CompleteExtractionIteration(const t8_forest_t previous_forest, const t8_forest_t adapted_forest) override;
     void RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest) override;
 
-    std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const override;
-    std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
+    std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const override;
+    std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
 
 protected:
     ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) override;
@@ -190,7 +190,7 @@ PrefixAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector<C
  * @return std::vector<uint8_t> The encoded data stream
  */
 template <typename T>
-std::vector<uint8_t>
+std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
 PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
 {
     cmc_debug_msg("The encoding of the CompressionValues after the prefix extraction iteration starts...");
@@ -227,7 +227,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
 
         /* Get the length of the prefix */
         const int pref_length = current_val.GetCountOfSignificantBits();
-        cmc_debug_msg("Pref length to be encoded: ", pref_length);
+
         /* Encode the prefix length */
         ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(static_cast<uint32_t>(pref_length));
 
@@ -244,79 +244,84 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
     /* Indicate that the encoding has been finished and flush all pending encodings */
     ICompressionAdaptData<T>::entropy_coder_->FinishEncoding();
 
+    /* Set up the BitVector holding the encoded data for further use */
+    encoding.TrimToContent();
+
+    /* Get the local remaining significant bits */
+    const uint64_t local_remaining_significant_bits_num_bytes = static_cast<uint64_t>(encoding.size());
+
     /* Get the local encoded prefix lengths */
     cmc::bit_map::BitMap local_encoded_prefix_length_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
-    const size_t local_encoded_prefix_length_stream_num_bytes = local_encoded_prefix_length_stream.size_bytes();
-    cmc_debug_msg("local encoded prefix length bytes: ", local_encoded_prefix_length_stream_num_bytes);
-    /* Get the local remaining significant bits */
-    const size_t local_remaining_significant_bits_num_bytes = encoding.size();
-    cmc_debug_msg("local remainingsingificant bytes: ", local_remaining_significant_bits_num_bytes);
+    const uint64_t local_encoded_prefix_length_stream_num_bytes = static_cast<uint64_t>(local_encoded_prefix_length_stream.size_bytes());
+
     /* We need exchange the encoded lengths */
-    const std::vector<uint64_t> local_bytes{static_cast<uint64_t>(local_encoded_prefix_length_stream_num_bytes), static_cast<uint64_t>(local_remaining_significant_bits_num_bytes)};
+    const std::vector<uint64_t> local_bytes{local_encoded_prefix_length_stream_num_bytes, local_remaining_significant_bits_num_bytes};
     std::vector<uint64_t> global_bytes{0, 0};
 
     ret_val = MPI_Reduce(local_bytes.data(), global_bytes.data(), 2, MPI_UINT64_T, MPI_SUM, root_rank, this->GetMPIComm());
     MPICheckError(ret_val);
 
-    /* Declare the buffer for the encoded data */
-    std::vector<uint8_t> encoded_stream;
+    /* Declare the buffers for the encoded data */
+    std::vector<uint8_t> encoded_entropy_codes;
+    std::vector<uint8_t> encoded_data;
 
     /* Only the root rank needs to encode the encoded sizes */
     if (rank == root_rank)
     {
         /* Get the encoded alphabet */
         cmc::bit_vector::BitVector encoded_alphabet = ICompressionAdaptData<T>::entropy_coder_->EncodeAlphabet();
-        const size_t encoded_alphabet_num_bytes = encoded_alphabet.size();
+        const uint64_t encoded_alphabet_num_bytes = static_cast<uint64_t>(encoded_alphabet.size());
 
         /* Calculate the overall amount of bytes on the root rank */
-        const size_t num_locally_encoded_bytes = 4 * sizeof(size_t) + encoded_alphabet_num_bytes + local_encoded_prefix_length_stream_num_bytes + local_remaining_significant_bits_num_bytes;
+        const uint64_t num_locally_encoded_entropy_codes_bytes = 4 * sizeof(uint64_t) + encoded_alphabet_num_bytes + local_encoded_prefix_length_stream_num_bytes;
 
         /* Allocate memory for the encoded data */
-        encoded_stream.reserve(num_locally_encoded_bytes);
+        encoded_entropy_codes.reserve(num_locally_encoded_entropy_codes_bytes);
 
         /** We store global information about the encoded level **/
         /* Push back the overall byte count for the level */
-        const size_t num_global_bytes_encoded_level = 4 * sizeof(size_t) + encoded_alphabet_num_bytes + global_bytes[0] + global_bytes[1];
-        PushBackValueToByteStream(encoded_stream, num_global_bytes_encoded_level);
+        const uint64_t num_global_bytes_encoded_level = 4 * sizeof(uint64_t) + encoded_alphabet_num_bytes + global_bytes[0] + global_bytes[1];
+        PushBackValueToByteStream<uint64_t>(encoded_entropy_codes, num_global_bytes_encoded_level);
 
         /* Push back the byte count for the encoded alphabet */
-        PushBackValueToByteStream(encoded_stream, encoded_alphabet_num_bytes);
+        PushBackValueToByteStream<uint64_t>(encoded_entropy_codes, encoded_alphabet_num_bytes);
 
         /* Push back the byte count for the encoded first "one-bit" positions */
-        PushBackValueToByteStream(encoded_stream, static_cast<size_t>(global_bytes[0]));
+        PushBackValueToByteStream<uint64_t>(encoded_entropy_codes, global_bytes[0]);
 
         /* Push back the byte count for the remaining significant bits */
-        PushBackValueToByteStream(encoded_stream, static_cast<size_t>(global_bytes[1]));
+        PushBackValueToByteStream<uint64_t>(encoded_entropy_codes, global_bytes[1]);
 
         /* Afterwards, we store the encoded alphabet */
-        std::copy_n(encoded_alphabet.begin(), encoded_alphabet_num_bytes, std::back_inserter(encoded_stream));
+        std::copy_n(encoded_alphabet.begin(), encoded_alphabet_num_bytes, std::back_inserter(encoded_entropy_codes));
+    
+        /* Finally, copy the entropy codes */
+        std::copy_n(local_encoded_prefix_length_stream.begin_bytes(), local_encoded_prefix_length_stream_num_bytes, std::back_insert_iterator(encoded_entropy_codes));
     } else
     {
-        /* Non-root ranks encode only the LZC and the significant bits */
-        const size_t num_locally_encoded_bytes = local_encoded_prefix_length_stream_num_bytes + local_remaining_significant_bits_num_bytes;
-
-        /* Allocate memory for the encoded data */
-        encoded_stream.reserve(num_locally_encoded_bytes);
+        /* Otherwise, the rank only hold the entropy codes */
+        local_encoded_prefix_length_stream.MoveDataInto(encoded_entropy_codes);
     }
 
-    std::copy_n(local_encoded_prefix_length_stream.begin_bytes(), local_encoded_prefix_length_stream_num_bytes, std::back_inserter(encoded_stream));
-    std::copy_n(encoding.begin(), local_remaining_significant_bits_num_bytes, std::back_inserter(encoded_stream));
-    
+    /* Get the encoded remaining significant bits */
+    encoding.MoveDataInto(encoded_data);
+
     cmc_debug_msg("The entropy encoder of the prefix extraction compression completed the encoding of the CompressionValues of this iteration.");
     
-    return encoded_stream;
+    return std::make_pair(encoded_entropy_codes, encoded_data);
 }
 
 template <typename T>
-std::vector<uint8_t>
+inline std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
 PrefixAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
 {
     cmc_debug_msg("The encoding of the root level values of the prefix compression starts.");
 
-    const std::vector<uint8_t> encoded_stream = EncodeLevelData(root_level_values);
+    auto encoded_streams = EncodeLevelData(root_level_values);
     
-    cmc_debug_msg("The entropy encoder of the prefix exctraction compression stored the root-level CompressionValues within ", encoded_stream.size(), " bytes.");
-    return encoded_stream;
+    cmc_debug_msg("The entropy encoder of the prefix exctraction compression completed the encoding of the root-level CompressionValues.");
+
+    return encoded_streams;
 }
 
 template <typename T>

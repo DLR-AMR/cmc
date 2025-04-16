@@ -7,7 +7,7 @@
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "decompression/cmc_byte_decompression_variable.hxx"
-#include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
+#include "utilities/cmc_prefix_entropy_coder.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_mesh_decoder.hxx"
 
@@ -70,7 +70,6 @@ template<typename T>
 inline uint32_t
 PrefixDecompressionAdaptData<T>::GetNextPrefixLength()
 {
-    cmc_debug_msg("GetNEXTPrefixLength is called");
     cmc_assert(entropy_decoder_ != nullptr);
     return entropy_decoder_->DecodeNextSymbol();
 }
@@ -120,25 +119,22 @@ PrefixDecompressionAdaptData<T>::InitializeDecompressionIteration()
     const auto data_start_ptr = cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.data();
 
     /* Get the amount of relevant bytes for this decompression level */
-    const size_t current_level_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t current_level_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
 
     cmc_debug_msg("The current refinement level is described by ", current_level_bytes, " bytes.");
     
     /* Get the bytes for the encoded alphabet */
-    const size_t alphabet_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t alphabet_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
-    cmc_debug_msg("alphabet_bytes size: ", alphabet_bytes);
 
     /* Get the bytes for the encoded prefix lengths */
-    const size_t encoded_prefix_length_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t encoded_prefix_length_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
-    cmc_debug_msg("encoded_prefix_length_bytes size: ", encoded_prefix_length_bytes);
 
     /* Get the bytes for the remaining bits */
-    const size_t prefix_bytes = GetValueFromByteStream<size_t>(data_start_ptr + processed_bytes);
+    const uint64_t prefix_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
     processed_bytes += offset;
-    cmc_debug_msg("prefix_bytes size: ", prefix_bytes);
 
     /* Set the view on the alphabet */
     alphabet_ = bit_vector::BitVectorView(data_start_ptr + processed_bytes, alphabet_bytes);
@@ -218,7 +214,7 @@ PrefixDecompressionAdaptData<T>::GetNextSuffixedValue(const CompressionValue<T>&
 
     /* Get the length of the suffix to be appended */
     uint32_t encoded_suffix_length = this->GetNextPrefixLength();
-    cmc_debug_msg("encoded suffix length: ",encoded_suffix_length );
+
     /* Check if a process-boundary symbol has been encoded */
     if (encoded_suffix_length == entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte)
     {
