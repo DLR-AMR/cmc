@@ -12,8 +12,6 @@ namespace cmc::entropy_coding::arithmetic_coding
 {
 
 constexpr uint32_t kByteCompressionSignumBit = 0x40000000;
-constexpr uint32_t kByteCompressionSymbolJumpToNextByte = 0x80000000;
-
 
 constexpr inline bool
 CheckIfCompressionSignumBitIsSet(const uint32_t symbol)
@@ -21,14 +19,8 @@ CheckIfCompressionSignumBitIsSet(const uint32_t symbol)
     return ((symbol >> (sizeof(uint32_t) * bit_map::kCharBit - 2)) & uint32_t{1});
 }
 
-constexpr inline bool
-CheckIfJumpToNextByteIndicatorBitIsSet(const uint32_t symbol)
-{
-    return ((symbol >> (sizeof(uint32_t) * bit_map::kCharBit - 1)) & uint32_t{1});
-}
-
 template <typename T>
-constexpr static size_t GetAlphabetCount()
+constexpr static size_t GetMultiResAlphabetCount()
 {
     return 2 * (sizeof(T) * bit_map::kCharBit + 1) + 1;
 }
@@ -39,7 +31,7 @@ template <typename T>
 class MultiResCompressionAlphabet : public IByteCompressionEntropyAlphabet
 {
 public:
-    size_t GetAlphabetSize() const override {return GetAlphabetCount<T>();};
+    size_t GetAlphabetSize() const override {return GetMultiResAlphabetCount<T>();};
 
     void InitializeSymbols([[maybe_unused]] const size_t type_size_in_bytes) override
     {

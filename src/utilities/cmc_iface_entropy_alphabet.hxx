@@ -39,6 +39,19 @@ public:
 
     virtual ~IByteCompressionEntropyAlphabet(){};
 };
+
+namespace arithmetic_coding
+{
+
+constexpr uint32_t kByteCompressionSymbolJumpToNextByte = 0x80000000;
+
+constexpr inline bool
+CheckIfJumpToNextByteIndicatorBitIsSet(const uint32_t symbol)
+{
+    return (symbol == kByteCompressionSymbolJumpToNextByte);
+}
+
+}
 }
 
 

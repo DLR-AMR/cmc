@@ -11,17 +11,8 @@
 namespace cmc::entropy_coding::arithmetic_coding
 {
 
-constexpr uint32_t kByteCompressionSymbolJumpToNextByte = 0x80000000;
-
-constexpr inline bool
-CheckIfJumpToNextByteIndicatorBitIsSet(const uint32_t symbol)
-{
-    return (symbol == kByteCompressionSymbolJumpToNextByte);
-    //return ((symbol >> (sizeof(uint32_t) * bit_map::kCharBit - 1)) & uint32_t{1});
-}
-
 template <typename T>
-constexpr static size_t GetAlphabetCount()
+constexpr static size_t GetPrefixAlphabetCount()
 {
     return (sizeof(T) * bit_map::kCharBit + 2);
 }
@@ -32,7 +23,7 @@ template <typename T>
 class PrefixCompressionAlphabet : public IByteCompressionEntropyAlphabet
 {
 public:
-    size_t GetAlphabetSize() const override {return GetAlphabetCount<T>();};
+    size_t GetAlphabetSize() const override {return GetPrefixAlphabetCount<T>();};
 
     void InitializeSymbols([[maybe_unused]] const size_t type_size_in_bytes) override
     {
