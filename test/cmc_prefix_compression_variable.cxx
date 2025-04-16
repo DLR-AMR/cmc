@@ -5,10 +5,12 @@
 #include "lossless/cmc_prefix_extraction_decompression.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_utilities.hxx"
+#include "compression_io/cmc_compression_output.hxx"
+#include "compression_io/cmc_decompression_input.hxx"
 
 #include <numeric>
 #include <algorithm>
-
+#include <memory>
 static t8_locidx_t
 TestAdapt ([[maybe_unused]] t8_forest_t forest,
            [[maybe_unused]] t8_forest_t forest_from,
@@ -37,9 +39,9 @@ main(void)
     {
 
     /* Create a mesh */
-    const sc_MPI_Comm comm = sc_MPI_COMM_SELF;
+    const sc_MPI_Comm comm = sc_MPI_COMM_WORLD;
     t8_cmesh_t cmesh;
-    cmesh = t8_cmesh_new_hypercube (T8_ECLASS_TRIANGLE, comm, 0, 0, 0);
+    cmesh = t8_cmesh_new_hypercube (T8_ECLASS_QUAD, comm, 0, 0, 0);
     t8_scheme_cxx_t* scheme = t8_scheme_new_default_cxx ();
     const int initial_level = 3;
     t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);
@@ -55,38 +57,20 @@ main(void)
 
     var.Compress();
 
-    std::vector<std::vector<uint8_t>> encoding;
-    var.MoveEncodedDataInto(encoding);
+    cmc::compression_io::Writer writer("example_lossless_compression_output.cmc");
+    
+    writer.SetVariable(&var);
 
-    std::vector<std::vector<uint8_t>> mesh_encoding;
-    var.MoveEncodedMeshInto(mesh_encoding);
+    writer.Write();
 
-    /* Serialize the data, as it would have been written out */
-    std::vector<uint8_t> serialized_encoded_data;
+    cmc::compression_io::Reader reader("example_lossless_compression_output.cmc", MPI_COMM_WORLD);
 
-    for(auto lvl_iter = encoding.rbegin(); lvl_iter != encoding.rend(); ++lvl_iter)
-    {
-        std::copy_n(lvl_iter->begin(), lvl_iter->size(), std::back_inserter(serialized_encoded_data));
-    }    
+    std::unique_ptr<cmc::decompression::AbstractByteDecompressionVariable<float>> decompression_var = reader.ReadVariableForDecompression<float>("test_var");
 
-    /* Serialize the encoded mesh, as it would have been written out */
-    std::vector<uint8_t> serialized_mesh_encoded_data;
+    decompression_var->Decompress();
+    cmc::ExpectTrue(decompression_var->Size() == data.size());
 
-    for(auto lvl_iter = mesh_encoding.rbegin(); lvl_iter != mesh_encoding.rend(); ++lvl_iter)
-    {
-        std::copy_n(lvl_iter->begin(), lvl_iter->size(), std::back_inserter(serialized_mesh_encoded_data));
-    } 
-
-    /* Define the decompressor for the data stream */
-    cmc::lossless::prefix::DecompressionVariable<float> decompression_var("test_var", std::move(serialized_encoded_data), std::move(serialized_mesh_encoded_data));
-
-    /* Decompress the data */
-    decompression_var.Decompress();
-
-    //cmc::cmc_debug_msg("Size of decompressed data: ", decompression_var.Size());
-    cmc::ExpectTrue(decompression_var.Size() == data.size());
-
-    std::vector<cmc::SerializedCompressionValue<sizeof(float)>> decompressed_byte_values = decompression_var.GetDecompressedData();
+    std::vector<cmc::SerializedCompressionValue<sizeof(float)>> decompressed_byte_values = decompression_var->GetDecompressedData();
 
     int idx = 0;
     for (auto cr_iter = decompressed_byte_values.begin(); cr_iter != decompressed_byte_values.end(); ++cr_iter, ++idx)
@@ -97,6 +81,7 @@ main(void)
     }
 
     }
+
     /* Finalize cmc */
     cmc::CmcFinalize();
 
