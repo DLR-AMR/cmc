@@ -9,7 +9,6 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_coordinate_array.hxx"
 #include "utilities/cmc_hyperslab.hxx"
-#include "utilities/cmc_input_variable.hxx"
 
 #ifdef CMC_WITH_NETCDF
 #include "netcdf.h"
