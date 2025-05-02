@@ -30,8 +30,6 @@ constexpr t8_locidx_t kCoarsenElements = -1;
 constexpr t8_locidx_t kRefineElement = 1;
 constexpr t8_locidx_t kLeaveElementUnchanged = 0;
 
-
-
 }
 
 #endif /* !CMC_T8_ADAPTATION_CALLBACKS_HXX */
