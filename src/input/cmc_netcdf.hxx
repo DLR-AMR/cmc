@@ -4,7 +4,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_coordinate_array.hxx"
 #include "utilities/cmc_hyperslab.hxx"
-#include "utilities/cmc_input_variable.hxx"
+#include "input/cmc_input_variable.hxx"
 #include "netcdf/cmc_netcdf.hxx"
 
 namespace cmc::input::netcdf
@@ -50,14 +50,14 @@ public:
 
     void SetHintTimeDimension(const int time_dimension_id);
 
-    [[nodiscard]] std::vector<InputVar>&& TransferData();
+    [[nodiscard]] std::vector<input::Var>&& TransferData();
 
 private:
     void Open(const std::string& path_to_file, const nc::OpeningMode mode, const MPI_Comm comm);
     void InquireCoordinates();
     void InquireCoordinateDimensions();
-    InputVar SetupVariableData(int, int, std::string&&, DataLayout, DomainIndex, std::vector<Hyperslab>&&, GeoDomain&&, int, const std::array<int, NC_MAX_VAR_DIMS>&);
-    InputVar InquireVariable(const Hyperslab&, std::string&&);
+    input::Var SetupVariableData(int, int, std::string&&, DataLayout, DomainIndex, std::vector<Hyperslab>&&, GeoDomain&&, int, const std::array<int, NC_MAX_VAR_DIMS>&);
+    input::Var InquireVariable(const Hyperslab&, std::string&&);
     template<typename... Ts> void InquireAllVariables(const Hyperslab&, Ts&&...);
 
     int ncid_;
@@ -74,7 +74,7 @@ private:
     std::vector<size_t> dimension_lengths_;
     std::vector<std::string> dimension_names_;
 
-    std::vector<InputVar> variables_;
+    std::vector<input::Var> variables_;
 
     bool _file_has_been_closed_{false};
     bool _data_has_been_transfered_{false};

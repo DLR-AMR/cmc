@@ -355,12 +355,12 @@ GetStartAndCountValuesForVariable(const Hyperslab& hyperslab, const CoordinateAr
 }
 
 template<typename T>
-static InputVar
+static input::Var
 SetUpInputVariable(const int ncid, const CoordinateArray<int>& coordinate_dimension_ids, const int variable_id, std::string&& variable_name, const DataLayout layout,
                    const DomainIndex num_values, std::vector<Hyperslab>&& hyperslabs, GeoDomain&& global_domain,
                    const int num_dimensions, const std::array<int, NC_MAX_VAR_DIMS>& dimension_ids)
 {
-    InputVariable<T> variable(std::move(variable_name), variable_id, layout);
+    input::Variable<T> variable(std::move(variable_name), variable_id, layout);
 
     variable.SetGlobalDomain(std::move(global_domain));
 
@@ -378,10 +378,10 @@ SetUpInputVariable(const int ncid, const CoordinateArray<int>& coordinate_dimens
 
     variable.SetDataAndCoordinates(std::move(local_data), std::move(hyperslabs));
 
-    return InputVar(std::move(variable));
+    return input::Var(std::move(variable));
 }
 
-InputVar
+input::Var
 Data::SetupVariableData(const int variable_nc_type, const int variable_id, std::string&& variable_name,
                           const DataLayout layout, const DomainIndex num_values, std::vector<Hyperslab>&& hyperslabs,
                           GeoDomain&& global_domain, const int num_dimensions, const std::array<int, NC_MAX_VAR_DIMS>& dimension_ids)
@@ -423,13 +423,15 @@ Data::SetupVariableData(const int variable_nc_type, const int variable_id, std::
         break;
         default:
             cmc_err_msg("The variable of type (NC-Type: ", variable_nc_type, ") is not supported.");
-            return InputVar();
+            return input::Var();
     }
 }
 
-InputVar
+input::Var
 Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
 {
+    cmc_debug_msg("Variable ", variable_name, " will be inquired.");
+
     const int variable_id = GetVariableId(ncid_, variable_name);
 
     int variable_nc_type;
@@ -439,11 +441,7 @@ Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
     /* Inquire some information about the variable, e.g. the data type and its dimensions */
     int err = nc_inq_var(ncid_, variable_id, NULL, &variable_nc_type, &num_dimensions, dimension_ids.data(), NULL);
     nc::CheckError(err);
-    cmc_debug_msg("Num dims: ", num_dimensions, " IDs: ");
-    for (auto iii = 0; iii < num_dimensions; ++iii)
-    {
-        cmc_debug_msg(dimension_ids[iii], ", ");
-    }
+ 
     /* Check some attributes of the variable */
     const auto [is_missing_value_present, missing_value] = CheckVariableForAttribute(ncid_, variable_id, "missing_value");
     const auto [is_add_offset_present, add_offset] = CheckVariableForAttribute(ncid_, variable_id, "add_offset");
@@ -464,11 +462,9 @@ Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
     {
         num_local_data_values += hs_iter->GetNumberCoordinates();
     }
-    
-    cmc_debug_msg("Num lcoal elems: ", num_local_data_values);
-
-    /* Inquire the data of the variable and construct a InputVariable with it */
-    InputVar variable = SetupVariableData(variable_nc_type, variable_id, std::move(variable_name), data_layout, num_local_data_values, std::move(local_hyperslabs), TransformHyperslabToGeoDomain(hyperslab), num_dimensions, dimension_ids);
+    cmc_debug_msg("in inquire variables: Num lcoal values: ", num_local_data_values);
+    /* Inquire the data of the variable and construct a input variable with it */
+    input::Var variable = SetupVariableData(variable_nc_type, variable_id, std::move(variable_name), data_layout, num_local_data_values, std::move(local_hyperslabs), TransformHyperslabToGeoDomain(hyperslab), num_dimensions, dimension_ids);
 
     if (is_missing_value_present)
         variable.SetMissingValue(missing_value);
@@ -479,11 +475,16 @@ Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
     if (is_scale_factor_present)
         variable.SetScaleFactor(scale_factor);
 
+    /* Set the MPI communcator */
+    variable.SetMPIComm(comm_);
+    cmc_debug_msg("Comm is: ", comm_);
+    cmc_debug_msg("Variable ", variable.GetName(), " has been inquired.");
+    
     return variable;
 }
 
 [[nodiscard]]
-std::vector<InputVar>&&
+std::vector<input::Var>&&
 Data::TransferData()
 {
     if (_data_has_been_transfered_)
