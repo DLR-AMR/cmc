@@ -8,6 +8,9 @@
 namespace cmc
 {
 
+class GeoDomain;
+GeoDomain ReconstructGeoDomainFromStartAndEndIndices(const std::array<DomainIndex, Dimension::NumCoordinates>& start_indices, const std::array<DomainIndex, Dimension::NumCoordinates>& end_indices);
+
 class GeoDomain
 {
 public:
@@ -53,6 +56,13 @@ public:
     GeoDomain GetZeroOffsetDomain() const;
     
     bool IsValid() const;
+
+    std::array<DomainIndex, Dimension::NumCoordinates>::const_iterator BeginStartIndices() const {return start_indices_.begin();}
+    std::array<DomainIndex, Dimension::NumCoordinates>::const_iterator EndStartIndices() const {return start_indices_.end();};
+    std::array<DomainIndex, Dimension::NumCoordinates>::const_iterator BeginEndIndices() const {return end_indices_.begin();}
+    std::array<DomainIndex, Dimension::NumCoordinates>::const_iterator EndEndIndices() const {return end_indices_.end();};
+
+    friend GeoDomain ReconstructGeoDomainFromStartAndEndIndices(const std::array<DomainIndex, Dimension::NumCoordinates>& start_indices, const std::array<DomainIndex, Dimension::NumCoordinates>& end_indices);
 private:
     void SetupDimension(const DimensionInterval& dimension);
 

@@ -199,4 +199,16 @@ GeoDomain::GetZeroOffsetDomain() const
                      0, GetDimensionLength(Dimension::Lev),
                      0, GetDimensionLength(Dimension::Time));
 }
+
+
+GeoDomain
+ReconstructGeoDomainFromStartAndEndIndices(const std::array<DomainIndex, Dimension::NumCoordinates>& start_indices, const std::array<DomainIndex, Dimension::NumCoordinates>& end_indices)
+{
+    GeoDomain domain;
+    domain.start_indices_ = start_indices;
+    domain.end_indices_ = end_indices;
+
+    return domain;
+}
+
 }
