@@ -47,6 +47,8 @@ src/utilities/cmc_multi_res_entropy_coder.hxx \
 src/utilities/cmc_prefix_compression_entropy_alphabet.hxx \
 src/utilities/cmc_prefix_entropy_coder.hxx \
 src/utilities/cmc_iface_arithmetic_encoding_freq_model.hxx \
+src/utilities/cmc_embedded_mesh_utilities.hxx \
+src/utilities/cmc_embedded_variable_attributes.hxx \
 src/mpi/cmc_mpi_io.hxx \
 src/mpi/cmc_mpi.hxx \
 src/mpi/cmc_mpi_data.hxx \
@@ -56,6 +58,10 @@ src/netcdf/cmc_nc_io_conventions.hxx \
 src/netcdf/cmc_nc_writer.hxx \
 src/netcdf/cmc_nc_reader.hxx \
 src/input/cmc_netcdf.hxx \
+src/input/cmc_input_variable.hxx \
+src/input/cmc_forward_decl_input_variable.hxx \
+src/input/cmc_binary_reader.hxx \
+src/input/cmc_binary_reader_forward.hxx \
 src/t8code/cmc_t8_mesh.hxx \
 src/t8code/cmc_t8_interpolation.hxx \
 src/t8code/cmc_t8_adapt_track_inaccuracy.hxx \
@@ -65,20 +71,31 @@ src/lossy/cmc_iface_adaptive_coarsening_variable.hxx \
 src/lossy/cmc_ac_compression_variable.hxx \
 src/lossy/cmc_adaptive_coarsening.hxx \
 src/lossless/cmc_byte_compression_variable.hxx \
+src/lossless/cmc_embedded_byte_compression_variable.hxx \
+src/lossless/cmc_embedded_byte_decompression_variable.hxx \
+src/lossless/cmc_embedded_prefix_extraction_compression.hxx \
+src/lossless/cmc_embedded_prefix_extraction_decompression.hxx \
 src/lossless/cmc_prefix_extraction_compression.hxx \
 src/lossless/cmc_multi_res_extraction_compression.hxx \
 src/lossless/cmc_multi_res_extraction_decompression.hxx \
 src/lossless/cmc_multi_res_extraction_residual_computation.hxx\
 src/lossless/cmc_prefix_extraction_decompression.hxx \
 src/decompression/cmc_byte_decompression_variable.hxx \
+src/mesh_compression/cmc_iface_abstract_mesh_encoder.hxx \
+src/mesh_compression/cmc_iface_abstract_mesh_decoder.hxx \
 src/mesh_compression/cmc_iface_mesh_encoder.hxx \
-src/mesh_compression/cmc_mesh_encoder.hxx \
 src/mesh_compression/cmc_iface_mesh_decoder.hxx \
+src/mesh_compression/cmc_mesh_encoder.hxx \
 src/mesh_compression/cmc_mesh_decoder.hxx \
+src/mesh_compression/cmc_iface_embedded_mesh_encoder.hxx \
+src/mesh_compression/cmc_iface_embedded_mesh_decoder.hxx \
+src/mesh_compression/cmc_embedded_mesh_encoder.hxx \
+src/mesh_compression/cmc_embedded_mesh_decoder.hxx \
 src/compression_io/cmc_compression_output.hxx \
 src/compression_io/cmc_compression_attr_names.hxx \
-src/compression_io/cmc_decompression_input.hxx
-
+src/compression_io/cmc_decompression_input.hxx \
+src/compression_io/cmc_byte_compression_output.txx \
+src/compression_io/cmc_embedded_byte_compression_output.txx
 
 
 # src/lossy/cmc_amr_lossy_compression.hxx 
@@ -163,6 +180,7 @@ src/t8code/cmc_t8_adapt_track_inaccuracy.cxx \
 src/t8code/cmc_t8_morton.cxx \
 src/t8code/cmc_t8_mpi.cxx \
 src/input/cmc_netcdf.cxx \
+src/input/cmc_input_variable.cxx \
 src/lossy/cmc_adaptive_coarsening.cxx
 
 
