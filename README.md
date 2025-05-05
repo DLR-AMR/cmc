@@ -1,4 +1,6 @@
-  
+
+### !Currently, the repository is under construction and some functionality might not work as expected! 
+
 ### Introduction
 
 CMC is a software package providing data compression techniques based on methods of the field of adaptive mesh refinement (AMR).  
