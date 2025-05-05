@@ -26,7 +26,7 @@ public:
     void IndicateElementStaysUnchanged();
     int GetNumberOfCompressionIterations() const {return compression_iteration_count_;};
 
-    std::vector<uint8_t> GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t8_forest_t partitioned_mesh, MPI_Comm com);
+    std::vector<uint8_t> GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t8_forest_t partitioned_mesh, MPI_Comm comm);
 
     virtual ~IAbstractMeshEncoder(){};
 
