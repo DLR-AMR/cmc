@@ -78,7 +78,7 @@ src/lossless/cmc_embedded_prefix_extraction_decompression.hxx \
 src/lossless/cmc_prefix_extraction_compression.hxx \
 src/lossless/cmc_multi_res_extraction_compression.hxx \
 src/lossless/cmc_multi_res_extraction_decompression.hxx \
-src/lossless/cmc_multi_res_extraction_residual_computation.hxx\
+src/lossless/cmc_multi_res_extraction_residual_computation.hxx \
 src/lossless/cmc_prefix_extraction_decompression.hxx \
 src/lossless/cmc_byte_decompression_variable.hxx \
 src/mesh_compression/cmc_iface_abstract_mesh_encoder.hxx \
@@ -132,11 +132,6 @@ src/compression_io/cmc_embedded_byte_compression_output.txx
 # src/t8code/cmc_t8_data.hxx 
 # src/t8code/cmc_t8_data_variables.cxx 
 # src/t8code/cmc_t8_data.cxx 
-
-if ENABLE_FORTRAN
-include_HEADERS += src/fortran_interfaces/cmcc.h \
-src/fortran_interfaces/cmcc_wrapper.h 
-endif
 
 
 # src/t8code/cmc_t8_adapt.cxx 
