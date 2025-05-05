@@ -67,6 +67,7 @@ src/t8code/cmc_t8_interpolation.hxx \
 src/t8code/cmc_t8_adapt_track_inaccuracy.hxx \
 src/t8code/cmc_t8_morton.hxx \
 src/t8code/cmc_t8_mpi.hxx \
+src/t8code/cmc_t8_adaptation_callbacks,hxx \
 src/lossy/cmc_iface_adaptive_coarsening_variable.hxx \
 src/lossy/cmc_ac_compression_variable.hxx \
 src/lossy/cmc_adaptive_coarsening.hxx \
