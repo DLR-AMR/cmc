@@ -183,21 +183,6 @@ src/input/cmc_netcdf.cxx \
 src/input/cmc_input_variable.cxx \
 src/lossy/cmc_adaptive_coarsening.cxx
 
-
-
-if ENABLE_FORTRAN
-cmc_module_sources = src/fortran_interfaces/cmc_fortran.f90 \
-src/fortran_interfaces/cmc_messy_interface.f90 \
-src/fortran_interfaces/cmc_netcdf_interface.f90 \
-src/fortran_interfaces/cmc_amr_compression_interface.f90
-
-src_libcmc_la_SOURCES += src/fortran_interfaces/cmcc.c \
-src/fortran_interfaces/cmcc_wrapper.c $(cmc_module_sources)
-
-MODSOURCES += $(cmc_module_sources)
-endif
-
-
 src_libcmc_la_CPPFLAGS = $(AM_CPPFLAGS)
 src_libcmc_la_LDFLAGS = $(AM_LDFLAGS)
 src_libcmc_la_CXXFLAGS = $(AM_CXXFLAGS)
