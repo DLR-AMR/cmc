@@ -99,62 +99,6 @@ src/compression_io/cmc_byte_compression_output.txx \
 src/compression_io/cmc_embedded_byte_compression_output.txx
 
 
-# src/lossy/cmc_amr_lossy_compression.hxx 
-# src/t8code/cmc_t8_adapt_callbacks.hxx 
-# src/utilities/cmc_variable_transformer_forward.hxx 
-# src/utilities/cmc_variable_transformer.hxx 
-# src/t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx 
-# src/utilities/cmc_output_variable_forward.hxx 
-# src/utilities/cmc_output_variable.hxx 
-# src/utilities/cmc_prefix.hxx 
-# src/lossy/cmc_amr_compression.hxx 
-# src/t8code/cmc_t8_byte_variable.hxx 
-# src/utilities/cmc_prefix_encoding.hxx 
-# src/netcdf/cmc_nc_decompress.hxx 
-# src/cmc_compression.hxx 
-# src/lossy/cmc_compression_class.hxx 
-# src/decompression/cmc_prefix_decompression.hxx 
-# src/lossless/cmc_prefix_compression.hxx 
-# src/lossy/cmc_patch_amr_compression.hxx 
-# src/lossy/cmc_prefix_compression.hxx 
-# src/lossless/cmc_diff_compression.hxx 
-# src/lossless/cmc_residual_compression.hxx 
-# src/lossy/cmc_full_amr_compression.hxx 
-# src/lossless/cmc_diff_decompression.hxx 
-# src/utilities/cmc_bytes.hxx 
-# src/utilities/cmc_serialized_compression_value_forward.hxx 
-# src/comparison/cmc_test_comparison_compression.hxx 
-# src/comparison/cmc_test_comparison_decompression.hxx 
-# src/comparison/cmc_test_comparison_pcp_decoder.hxx 
-# src/t8code/cmc_t8_adapt.hxx 
-# src/t8code/cmc_t8_data_variables_forward.hxx 
-# src/t8code/cmc_t8_data_variables.hxx 
-# src/t8code/cmc_t8_variables.hxx 
-# src/t8code/cmc_t8_data.hxx 
-# src/t8code/cmc_t8_data_variables.cxx 
-# src/t8code/cmc_t8_data.cxx 
-
-
-# src/t8code/cmc_t8_adapt.cxx 
-# src/lossy/cmc_amr_lossy_compression.cxx 
-# src/t8code/cmc_t8_adapt_callbacks.cxx 
-# src/utilities/cmc_variable_transformer.cxx 
-# src/utilities/cmc_output_variable.cxx 
-# src/cmc_compression.cxx 
-# src/lossy/cmc_amr_compression.cxx 
-# src/t8code/cmc_t8_byte_variable.cxx 
-# src/netcdf/cmc_nc_decompress.cxx 
-# src/decompression/cmc_prefix_decompression.cxx 
-# src/lossless/cmc_prefix_compression.cxx 
-# src/lossless/cmc_diff_compression.cxx 
-# src/lossless/cmc_residual_compression.cxx 
-# src/lossy/cmc_patch_amr_compression.cxx 
-# src/lossy/cmc_prefix_compression.cxx 
-# src/lossy/cmc_full_amr_compression.cxx 
-# src/lossless/cmc_diff_decompression.cxx 
-# src/comparison/cmc_test_comparison_compression.cxx 
-# src/comparison/cmc_test_comparison_decompression.cxx 
-
 src_libcmc_la_SOURCES = src/cmc.cxx \
 src/utilities/cmc_utilities.cxx \
 src/utilities/cmc_compression_settings.cxx \
