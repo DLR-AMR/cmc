@@ -80,7 +80,7 @@ src/lossless/cmc_multi_res_extraction_compression.hxx \
 src/lossless/cmc_multi_res_extraction_decompression.hxx \
 src/lossless/cmc_multi_res_extraction_residual_computation.hxx\
 src/lossless/cmc_prefix_extraction_decompression.hxx \
-src/decompression/cmc_byte_decompression_variable.hxx \
+src/lossless/cmc_byte_decompression_variable.hxx \
 src/mesh_compression/cmc_iface_abstract_mesh_encoder.hxx \
 src/mesh_compression/cmc_iface_abstract_mesh_decoder.hxx \
 src/mesh_compression/cmc_iface_mesh_encoder.hxx \

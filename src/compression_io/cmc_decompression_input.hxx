@@ -1,10 +1,10 @@
 #ifndef CMC_DECOMPRESSION_INPUT_HXX
 #define CMC_DECOMPRESSION_INPUT_HXX
 
-#include "decompression/cmc_byte_decompression_variable.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
+#include "lossless/cmc_byte_decompression_variable.hxx"
 #include "lossless/cmc_prefix_extraction_decompression.hxx"
 #include "lossless/cmc_multi_res_extraction_decompression.hxx"
 

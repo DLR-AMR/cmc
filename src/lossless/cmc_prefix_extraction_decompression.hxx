@@ -6,8 +6,8 @@
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
-#include "decompression/cmc_byte_decompression_variable.hxx"
 #include "utilities/cmc_prefix_entropy_coder.hxx"
+#include "lossless/cmc_byte_decompression_variable.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_mesh_decoder.hxx"
 
