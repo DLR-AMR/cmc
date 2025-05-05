@@ -2,7 +2,6 @@
 #define CMC_AC_COMPRESSION_VARIABLE_HXX
 
 #include "cmc_config.h"
-#include "lossy/cmc_iface_adaptive_coarsening_variable.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_log_functions.hxx"
