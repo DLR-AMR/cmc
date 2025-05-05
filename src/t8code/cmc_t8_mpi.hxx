@@ -17,9 +17,6 @@ namespace cmc
 DataOffsets
 GatherGlobalDataOffsets(const AmrMesh& mesh, const MPI_Comm comm);
 
-VariableSendMessage
-GatherDataToBeDistributed(const AmrMesh mesh, const DataOffsets offsets, const MPI_Comm comm);
-
 }
 
 #endif /* !CMC_T8_MPI_HXX */
