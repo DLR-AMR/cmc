@@ -41,7 +41,7 @@ main(void)
     /* Create a mesh */
     const sc_MPI_Comm comm = sc_MPI_COMM_SELF;
     t8_cmesh_t cmesh;
-    cmesh = t8_cmesh_new_hypercube (T8_ECLASS_QUAD, comm, 0, 0, 0);
+    cmesh = t8_cmesh_new_hypercube (T8_ECLASS_TRIANGLE, comm, 0, 0, 0);
     t8_scheme_cxx_t* scheme = t8_scheme_new_default_cxx ();
     const int initial_level = 3;
     t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);

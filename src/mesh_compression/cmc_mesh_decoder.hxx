@@ -18,7 +18,7 @@ public:
     : IMeshDecoder(encoded_mesh) {};
 
 protected:
-    std::pair<t8_forest_t, size_t> DecodeRootLevelMesh(const std::vector<uint8_t>& encoded_mesh_stream_) override;    
+    std::pair<t8_forest_t, size_t> DecodeRootLevelMesh(const std::vector<uint8_t>& encoded_mesh_stream_) override;
 
 };
 
@@ -39,7 +39,8 @@ MeshDecoder::DecodeRootLevelMesh(const std::vector<uint8_t>& encoded_mesh_stream
     //TODO: WE need an implementation for the cmesh storage
     const int dimensionality = 2;
     /* Get a base cmesh corresponding to the dimensionality */
-    t8_cmesh_t cmesh = t8_cmesh_new_hypercube(DimensionToElementClass(dimensionality), MPI_COMM_WORLD, 0, 0, 1);
+    //t8_cmesh_t cmesh = t8_cmesh_new_hypercube(T8_ECLASS_TRIANGLE, MPI_COMM_WORLD, 0, 0, 0);
+    t8_cmesh_t cmesh = t8_cmesh_new_hypercube(T8_ECLASS_TRIANGLE, MPI_COMM_WORLD, 0, 0, 0);
 
     /* Construct a forest from the cmesh */
     t8_forest_t base_mesh;
