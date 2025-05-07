@@ -7,14 +7,14 @@
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
-#include <t8_cmesh.h>
-#include <t8_cmesh/t8_cmesh_examples.h>
-#include <t8_forest/t8_forest.h>
-#include <t8_schemes/t8_default/t8_default_c_interface.h>
-#include <t8_element_c_interface.h>
-#include <t8_forest/t8_forest_iterate.h>
-#include <p4est.h>
-#include <p8est.h>
+//#include <t8_cmesh.h>
+//include <t8_cmesh/t8_cmesh_examples.h>
+#include <t8_forest/t8_forest_general.h>
+//#include <t8_schemes/t8_scheme.hxx> 
+//#include <t8_schemes/t8_default/t8_default.hxx>
+//#include <t8_forest/t8_forest_iterate.h>
+//#include <p4est.h>
+//#include <p8est.h>
 #endif
 
 #include <vector>
@@ -23,7 +23,8 @@
 namespace cmc::t8
 {
 
-using AdaptationFn = t8_forest_adapt_t;
+//using AdaptationFn = t8_forest_adapt_t;
+typedef t8_forest_adapt_t AdaptationFn;
 
 /* Helper functions for return values during the t8code adaptation call */
 constexpr t8_locidx_t kCoarsenElements = -1;

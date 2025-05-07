@@ -28,8 +28,8 @@ struct IntraLevelStreamOffset;
 class Writer
 {
 public:
-    Writer(const std::string& file_name)
-    : file_name_{file_name}, nc_writer_(file_name, NC_NETCDF4) {};
+    Writer(const std::string& file_name, MPI_Comm comm)
+    : file_name_{file_name}, nc_writer_(file_name, NC_NETCDF4, comm) {};
 
     template<typename T> void SetVariable(cmc::lossless::AbstractByteCompressionVariable<T>* variable);
     template<typename T> void SetVariable(cmc::lossless::embedded::AbstractEmbeddedByteCompressionVariable<T>* variable);

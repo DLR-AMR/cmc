@@ -14,10 +14,10 @@
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
 #include <t8_forest/t8_forest_general.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx> 
+#include <t8_schemes/t8_scheme.hxx> 
 #include <t8_forest/t8_forest_iterate.h>
 #include <t8_eclass.h>
-#include <t8_element_cxx.hxx>
+#include <t8_element.h>
 #endif
 
 namespace cmc
@@ -73,12 +73,12 @@ t8_eclass_t
 DimensionToElementClass(const int dimensionality);
 
 bool
-IsMeshElementWithinGlobalDomain(const t8_element_t* element, t8_eclass_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
+IsMeshElementWithinGlobalDomain(const t8_eclass_t tree_class, const t8_element_t* element, const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
 
 bool
-IsAnyElementWithinGlobalDomain(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
+IsAnyElementWithinGlobalDomain(const t8_eclass_t tree_class, const int num_elements, const t8_element_t* elements[], const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
 
-MortonIndex GetMortonIndexOnLevel(const t8_element_t* elem, t8_eclass_scheme_c* ts, const int dimensioanlity, const int level);
+MortonIndex GetMortonIndexOnLevel(const t8_eclass_t tree_class, const t8_element_t* elem, const t8_scheme_c* ts, const int dimensioanlity, const int level);
 
 }
 

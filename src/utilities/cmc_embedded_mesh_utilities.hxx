@@ -8,14 +8,12 @@
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
-#include <t8_forest/t8_forest.h>
 #include <t8_forest/t8_forest_general.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx> 
+#include <t8_schemes/t8_scheme.hxx> 
 #include <t8_forest/t8_forest_iterate.h> 
 #include <t8_forest/t8_forest_partition.h>
-#include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_quad/t8_default_quad_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_hex/t8_default_hex_cxx.hxx>
+#include <t8_schemes/t8_default/t8_default.hxx>
+
 #endif
 
 #include <array>
@@ -39,25 +37,26 @@ public:
 inline t8_locidx_t
 RefineToInitialEmbeddedMesh (t8_forest_t forest,
                              [[maybe_unused]] t8_forest_t forest_from,
-                             [[maybe_unused]] t8_locidx_t which_tree,
+                             t8_locidx_t which_tree,
+                             const t8_eclass_t tree_class,
                              t8_locidx_t lelement_id,
-                             t8_eclass_scheme_c * ts,
+                             const t8_scheme_c * ts,
                              [[maybe_unused]] const int is_family,
                              const int num_elements,
                              t8_element_t * elements[])
 {
     AdaptDataInitialEmbeddedMesh* adapt_data = static_cast<AdaptDataInitialEmbeddedMesh*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
-    
+
     /* Check if the element is already on the initial refinement level (or if it is still coarser) */
-    if (t8_element_level(ts, elements[0]) >= adapt_data->initial_refinement_level)
+    if (ts->element_get_level(tree_class, elements[0]) >= adapt_data->initial_refinement_level)
     {
         /* If the element's level is already on the initial refinement level the refinement process stops */
         return 0;
     }
 
     /* If the element is inside the global domain, it will be refined until the intial refinement level is reached */
-    if (IsMeshElementWithinGlobalDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
+    if (IsMeshElementWithinGlobalDomain(tree_class, elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
     {
         return 1;
     } else
@@ -116,7 +115,7 @@ BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layou
     t8_forest_t initial_forest;
     t8_forest_init(&initial_forest);
     t8_forest_set_cmesh(initial_forest, cmesh, comm);
-    t8_forest_set_scheme(initial_forest, t8_scheme_new_default_cxx());
+    t8_forest_set_scheme(initial_forest, t8_scheme_new_default());
     t8_forest_set_level(initial_forest, 0);
     t8_forest_commit(initial_forest);
 

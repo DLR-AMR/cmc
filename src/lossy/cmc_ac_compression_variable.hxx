@@ -13,7 +13,7 @@
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
 #include <t8_forest/t8_forest_general.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx> 
+#include <t8_schemes/t8_scheme.hxx> 
 #include <t8_forest/t8_forest_iterate.h> 
 #endif
 

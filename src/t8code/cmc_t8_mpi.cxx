@@ -5,8 +5,8 @@
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
-#include <t8_schemes/t8_default/t8_default_c_interface.h>
-#include <t8_element_c_interface.h>
+#include <t8_schemes/t8_scheme.hxx> 
+#include <t8_schemes/t8_default/t8_default.hxx>
 #endif
 
 namespace cmc
@@ -24,18 +24,18 @@ GatherGlobalDataOffsets(const AmrMesh& mesh, const MPI_Comm comm)
     ret_val = MPI_Comm_rank(comm, &rank);
     MPICheckError(ret_val);
 
-    const t8_locidx_t ltree_id = 0; //The mesh is always built based on single tree
     const t8_forest_t forest = mesh.GetMesh();
 
-    t8_eclass_scheme_c* ts = t8_forest_get_eclass_scheme(forest, t8_forest_get_eclass(forest, ltree_id));
+    const t8_locidx_t ltree_id = 0; //The mesh is always built based on single tree
+    const t8_eclass_t eclass = t8_forest_get_tree_class (forest, ltree_id);
+
+    const t8_scheme_c* ts = t8_forest_get_scheme(forest);
 
     /* Get each process-local offset */
     MortonIndex elem_offset{-1}; 
     if (rank != 0)
     {
-        elem_offset = static_cast<MortonIndex>(t8_element_get_linear_id (ts,
-                                                                         t8_forest_get_element_in_tree(forest, ltree_id, 0),
-                                                                         mesh.GetInitialRefinementLevel()));
+        elem_offset = static_cast<MortonIndex>(ts->element_get_linear_id(eclass, t8_forest_get_element_in_tree(forest, ltree_id, 0), mesh.GetInitialRefinementLevel()));
     }
 
     /* Define a vector capable o holding all offsets */

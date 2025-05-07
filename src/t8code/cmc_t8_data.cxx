@@ -20,7 +20,7 @@
 #include <t8_forest/t8_forest_iterate.h>
 #include <t8_forest/t8_forest_vtk.h>
 #include <t8_forest/t8_forest_partition.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx>
+#include <t8_schemes/t8_scheme.hxx>
 #include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_quad/t8_default_quad_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_hex/t8_default_hex_cxx.hxx>
@@ -161,17 +161,14 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
     const t8_eclass_t eclass = t8_forest_get_eclass(initial_mesh_.GetMesh(), 0);
 
     /* Get the scheme of the forest's only tree */
-    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (initial_mesh_.GetMesh(), eclass);
-
-    /* Get the element scheme */
-    t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
+    const t8_scheme_c* scheme =  t8_forest_get_scheme (initial_mesh_.GetMesh());
 
     const t8_locidx_t first_ltree_id = 0;
 
-    const int num_children = ts_c->t8_element_num_children(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0));
+    const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0));
 
-    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0),
-                                                   ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
+    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(eclass, t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0),
+                                                   scheme, t8_eclass_to_dimension[eclass], initial_refinement_level);
     
     /* Locally, this update function reduces the global_index to zero for the first local element */
     std::vector<IndexReduction> index_correction;
@@ -187,16 +184,16 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
     {
         const t8_element_t* elem = t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, iter);
 
-        if (t8_element_level(ts, elem) != initial_refinement_level)
+        if (scheme->element_get_level(elem) != initial_refinement_level)
         {
             /* Get the number of uniform indices which were skipped by this element which lays outside of the domain */
-            skipped_indices += std::pow(num_children, initial_refinement_level - t8_element_level(ts, elem)) - 1;
+            skipped_indices += std::pow(num_children, initial_refinement_level - scheme->element_get_level(eclass, elem)) - 1;
             coarse_element_streak = true;
         } else if (coarse_element_streak)
         {
             /* We accumulate the amount of skipped indices (with regard to the initial refinement level) and store the offset 
              * once we have reached again an element on the initial refinement level */
-            const MortonIndex uniform_index_of_elem = GetMortonIndexOnLevel(elem, ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
+            const MortonIndex uniform_index_of_elem = GetMortonIndexOnLevel(eclass, elem, scheme, t8_eclass_to_dimension[eclass], initial_refinement_level);
             index_correction.emplace_back(uniform_index_of_elem, skipped_indices);
             coarse_element_streak = false;
         }
@@ -841,9 +838,9 @@ AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain
         const GeoDomain& var_domain = var_iter->GetGlobalDomain();
 
         const t8_eclass_t eclass = t8_forest_get_eclass(initial_mesh_.GetMesh(), 0);
-        t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (initial_mesh_.GetMesh(), eclass);
-        t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
-        const int num_children = ts_c->t8_element_num_children(t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, 0));
+        const t8_scheme_c* scheme =  t8_forest_get_scheme (initial_mesh_.GetMesh());
+
+        const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, 0));
 
         /* An estimation for the memory allocation (we estimate 10% more elements if dummy elements are decompressed as well) */
         const size_t memory_estimation = var_domain.GetNumberReferenceCoordsCovered() + (restrict_to_global_domain ? 0 : 0.1 * var_domain.GetNumberReferenceCoordsCovered());
@@ -858,7 +855,7 @@ AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain
             /* In case that the dummy elements are excluded from the decompression, we need to ensure that only the amount of elements within the domain 
              * are inserted in the decompressed vector (especially for relatively coarse elements). Therefore, we need a correction.
              */
-            const int num_copies = DetermineNumberOfDecompressedElements(restrict_to_global_domain, element, ts, num_children, var_domain, initial_refinement_level, initial_data_layout);
+            const int num_copies = DetermineNumberOfDecompressedElements(restrict_to_global_domain, element, scheme, num_children, var_domain, initial_refinement_level, initial_data_layout);
 
             var_iter->DecompressElementConstantly(elem_id, num_copies);
         }
@@ -961,7 +958,7 @@ AmrData::TransferToDecompressionData(OutputVar& output_variable, const Var& comp
     const GeoDomain& var_domain = compression_variable.GetGlobalDomain();
 
     const t8_eclass_t eclass = t8_forest_get_eclass(initial_mesh_.GetMesh(), 0);
-    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (initial_mesh_.GetMesh(), eclass);
+    const t8_scheme_c* ts =  t8_forest_get_scheme (initial_mesh_.GetMesh());
 
     const t8_locidx_t num_local_elements = t8_forest_get_local_num_elements(compressed_forest);
 

@@ -81,7 +81,7 @@ main(void)
     t8_scheme_cxx_t* scheme = t8_scheme_new_default_cxx ();
     const int initial_level = 3;
     t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);
-    t8_eclass_scheme_c* ts = t8_forest_get_eclass_scheme(forest, t8_forest_get_eclass(forest, 0));
+    const t8_scheme_c* ts = t8_forest_get_scheme(forest);
 
     /* Create a variable for containing a value for each element */
     const t8_locidx_t num_elements = t8_forest_get_local_num_elements(forest);

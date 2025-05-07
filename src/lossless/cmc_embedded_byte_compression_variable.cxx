@@ -25,9 +25,9 @@ public:
 static t8_locidx_t
 RefineToInitialEmbeddedMesh (t8_forest_t forest,
                              [[maybe_unused]] t8_forest_t forest_from,
-                             [[maybe_unused]] t8_locidx_t which_tree,
+                             t8_locidx_t which_tree,
                              t8_locidx_t lelement_id,
-                             t8_eclass_scheme_c * ts,
+                             const t8_scheme_c * ts,
                              [[maybe_unused]] const int is_family,
                              const int num_elements,
                              t8_element_t * elements[])
@@ -35,15 +35,17 @@ RefineToInitialEmbeddedMesh (t8_forest_t forest,
     AdaptDataInitialEmbeddedMesh* adapt_data = static_cast<AdaptDataInitialEmbeddedMesh*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
     
+    const t8_eclass_t tree_class = t8_forest_get_tree_class (forest, which_tree);
+
     /* Check if the element is already on the initial refinement level (or if it is still coarser) */
-    if (t8_element_level(ts, elements[0]) >= adapt_data->initial_refinement_level)
+    if (ts->element_get_level(tree_class, elements[0]) >= adapt_data->initial_refinement_level)
     {
         /* If the element's level is already on the initial refinement level the refinement process stops */
         return 0;
     }
 
     /* If the element is inside the global domain, it will be refined until the intial refinement level is reached */
-    if (IsMeshElementWithinGlobalDomain(elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
+    if (IsMeshElementWithinGlobalDomain(tree_class, elements[0], ts, adapt_data->global_domain, adapt_data->initial_refinement_level, adapt_data->initial_layout))
     {
         return 1;
     } else
@@ -60,15 +62,14 @@ DimensionToElementClass(const int dimensionality)
 }
 
 static std::array<int, 3>
-GetElementAnchorOfElement(const t8_element_t* element, t8_eclass_scheme_c* ts)
+GetElementAnchorOfElement(t8_forest_t mesh, const t8_element_t* element, const t8_scheme_c* ts)
 {
+    const t8_locidx_t ltree_id = 0;
+    const t8_eclass_t tree_class = t8_forest_get_tree_class (forest, ltree_id);
+
     std::array<int, 3> element_anchor;
-
-    /* Get the element scheme */
-    t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
-
     /* Receive the integer anchor coordinates of the element */
-    ts_c->t8_element_anchor (element, element_anchor.data());
+    ts->element_get_anchor (tree_class, element, element_anchor.data());
 
     return element_anchor;
 }
@@ -154,17 +155,14 @@ AbstractEmbeddedByteCompressionVariable<T>::UpdateLinearIndicesToTheInitialMesh(
     const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
 
     /* Get the scheme of the forest's only tree */
-    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (mesh_.GetMesh(), eclass);
-
-    /* Get the element scheme */
-    t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
+    const t8_scheme *scheme = t8_forest_get_scheme (mesh_.GetMesh());
 
     const t8_locidx_t first_ltree_id = 0;
 
-    const int num_children = ts_c->t8_element_num_children(t8_forest_get_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0));
+    const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0));
 
-    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(t8_forest_get_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0),
-                                                   ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
+    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(eclass, t8_forest_get_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0),
+                                                   scheme, t8_eclass_to_dimension[eclass], initial_refinement_level);
     
     /* Locally, this update function reduces the global_index to zero for the first local element */
     std::vector<IndexReduction> index_correction;
@@ -189,7 +187,7 @@ AbstractEmbeddedByteCompressionVariable<T>::UpdateLinearIndicesToTheInitialMesh(
         {
             /* We accumulate the amount of skipped indices (with regard to the initial refinement level) and store the offset 
              * once we have reached again an element on the initial refinement level */
-            const MortonIndex uniform_index_of_elem = GetMortonIndexOnLevel(elem, ts_c, t8_eclass_to_dimension[eclass], initial_refinement_level);
+            const MortonIndex uniform_index_of_elem = GetMortonIndexOnLevel(eclass, elem, scheme, t8_eclass_to_dimension[eclass], initial_refinement_level);
             index_correction.emplace_back(uniform_index_of_elem, skipped_indices);
             coarse_element_streak = false;
         }

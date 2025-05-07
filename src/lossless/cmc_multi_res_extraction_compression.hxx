@@ -84,7 +84,7 @@ GetCoarseApproximationMaximizingResidualsLZC(const VectorView<CompressionValue<T
 {
     cmc_assert(values.size() >= 1);
 
-    T current_best_predictor;
+    T current_best_predictor{T()};
     int current_max_lzc{-1};
 
     /* Try each value from the view as a predictor */

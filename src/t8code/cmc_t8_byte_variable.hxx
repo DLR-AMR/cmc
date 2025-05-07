@@ -1311,8 +1311,8 @@ ByteVariable<T>::PerformTailTruncationRegardingUncompressedStates()
     const t8_locidx_t num_elements = t8_forest_get_local_num_elements(mesh_.GetMesh());
     
     /* We need the eclass of the tree as well as the scheme */
-    const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
-    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (mesh_.GetMesh(), eclass);
+    const t8_eclass_t eclass = t8_forest_get_tree_class (mesh_.GetMesh(), 0);
+    const t8_scheme_c* ts =  t8_forest_get_scheme (mesh_.GetMesh());
 
     cmc_debug_msg("In perform tail truncation before element loop, num elems: ", num_elements);
     cmc_debug_msg("Size of byte values_: ", byte_values_.size());
@@ -1473,7 +1473,7 @@ ByteVariable<T>::GetPermittedError(const int index) const
 
     const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
     
-    t8_eclass_scheme_c* ts =  t8_forest_get_eclass_scheme (mesh_.GetMesh(), eclass);
+    const t8_scheme_c* ts =  t8_forest_get_scheme (mesh_.GetMesh());
 
     /* Iterate over all error domains for all elements and find the minimum error */
     bool is_abs_error_present{false};

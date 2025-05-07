@@ -19,8 +19,6 @@ src/utilities/cmc_input_variable.hxx  \
 src/utilities/cmc_bit_vector.hxx \
 src/utilities/cmc_bit_map.hxx \
 src/utilities/cmc_huffman.hxx \
-src/utilities/cmc_binary_reader_forward.hxx \
-src/utilities/cmc_binary_reader.hxx \
 src/utilities/cmc_arithmetic_encoder.hxx \
 src/utilities/cmc_ac_model.hxx \
 src/utilities/cmc_iface_entropy_alphabet.hxx \
@@ -68,7 +66,6 @@ src/t8code/cmc_t8_adapt_track_inaccuracy.hxx \
 src/t8code/cmc_t8_morton.hxx \
 src/t8code/cmc_t8_mpi.hxx \
 src/t8code/cmc_t8_adaptation_callbacks.hxx \
-src/lossy/cmc_iface_adaptive_coarsening_variable.hxx \
 src/lossy/cmc_ac_compression_variable.hxx \
 src/lossy/cmc_adaptive_coarsening.hxx \
 src/lossless/cmc_byte_compression_variable.hxx \

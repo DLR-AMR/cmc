@@ -23,7 +23,7 @@ public:
 
     std::vector<PermittedError>
     FindRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
-                          t8_eclass_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
+                          const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
 
 private:
     std::vector<ErrorDomain> error_domains_;
@@ -32,7 +32,7 @@ private:
 
 std::vector<PermittedError>
 CompressionSettings::FindRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
-                                           t8_eclass_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+                                           const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
 {
     bool is_absolute_error_found = false;
     double min_absolute_error = std::numeric_limits<double>::max();

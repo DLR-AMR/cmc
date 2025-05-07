@@ -7,6 +7,11 @@
 #include "compression_io/cmc_compression_output.hxx"
 #include "compression_io/cmc_decompression_input.hxx"
 
+#ifdef CMC_WITH_T8CODE
+#include <t8_cmesh/t8_cmesh_examples.h>
+#include <t8_schemes/t8_default/t8_default.hxx>
+#endif
+
 #include <numeric>
 #include <algorithm>
 #include <memory>
@@ -15,8 +20,9 @@ static t8_locidx_t
 TestAdapt ([[maybe_unused]] t8_forest_t forest,
            [[maybe_unused]] t8_forest_t forest_from,
            t8_locidx_t which_tree,
+           [[maybe_unused]] const t8_eclass_t tree_class,
            t8_locidx_t lelement_id,
-           [[maybe_unused]] t8_eclass_scheme_c * ts,
+           [[maybe_unused]] const t8_scheme_c * ts,
            const int is_family,
            [[maybe_unused]] const int num_elements,
            [[maybe_unused]] t8_element_t * elements[])
@@ -42,7 +48,7 @@ main(void)
     const sc_MPI_Comm comm = sc_MPI_COMM_SELF;
     t8_cmesh_t cmesh;
     cmesh = t8_cmesh_new_hypercube (T8_ECLASS_TRIANGLE, comm, 0, 0, 0);
-    t8_scheme_cxx_t* scheme = t8_scheme_new_default_cxx ();
+    const t8_scheme *scheme = t8_scheme_new_default ();
     const int initial_level = 3;
     t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);
     
@@ -57,13 +63,13 @@ main(void)
 
     var.Compress();
 
-    cmc::compression_io::Writer writer("multi_res_example_lossless_compression_output.cmc");
+    cmc::compression_io::Writer writer("multi_res_example_lossless_compression_output.cmc", MPI_COMM_SELF);
     
     writer.SetVariable(&var);
 
     writer.Write();
 
-    cmc::compression_io::Reader reader("multi_res_example_lossless_compression_output.cmc", MPI_COMM_WORLD);
+    cmc::compression_io::Reader reader("multi_res_example_lossless_compression_output.cmc", MPI_COMM_SELF);
 
     std::unique_ptr<cmc::decompression::AbstractByteDecompressionVariable<float>> decompression_var = reader.ReadVariableForDecompression<float>("test_var");
 

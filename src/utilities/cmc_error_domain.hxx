@@ -32,14 +32,14 @@ public:
     
     inline bool
     IsElementWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
-                          t8_eclass_scheme_c* ts, const t8_element_t* element) const
+                          const t8_scheme_c* ts, const t8_element_t* element) const
     {
         return is_inside_domain_check_(forest, tree_id, lelement_id, ts, element);
     }
     
     inline bool
     IsAnyElementWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
-                             t8_eclass_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+                             const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
     {
         for (int idx = 0; idx < num_elements; ++idx)
         {
@@ -55,7 +55,7 @@ public:
 
     inline bool
     AreAllElementsWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
-                              t8_eclass_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+                              const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
     {
         for (int idx = 0; idx < num_elements; ++idx)
         {

@@ -3,7 +3,6 @@
 
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_input_variable_forward.hxx"
-#include "utilities/cmc_variable_transformer_forward.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_dimension_interval.hxx"
 #include "utilities/cmc_hyperslab.hxx"
@@ -15,7 +14,7 @@
 #include "t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx"
 #include "t8code/cmc_t8_interpolation.hxx"
 #include "mpi/cmc_mpi_data.hxx"
-#include "utilities/cmc_binary_reader_forward.hxx"
+//#include "utilities/cmc_binary_reader_forward.hxx"
 
 #include <iterator>
 #include <map>
@@ -161,7 +160,7 @@ public:
     //friend ReceiverMap<T> GatherDataToBeDistributed <> (const InputVariable& variable, const DataOffsets& offsets);
     friend InputVariable HollowCopy <> (const InputVariable& variable);
     template <class U> friend class InputVariable;
-    friend class TransformerInputToCompressionVariable;
+    //friend class TransformerInputToCompressionVariable;
 
     std::vector<T> GetDataFromHyperslab(const Hyperslab& hyperslab) const;
 
@@ -260,7 +259,7 @@ public:
     friend std::vector<InputVar> SplitIntoSubVariables(const InputVar& variable, const Dimension dimension);
     //friend std::vector<VariableSendMessage> GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
     //friend void GatherDistributionData(const InputVar& variable, const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
-    friend class TransformerInputToCompressionVariable;
+    //friend class TransformerInputToCompressionVariable;
 
     template <typename T> friend class InputVariable;
 
@@ -285,7 +284,7 @@ private:
     template<class T> friend void InputVar::ApplyScaling(const InputVariable<T>&);
     template<class T> friend void InputVar::ApplyOffset(const InputVariable<T>&);
 
-    friend class bin_reader::Reader;
+    //friend class bin_reader::Reader;
 };
 
 CmcType

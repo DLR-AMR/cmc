@@ -19,7 +19,7 @@
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
 #include <t8_forest/t8_forest_general.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx> 
+#include <t8_schemes/t8_scheme.hxx> 
 #include <t8_forest/t8_forest_iterate.h> 
 #include <t8_forest/t8_forest_partition.h>
 #endif
@@ -137,7 +137,7 @@ private:
     VectorView<CompressionValue<T>> GetView(const int tree_id, const int lelement_index, const int count) const;
     CompressionValue<T> GetValue(const int tree_id, const int lelement_index) const;
 
-    bool WillNextElementBeRefined(t8_element_t* element, t8_eclass_scheme_c* ts);
+    bool WillNextElementBeRefined(t8_element_t* element, const t8_scheme_c* ts);
     void StoreRefinedValues(const RefinementData<T>& refiend_values);
     void StoreUnchangedElement(const UnchangedData<T>& unchanged_value);
 
@@ -186,7 +186,7 @@ public:
 
     int ApplyDecompression(const int which_tree, const int lelement_id, const int num_refined_elements);
     int LeaveElementUnchanged(const int which_tree, const int lelement_id);
-    bool WillNextElementBeRefined(t8_element_t* element, t8_eclass_scheme_c* ts);
+    bool WillNextElementBeRefined(t8_element_t* element, const t8_scheme_c* ts);
     virtual ~IEmbeddedDecompressionAdaptData(){};
 
     bool IsValidForDeompression() const;
@@ -221,7 +221,7 @@ IEmbeddedDecompressionAdaptData<T>::IsValidForDeompression() const
 
 template <typename T>
 inline bool
-IEmbeddedDecompressionAdaptData<T>::WillNextElementBeRefined(t8_element_t* element, t8_eclass_scheme_c* ts)
+IEmbeddedDecompressionAdaptData<T>::WillNextElementBeRefined(t8_element_t* element, const t8_scheme_c* ts)
 {
     return base_variable_->WillNextElementBeRefined(element, ts);
 }
@@ -296,8 +296,9 @@ inline t8_locidx_t
 EmbeddedByteVariableDecompressionAdaptation (t8_forest_t forest,
                                              t8_forest_t forest_from,
                                              t8_locidx_t which_tree,
+                                             const t8_eclass_t tree_class,
                                              t8_locidx_t lelement_id,
-                                             t8_eclass_scheme_c * ts,
+                                             const t8_scheme_c * ts,
                                              [[maybe_unused]] const int is_family,
                                              [[maybe_unused]] const int num_elements,
                                              t8_element_t * elements[])
@@ -313,7 +314,7 @@ EmbeddedByteVariableDecompressionAdaptation (t8_forest_t forest,
     {
         /* If the element will be refined */
         /* Get the number of children elements into which this element will be refined */
-        const int num_children = ts->t8_element_num_children(elements[0]);
+        const int num_children = ts->element_get_num_children(tree_class, elements[0]);
         const int ret_val = adapt_data->ApplyDecompression(which_tree, lelement_id, num_children);
         return ret_val;
     } else
@@ -326,7 +327,7 @@ EmbeddedByteVariableDecompressionAdaptation (t8_forest_t forest,
 
 template <typename T>
 bool
-AbstractEmbeddedByteDecompressionVariable<T>::WillNextElementBeRefined(t8_element_t* element, t8_eclass_scheme_c* ts)
+AbstractEmbeddedByteDecompressionVariable<T>::WillNextElementBeRefined(t8_element_t* element, const t8_scheme_c* ts)
 {
     if (are_mesh_refinement_bits_given_)
     {
@@ -335,9 +336,10 @@ AbstractEmbeddedByteDecompressionVariable<T>::WillNextElementBeRefined(t8_elemen
         return mesh_decoder_->WillNextElementBeRefined();
     } else
     {
+        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh_.GetMesh(), 0);
         /* In case theere are no refinement bits given, we perfom the reconstruction based on the global domain */
-        const bool is_not_yet_on_initial_refinement_level = ts->t8_element_level(element) < mesh_.GetInitialRefinementLevel();
-        const bool is_within_global_domain = IsMeshElementWithinGlobalDomain(element, ts, attributes_.GetGlobalDomain(), mesh_.GetInitialRefinementLevel(), attributes_.GetInitialDataLayout());
+        const bool is_not_yet_on_initial_refinement_level = ts->element_get_level (tree_class, element) < mesh_.GetInitialRefinementLevel();
+        const bool is_within_global_domain = IsMeshElementWithinGlobalDomain(tree_class, element, ts, attributes_.GetGlobalDomain(), mesh_.GetInitialRefinementLevel(), attributes_.GetInitialDataLayout());
 
         return is_not_yet_on_initial_refinement_level && is_within_global_domain;
     }

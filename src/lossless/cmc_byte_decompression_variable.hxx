@@ -15,7 +15,7 @@
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
 #include <t8_forest/t8_forest_general.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx> 
+#include <t8_schemes/t8_scheme.hxx> 
 #include <t8_forest/t8_forest_iterate.h> 
 #include <t8_forest/t8_forest_partition.h>
 #endif
@@ -282,8 +282,9 @@ inline t8_locidx_t
 ByteVariableDecompressionAdaptation (t8_forest_t forest,
                                      t8_forest_t forest_from,
                                      t8_locidx_t which_tree,
+                                     const t8_eclass_t tree_class,
                                      t8_locidx_t lelement_id,
-                                     t8_eclass_scheme_c * ts,
+                                     const t8_scheme_c * ts,
                                      [[maybe_unused]] const int is_family,
                                      [[maybe_unused]] const int num_elements,
                                      t8_element_t * elements[])
@@ -299,7 +300,7 @@ ByteVariableDecompressionAdaptation (t8_forest_t forest,
     {
         /* If the element will be refined */
         /* Get the number of children elements into which this element will be refined */
-        const int num_children = ts->t8_element_num_children(elements[0]);
+        const int num_children = ts->element_get_num_children(tree_class, elements[0]);
         const int ret_val = adapt_data->ApplyDecompression(which_tree, lelement_id, num_children);
         return ret_val;
     } else

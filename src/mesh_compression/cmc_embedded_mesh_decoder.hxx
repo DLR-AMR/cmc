@@ -6,6 +6,11 @@
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_embedded_mesh_utilities.hxx"
 
+#ifdef CMC_WITH_T8CODE
+#include <t8_cmesh/t8_cmesh_examples.h>
+#include <t8_schemes/t8_default/t8_default.hxx>
+#endif
+
 #include <array>
 #include <vector>
 #include <tuple>
@@ -75,7 +80,7 @@ EmbeddedMeshDecoder::DecodeRootLevelMesh(const std::vector<uint8_t>& encoded_mes
     t8_forest_t base_mesh;
     t8_forest_init(&base_mesh);
     t8_forest_set_cmesh(base_mesh, cmesh, comm);
-    t8_forest_set_scheme(base_mesh, t8_scheme_new_default_cxx());
+    t8_forest_set_scheme(base_mesh, t8_scheme_new_default());
     t8_forest_set_level(base_mesh, 0);
     t8_forest_commit(base_mesh);
 

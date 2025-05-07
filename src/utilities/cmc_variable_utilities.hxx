@@ -2,7 +2,6 @@
 #define CMC_VARIABLE_UTILITIES_HXX
 
 #include "t8code/cmc_t8_data_variables_forward.hxx"
-#include "utilities/cmc_variable_transformer_forward.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "t8code/cmc_t8_interpolation.hxx"
@@ -88,8 +87,8 @@ public:
 
     void RepartitionInaccuracyData(t8_forest_t initial_forest, t8_forest_t partitioned_forest);
 
-    friend class TransformerInputToCompressionVariable;
-    friend class TransformerCompressionToOutputVariable;
+    //friend class TransformerInputToCompressionVariable;
+    //friend class TransformerCompressionToOutputVariable;
 
 private:
     const InaccuracyComputerSkipMissingValues<T>& CompressionCriterionToInaccuracyComputerSkipMissingValues(const CompressionCriterion criterion) const;

@@ -3,9 +3,16 @@
 #include "t8code/cmc_t8_morton.hxx"
 
 #if CMC_WITH_T8CODE
+#include <t8_schemes/t8_default/t8_default.hxx>
+#include <p4est.h>
+#include <p8est.h>
+#endif
+
+#if 0
+#if CMC_WITH_T8CODE
 #include <t8_eclass.h>
-#include <t8_element_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx>
+#include <t8_element.h>
+#include <t8_schemes/t8_scheme.hxx>
 #include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_quad/t8_default_quad_cxx.hxx>
 #include <t8_schemes/t8_default/t8_default_hex/t8_default_hex_cxx.hxx>
@@ -13,6 +20,7 @@
 #include "t8_element_c_interface.h"
 #include <p4est.h>
 #include <p8est.h>
+#endif
 #endif
 
 namespace cmc
@@ -140,22 +148,22 @@ DimensionToElementClass(const int dimensionality)
 
 static
 std::array<int, 3>
-GetElementAnchorOfElement(const t8_element_t* element, t8_eclass_scheme_c* ts)
+GetElementAnchorOfElement(const t8_eclass_t tree_class, const t8_element_t* element, const t8_scheme_c* scheme)
 {
-    std::array<int, 3> element_anchor;
+    cmc_assert(t8_eclass_scheme_is_default(scheme, tree_class) != 0);
 
-    /* Get the element scheme */
-    t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
+    std::array<int, 3> element_anchor;
+    element_anchor.fill(0);
+    //int* array_ptr = element_anchor.data();
 
     /* Receive the integer anchor coordinates of the element */
-    ts_c->t8_element_anchor (element, element_anchor.data());
+    scheme->element_get_anchor (tree_class, element, element_anchor.data());
 
     return element_anchor;
 }
 
-
 bool
-IsMeshElementWithinGlobalDomain(const t8_element_t* element, t8_eclass_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout)
+IsMeshElementWithinGlobalDomain(const t8_eclass_t tree_class, const t8_element_t* element, const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout)
 {
     #ifdef CMC_WITH_T8CODE
     cmc_assert(global_domain.GetDimensionality() == 2 || global_domain.GetDimensionality() == 3);
@@ -166,7 +174,7 @@ IsMeshElementWithinGlobalDomain(const t8_element_t* element, t8_eclass_scheme_c*
     const int element_anchor_max_lvl = (dimensionality == 2 ? P4EST_MAXLEVEL : P8EST_MAXLEVEL);
 
     /* Get the anchor coordinates of the element */
-    std::array<int, 3> element_anchor = GetElementAnchorOfElement(element, ts);
+    std::array<int, 3> element_anchor = GetElementAnchorOfElement(tree_class, element, ts);
 
     /* Transform coordinates into the range of the initial-refinement-level coordinate values */
     for (int index{0}; index < dimensionality; ++index)
@@ -239,13 +247,13 @@ IsMeshElementWithinGlobalDomain(const t8_element_t* element, t8_eclass_scheme_c*
 }
 
 bool
-IsAnyElementWithinGlobalDomain(const int num_elements, const t8_element_t* elements[], t8_eclass_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout)
+IsAnyElementWithinGlobalDomain(const t8_eclass_t tree_class, const int num_elements, const t8_element_t* elements[], const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout)
 {
     cmc_assert(global_domain.GetDimensionality() == 2 || global_domain.GetDimensionality() == 3);
 
     for (int elem_id = 0; elem_id < num_elements; ++elem_id)
     {
-        if (IsMeshElementWithinGlobalDomain(elements[elem_id], ts, global_domain, initial_refinement_level, initial_layout))
+        if (IsMeshElementWithinGlobalDomain(tree_class, elements[elem_id], ts, global_domain, initial_refinement_level, initial_layout))
         {
             return true;
         }
@@ -256,18 +264,17 @@ IsAnyElementWithinGlobalDomain(const int num_elements, const t8_element_t* eleme
 }
 
 MortonIndex
-GetMortonIndexOnLevel(const t8_element_t* elem, t8_eclass_scheme_c* ts, const int dimensionality, const int level)
+GetMortonIndexOnLevel(const t8_eclass_t tree_class, const t8_element_t* elem, const t8_scheme_c* ts, const int dimensionality, const int level)
 {
+    cmc_assert(t8_eclass_scheme_is_default(ts, tree_class) != 0);
+
     /* Maximum refinement level depending on the dimension of the data */
     const int element_anchor_max_lvl = (dimensionality == 2 ? P4EST_MAXLEVEL : P8EST_MAXLEVEL);
 
     int element_anchor[3];
 
-    /* Get the element scheme */
-    t8_default_scheme_common_c* ts_c = static_cast<t8_default_scheme_common_c*>(ts);
-
     /* Receive the integer anchor coordinates of the element */
-    ts_c->t8_element_anchor (elem, element_anchor);
+    ts->element_get_anchor (tree_class, elem, element_anchor);
 
     std::vector<DomainIndex> coords;
 

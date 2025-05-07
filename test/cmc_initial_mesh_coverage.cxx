@@ -13,14 +13,14 @@
 #include <t8_cmesh/t8_cmesh_examples.h> 
 #include <t8_forest/t8_forest_general.h>
 #include <t8_forest/t8_forest.h>
-#include <t8_schemes/t8_default/t8_default_cxx.hxx> 
+#include <t8_schemes/t8_scheme.hxx> 
 #include <t8_forest/t8_forest_iterate.h> 
 #endif
 
 #include <vector>
 
 static int
-coarsen_all_elements(t8_forest_t forest, t8_forest_t forest_from, int which_tree, int lelement_id, t8_eclass_scheme_c * ts,
+coarsen_all_elements(t8_forest_t forest, t8_forest_t forest_from, int which_tree, int lelement_id, const t8_scheme_c * ts,
                      const int is_family, const int num_elements, t8_element_t * elements[])
 {
     if (is_family)
@@ -46,7 +46,7 @@ int main(void)
     t8_scheme_cxx_t* scheme = t8_scheme_new_default_cxx ();
     const int initial_level = 5;
     t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);
-    t8_eclass_scheme_c* ts = t8_forest_get_eclass_scheme(forest, t8_forest_get_eclass(forest, 0));
+    const t8_scheme_c* ts = t8_forest_get_scheme(forest);
 
     /* We want to keep the initial forest */
     t8_forest_ref(forest);
