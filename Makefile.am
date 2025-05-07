@@ -30,6 +30,3 @@ EXTRA_DIST += bootstrap \
 include src/Makefile.am
 include example/Makefile.am
 include test/Makefile.am
-
-# Include the Fortran specific makefile
-include cmc_fortran_specific.mk
