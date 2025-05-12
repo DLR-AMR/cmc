@@ -98,7 +98,6 @@ src/compression_io/cmc_embedded_byte_compression_output.txx
 
 src_libcmc_la_SOURCES = src/cmc.cxx \
 src/utilities/cmc_utilities.cxx \
-src/utilities/cmc_compression_settings.cxx \
 src/utilities/cmc_geo_domain.cxx \
 src/utilities/cmc_hyperslab.cxx \
 src/utilities/cmc_input_variable.cxx \
