@@ -54,14 +54,14 @@ DestroyAdaptationClass(ICompressionAdaptData* iadapt_data)
 template<typename T>
 inline t8_locidx_t
 DefaultAdaptiveCoarsening (t8_forest_t forest,
-                           t8_forest_t forest_from,
+                           [[maybe_unused]] t8_forest_t forest_from,
                            t8_locidx_t which_tree,
-                           const t8_eclass_t tree_class,
+                           [[maybe_unused]] const t8_eclass_t tree_class,
                            t8_locidx_t lelement_id,
-                           const t8_scheme_c * ts,
+                           [[maybe_unused]] const t8_scheme_c * ts,
                            const int is_family,
                            const int num_elements,
-                           t8_element_t * elements[])
+                           [[maybe_unused]] t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
     ICompressionAdaptData* _adapt_data = static_cast<ICompressionAdaptData*>(t8_forest_get_user_data(forest));
@@ -131,14 +131,14 @@ DefaultAdaptData<T>::FinalizeCompressionIteration()
 
 template <typename T>
 void
-DefaultAdaptData<T>::CompleteInterpolation(const t8_forest_t previous_forest, const t8_forest_t adapted_forest)
+DefaultAdaptData<T>::CompleteInterpolation([[maybe_unused]] const t8_forest_t previous_forest, [[maybe_unused]] const t8_forest_t adapted_forest)
 {
     //Nothing to be done here!
 }
 
 template <typename T>
 void
-DefaultAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
+DefaultAdaptData<T>::RepartitionData([[maybe_unused]] const t8_forest_t adapted_forest, [[maybe_unused]] const t8_forest_t partitioned_forest)
 {
     //Nothing to be done here!
 }

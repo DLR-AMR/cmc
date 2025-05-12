@@ -734,7 +734,7 @@ public:
     {};
     void TransferPreviousDeviation([[maybe_unused]] const int start_index_previous_values) override {};
     void AllocateDeviationStorage([[maybe_unused]] const int num_elements) override {};
-    void RepartitionDeviations(t8_forest_t initial_forest, t8_forest_t partitioned_forest) override {};
+    void RepartitionDeviations([[maybe_unused]] t8_forest_t initial_forest, [[maybe_unused]] t8_forest_t partitioned_forest) override {};
 
 private:
     std::unordered_map<int, double> deviations_;

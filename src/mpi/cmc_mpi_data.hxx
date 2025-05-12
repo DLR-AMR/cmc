@@ -112,31 +112,31 @@ public:
 
     DataOffsets() = delete;
     DataOffsets(const size_t num_elements)
-    : offsets_(num_elements){};
+    : offsets_(num_elements){}
 
     DataOffsets(const DataOffsets& other) = default;
     DataOffsets& operator=(const DataOffsets& other) = default;
     DataOffsets(DataOffsets&& other) = default;
     DataOffsets& operator=(DataOffsets&& other) = default;
 
-    template<typename U> auto operator[](U index) const -> std::enable_if_t<std::is_integral_v<U>, MortonIndex> {return offsets_[index];};
-    template<typename U> auto operator[](U index) -> std::enable_if_t<std::is_integral_v<U>, MortonIndex&> {return offsets_[index];};
+    template<typename U> auto operator[](U index) const -> std::enable_if_t<std::is_integral_v<U>, MortonIndex> {return offsets_[index];}
+    template<typename U> auto operator[](U index) -> std::enable_if_t<std::is_integral_v<U>, MortonIndex&> {return offsets_[index];}
 
-    iterator Begin() { return offsets_.begin(); };
-    iterator End() { return offsets_.end(); };
-    const_iterator Begin() const { return offsets_.begin(); };
-    const_iterator End() const { return offsets_.end(); };
-    const_iterator CBegin() const { return offsets_.cbegin(); };
-    const_iterator CEnd() const { return offsets_.cend(); };
+    iterator Begin() { return offsets_.begin(); }
+    iterator End() { return offsets_.end(); }
+    const_iterator Begin() const { return offsets_.begin(); }
+    const_iterator End() const { return offsets_.end(); }
+    const_iterator CBegin() const { return offsets_.cbegin(); }
+    const_iterator CEnd() const { return offsets_.cend(); }
 
-    size_t size() const {return offsets_.size();};
+    size_t size() const {return offsets_.size();}
 
     MortonIndex* data()
     {
         return offsets_.data();
-    };
+    }
 
-    void SetMPIComm(const MPI_Comm comm) {comm_ = comm;};
+    void SetMPIComm(const MPI_Comm comm) {comm_ = comm;}
 
 private:
     std::vector<MortonIndex> offsets_;
@@ -152,9 +152,9 @@ class VariableMessage
 public:
     VariableMessage() = default;
     VariableMessage(const int rank, const int variable_id)
-    : rank_{rank}, variable_id_{variable_id}{};
+    : rank_{rank}, variable_id_{variable_id}{}
     VariableMessage(const int rank, const int variable_id, const int num_elements)
-    : rank_{rank}, variable_id_{variable_id}, data_(num_elements), morton_indices_(num_elements){};
+    : rank_{rank}, variable_id_{variable_id}, data_(num_elements), morton_indices_(num_elements){}
 
     VariableMessage(const VariableMessage& other) = default;
     VariableMessage& operator=(const VariableMessage& other) = default;
@@ -167,18 +167,18 @@ public:
     void* GetInitialDataPtr() {return static_cast<void*>(data_.data());}
     void* GetInitialMortonIndicesPtr() {return static_cast<void*>(morton_indices_.data());}
 
-    int GetRank() const {return rank_;};
-    int GetVariableID() const {return variable_id_;};
+    int GetRank() const {return rank_;}
+    int GetVariableID() const {return variable_id_;}
 
-    std::vector<T>::iterator DataBegin() {return data_.begin();};
-    std::vector<T>::const_iterator DataBegin() const {return data_.begin();};
-    std::vector<T>::iterator DataEnd() {return data_.end();};
-    std::vector<T>::const_iterator DataEnd() const {return data_.end();};
+    std::vector<T>::iterator DataBegin() {return data_.begin();}
+    std::vector<T>::const_iterator DataBegin() const {return data_.begin();}
+    std::vector<T>::iterator DataEnd() {return data_.end();}
+    std::vector<T>::const_iterator DataEnd() const {return data_.end();}
 
-    std::vector<MortonIndex>::iterator MortonIndicesBegin() {return morton_indices_.begin();};
-    std::vector<MortonIndex>::const_iterator MortonIndicesBegin() const {return morton_indices_.begin();};
-    std::vector<MortonIndex>::iterator MortonIndicesEnd() {return morton_indices_.end();};
-    std::vector<MortonIndex>::const_iterator MortonIndicesEnd() const {return morton_indices_.end();};
+    std::vector<MortonIndex>::iterator MortonIndicesBegin() {return morton_indices_.begin();}
+    std::vector<MortonIndex>::const_iterator MortonIndicesBegin() const {return morton_indices_.begin();}
+    std::vector<MortonIndex>::iterator MortonIndicesEnd() {return morton_indices_.end();}
+    std::vector<MortonIndex>::const_iterator MortonIndicesEnd() const {return morton_indices_.end();}
 
     int rank_{kVarMessageMPIErr};
     int variable_id_{kVarMessageMPIErr};
@@ -236,7 +236,7 @@ class VariableSendMessage
 {
 public:
     template<typename T> VariableSendMessage(VariableMessage<T>&& var_message)
-    : type_{ConvertToCmcType<T>()}, message_{std::move(var_message)}{};
+    : type_{ConvertToCmcType<T>()}, message_{std::move(var_message)}{}
 
     VariableSendMessage(const VariableSendMessage& other) = default;
     VariableSendMessage& operator=(const VariableSendMessage& other) = default;
@@ -244,8 +244,8 @@ public:
     VariableSendMessage& operator=(VariableSendMessage&& other) = default;
 
     std::pair<MPI_Request, MPI_Request> Send(const MPI_Comm comm);
-    VarMessage& GetInternalVariant() {return message_;};
-    const VarMessage& GetInternalVariant() const {return message_;};
+    VarMessage& GetInternalVariant() {return message_;}
+    const VarMessage& GetInternalVariant() const {return message_;}
 
 private:
     CmcType type_;
@@ -257,7 +257,7 @@ VariableRecvMessage
 {
 public:
     template<typename T> VariableRecvMessage(VariableMessage<T>&& var_message)
-    : type_{ConvertToCmcType<T>()}, message_{std::move(var_message)}{};
+    : type_{ConvertToCmcType<T>()}, message_{std::move(var_message)}{}
 
     VariableRecvMessage(const CmcType type, VarMessage&& message)
     : type_{type}, message_{std::move(message)} {};
@@ -273,8 +273,8 @@ public:
     int GetSendingRank() const;
     int GetVariableID() const;
 
-    VarMessage& GetInternalVariant() {return message_;};
-    const VarMessage& GetInternalVariant() const {return message_;};
+    VarMessage& GetInternalVariant() {return message_;}
+    const VarMessage& GetInternalVariant() const {return message_;}
 private:
     CmcType type_;
     VarMessage message_;

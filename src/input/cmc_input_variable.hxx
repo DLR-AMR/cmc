@@ -31,11 +31,11 @@ class Variable
 public:
     Variable() = default;
     Variable(const std::string& name, const int id, const DataLayout layout)
-    : name_{name}, id_{id}, initial_layout_{layout}{};
+    : name_{name}, id_{id}, initial_layout_{layout}{}
     Variable(std::string&& name, const int id, const DataLayout layout)
-    : name_{std::move(name)}, id_{id}, initial_layout_{layout}{};
+    : name_{std::move(name)}, id_{id}, initial_layout_{layout}{}
     Variable(const DataLayout layout, const DataFormat format)
-    : initial_layout_{layout}, active_format_{format}{};
+    : initial_layout_{layout}, active_format_{format}{}
     ~Variable() = default;
 
     Variable(const Variable& other) = default;
@@ -43,8 +43,8 @@ public:
     Variable(Variable&& other) = default;
     Variable& operator=(Variable&& other) = default;
 
-    template<typename U> auto operator[](U index) const -> std::enable_if_t<std::is_integral_v<U>, T> {return data_[index];};
-    template<typename U> auto operator[](U index) -> std::enable_if_t<std::is_integral_v<U>, T&> {return data_[index];};
+    template<typename U> auto operator[](U index) const -> std::enable_if_t<std::is_integral_v<U>, T> {return data_[index];}
+    template<typename U> auto operator[](U index) -> std::enable_if_t<std::is_integral_v<U>, T&> {return data_[index];}
 
     int GetID() const;
     CmcType GetType() const;
@@ -136,9 +136,9 @@ public:
     std::vector<T> GetDataFromHyperslab(const Hyperslab& hyperslab) const;
 
     /* Those functions are only accessible for certain functions */
-    const std::vector<T>& GetDataForReading() const {return data_;};
-    const std::vector<T>& GetData([[maybe_unused]] const AccessKey& key) const {return data_;};
-    void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {data_ = std::move(data);};
+    const std::vector<T>& GetDataForReading() const {return data_;}
+    const std::vector<T>& GetData([[maybe_unused]] const AccessKey& key) const {return data_;}
+    void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {data_ = std::move(data);}
     void MoveDataInto(std::vector<T>& vec_to_move_data_into);
 
 private:
@@ -239,7 +239,7 @@ public:
 
     friend Var MetaCopy(const Var& variable);
 
-    template<typename T> void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {std::visit([&](auto& var){var.SetData(key, std::move(data));}, var_);};
+    template<typename T> void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {std::visit([&](auto& var){var.SetData(key, std::move(data));}, var_);}
 private:
     template<class T> void ApplyAxpyScalingAndOffset(const Variable<T>&);
     template<class T> void ApplyScaling(const Variable<T>&);
@@ -252,7 +252,7 @@ private:
 struct IndexReduction
 {
     IndexReduction(const MortonIndex index, MortonIndex skipped_elements)
-    : start_index{index}, indices_to_subtract{skipped_elements}{};
+    : start_index{index}, indices_to_subtract{skipped_elements}{}
 
     MortonIndex start_index{0};
     MortonIndex indices_to_subtract{0};
@@ -263,9 +263,9 @@ class UpdateLinearIndices
 public:
     UpdateLinearIndices() = delete;
     UpdateLinearIndices(std::vector<IndexReduction>&& correction)
-    : correction_{correction}{};
+    : correction_{correction}{}
     UpdateLinearIndices(const std::vector<IndexReduction>& correction)
-    : correction_{correction}{};
+    : correction_{correction}{}
 
     template<typename T>
     auto operator()(T index_to_be_updated) const
@@ -285,8 +285,8 @@ private:
 class AccessKey
 {
 private:
-    AccessKey(){};
-    AccessKey([[maybe_unused]] const AccessKey& other){};
+    AccessKey(){}
+    AccessKey([[maybe_unused]] const AccessKey& other){}
 
     template<class T> friend void Var::ApplyAxpyScalingAndOffset(const Variable<T>&);
     template<class T> friend void Var::ApplyScaling(const Variable<T>&);
@@ -333,7 +333,7 @@ void Variable<T>::SetUpFilledVariable(const size_t num_elements, const T fill_va
 {
     std::vector<T> filled_vector(num_elements, fill_value);
     std::swap(filled_vector, data_); 
-};
+}
 
 template<class T>
 void Variable<T>::SetUpFilledVariable(const size_t num_elements, const CmcUniversalType& fill_value)
@@ -348,35 +348,35 @@ void Variable<T>::PushBack(const T value, const LinearIndex index)
 {
     data_.push_back(value);
     linear_indices_.push_back(index);
-};
+}
 
 template<class T>
 void Variable<T>::PushBack(const T value, const CartesianCoordinate& coordinate)
 {
     data_.push_back(value);
     cartesian_coordinates_.push_back(coordinate);
-};
+}
 
 template<class T>
 void Variable<T>::PushBack(const T value, CartesianCoordinate&& coordinate)
 {
     data_.push_back(value);
     cartesian_coordinates_.push_back(std::move(coordinate));
-};
+}
 
 template<class T>
 void Variable<T>::PushBack(const std::vector<T>& values, const Hyperslab& hyperslab)
 {
     std::copy(values.begin(), values.end(), std::back_inserter(data_));
     hyperslabs_.push_back(hyperslab);
-};
+}
 
 template<class T>
 void Variable<T>::PushBack(const std::vector<T>& values, Hyperslab&& hyperslab)
 {
     std::copy(values.begin(), values.end(), std::back_inserter(data_));
     hyperslabs_.push_back(std::move(hyperslab));
-};
+}
 
 template<class T>
 void Variable<T>::SetDataAndCoordinates(std::vector<T>&& values, std::vector<Hyperslab>&& hyperslabs)
@@ -384,31 +384,31 @@ void Variable<T>::SetDataAndCoordinates(std::vector<T>&& values, std::vector<Hyp
     data_ = std::move(values);
     hyperslabs_ = std::move(hyperslabs);
     active_format_ = DataFormat::HyperslabFormat;
-};
+}
 
 template<class T>
 LinearIndex Variable<T>::GetLinearIndexCoordinate(const size_t position) const
 {
     return linear_indices_[position];
-};
+}
 
 template<class T>
 CartesianCoordinate Variable<T>::GetCartesianCoordinate(const size_t position) const
 {
     return cartesian_coordinates_[position];
-};
+}
 
 template<class T>
 Hyperslab Variable<T>::GetHyperslab(const size_t position) const
 {
     return hyperslabs_[position];
-};
+}
 
 template<class T>
 DataLayout Variable<T>::GetInitialDataLayout() const
 {
     return initial_layout_;
-};
+}
 
 template<class T>
 DataLayout Variable<T>::GetPreCompressionDataLayout() const
@@ -420,7 +420,7 @@ template<class T>
 GeoDomain& Variable<T>::GetGlobalDomain()
 {
     return global_domain_;
-};
+}
 
 template<class T>
 const GeoDomain& 
@@ -433,13 +433,13 @@ template<class T>
 void Variable<T>::SetGlobalDomain(const GeoDomain& domain)
 {
     global_domain_ = domain;
-};
+}
 
 template<class T>
 void Variable<T>::SetGlobalDomain(GeoDomain&& domain)
 {
     global_domain_ = std::move(domain);
-};
+}
 
 template<class T>
 void Variable<T>::SetMPIComm(const MPI_Comm comm)
@@ -451,7 +451,7 @@ template<class T>
 MPI_Comm Variable<T>::GetMPIComm() const
 {
     return comm_;
-};
+}
 
 template<class T>
 void Variable<T>::MoveDataInto(std::vector<T>& vec_to_move_data_into)
@@ -468,7 +468,7 @@ void Variable<T>::Clear()
     linear_indices_.clear();
     hyperslabs_.clear();
     active_format_ = DataFormat::FormatUndefined;
-};
+}
 
 template<class T>
 void
@@ -557,7 +557,7 @@ Variable<T>::TransformCoordinatesToMortonIndices()
         break;
         default:
             cmc_err_msg("The variable's coordinates cannot to transformed to Morton indices.");
-    };
+    }
 
     active_format_ = DataFormat::LinearFormat;
 }
@@ -994,11 +994,11 @@ Variable<T>::GetActiveDataFormat() const
 /** INPUT VAR MEMBER FUNCTIONS **/
 template<typename T>
 Var::Var(const Variable<T>& var)
-: var_{var}{};
+: var_{var}{}
 
 template<typename T>
 Var::Var(Variable<T>&& var)
-: var_{std::move(var)}{};
+: var_{std::move(var)}{}
 
 template<typename T>
 bool

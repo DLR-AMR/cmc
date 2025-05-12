@@ -30,19 +30,19 @@ class Dimension
 public:
     Dimension() = default;
     Dimension(const std::string& name, const size_t length)
-    : name_{name}, length_{length} {};
+    : name_{name}, length_{length} {}
     Dimension(std::string&& name, const size_t length)
-    : name_{std::move(name)}, length_{length} {};
+    : name_{std::move(name)}, length_{length} {}
     Dimension(const std::string& name, const size_t length, const int dim_id)
-    : name_{name}, length_{length}, nc_dim_id{dim_id} {};
+    : name_{name}, length_{length}, nc_dim_id{dim_id} {}
     Dimension(std::string&& name, const size_t length, const int dim_id)
-    : name_{std::move(name)}, length_{length}, nc_dim_id{dim_id} {};
+    : name_{std::move(name)}, length_{length}, nc_dim_id{dim_id} {}
 
-    std::string GetName(){return name_;};
-    const std::string& GetName() const {return name_;};
-    size_t GetLength() const {return length_;};
+    std::string GetName(){return name_;}
+    const std::string& GetName() const {return name_;}
+    size_t GetLength() const {return length_;}
 
-    void AppendNumToName(const int number){name_.append(std::to_string(number));};
+    void AppendNumToName(const int number){name_.append(std::to_string(number));}
 
 private:
     std::string name_;
@@ -55,13 +55,13 @@ class Attribute
 public:
     Attribute() = default;
     Attribute(const std::string& name, const CmcUniversalType& value)
-    : name_{name}, value_{value}{};
+    : name_{name}, value_{value}{}
     Attribute(std::string&& name, const CmcUniversalType& value)
-    : name_{std::move(name)}, value_{value}{};
+    : name_{std::move(name)}, value_{value}{}
     template<typename T> Attribute(const std::string& name, T value)
-    : name_{name}, value_{value}{};
+    : name_{name}, value_{value}{}
     template<typename T> Attribute(std::string&& name, T value)
-    : name_{std::move(name)}, value_{value}{};
+    : name_{std::move(name)}, value_{value}{}
     ~Attribute() = default;
 
     Attribute(const Attribute& other) = default;
@@ -85,7 +85,7 @@ struct GeneralHyperslab
 {
 public:
     GeneralHyperslab(std::vector<size_t>&& start_vals, std::vector<size_t>&& count_vals)
-    : start_values{std::move(start_vals)}, count_values{std::move(count_vals)}{};
+    : start_values{std::move(start_vals)}, count_values{std::move(count_vals)}{}
 
     size_t GetNumberOfCoveredCoordinates() const
     {
@@ -120,15 +120,15 @@ class SpecificVariable
 public:
     SpecificVariable() = default;
     SpecificVariable(const int id)
-    : id_{id} {};
+    : id_{id} {}
     SpecificVariable(const std::string& name)
-    : name_{name} {};
+    : name_{name} {}
     SpecificVariable(const std::string& name, const int id)
-    : name_{name}, id_{id} {};
+    : name_{name}, id_{id} {}
     SpecificVariable(const std::string& name, const int id, const size_t size_hint)
     : name_{name}, id_{id} {
         this->Reserve(size_hint);
-    };
+    }
     ~SpecificVariable() = default;
 
     SpecificVariable(const SpecificVariable& other) = default;
@@ -173,36 +173,36 @@ public:
     ~Variable() = default;
 
     template<class T> Variable(const SpecificVariable<T>& variable)
-    : variable_{variable} {};
+    : variable_{variable} {}
     template<class T> Variable(SpecificVariable<T>&& variable)
-    : variable_{std::move(variable)} {};
+    : variable_{std::move(variable)} {}
     template<class T> Variable(const SpecificVariable<T>& variable, const std::vector<Attribute>& attributes)
-    : variable_{variable}, attributes_{attributes} {};
+    : variable_{variable}, attributes_{attributes} {}
     template<class T> Variable(const SpecificVariable<T>& variable, std::vector<Attribute>&& attributes)
-    : variable_{variable}, attributes_{std::move(attributes)} {};
+    : variable_{variable}, attributes_{std::move(attributes)} {}
     template<class T> Variable(SpecificVariable<T>&& variable, const std::vector<Attribute>& attributes)
-    : variable_{std::move(variable)}, attributes_{attributes} {};
+    : variable_{std::move(variable)}, attributes_{attributes} {}
     template<class T> Variable(SpecificVariable<T>&& variable, std::vector<Attribute>&& attributes)
-    : variable_{std::move(variable)}, attributes_{std::move(attributes)} {};
+    : variable_{std::move(variable)}, attributes_{std::move(attributes)} {}
     template<class T> Variable(const SpecificVariable<T>& variable, const Attribute& attribute)
     : variable_{variable} {
         attributes_.push_back(attribute);
-    };
+    }
     template<class T> Variable(const SpecificVariable<T>& variable, Attribute&& attribute)
     : variable_{variable} {
         attributes_.push_back(attribute);
-    };
+    }
     template<class T> Variable(SpecificVariable<T>&& variable, const Attribute& attribute)
     : variable_{std::move(variable)} {
         attributes_.push_back(attribute);
-    };
+    }
     template<class T> Variable(SpecificVariable<T>&& variable, Attribute&& attribute)
     : variable_{std::move(variable)} {
         attributes_.push_back(attribute);
-    };
+    }
 
     Variable(std::vector<Attribute>&& attributes, std::vector<Dimension>&& dimensions)
-    : attributes_{std::move(attributes)}, dimensions_{std::move(dimensions)} {};
+    : attributes_{std::move(attributes)}, dimensions_{std::move(dimensions)} {}
 
     Variable(const Variable& other) = default;
     Variable& operator=(const Variable& other) = default;
@@ -276,7 +276,7 @@ void
 SpecificVariable<T>::Reserve(const size_t num_data_slabs)
 {
     data_.reserve(num_data_slabs);
-};
+}
 
 template<class T>
 void

@@ -379,7 +379,7 @@ Var::ApplyScalingAndOffset()
             ApplyOffset(var);
         }
     }, var_);
-};
+}
 
 class SplitVariables
 {

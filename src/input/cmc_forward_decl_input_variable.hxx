@@ -23,7 +23,7 @@ using GeneralVariable = std::variant<Variable<int8_t>, Variable<char>, Variable<
                                       Variable<uint8_t>, Variable<uint16_t>, Variable<uint32_t>, Variable<int64_t>, Variable<uint64_t>>;
 
 using CmcDefaultDataType = float;
-inline CmcType GetDefaultCmcType() { return CmcType::Float; };
+inline CmcType GetDefaultCmcType() { return CmcType::Float; }
 
 template<class T> std::vector<Variable<T>> ExtractSubVariables (const Variable<T>& variable, const Dimension split_dimension);
     

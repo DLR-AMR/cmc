@@ -35,19 +35,19 @@ Hyperslab::SetupDimension(const DimensionInterval& dimension)
 Hyperslab::Hyperslab(const DimensionInterval& dimension1)
 {
     SetupDimension(dimension1);
-};
+}
 Hyperslab::Hyperslab(const DimensionInterval& dimension1, const DimensionInterval& dimension2)
 {
     SetupDimension(dimension1);
     SetupDimension(dimension2);
-};
+}
 Hyperslab::Hyperslab(const DimensionInterval& dimension1, const DimensionInterval& dimension2,
                      const DimensionInterval& dimension3)
 {
     SetupDimension(dimension1);
     SetupDimension(dimension2);
     SetupDimension(dimension3);
-};
+}
 Hyperslab::Hyperslab(const DimensionInterval& dimension1, const DimensionInterval& dimension2,
                      const DimensionInterval& dimension3, const DimensionInterval& dimension4)
 {
@@ -55,20 +55,20 @@ Hyperslab::Hyperslab(const DimensionInterval& dimension1, const DimensionInterva
     SetupDimension(dimension2);
     SetupDimension(dimension3);
     SetupDimension(dimension4);
-};
+}
 
 Hyperslab::Hyperslab(const HyperslabIndex lon_start, const HyperslabIndex lon_count,
                      const HyperslabIndex lat_start, const HyperslabIndex lat_count,
                      const HyperslabIndex lev_start, const HyperslabIndex lev_count,
                      const HyperslabIndex time_start, const HyperslabIndex time_count)
-: start_indices_{lon_start, lat_start, lev_start, time_start}, count_indices_{lon_count, lat_count, lev_count, time_count}{};
+: start_indices_{lon_start, lat_start, lev_start, time_start}, count_indices_{lon_count, lat_count, lev_count, time_count}{}
 
 HyperslabIndex
 Hyperslab::GetNumberCoordinates() const
 {
     const HyperslabIndex product =  std::accumulate(count_indices_.begin(), count_indices_.end(), 1, std::multiplies<HyperslabIndex>());
     return product;
-};
+}
 
 HyperslabIndex
 Hyperslab::GetNumberCoordinatesWithoutCertainDimension(const Dimension excluded_dimension) const

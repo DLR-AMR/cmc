@@ -8,7 +8,7 @@ typedef int cmc_err_t;
 typedef void* cmc_err_ptr_t;
 typedef void *cmc_err_func_ptr_t(void);
 
-#if CMC_ENABLE_DEBUG
+#ifdef CMC_ENABLE_DEBUG
 #define cmc_assert(condition) assert(condition)
 #else
 #define cmc_assert(condition) ((void)0)
@@ -56,10 +56,7 @@ typedef long long t8_gloidx_t;
 #define t8_forest_ref(err) void(0);
 #endif
 #endif
-/* Definitions to ensure compilation without t8code */
-#ifndef CMC_WITH_MESSY
 
-#endif
 
 #endif /* Check existence of CMC_CONFIG_H */
 #endif /* CMC_FALLBACKS_H */

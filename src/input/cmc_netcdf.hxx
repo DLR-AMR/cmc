@@ -87,7 +87,7 @@ Data::InquireAllVariables(const Hyperslab& hyperslab, Ts&&... var_names)
     #ifdef CMC_WITH_NETCDF
     (variables_.push_back(InquireVariable(hyperslab, std::forward<Ts>(var_names))), ...);
     #endif
-};
+}
 
 
 template<typename... Ts>
@@ -106,7 +106,7 @@ Data::InquireVariables(const Hyperslab& hyperslab, Ts&&... variable_names)
     #else
     cmc_err_msg("CMC is not compiled with netCDF, please reconfigure with netCDF linkage in order to use this function.");
     #endif
-};
+}
 
 }
 

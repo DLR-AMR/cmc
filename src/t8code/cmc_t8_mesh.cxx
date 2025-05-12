@@ -2,14 +2,14 @@
 #include "utilities/cmc_log_functions.hxx"
 #include "t8code/cmc_t8_morton.hxx"
 
-#if CMC_WITH_T8CODE
+#ifdef CMC_WITH_T8CODE
 #include <t8_schemes/t8_default/t8_default.hxx>
 #include <p4est.h>
 #include <p8est.h>
 #endif
 
 #if 0
-#if CMC_WITH_T8CODE
+#ifdef CMC_WITH_T8CODE
 #include <t8_eclass.h>
 #include <t8_element.h>
 #include <t8_schemes/t8_scheme.hxx>

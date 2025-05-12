@@ -160,7 +160,7 @@ T
 VariableUtilities<T>::Interpolation(const VectorView<T>& values, const t8_forest_t previous_mesh, const int tree_id, const t8_locidx_t start_index, const int num_elements, const T missing_value) const
 {
     return interpolate_skip_missing_values_(values, previous_mesh, tree_id, start_index, num_elements, missing_value);
-};
+}
 
 template<class T>
 T
