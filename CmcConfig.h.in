@@ -1,0 +1,16 @@
+#cmakedefine CMC_VERSION "@CMC_VERSION@"
+
+#cmakedefine CMAKE_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+#cmakedefine CMAKE_C_COMPILER "@CMAKE_C_COMPILER@"
+#cmakedefine cmc_CFLAGS "@cmc_CFLAGS@"
+#cmakedefine CMAKE_CXX_COMPILER "@CMAKE_CXX_COMPILER@"
+#cmakedefine cmc_CXXFLAGS "@cmc_CXXFLAGS@"
+#cmakedefine CMAKE_SHARED_LINKER_FLAGS "@CMAKE_SHARED_LINKER_FLAGS@"
+
+#cmakedefine CMC_ENABLE_DEBUG 
+
+#cmakedefine CMC_ENABLE_MPI 
+#cmakedefine CMC_WITH_NETCDF 
+#cmakedefine CMC_WITH_NETCDF_PAR 
+#cmakedefine CMC_WITH_T8CODE 
+

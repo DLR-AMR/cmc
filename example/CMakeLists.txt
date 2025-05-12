@@ -1,0 +1,7 @@
+
+# Gather nc data example
+set(EXAMPLE_NETCDF_CMC_GATHER_NC_DATA cmc_gather_nc_data)
+add_executable(${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} ${CMAKE_CURRENT_LIST_DIR}/netcdf/cmc_gather_nc_data.cxx)
+target_link_libraries(${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} PUBLIC cmc)
+target_include_directories(${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+install(TARGETS ${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} DESTINATION bin/netcdf)
