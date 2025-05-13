@@ -14,6 +14,7 @@
 #include "netcdf.h"
 #endif
 #ifdef CMC_WITH_NETCDF_PAR
+#include "mpi/cmc_mpi.hxx"
 #include "netcdf_par.h"
 #endif
 

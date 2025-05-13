@@ -7,6 +7,11 @@
 #include "utilities/cmc_utilities.hxx"
 
 #ifdef CMC_ENABLE_MPI
+/* We define a macro to skip the inclusion of MPI-CXX interface when OpenMPI is used (but buitl with CXX support) */
+#ifndef OMPI_SKIP_MPICXX
+#define OMPI_SKIP_MPICXX
+#endif
+/* Include the MPi-Interface*/
 #include "mpi.h"
 #endif
 
