@@ -60,7 +60,7 @@ GeoDomain::GeoDomain(const DomainIndex lon_dimension_start, const DomainIndex lo
               const DomainIndex lev_dimension_start, const DomainIndex lev_dimension_end,
               const DomainIndex time_dimension_start, const DomainIndex time_dimension_end)
 : start_indices_{lon_dimension_start, lat_dimension_start, lev_dimension_start, time_dimension_start},
-  end_indices_{lon_dimension_end, lat_dimension_end, lev_dimension_end, time_dimension_end} {};
+  end_indices_{lon_dimension_end, lat_dimension_end, lev_dimension_end, time_dimension_end} {}
 
 DomainIndex
 GeoDomain::GetDimensionLength(const Dimension dimension) const
@@ -80,7 +80,7 @@ GeoDomain::GetDimensionLength(const Dimension dimension) const
             return end_indices_[Dimension::Time] - start_indices_[Dimension::Time];
         break;
         default:
-            cmc_err_msg("The dimension is cannot be considered.");
+            cmc_err_msg("The supplied dimension is not considered.");
     }
 }
 
