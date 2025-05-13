@@ -30,7 +30,7 @@ target_sources(cmc PRIVATE
 install(FILES
     cmc.hxx 
     cmc_config.h 
-    DESTINATION include
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(FILES
@@ -77,14 +77,14 @@ install(FILES
     utilities/cmc_iface_arithmetic_encoding_freq_model.hxx 
     utilities/cmc_embedded_mesh_utilities.hxx 
     utilities/cmc_embedded_variable_attributes.hxx 
-    DESTINATION include/utilities
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 
 install(FILES
     mpi/cmc_mpi_io.hxx 
     mpi/cmc_mpi.hxx 
     mpi/cmc_mpi_data.hxx 
-DESTINATION include/mpi
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpi
 )
 
 install(FILES
@@ -93,7 +93,7 @@ install(FILES
     netcdf/cmc_nc_io_conventions.hxx 
     netcdf/cmc_nc_writer.hxx 
     netcdf/cmc_nc_reader.hxx 
-DESTINATION include/netcdf
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/netcdf
 )
 
 install(FILES
@@ -102,7 +102,7 @@ install(FILES
     input/cmc_forward_decl_input_variable.hxx 
     input/cmc_binary_reader.hxx 
     input/cmc_binary_reader_forward.hxx 
-DESTINATION include/input
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
 )
 
 install(FILES
@@ -112,13 +112,13 @@ install(FILES
     t8code/cmc_t8_morton.hxx 
     t8code/cmc_t8_mpi.hxx 
     t8code/cmc_t8_adaptation_callbacks.hxx 
-DESTINATION include/t8code
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/t8code
 )
 
 install(FILES
     lossy/cmc_ac_compression_variable.hxx 
     lossy/cmc_adaptive_coarsening.hxx 
-DESTINATION include/lossy
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lossy
 )
 
 install(FILES
@@ -133,7 +133,7 @@ install(FILES
     lossless/cmc_multi_res_extraction_residual_computation.hxx 
     lossless/cmc_prefix_extraction_decompression.hxx 
     lossless/cmc_byte_decompression_variable.hxx 
-DESTINATION include/lossless
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lossless
 )
 
 install(FILES
@@ -147,7 +147,7 @@ install(FILES
     mesh_compression/cmc_iface_embedded_mesh_decoder.hxx 
     mesh_compression/cmc_embedded_mesh_encoder.hxx 
     mesh_compression/cmc_embedded_mesh_decoder.hxx 
-DESTINATION include/mesh_compression
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mesh_compression
 )
 
 install(FILES
@@ -156,9 +156,9 @@ install(FILES
     compression_io/cmc_decompression_input.hxx 
     compression_io/cmc_byte_compression_output.txx 
     compression_io/cmc_embedded_byte_compression_output.txx 
-DESTINATION include/compression_io
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
 )
 
-install(TARGETS cmc DESTINATION lib)
+install(TARGETS cmc DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 
