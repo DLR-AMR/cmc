@@ -16,7 +16,7 @@ option(WITH_T8CODE "Link against an available t8code installation" OFF)
 option(ENABLE_ALL_WARNINGS "Use compilation flags -Wall -Wextra -Wpedantic" [ON])
 
 # Define some paths for potential library linkage
-set(CMC_NETCDF_ROOT_DIR "" CACHE PATH "Folder containing netCDF")
+set(CMC_NETCDF_ROOT_DIR "" CACHE PATH "Directory containing netCDF installation")
 
 # Check if a shared or a static library should be built
 if(BUILD_SHARED_LIBS)
@@ -24,7 +24,7 @@ if(BUILD_SHARED_LIBS)
 else()
     add_library(cmc STATIC)
 endif()
-add_library(CMC::cmc ALIAS cmc)
+add_library(cmc::cmc ALIAS cmc)
 
 # Add some library properties regarding versioning
 set_target_properties(cmc PROPERTIES VERSION ${PROJECT_VERSION})
@@ -34,7 +34,7 @@ set_target_properties(cmc PROPERTIES OUTPUT_NAME cmc)
 # Set C and C++ standard for compilations
 target_compile_features(cmc PUBLIC c_std_11 cxx_std_17)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set a default build type if none was specified
 set(default_build_type "Release")
@@ -151,11 +151,15 @@ if(WITH_T8CODE)
 endif()
 
 # Define incldue-directories for building and installing
-target_include_directories(cmc PUBLIC "${PROJECT_SOURCE_DIR}")
+#target_include_directories(cmc PUBLIC "${PROJECT_SOURCE_DIR}")
 target_include_directories(cmc PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+# Add this path as an include directory
+include_directories(${PROJECT_BINARY_DIR}/src)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # Rpath options necessary for shared library install to work correctly in user projects.
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
@@ -165,27 +169,24 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH true)
 # Configure an input file with some given flags
 configure_file(CmcConfig.h.in ${PROJECT_BINARY_DIR}/src/cmc_ac_config.h @ONLY)
 
-# Add this path as an include directory
-include_directories(${PROJECT_BINARY_DIR}/src)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # Set some compile defintions regarding compialtion flags and versioning
-target_compile_definitions(cmc PUBLIC CMC_CC="${CMAKE_C_COMPILER}" )
-target_compile_definitions(cmc PUBLIC CMC_CFLAGS="${CMC_CFLAGS}" )
-target_compile_definitions(cmc PUBLIC CMC_CXX="${CMAKE_CXX_COMPILER}" )
-target_compile_definitions(cmc PUBLIC CMC_CXXFLAGS="${CMC_CXXFLAGS}" )
-target_compile_definitions(cmc PUBLIC CMC_LDFLAGS="${CMAKE_SHARED_LINKER_FLAGS}" )
-target_compile_definitions(cmc PUBLIC CMC_PACKAGE_STRING="cmc ${cmc_VERSION}" )
-target_compile_definitions(cmc PUBLIC CMC_VERSION="${cmc_VERSION}" )
-target_compile_definitions(cmc PUBLIC CMC_VERSION_MAJOR=${cmc_VERSION_MAJOR} )
-target_compile_definitions(cmc PUBLIC CMC_VERSION_MINOR=${cmc_VERSION_MINOR} )
-target_compile_definitions(cmc PUBLIC CMC_VERSION_PATCH=${cmc_VERSION_PATCH} )
-target_compile_definitions(cmc PUBLIC CMC_VERSION_POINT=${cmc_VERSION_POINT} )
+target_compile_definitions(cmc PUBLIC CMC_CC="${CMAKE_C_COMPILER}")
+target_compile_definitions(cmc PUBLIC CMC_CFLAGS="${CMC_CFLAGS}")
+target_compile_definitions(cmc PUBLIC CMC_CXX="${CMAKE_CXX_COMPILER}")
+target_compile_definitions(cmc PUBLIC CMC_CXXFLAGS="${CMC_CXXFLAGS}")
+target_compile_definitions(cmc PUBLIC CMC_LDFLAGS="${CMAKE_SHARED_LINKER_FLAGS}")
+target_compile_definitions(cmc PUBLIC CMC_PACKAGE_STRING="cmc ${cmc_VERSION}")
+target_compile_definitions(cmc PUBLIC CMC_VERSION="${cmc_VERSION}")
+target_compile_definitions(cmc PUBLIC CMC_VERSION_MAJOR=${cmc_VERSION_MAJOR})
+target_compile_definitions(cmc PUBLIC CMC_VERSION_MINOR=${cmc_VERSION_MINOR})
+target_compile_definitions(cmc PUBLIC CMC_VERSION_PATCH=${cmc_VERSION_PATCH})
+target_compile_definitions(cmc PUBLIC CMC_VERSION_POINT=${cmc_VERSION_POINT})
 
 # Add the linker flags to the compile definitions
-get_target_property(cmc_LIBS_LIST cmc LINK_LIBRARIES )
-string( REPLACE ";" " " cmc_LIBS "${cmc_LIBS_LIST}" )
-target_compile_definitions(cmc PUBLIC cmc_LIBS="${cmc_LIBS}" )
+get_target_property(cmc_LIBS_LIST cmc LINK_LIBRARIES)
+string(REPLACE ";" " " cmc_LIBS "${cmc_LIBS_LIST}")
+target_compile_definitions(cmc PUBLIC cmc_LIBS="${cmc_LIBS}")
 
 # Get in the src-directory
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src)
@@ -195,3 +196,28 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/example)
 
 # Get in the test-directory
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/test)
+
+# Create config files such that cmc may be found by find_package etc.
+include(CMakePackageConfigHelpers)
+
+set(CmcConfigPackageLocation ${CMAKE_INSTALL_LIBDIR}/cmake/cmc)
+
+install(EXPORT CmcTargets
+    NAMESPACE cmc::
+    DESTINATION ${CmcConfigPackageLocation})
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/CmcConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/CmcConfig.cmake
+    INSTALL_DESTINATION ${CmcConfigPackageLocation}
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/CmcConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CmcConfig.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/CmcConfigVersion.cmake
+        DESTINATION ${CmcConfigPackageLocation})
+        
