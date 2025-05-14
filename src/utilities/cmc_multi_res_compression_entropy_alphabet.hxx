@@ -154,7 +154,7 @@ template <typename T>
 std::vector<uint32_t>
 MultiResCompressionAlphabet<T>::CommunicateSymbolFrequencies(const MPI_Comm comm)
 {
-#if CMC_ENABLE_MPI
+#ifdef CMC_ENABLE_MPI
 
     cmc_debug_msg("The symbol frequencies of the entropy coding alphabet will be exchanged.");
     

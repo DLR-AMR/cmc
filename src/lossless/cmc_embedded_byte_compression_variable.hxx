@@ -1000,7 +1000,7 @@ AbstractEmbeddedByteCompressionVariable<T>::IsValidForCompression() const
         return false;
     }
 
-#if CMC_ENABLE_MPI
+#ifdef CMC_ENABLE_MPI
     if (comm_ == MPI_COMM_NULL)
     {
         cmc_err_msg("The MPI-Communicator is not set. Therefore, no compression can be applied.");
