@@ -18,6 +18,9 @@ option(ENABLE_ALL_WARNINGS "Use compilation flags -Wall -Wextra -Wpedantic" [ON]
 # Define some paths for potential library linkage
 set(CMC_NETCDF_ROOT_DIR "" CACHE PATH "Directory containing netCDF installation")
 
+include(CTest)
+enable_testing()
+
 # Check if a shared or a static library should be built
 if(BUILD_SHARED_LIBS)
     add_library(cmc SHARED)
