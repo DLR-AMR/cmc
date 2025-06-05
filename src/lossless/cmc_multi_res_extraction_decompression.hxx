@@ -113,7 +113,7 @@ MultiResDecompressionAdaptData<T>::InitializeDecompressionIteration()
 {
     cmc_debug_msg("A multi-resolution decompression iteration is initialized.");
 
-    constexpr size_t offset = sizeof(size_t);
+    constexpr size_t offset = sizeof(uint64_t);
 
     size_t processed_bytes = level_byte_offset_;
 
@@ -319,8 +319,8 @@ class DecompressionVariable : public cmc::decompression::AbstractByteDecompressi
 public:
     DecompressionVariable() = delete;
 
-    DecompressionVariable(const std::string& name, std::vector<uint8_t>&& encoded_data_byte_stream, std::vector<uint8_t>&& encoded_mesh_byte_stream)
-    : cmc::decompression::AbstractByteDecompressionVariable<T>(std::move(encoded_data_byte_stream), std::move(encoded_mesh_byte_stream))
+    DecompressionVariable(const std::string& name, std::vector<uint8_t>&& encoded_data_byte_stream, std::vector<uint8_t>&& encoded_mesh_byte_stream, const int max_num_decompression_iterations)
+    : cmc::decompression::AbstractByteDecompressionVariable<T>(std::move(encoded_data_byte_stream), std::move(encoded_mesh_byte_stream), max_num_decompression_iterations)
     {
         this->SetName(name);
         cmc::decompression::AbstractByteDecompressionVariable<T>::adaptation_creator_ = CreateMultiResDecompressionAdaptationClass<T>;
