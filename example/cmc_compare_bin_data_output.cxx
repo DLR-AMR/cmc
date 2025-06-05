@@ -50,9 +50,13 @@ PrintValuesFromFile(const std::string& file_name)
 
 int main(void)
 {
-    
-    const std::vector<float> initial_data = ReadDataFromStream<float>("initial_cmc_sfc_data.bin");
-    const std::vector<float> decompressed_data = ReadDataFromStream<float>("decompressed_cmc_sfc_data.bin");
+    #if 0
+    const std::vector<float> initial_data = ReadDataFromStream<float>("../../programs/data/100x500x500/Wf48.bin.f32");
+    #else
+    const std::vector<float> initial_data = ReadDataFromStream<float>("../../programs/data/SDRBENCH-EXASKY-NYX-512x512x512/baryon_density.f32");
+    #endif
+
+    const std::vector<float> decompressed_data = ReadDataFromStream<float>("decompressed_data.cmc");
 
     std::cout << "Initial data size: " << initial_data.size() << std::endl;
     std::cout << "Decompressed data size: " << decompressed_data.size() << std::endl;
@@ -67,12 +71,6 @@ int main(void)
             std::cout << "No equality at " << idx << ", Initial Value: " << initial_data[idx] << ", Decompressed Value: " << decompressed_data[idx] << std::endl;
         }
     }
-
-    //for (auto i = 0; i < decompressed_data.size(); ++i)
-    //{
-    //    std::cout << "Index i: " << i << ", initial_value: " << initial_data[i] << ", decompressed value: " << decompressed_data[i] << std::endl;
-    //}
-    
 
    return 0;
 }
