@@ -111,7 +111,7 @@ PrefixEmbeddedDecompressionAdaptData<T>::InitializeDecompressionIteration()
 {
     cmc_debug_msg("A prefix decompression iteration is initialized.");
 
-    constexpr size_t offset = sizeof(size_t);
+    constexpr size_t offset = sizeof(uint64_t);
 
     size_t processed_bytes = level_byte_offset_;
 
