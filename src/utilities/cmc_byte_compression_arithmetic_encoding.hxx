@@ -205,13 +205,18 @@ Encoder<T>::FinishEncoding()
         encoded_stream_.AppendSetBit();
     }
 
+    /* Emplace some buffer bits */
+    encoded_stream_.FillCurrentByte();
+    encoded_stream_.AppendUnsetBit();
+
     /* Enforce a minimum encoded stream length */
-    if (encoded_stream_.size() < kNumWorkingBits)
+    if (encoded_stream_.size() <= kNumWorkingBits)
     {
-        for (size_t i = encoded_stream_.size(); i < kNumWorkingBits; ++i)
+        for (size_t i = encoded_stream_.size(); i <= kNumWorkingBits; ++i)
         {
             encoded_stream_.AppendUnsetBit();
         }
+        cmc_assert(encoded_stream_.size() >= sizeof(Uint32_t) * bit_map::kCharBit);
     }
 
     cmc_debug_msg("The arithmetic encoder encoded the message in ", encoded_stream_.size(), " bits (=> ", encoded_stream_.size_bytes(), " bytes).");
