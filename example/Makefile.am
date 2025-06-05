@@ -1,3 +1,16 @@
-bin_PROGRAMS += example/netcdf/cmc_gather_nc_data
+bin_PROGRAMS += example/netcdf/cmc_gather_nc_data \
+example/cmc_t8_construct_mesh_and_data_for_compression \
+example/lossless/cmc_embedded_multi_res_compression \
+example/lossless/cmc_embedded_prefix_compression \
+example/lossless/cmc_embedded_pcp4_multi_res_compression \
+example/cmc_compare_bin_output
 
 example_netcdf_cmc_gather_nc_data_SOURCES =  example/netcdf/cmc_gather_nc_data.cxx
+
+example_cmc_t8_construct_mesh_and_data_for_compression_SOURCES = example/cmc_t8_construct_mesh_and_data_for_compression.cxx
+
+example_lossless_cmc_embedded_multi_res_compression_SOURCES = example/lossless/cmc_embedded_multi_res_compression.cxx
+
+example_cmc_compare_bin_output_SOURCES = example/cmc_compare_bin_output.cxx
+
+example_lossless_cmc_embedded_pcp4_multi_res_compression_SOURCES = example/lossless/cmc_embedded_pcp4_multi_res_compression.cxx
