@@ -47,7 +47,7 @@ public:
         ++(alphabet_[TransformSymbolToArrayIndex(symbol)]);
     };
     
-    const std::vector<uint32_t>&  GetSymbolFrequencies() const override
+    const std::vector<uint32_t>& GetSymbolFrequencies() const override
     {
         return alphabet_;
     }
@@ -105,7 +105,7 @@ MultiResCompressionAlphabet<T>::TransformSymbolToArrayIndex(const uint32_t symbo
     
     if (CheckIfCompressionSignumBitIsSet(symbol))
     {
-        /* Return the index for the symbols with a set signum bit */
+        /* Return the index for the symbol with a set signum bit */
         return (symbol - kByteCompressionSignumBit) + offset;
     } else if (CheckIfJumpToNextByteIndicatorBitIsSet(symbol))
     {
@@ -138,7 +138,7 @@ MultiResCompressionAlphabet<T>::RevertArrayIndexToSymbol(const uint32_t index)
             return kByteCompressionSymbolJumpToNextByte;
         } else
         {
-            /* In case the index is greater/eual to the offset, we need to apply de-offset the value and apply te signum */
+            /* In case the index is greater/equal to the offset, we need to apply de-offset the value and apply te signum */
             return kByteCompressionSignumBit + (index - offset);
         }
     }
