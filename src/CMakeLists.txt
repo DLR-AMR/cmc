@@ -127,11 +127,21 @@ install(FILES
     lossless/cmc_embedded_byte_decompression_variable.hxx 
     lossless/cmc_embedded_prefix_extraction_compression.hxx 
     lossless/cmc_embedded_prefix_extraction_decompression.hxx 
+    lossless/cmc_embedded_prefix_extraction_compression_plain_suffixes.hxx 
+    lossless/cmc_embedded_prefix_extraction_decompression_plain_suffixes.hxx 
+    lossless/cmc_embedded_multi_res_extraction_compression.hxx 
+    lossless/cmc_embedded_multi_res_extraction_decompression.hxx 
+    lossless/cmc_test_pcp4_embedded_compression.hxx 
+    lossless/cmc_test_pcp4_embedded_decompression.hxx 
+    lossless/cmc_test_pcp4_embedded_compression.hxx 
+    lossless/cmc_test_pcp4_embedded_decompression.hxx 
     lossless/cmc_prefix_extraction_compression.hxx 
+    lossless/cmc_prefix_extraction_compression_plain_suffixes.hxx 
     lossless/cmc_multi_res_extraction_compression.hxx 
     lossless/cmc_multi_res_extraction_decompression.hxx 
     lossless/cmc_multi_res_extraction_residual_computation.hxx 
     lossless/cmc_prefix_extraction_decompression.hxx 
+    lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx 
     lossless/cmc_byte_decompression_variable.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lossless
 )
