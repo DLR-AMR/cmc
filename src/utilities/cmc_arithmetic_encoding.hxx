@@ -239,10 +239,14 @@ Encoder<T>::FinishEncoding()
         encoded_stream_.AppendSetBit();
     }
 
+    /* Empace some buffer bits */
+    encoded_stream_.FillCurrentByte();
+    encoded_stream_.AppendUnsetBit();
+
     /* Enforce a minimum encoded stream length */
-    if (encoded_stream_.size() < kNumWorkingBits)
+    if (encoded_stream_.size() <= kNumWorkingBits)
     {
-        for (size_t i = encoded_stream_.size(); i < kNumWorkingBits; ++i)
+        for (size_t i = encoded_stream_.size(); i <= kNumWorkingBits; ++i)
         {
             encoded_stream_.AppendUnsetBit();
         }
