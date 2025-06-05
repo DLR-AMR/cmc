@@ -1,7 +1,7 @@
 #ifndef INPUT_CMC_BINARY_READER_HXX
 #define INPUT_CMC_BINARY_READER_HXX
 
-#include "utilities/cmc_binary_reader_forward.hxx"
+#include "input/cmc_binary_reader_forward.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_dimension_interval.hxx"
 #include "utilities/cmc_geo_utilities.hxx"
