@@ -152,6 +152,38 @@ std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LevLatLon(const
 std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLevLon(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
 std::vector<HyperslabIndex> GetIndicesForHyperslabDataExtraction_LatLonLev(const Hyperslab& global_hyperslab, const Hyperslab& domain_indices_to_extract);
 
+
+using LinearizeHyperslabCoordiantesFn = HyperslabIndex(*)(const Hyperslab&, const std::vector<HyperslabIndex>&);
+
+LinearizeHyperslabCoordiantesFn
+GetLinearizedIndexFromHyperslabCoordsFunction(const DataLayout layout);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLat(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLon(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLev(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLat(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLev(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLon(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLatLev(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLonLat(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLevLat(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLatLon(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLevLon(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLonLev(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsError(const Hyperslab& hyperslab, std::vector<HyperslabIndex>& hs_indices);
+
 }
 
 #endif /* !CMC_HYPERSLAB_HXX */

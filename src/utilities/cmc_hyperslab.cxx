@@ -1114,4 +1114,140 @@ GetIndicesExtractionFunction(const DataLayout layout)
     }
 }
 
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLat(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lat_length = hyperslab.GetDimensionLength(Dimension::Lat);
+    return hs_indices[0] * lat_length + hs_indices[1];
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLon(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lon_length = hyperslab.GetDimensionLength(Dimension::Lon);
+    return hs_indices[0] + hs_indices[1] * lon_length;
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLev(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lev_length = hyperslab.GetDimensionLength(Dimension::Lev);
+    return hs_indices[0] * lev_length + hs_indices[1];
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLat(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lat_length = hyperslab.GetDimensionLength(Dimension::Lat);
+    return hs_indices[0] + hs_indices[1] * lat_length;
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLev(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lev_length = hyperslab.GetDimensionLength(Dimension::Lev);
+    return hs_indices[0] * lev_length + hs_indices[1];
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLon(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lon_length = hyperslab.GetDimensionLength(Dimension::Lon);
+    return hs_indices[0] + hs_indices[1] * lon_length;
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLatLev(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lat_length = hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lev_length = hyperslab.GetDimensionLength(Dimension::Lev);
+
+    return hs_indices[0] * lat_length * lev_length + hs_indices[1] * lev_length + hs_indices[2];
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLonLat(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lon_length = hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lat_length = hyperslab.GetDimensionLength(Dimension::Lat);
+
+    return hs_indices[0] * lat_length + hs_indices[1] + hs_indices[2] * lon_length * lat_length;
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLonLevLat(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lev_length = hyperslab.GetDimensionLength(Dimension::Lev);
+    const HyperslabIndex lat_length = hyperslab.GetDimensionLength(Dimension::Lat);
+
+    return hs_indices[0] * lev_length * lat_length + hs_indices[1] + hs_indices[2] * lat_length;
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLevLatLon(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lat_length = hyperslab.GetDimensionLength(Dimension::Lat);
+    const HyperslabIndex lon_length = hyperslab.GetDimensionLength(Dimension::Lon);
+
+    return hs_indices[0] + hs_indices[1] * lon_length + hs_indices[2] * lat_length * lon_length;
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLevLon(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lev_length = hyperslab.GetDimensionLength(Dimension::Lev);
+    const HyperslabIndex lon_length = hyperslab.GetDimensionLength(Dimension::Lon);
+
+    return hs_indices[0] + hs_indices[1] * lev_length * lon_length + hs_indices[2] * lon_length;
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsLatLonLev(const Hyperslab& hyperslab, const std::vector<HyperslabIndex>& hs_indices)
+{
+    const HyperslabIndex lon_length = hyperslab.GetDimensionLength(Dimension::Lon);
+    const HyperslabIndex lev_length = hyperslab.GetDimensionLength(Dimension::Lev);
+
+    return hs_indices[0] * lev_length + hs_indices[1] * lev_length * lon_length + hs_indices[2];
+}
+
+HyperslabIndex GetLinearizedIndexFromHyperslabCoordsError([[maybe_unused]] const Hyperslab& hyperslab, [[maybe_unused]] const std::vector<HyperslabIndex>& hs_indices){return CMC_ERR;}
+
+LinearizeHyperslabCoordiantesFn
+GetLinearizedIndexFromHyperslabCoordsFunction(const DataLayout layout)
+{
+    switch (layout)
+    {
+        case DataLayout::Lon_Lat:
+            return GetLinearizedIndexFromHyperslabCoordsLonLat;
+        break;
+        case DataLayout::Lat_Lon:
+            return GetLinearizedIndexFromHyperslabCoordsLatLon;
+        break;
+        case DataLayout::Lat_Lev:
+            return GetLinearizedIndexFromHyperslabCoordsLatLev;
+        break;
+        case DataLayout::Lev_Lat:
+            return GetLinearizedIndexFromHyperslabCoordsLevLat;
+        break;
+        case DataLayout::Lon_Lev:
+            return GetLinearizedIndexFromHyperslabCoordsLonLev;
+        break;
+        case DataLayout::Lev_Lon:
+            return GetLinearizedIndexFromHyperslabCoordsLevLon;
+        break;
+        case DataLayout::Lon_Lat_Lev:
+            return GetLinearizedIndexFromHyperslabCoordsLonLatLev;
+        break;
+        case DataLayout::Lev_Lon_Lat:
+            return GetLinearizedIndexFromHyperslabCoordsLevLonLat;
+        break;
+        case DataLayout::Lon_Lev_Lat:
+            return GetLinearizedIndexFromHyperslabCoordsLonLevLat;
+        break;
+        case DataLayout::Lev_Lat_Lon:
+            return GetLinearizedIndexFromHyperslabCoordsLevLatLon;
+        break;
+        case DataLayout::Lat_Lev_Lon:
+            return GetLinearizedIndexFromHyperslabCoordsLatLevLon;
+        break;
+        case DataLayout::Lat_Lon_Lev:
+            return GetLinearizedIndexFromHyperslabCoordsLatLonLev;
+        break;
+        default :
+            cmc_err_msg("The variable contains an undefined data layout.");
+            return GetLinearizedIndexFromHyperslabCoordsError;
+    }
+}
+
+
+
+
 }
