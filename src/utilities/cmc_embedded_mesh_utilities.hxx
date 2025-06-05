@@ -127,7 +127,7 @@ BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layou
         t8_forest_init(&adapted_forest);
         t8_forest_set_adapt(adapted_forest, initial_forest, RefineToInitialEmbeddedMesh, 0);
         const int set_partition_for_coarsening = 0; //TODO change to one later
-        //t8_forest_set_partition(adapted_forest, NULL, set_partition_for_coarsening);
+        t8_forest_set_partition(adapted_forest, NULL, set_partition_for_coarsening);
         t8_forest_set_user_data(adapted_forest, static_cast<void*>(&adapt_data));
         t8_forest_commit(adapted_forest);
 
