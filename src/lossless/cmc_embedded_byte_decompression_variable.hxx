@@ -11,6 +11,8 @@
 #include "utilities/cmc_compression_schema.hxx"
 #include "mesh_compression/cmc_iface_embedded_mesh_decoder.hxx"
 #include "utilities/cmc_geo_domain.hxx"
+#include "utilities/cmc_hyperslab.hxx"
+#include "utilities/cmc_geo_utilities.hxx"
 #include "utilities/cmc_embedded_variable_attributes.hxx"
 
 #include "mpi/cmc_mpi.hxx"
@@ -109,6 +111,8 @@ public:
 
     MPI_Comm GetMPIComm() const {return comm_;};
 
+    std::vector<T> DeMortonizeData() const;
+
     friend IEmbeddedDecompressionAdaptData<T>;
 protected:
     AbstractEmbeddedByteDecompressionVariable() = delete;
@@ -191,6 +195,8 @@ public:
 
     bool IsValidForDeompression() const;
 
+    const AmrMesh& GetAmrMesh() const {return base_variable_->GetAmrMesh();}
+    
 private:
     AbstractEmbeddedByteDecompressionVariable<T>* const base_variable_{nullptr};
 
@@ -585,6 +591,61 @@ AbstractEmbeddedByteDecompressionVariable<T>::IsValidForDecompression() const
     }
 
     return true;
+}
+
+template <typename T>
+std::vector<T>
+AbstractEmbeddedByteDecompressionVariable<T>::DeMortonizeData() const
+{
+    const DataLayout layout = attributes_.GetInitialDataLayout();
+    const GeoDomain global_domain = attributes_.GetGlobalDomain();
+    const Hyperslab hs_global_domain = TransformGeoDomainToHyperslab(global_domain);
+
+    LinearizeHyperslabCoordiantesFn linearization_fn = GetLinearizedIndexFromHyperslabCoordsFunction(layout);
+
+    t8_forest_t mesh = mesh_.GetMesh();
+    const int init_level = mesh_.GetInitialRefinementLevel();
+    const int dimensionality = mesh_.GetDimensionality();
+    const int element_anchor_max_lvl = (dimensionality == 2 ? P4EST_MAXLEVEL : P8EST_MAXLEVEL);
+
+    std::vector<T> data(global_domain.GetNumberReferenceCoordsCovered());
+
+    std::array<int, 3> element_anchor;
+    const t8_scheme *scheme = t8_forest_get_scheme (mesh);
+    const t8_locidx_t num_local_trees = t8_forest_get_num_local_trees (mesh);
+    t8_locidx_t val_iter = 0;
+
+    for (t8_locidx_t tree_id = 0; tree_id < num_local_trees; ++tree_id) {
+        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, tree_id);
+        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_elements (mesh, tree_id);
+        for (t8_locidx_t elem_id = 0; elem_id < num_elements_in_tree; ++elem_id, ++val_iter) {
+            /* Get the current element */
+            const t8_element_t* element = t8_forest_get_element_in_tree (mesh, tree_id, elem_id);
+            /* Get the element anchor */
+            scheme->element_get_anchor(tree_class, element, element_anchor.data());
+
+            std::vector<DomainIndex> coords;
+            /* Transform coordinates into the range of the initial-refinement-level coordinate values */
+            for (int index{0}; index < dimensionality; ++index)
+            {
+                coords.emplace_back(element_anchor[index] >> (element_anchor_max_lvl - init_level));
+            }
+
+            /* Check whether the element is within the global domain */
+            const bool is_in_domain = IsMeshElementWithinGlobalDomain(coords, global_domain, layout);
+            if (is_in_domain)
+            {
+                /* Linearize the coorridnates accordingly */
+                const HyperslabIndex idx = linearization_fn(hs_global_domain, coords);
+                /* Reinerpret the decomrpessed value */
+                const T value = data_[val_iter].template ReinterpretDataAs<T>();
+                /* Store the value at the correct position */
+                data[idx] = value;
+            }
+        }
+    }
+
+    return data;
 }
 
 }
