@@ -76,6 +76,9 @@ bool
 IsMeshElementWithinGlobalDomain(const t8_eclass_t tree_class, const t8_element_t* element, const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
 
 bool
+IsMeshElementWithinGlobalDomain(const std::vector<DomainIndex>& element_anchor, const GeoDomain& global_domain, const DataLayout initial_layout);
+
+bool
 IsAnyElementWithinGlobalDomain(const t8_eclass_t tree_class, const int num_elements, const t8_element_t* elements[], const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
 
 MortonIndex GetMortonIndexOnLevel(const t8_eclass_t tree_class, const t8_element_t* elem, const t8_scheme_c* ts, const int dimensioanlity, const int level);

@@ -247,6 +247,78 @@ IsMeshElementWithinGlobalDomain(const t8_eclass_t tree_class, const t8_element_t
 }
 
 bool
+IsMeshElementWithinGlobalDomain(const std::vector<DomainIndex>& element_anchor, const GeoDomain& global_domain, const DataLayout initial_layout)
+{
+    #ifdef CMC_WITH_T8CODE
+    cmc_assert(global_domain.GetDimensionality() == 2 || global_domain.GetDimensionality() == 3);
+
+    const int dimensionality = global_domain.GetDimensionality();
+
+    /* Check if the anchor coordinates of the element lie within the "lat x lon x lev" mesh */
+    /** \note: Different geo-spatial coordinate combinations are corresponding to certain x- and y- coordinates. This labeling is consistent. 
+     *         Data only concerning latitude and longitude will be ordered, s.t. longitude equals x, latitude equals y
+     *         Data only concerning latitude and elevation will be ordered, s.t. latitude equals x, elevation equals y
+     *         Data only concerning longitude and elevation will be ordered, s.t. longitude equals x, elevation equals y
+    **/
+    if (dimensionality == 2)
+    {
+        /* 2D case */
+        switch (initial_layout)
+        {
+            case DataLayout::Lat_Lon:
+                [[fallthrough]];
+            case DataLayout::Lon_Lat:
+                if (element_anchor[0] >= 0 && element_anchor[0] < global_domain.GetDimensionLength(Dimension::Lon) &&
+                    element_anchor[1] >= 0 && element_anchor[1] < global_domain.GetDimensionLength(Dimension::Lat))
+                {
+                    /* The 2D element is inside the "lon x lat" mesh */
+                    return true;
+                }
+            break;
+            case DataLayout::Lat_Lev:
+                [[fallthrough]];
+            case DataLayout::Lev_Lat:
+                if (element_anchor[0] >= 0 && element_anchor[0] < global_domain.GetDimensionLength(Dimension::Lat) &&
+                    element_anchor[1] >= 0 && element_anchor[1] < global_domain.GetDimensionLength(Dimension::Lev))
+                {
+                    /* The 2D element is inside the "lev x lat" mesh */
+                    return true;
+                }
+            break;
+            case DataLayout::Lon_Lev:
+                [[fallthrough]];
+            case DataLayout::Lev_Lon:
+                if (element_anchor[0] >= 0 && element_anchor[0] < global_domain.GetDimensionLength(Dimension::Lon) &&
+                    element_anchor[1] >= 0 && element_anchor[1] < global_domain.GetDimensionLength(Dimension::Lev))
+                {
+                    /* The 2D element is inside the "lev x lon" mesh */
+                    return true;
+                }
+            break;
+            default:
+                cmc_err_msg("There was no valid 2D data layout supplied to determine whether or not the element is within the domain.");
+        }
+
+    } else {
+        /* 3D case */
+        if (element_anchor[0] >= 0 && element_anchor[0] < global_domain.GetDimensionLength(Dimension::Lon) &&
+            element_anchor[1] >= 0 && element_anchor[1] < global_domain.GetDimensionLength(Dimension::Lat) &&
+            element_anchor[2] >= 0 && element_anchor[2] < global_domain.GetDimensionLength(Dimension::Lev))
+        {
+            /* The 3D is inside the "lat x lon x lev" mesh */
+            return true;
+        }
+    }
+
+    /* The element is not inside the ("lat x lon x lev") mesh */
+    return false;
+
+    #else
+    return static_cast<bool>(CMC_ERR);
+    #endif
+}
+
+bool
 IsAnyElementWithinGlobalDomain(const t8_eclass_t tree_class, const int num_elements, const t8_element_t* elements[], const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout)
 {
     cmc_assert(global_domain.GetDimensionality() == 2 || global_domain.GetDimensionality() == 3);
