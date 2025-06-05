@@ -6,10 +6,16 @@
 #include "compression_io/cmc_compression_attr_names.hxx"
 #include "lossless/cmc_byte_decompression_variable.hxx"
 #include "lossless/cmc_prefix_extraction_decompression.hxx"
+#include "lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx"
 #include "lossless/cmc_multi_res_extraction_decompression.hxx"
 
 #include "lossless/cmc_embedded_byte_decompression_variable.hxx"
 #include "lossless/cmc_embedded_prefix_extraction_decompression.hxx"
+#include "lossless/cmc_embedded_prefix_extraction_decompression_plain_suffixes.hxx" 
+#include "lossless/cmc_embedded_multi_res_extraction_decompression.hxx"
+#include "lossless/cmc_test_pcp4_embedded_decompression.hxx"
+#include "lossless/cmc_test_pcp4_decompression.hxx"
+
 #include "utilities/cmc_embedded_variable_attributes.hxx"
 
 #ifdef CMC_WITH_NETCDF
@@ -108,14 +114,20 @@ Reader::ReadVariableForDecompression(const std::string& var_name)
     switch (compression_scheme)
     {
         case CompressionSchema::PrefixExtraction:
-            return std::make_unique<lossless::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh));
+            return std::make_unique<lossless::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), num_compression_iterations);
+        break;
+        case CompressionSchema::PrefixExtractionPlainSuffixes:
+            return std::make_unique<lossless::prefix::plain_suffix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), num_compression_iterations);
         break;
         case CompressionSchema::MultiResExtraction:
-            return std::make_unique<lossless::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh));
+            return std::make_unique<lossless::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), num_compression_iterations);
+        break;
+        case CompressionSchema::_TestPCP4Extraction:
+            return std::make_unique<lossless::test_pcp4::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), num_compression_iterations);
         break;
         default:
             cmc_err_msg("The compression schema of the compressed variable is not recognized.");
-            return std::make_unique<lossless::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh));
+            return std::make_unique<lossless::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), num_compression_iterations);
     }
 }
 
@@ -209,10 +221,18 @@ Reader::ReadEmbeddedVariableForDecompression(const std::string& var_name)
         case CompressionSchema::EmbeddedPrefixExtraction:
             return std::make_unique<lossless::embedded::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
         break;
+        case CompressionSchema::EmbeddedPrefixExtractionPlainSuffixes:
+            cmc_debug_msg("\n\nPlain Suffix Version is instantiated \n\n");
+            return std::make_unique<lossless::embedded::prefix::plain_suffix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+        break;
         case CompressionSchema::EmbeddedMultiResExtraction:
             //return std::make_unique<lossless::embedded::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh));
-            cmc_err_msg("Embedded MultiRes Decompression is not yet activated.");
-            return std::make_unique<lossless::embedded::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+            cmc_debug_msg("Embedded MultiRes Decompression is instantiated.");
+            return std::make_unique<lossless::embedded::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+        break;
+        case CompressionSchema::_TestEmbeddedPCP4Extraction:
+            cmc_debug_msg("Test MultiRes PCP4 Decompression is instantiated.");
+            return std::make_unique<lossless::embedded::test_pcp4::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         default:
             cmc_err_msg("The compression schema of the compressed variable is not recognized for an embedded variable.");
