@@ -34,7 +34,9 @@ template<int N>
 class SerializedCompressionValue
 {
 public:
-    SerializedCompressionValue() = default;
+    SerializedCompressionValue(){
+        bytes_.fill(0);
+    }
     template<typename T> SerializedCompressionValue(const T& value);
     SerializedCompressionValue(std::array<uint8_t, N>&& serialized_value);
     SerializedCompressionValue(std::array<uint8_t, N>&& serialized_value, const uint8_t tail_bit);
@@ -53,6 +55,7 @@ public:
 
     int GetNumberTrailingZeros() const;
     int GetNumberLeadingZeros() const;
+    int GetNumberTrailingOnes() const;
     void UpdateTailBitCount();
     void UpdateFrontBitCount();
     void SetFrontBit(const uint8_t front_bit);
@@ -61,11 +64,18 @@ public:
     uint8_t GetFrontBit() const;
     int GetCountOfSignificantBits() const;
     bool IsEmpty() const;
+    bool IsExactlyEmpty() const;
     std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering() const;
     void ApplySuffix(const std::vector<uint8_t>& serialized_suffix, const int num_bits);
-    
+
     //void AddIntegerResidual(const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
     //void AddXORResidualWithoutImplicitOneBit(const uint32_t lzc, const std::vector<uint8_t>& residual_bits);
+    void _TestPCP4ReverseXORResidual(const SerializedCompressionValue<N>& residual);
+    int GatherEqualTailBitCount() const;
+    void TrimEqualTailSequence();
+    void RevertEqualTailSequence();
+    int GetSizeBits() const {return N * CHAR_BIT;}
+    bool IsTailBitValueSet() const;
 
     template<typename T> 
     auto ReinterpretDataAs() const
@@ -120,7 +130,7 @@ public:
         return xor_val;
     };
 private:
-    std::array<uint8_t, N> bytes_;
+    std::array<uint8_t, N> bytes_{};
     SignificantBitsIndicator<N> indicators_;
 };
 
@@ -221,12 +231,14 @@ SerializedCompressionValue<N>::NullifyNonSignificantFrontBits()
 
 }
 
+
 /* This functions needs the serialized suffix to be aligned at the high bits ( e.g. four bit prefix: 0b(p1 p2 p3 p4 0 0 0 0) */
 template<int N>
 void
 SerializedCompressionValue<N>::ApplySuffix(const std::vector<uint8_t>& serialized_suffix, const int num_bits)
 {
     if (num_bits <= 0) {return;}
+
     cmc_assert(indicators_.tail_bit_ > 0);
 
     int bits_written = 0;
@@ -333,6 +345,18 @@ SerializedCompressionValue<N>::IsEmpty() const
     }
 }
 
+template<int N>
+bool
+SerializedCompressionValue<N>::IsExactlyEmpty() const
+{
+    if (indicators_.front_bit_ + indicators_.tail_bit_ == static_cast<uint8_t>(N * CHAR_BIT))
+    {
+        return true;
+    } else
+    {
+        return false;
+    }
+}
 
 template<int N>
 void
@@ -467,7 +491,7 @@ SerializedCompressionValue<N>::GetNumberTrailingZeros() const
             {
                 if (bytes_[byte_id] & (kLowBit << bit_index))
                 {
-                    /* If true, the value does hold a zero-bit at this position */
+                    /* If true, the value does not hold a zero-bit at this position */
                     return num_trailing_zeros;
                 } else
                 {
@@ -477,6 +501,36 @@ SerializedCompressionValue<N>::GetNumberTrailingZeros() const
         }
     }
     return num_trailing_zeros;
+}
+
+template<int N>
+inline
+int
+SerializedCompressionValue<N>::GetNumberTrailingOnes() const
+{
+    int num_trailing_ones = 0;
+    for (int byte_id = GetLSBByteStart<N>(); LSBContinueIteration<N>(byte_id); LSBByteIncrement(byte_id))
+    {
+        /* Check whether the full byte is zero */
+        if (bytes_[byte_id] == kOneByte)
+        {
+            num_trailing_ones += CHAR_BIT;
+        } else
+        {
+            for (int bit_index = 0; bit_index < CHAR_BIT; ++bit_index)
+            {
+                if (bytes_[byte_id] & (kLowBit << bit_index))
+                {
+                    /* If true, the value does hold a one-bit at this position */
+                    ++num_trailing_ones;
+                } else
+                {
+                    return num_trailing_ones;
+                }
+            }
+        }
+    }
+    return num_trailing_ones;
 }
 
 template<int N>
@@ -507,6 +561,68 @@ SerializedCompressionValue<N>::GetNumberLeadingZeros() const
         }
     }
     return num_leading_zeros;
+}
+
+template<int N>
+inline
+bool
+SerializedCompressionValue<N>::IsTailBitValueSet() const
+{
+    const int lsb_byte_pos = indicators_.tail_bit_ / CHAR_BIT;
+    int byte_pos = GetLSBByteStart<N>();
+    for (int byte_id = 0; byte_id < lsb_byte_pos; LSBByteIncrement(byte_pos)){}
+
+    const int bit_pos = indicators_.tail_bit_ - lsb_byte_pos * CHAR_BIT;
+    return ((bytes_[byte_pos] >> bit_pos) & uint8_t{1});
+}
+
+template<int N>
+inline
+int
+SerializedCompressionValue<N>::GatherEqualTailBitCount() const
+{
+    const int num_trailing_ones = this->GetNumberTrailingOnes();
+    const int num_trailing_zeros = this->GetNumberTrailingZeros();
+    const int max_bit_seq = std::max(num_trailing_ones, num_trailing_zeros);
+    return max_bit_seq;
+}
+
+
+template<int N>
+inline
+void
+SerializedCompressionValue<N>::TrimEqualTailSequence()
+{
+    const int num_trailing_ones = this->GetNumberTrailingOnes();
+    const int num_trailing_zeros = this->GetNumberTrailingZeros();
+    const int max_bit_seq = std::max(num_trailing_ones, num_trailing_zeros);
+    if (max_bit_seq < this->GetSizeBits())
+    {
+        indicators_.tail_bit_ = static_cast<uint8_t>(max_bit_seq);
+    }
+}
+
+template<int N>
+inline
+void
+SerializedCompressionValue<N>::RevertEqualTailSequence()
+{
+    if (indicators_.tail_bit_ == 0)
+    {
+        return;
+    }
+
+    /* Gather whether the tail bit is set or not */
+    const bool is_tail_value_set = IsTailBitValueSet();
+
+    /* Depending on whether the value is set or not, we create a contrary sequence which will be appended */
+    const uint8_t sequence = is_tail_value_set ? 0x00 : 0xFF;
+    const std::vector<uint8_t> max_tail_sequence(N, sequence);
+
+    /* Append the previously trimmed tail sequence */
+    this->ApplySuffix(max_tail_sequence,  indicators_.tail_bit_);
+
+    cmc_assert(indicators_.tail_bit_ == 0);
 }
 
 template<int N>
@@ -750,94 +866,12 @@ SerializedCompressionValue<8>::PerformIntegerSubtraction(const SerializedCompres
     bytes_ = SerializeIntegerValueNatively<8, uint64_t>(value);
 }
 
-#if 0
 template<int N>
 void
-SerializedCompressionValue<N>::AddIntegerResidual(const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits)
+SerializedCompressionValue<N>::_TestPCP4ReverseXORResidual(const SerializedCompressionValue<N>& residual)
 {
-    cmc_assert(residual_bits.size() <= static_cast<size_t>(N));
-
-    /* Decode the encoded LZC */
-    const auto [signum, lzc] = arithmetic_encoding::DecodeLZC(encoded_lzc);
-
-    if (lzc == static_cast<uint32_t>(N * CHAR_BIT))
-    {
-        /* The residual is empty, therefore nothing has to be added */
-        return;
-    }
-
-    std::array<uint8_t, N> serialized_val;
-    serialized_val.fill(uint8_t{0});
-
-    cmc_assert(N * CHAR_BIT >= lzc);
-
-    /* Set up an compression value holding the residual in the front bits */
-    SerializedCompressionValue<N> residual(serialized_val);
-    residual.SetTailBit(static_cast<uint8_t>(N * CHAR_BIT - lzc));
-
-    /* Afterwards, we add the the implicit one bit */
-    residual.ApplyPrefix(std::vector<uint8_t>{0x80}, 1);
-    const int remaining_bits = N * CHAR_BIT - lzc - 1;
-
-    cmc_assert((not residual_bits.empty()) || ((remaining_bits == 0) && residual_bits.empty()));
-
-    if (residual.GetTailBit() > 0)
-    {
-        /* And finally, we combine it with the actual remaining residual bits */
-        residual.ApplyPrefix(residual_bits, remaining_bits);
-    }
-
-    /* Now, we should have a full SerializedCompressionValue resembling the residual */
-    cmc_assert(residual.GetFrontBit() == 0 && residual.GetTailBit() == 0);
-
-    /* Dependeing on the signum, either add or subtract the residual */
-    if (signum == true)
-    {
-        this->PerformIntegerAddition(residual);
-    } else
-    {
-        this->PerformIntegerSubtraction(residual);
-    }
+    *this ^= residual;
 }
-
-template<int N>
-void
-SerializedCompressionValue<N>::AddXORResidualWithoutImplicitOneBit(const uint32_t lzc, const std::vector<uint8_t>& residual_bits)
-{
-    cmc_assert(residual_bits.size() <= static_cast<size_t>(N));
-
-    if (lzc >= static_cast<uint32_t>(N * CHAR_BIT))
-    {
-        /* The residual is empty, therefore nothing has to be added */
-        return;
-    }
-
-    std::array<uint8_t, N> serialized_val;
-    serialized_val.fill(uint8_t{0});
-
-    cmc_assert(N * CHAR_BIT >= lzc);
-
-    /* Set up an compression value holding the residual in the front bits */
-    SerializedCompressionValue<N> residual(serialized_val);
-    residual.SetTailBit(static_cast<uint8_t>(N * CHAR_BIT - lzc));
-    
-
-    const int remaining_bits = N * CHAR_BIT - lzc;
-
-    if (residual.GetTailBit() > 0)
-    {
-        /* And finally, we combine it with the actual remaining residual bits */
-        residual.ApplyPrefix(residual_bits, remaining_bits);
-    }
-
-    /* Now, we should have a full SerializedCompressionValue resembling the residual */
-    cmc_assert(residual.GetFrontBit() == 0 && residual.GetTailBit() == 0);
-
-    /* Reverse the XOR operation */
-    bytes_ ^= residual.bytes_;
-}
-
-#endif
 
 /* Convert a view of ComrpessionValues to a vector of values of a certain data type */
 template<typename T>
