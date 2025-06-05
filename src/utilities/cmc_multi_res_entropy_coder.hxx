@@ -17,6 +17,8 @@ class MultiResEncoder : public Encoder<T>
 public:
     MultiResEncoder()
     : Encoder<T>(std::make_unique<MultiResCompressionAlphabet<T>>()) {};
+    MultiResEncoder(std::unique_ptr<IByteCompressionEntropyAlphabet> alphabet)
+    : Encoder<T>(std::move(alphabet)) {};
 };
 
 template <typename T>
@@ -28,6 +30,9 @@ public:
 
     template <typename Iter> MultiResDecoder(Iter alphabet_begin, bit_map::BitMapView encoded_stream)
     : Decoder(DecodeByteCompressionStaticFrequencyAlphabet<T>(alphabet_begin, std::make_unique<MultiResCompressionAlphabet<T>>()), encoded_stream) {};
+
+    template <typename Iter> MultiResDecoder(std::unique_ptr<IByteCompressionEntropyAlphabet> alphabet, Iter alphabet_begin, bit_map::BitMapView encoded_stream)
+    : Decoder(DecodeByteCompressionStaticFrequencyAlphabet<T>(alphabet_begin, std::move(alphabet)), encoded_stream) {};
 };
 
 }
