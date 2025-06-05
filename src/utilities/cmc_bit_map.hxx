@@ -60,7 +60,7 @@ public:
 
     BitMap() = default;
     BitMap(const size_t num_bits)
-    : vector_(num_bits / kCharBit + (num_bits % kCharBit != 0 ? 1 : 0), 0), num_bits_{num_bits}{};
+    : vector_(num_bits / kCharBit + (num_bits % kCharBit != 0 ? 1 : 0), 0), num_bits_{num_bits}{}
 
     BitMap(const std::vector<uint8_t>& bitmap_conform_bitfield, const size_t num_bits)
     : vector_(bitmap_conform_bitfield), num_bits_{num_bits}{
@@ -70,7 +70,7 @@ public:
         }
         byte_position_ = vector_.size() - 1;
         bit_position_ = (num_bits % kCharBit == 0 ? kCharBit : (num_bits % kCharBit));
-    };
+    }
     BitMap(std::vector<uint8_t>&& bitmap_conform_bitfield, const size_t num_bits)
     : vector_(std::move(bitmap_conform_bitfield)), num_bits_{num_bits}{
         if (bitmap_conform_bitfield.size() != (num_bits / kCharBit + (num_bits % kCharBit != 0 ? 1 : 0)) || num_bits == 0)
@@ -79,7 +79,7 @@ public:
         }
         byte_position_ = vector_.size() - 1;
         bit_position_ = (num_bits % kCharBit == 0 ? kCharBit : (num_bits % kCharBit));
-    };
+    }
 
     BitMap(const BitMap& other) = default;
     BitMap& operator=(const BitMap& other) = default;
@@ -106,27 +106,34 @@ public:
     void SetBit(const size_t global_bit_position);
     bool IsBitSet(const size_t global_bit_position) const;
 
-    Iterator begin() const {return Iterator(vector_.data());};
+    Iterator begin() const {return Iterator(vector_.data());}
     const Iterator end() const {return Iterator(vector_.data() + vector_.size() - (num_bits_ % kCharBit != 0 ? 1 : 0), num_bits_ % kCharBit);}
 
-    byte_iterator begin_bytes() { return vector_.begin(); };
-    byte_iterator end_bytes() { return vector_.end(); };
-    const_byte_iterator begin_bytes() const { return vector_.begin(); };
-    const_byte_iterator end_bytes() const { return vector_.end(); };
-    const_byte_iterator cbegin_bytes() const { return vector_.cbegin(); };
-    const_byte_iterator cend_bytes() const { return vector_.cend(); };
+    byte_iterator begin_bytes() { return vector_.begin(); }
+    byte_iterator end_bytes() { return vector_.end(); }
+    const_byte_iterator begin_bytes() const { return vector_.begin(); }
+    const_byte_iterator end_bytes() const { return vector_.end(); }
+    const_byte_iterator cbegin_bytes() const { return vector_.cbegin(); }
+    const_byte_iterator cend_bytes() const { return vector_.cend(); }
 
-    size_t size() const {return num_bits_;};
-    size_t size_bytes() const {return vector_.size();};
-    bool IsEmpty() const {return num_bits_ == 0;}; 
+    size_t size() const {return num_bits_;}
+    size_t size_bytes() const {if (IsEmpty()){return 0;} else {return vector_.size();}}
+    bool IsEmpty() const {return num_bits_ == 0;}
 
-    const uint8_t* data() const {return vector_.data();};
+    const uint8_t* data() const {return vector_.data();}
 
     uint8_t* data_overwrite() {return &vector_[0];}
 
     void AppendBits(const BitMap& bitmap);
-
-    const std::vector<uint8_t>& GetByteData() const {return vector_;};
+    void FillCurrentByte(){
+        if (bit_position_ <= kCharBit)
+        {
+            num_bits_ += (kCharBit - bit_position_);
+            cmc_assert(num_bits_ % kCharBit == 0);
+            bit_position_ = kCharBit;
+        }
+    }
+    const std::vector<uint8_t>& GetByteData() const {return vector_;}
     void MoveDataInto(std::vector<uint8_t>& vector);
     friend class BitMapView;
 private:
@@ -155,6 +162,12 @@ public:
     std::vector<uint8_t> GetNextNumberOfBits(const size_t num_bits);
 
     void MoveToNextByte();
+
+    const uint8_t* begin_bytes() const {return data_;}
+    const uint8_t* end_bytes() const {return data_ + size_bytes();}
+
+    size_t size() const {return size_;}
+    size_t size_bytes() const {return (size_ / kCharBit) + (size_ % kCharBit != 0 ? 1 : 0);}
 
 private:
     const uint8_t* data_;
