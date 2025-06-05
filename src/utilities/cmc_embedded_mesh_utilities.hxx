@@ -7,13 +7,13 @@
 #include "utilities/cmc_log_functions.hxx"
 
 #ifdef CMC_WITH_T8CODE
-#include <t8.h>
-#include <t8_forest/t8_forest_general.h>
+#include <t8_cmesh.h>
+#include <t8_cmesh/t8_cmesh_examples.h>
 #include <t8_schemes/t8_scheme.hxx> 
-#include <t8_forest/t8_forest_iterate.h> 
-#include <t8_forest/t8_forest_partition.h>
 #include <t8_schemes/t8_default/t8_default.hxx>
-
+#include <t8_forest/t8_forest_general.h>
+#include <t8_forest/t8_forest_geometrical.h>
+#include <t8_forest/t8_forest_partition.h>
 #endif
 
 #include <array>
@@ -127,7 +127,7 @@ BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layou
         t8_forest_init(&adapted_forest);
         t8_forest_set_adapt(adapted_forest, initial_forest, RefineToInitialEmbeddedMesh, 0);
         const int set_partition_for_coarsening = 0; //TODO change to one later
-        t8_forest_set_partition(adapted_forest, NULL, set_partition_for_coarsening);
+        //t8_forest_set_partition(adapted_forest, NULL, set_partition_for_coarsening);
         t8_forest_set_user_data(adapted_forest, static_cast<void*>(&adapt_data));
         t8_forest_commit(adapted_forest);
 
@@ -139,11 +139,6 @@ BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layou
     return std::make_tuple(initial_forest, initial_refinement_level, dimensionality); 
 }
 
-
-
 }
-
-
-
 
 #endif /* !CMC_EMBEDDED_MESH_UTILITIES_HXX */
