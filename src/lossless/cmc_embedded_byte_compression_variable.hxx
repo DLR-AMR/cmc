@@ -799,7 +799,6 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
 
         /* Encode the data of this level and store it within a buffer */
         auto [encoded_entropy_codes, encoded_data] = adapt_data->EncodeLevelData(data_);
-        cmc_debug_msg("HEREEEEEEEEEEEEEE: num entropy codes: ", encoded_entropy_codes.size(), " and num bits: ", encoded_data.size());
         buffered_entropy_codes_.push_back(std::move(encoded_entropy_codes));
         buffered_encoded_data_.push_back(std::move(encoded_data));
 
@@ -949,7 +948,6 @@ AbstractEmbeddedByteCompressionVariable<T>::RepartitionMesh(t8_forest_t adapted_
 {
     /* Keep the not-partitioned forest */
     t8_forest_ref(adapted_forest);
-    return adapted_forest;//TODO:Delete
 
     /* Allocate a forest */
     t8_forest_t partitioned_forest;
