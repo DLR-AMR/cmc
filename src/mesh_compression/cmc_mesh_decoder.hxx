@@ -10,6 +10,7 @@
 #ifdef CMC_WITH_T8CODE
 #include <t8_cmesh/t8_cmesh_examples.h>
 #include <t8_schemes/t8_default/t8_default.hxx>
+#include <t8_cmesh_readmshfile.h>
 #endif
 
 namespace cmc::mesh_compression
@@ -45,8 +46,10 @@ MeshDecoder::DecodeRootLevelMesh(const std::vector<uint8_t>& encoded_mesh_stream
     const int dimensionality = 2;
     /* Get a base cmesh corresponding to the dimensionality */
     //t8_cmesh_t cmesh = t8_cmesh_new_hypercube(T8_ECLASS_TRIANGLE, MPI_COMM_WORLD, 0, 0, 0);
-    t8_cmesh_t cmesh = t8_cmesh_new_hypercube(T8_ECLASS_TRIANGLE, MPI_COMM_WORLD, 0, 0, 0);
-
+    //t8_cmesh_t cmesh = t8_cmesh_new_hypercube(T8_ECLASS_TRIANGLE, MPI_COMM_SELF, 0, 0, 0);
+    //t8_cmesh_t cmesh = t8_cmesh_new_hypercube(T8_ECLASS_QUAD, MPI_COMM_SELF, 0, 0, 0);
+    //t8_cmesh_t cmesh = t8_cmesh_new_periodic_hybrid(MPI_COMM_SELF);
+    t8_cmesh_t cmesh = t8_cmesh_from_msh_file ("/home/niklas/software/programs/t8code/example/IO/cmesh/gmsh/circlesquare_hybrid_hole",0,MPI_COMM_SELF,2,0,0);
     /* Construct a forest from the cmesh */
     t8_forest_t base_mesh;
     t8_forest_init(&base_mesh);
