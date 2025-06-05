@@ -137,6 +137,8 @@ protected:
         this->SetupInputVariableForCompression(input_variable);
     };
 
+    virtual void PreCompressionProcessing([[maybe_unused]] std::vector<CompressionValue<T>>& initial_data){}
+
     void SetName(const std::string& name) {name_ = name;};
     void SetAmrMesh(const AmrMesh& mesh) {mesh_ = mesh;};
     void SetAmrMesh(AmrMesh&& mesh) {mesh_ = std::move(mesh);};
@@ -228,6 +230,8 @@ public:
     virtual ~IEmbeddedCompressionAdaptData(){};
 
     bool IsValidForCompression() const;
+    const VariableAttributes<T>& GetVariableAttributes() const {cmc_assert(base_variable_ != nullptr); return base_variable_->GetVariableAttributes();}
+    
 protected:
     virtual ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) = 0;
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
@@ -537,6 +541,12 @@ AbstractEmbeddedByteCompressionVariable<T>::SetupInputVariableForCompression(inp
     /* get the MPI communicator from the variable */
     comm_ = input_var.GetMPIComm();
 
+    //const std::vector<T>& values = std::get<input::Variable<T>>(input_var.GetInternalVariant()).GetDataForReading();
+    //FILE* file_out = fopen("direct_output_data_bin_reader.cmc", "wb");
+    //fwrite(values.data(), sizeof(T), values.size(), file_out);
+    //fclose(file_out);
+    //cmc_err_msg("End here");
+
     /* Potentially, apply scaling values and offsets if defined (potentially, the datatype changes by this call) */
     input_var.ApplyScalingAndOffset();
     
@@ -590,7 +600,9 @@ AbstractEmbeddedByteCompressionVariable<T>::SetupInputVariableForCompression(inp
 
     #endif
 
-
+    //FILE* file_out = fopen("initial_input_prefix_amr_data.cmc", "wb");
+    //fwrite(input_variable.GetDataForReading().data(), sizeof(T), input_variable.GetDataForReading().size(), file_out);
+    //fclose(file_out);
 
 
 
@@ -600,7 +612,14 @@ AbstractEmbeddedByteCompressionVariable<T>::SetupInputVariableForCompression(inp
     cmc_debug_msg("The setup of the InputVariable for compression has been succcessfull.");
 
     /* Nur zum testen gerade; funktioniert nur für PrefixAMR */
-    this->PerformTailTruncationOnInitialData();
+    //this->PerformTailTruncationOnInitialData();
+    //for (auto val_iter = data_.begin(); val_iter != data_.end(); ++val_iter)
+    //{
+    //    val_iter->UpdateTailBitCount();
+    //}
+
+    //const uint64_t num_bits_potentially_to_save = GetSpareBitCount();
+    //cmc_debug_msg("\n\n\nBits to spare: ", num_bits_potentially_to_save, "\n\n\n");
 }
 
 template <typename T>
@@ -744,6 +763,9 @@ template <typename T>
 inline void
 AbstractEmbeddedByteCompressionVariable<T>::Compress()
 {
+    /* Potentially, create a pre-compression processing step */
+    this->PreCompressionProcessing(data_);
+
     cmc_assert(this->IsValidForCompression());
     cmc_debug_msg("Lossless compression of variable ", this->name_, " starts...");
 
@@ -777,6 +799,7 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
 
         /* Encode the data of this level and store it within a buffer */
         auto [encoded_entropy_codes, encoded_data] = adapt_data->EncodeLevelData(data_);
+        cmc_debug_msg("HEREEEEEEEEEEEEEE: num entropy codes: ", encoded_entropy_codes.size(), " and num bits: ", encoded_data.size());
         buffered_entropy_codes_.push_back(std::move(encoded_entropy_codes));
         buffered_encoded_data_.push_back(std::move(encoded_data));
 
@@ -926,6 +949,7 @@ AbstractEmbeddedByteCompressionVariable<T>::RepartitionMesh(t8_forest_t adapted_
 {
     /* Keep the not-partitioned forest */
     t8_forest_ref(adapted_forest);
+    return adapted_forest;//TODO:Delete
 
     /* Allocate a forest */
     t8_forest_t partitioned_forest;
