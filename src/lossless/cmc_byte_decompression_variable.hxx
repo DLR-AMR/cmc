@@ -101,12 +101,14 @@ public:
     virtual ~AbstractByteDecompressionVariable(){};
 
     const std::vector<CompressionValue<T>>& GetDecompressedData() const {return data_;};
+    
+    int GetMaxNumDecompressionIterations() const {return max_num_decompression_iterations_;}
 
     friend IDecompressionAdaptData<T>;
 protected:
     AbstractByteDecompressionVariable() = delete;
-    explicit AbstractByteDecompressionVariable(std::vector<uint8_t>&& encoded_data_byte_stream, std::vector<uint8_t>&& encoded_mesh_byte_stream)
-    : encoded_data_byte_stream_(std::move(encoded_data_byte_stream)), encoded_mesh_byte_stream_(std::move(encoded_mesh_byte_stream)) {};
+    explicit AbstractByteDecompressionVariable(std::vector<uint8_t>&& encoded_data_byte_stream, std::vector<uint8_t>&& encoded_mesh_byte_stream, const int max_num_decompression_iterations)
+    : encoded_data_byte_stream_(std::move(encoded_data_byte_stream)), encoded_mesh_byte_stream_(std::move(encoded_mesh_byte_stream)), max_num_decompression_iterations_{max_num_decompression_iterations} {};
 
     void SetName(const std::string& name) {name_ = name;};
     void SetAmrMesh(const AmrMesh& mesh) {mesh_ = mesh;};
@@ -144,6 +146,7 @@ private:
     std::vector<CompressionValue<T>> data_; //!< The current data of the variable 
     std::vector<CompressionValue<T>> data_new_; //!< A helper variable for the adaptation
 
+    int max_num_decompression_iterations_{0};
     const std::vector<uint8_t> encoded_data_byte_stream_; //!< The encoded byte stream of the variable
     const std::vector<uint8_t> encoded_mesh_byte_stream_; //!< The encoded byte stream of the mesh
 };
@@ -176,7 +179,9 @@ public:
     virtual ~IDecompressionAdaptData(){};
 
     bool IsValidForDeompression() const;
-
+    const AmrMesh& GetAmrMesh() const {return base_variable_->GetAmrMesh();}
+    int GetMaxNumDecompressionIterations() const {return base_variable_->GetMaxNumDecompressionIterations();}
+    const std::vector<CompressionValue<T>>& GetDecompressedData() const {return base_variable_->data_;};
 private:
     AbstractByteDecompressionVariable<T>* const base_variable_{nullptr};
 
