@@ -381,9 +381,13 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
+        uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
-
+        if (val.GetNumberLeadingZeros() == sizeof(T) * bit_map::kCharBit)
+        {
+            signum = 0;
+        }
+        
         /* Encode the LZC and the residual flag together */
         ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(signum + first_one_bit);
 
@@ -482,7 +486,7 @@ MultiResAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>
     for (auto val_iter = root_level_values.begin(); val_iter != root_level_values.end(); ++val_iter)
     {
         const T val = val_iter->template ReinterpretDataAs<T>();
-
+        cmc_debug_msg("Root val to be encoded: ", val);
         PushBackValueToByteStream(encoded_stream, val);
     }
 
