@@ -63,7 +63,7 @@ template <typename T>
 bool
 PrefixCompressionAlphabet<T>::DoesSymbolExistInAlphabet(const uint32_t symbol)
 {
-    if (symbol >= GetAlphabetSize() && symbol != kByteCompressionSymbolJumpToNextByte)
+    if (symbol > (sizeof(T) * bit_map::kCharBit) && symbol != kByteCompressionSymbolJumpToNextByte)
     {
         return false;
     }
