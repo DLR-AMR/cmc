@@ -18,6 +18,7 @@ constexpr int kDoubleBytes = static_cast<int>(sizeof(double));
 
 
 constexpr uint8_t kZeroByte = 0x00;
+constexpr uint8_t kOneByte = 0xFF;
 constexpr uint8_t kLowBit = 0x01;
 constexpr uint8_t kHighBit = 0x80;
 
