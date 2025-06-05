@@ -80,7 +80,6 @@ PrefixEmbeddedAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, co
     //Currently, nothing to be done here!
 }
 
-
 template<typename T>
 std::pair<bool, CompressionValue<T>>
 EvaluateEmbeddedCommonPrefix(const VectorView<CompressionValue<T>>& compression_values)
@@ -123,7 +122,6 @@ EvaluateEmbeddedCommonPrefix(const VectorView<CompressionValue<T>>& compression_
     /* If the function arrives here, we do have found a common prefix which can be extracted from the 'previous prefixes' */
     return std::make_pair(true, prefix);
 }
-
 
 template <typename T>
 ExtractionData<T>
@@ -243,7 +241,7 @@ PrefixEmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T
         }
     }
 
-    /* We set an indicaton symbol that the process local end of the values have been reached */
+    /* We set an indication symbol that the process local end of the values have been reached */
     IEmbeddedCompressionAdaptData<T>::entropy_coder_->EncodeSymbol(entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte);
 
     /* Indicate that the encoding has been finished and flush all pending encodings */
@@ -355,8 +353,6 @@ public:
         //cmc_assert(input_variable.IsValid());//TODO: implement 
 
         this->SetName(input_variable.GetName());
-        //this->SetMPIComm(input_variable.GetMPIComm());
-        //cmc_debug_msg("Here is comm: ", input_variable.GetMPIComm());
         this->IndicateWhetherMeshRefinementBitsWillBeStored(true);
 
         AbstractEmbeddedByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixEmbeddedExtractionAdaptationClass<T>;
@@ -373,9 +369,6 @@ private:
 
 };
 
-
-
 }
-
 
 #endif /* !CMC_EMBEDDED_PREFIX_EXTRACTION_COMPRESSION_HXX */
