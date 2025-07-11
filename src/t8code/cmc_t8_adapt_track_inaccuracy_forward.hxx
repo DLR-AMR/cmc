@@ -13,6 +13,7 @@ namespace cmc
 enum TrackingOption {TrackFullInaccuracy = 0, TrackMinimalWorkingInaccuracy};
 
 constexpr size_t kInvalidSizeHintForInaccuracyContainer = 0;
+constexpr int kPlaceholderInaccuracyIndex = 0;
 
 template<typename T>
 using ComputeInaccuracySkipMissingValues = std::vector<double>(*)(const VectorView<T>& values, const T& interpolated_value, const std::vector<double>& previous_absolute_max_deviation, const T& missing_value);
