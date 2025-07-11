@@ -47,6 +47,10 @@ src/utilities/cmc_prefix_entropy_coder.hxx \
 src/utilities/cmc_iface_arithmetic_encoding_freq_model.hxx \
 src/utilities/cmc_embedded_mesh_utilities.hxx \
 src/utilities/cmc_embedded_variable_attributes.hxx \
+src/utilities/cmc_iface_abstract_byte_compression_variable.hxx \
+src/utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx \
+src/utilities/cmc_trimmed_multi_res_compression_entropy_alphabet.hxx \
+src/utilities/cmc_trimmed_multi_res_coder.hxx \
 src/mpi/cmc_mpi_io.hxx \
 src/mpi/cmc_mpi.hxx \
 src/mpi/cmc_mpi_data.hxx \
@@ -68,6 +72,12 @@ src/t8code/cmc_t8_mpi.hxx \
 src/t8code/cmc_t8_adaptation_callbacks.hxx \
 src/lossy/cmc_ac_compression_variable.hxx \
 src/lossy/cmc_adaptive_coarsening.hxx \
+src/lossy/cmc_byte_compression_variable.hxx \
+src/lossy/cmc_multi_res_trimmed_residuals.hxx \
+src/lossy/cmc_multi_res_extraction_residual_computation.hxx \
+src/lossy/cmc_embedded_byte_compression_variable.hxx \
+src/lossy/cmc_embedded_trimmed_multi_res_extraction_compression.hxx \
+src/lossy/cmc_embedded_prefix_quantization_compression.hxx \
 src/lossless/cmc_byte_compression_variable.hxx \
 src/lossless/cmc_embedded_byte_compression_variable.hxx \
 src/lossless/cmc_embedded_byte_decompression_variable.hxx \
@@ -89,6 +99,10 @@ src/lossless/cmc_multi_res_extraction_residual_computation.hxx \
 src/lossless/cmc_prefix_extraction_decompression.hxx \
 src/lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx \
 src/lossless/cmc_byte_decompression_variable.hxx \
+src/lossless/cmc_embedded_byte_compression_ext_variable.hxx \
+src/lossless/cmc_embedded_multi_res_extraction_lin_reconstruction_compression.hxx \
+src/lossless/cmc_embedded_byte_compression_extended_variable.hxx \
+src/lossless/cmc_embedded_multi_res_extraction_nearest_neighbor_reconstruction.hxx \
 src/mesh_compression/cmc_iface_abstract_mesh_encoder.hxx \
 src/mesh_compression/cmc_iface_abstract_mesh_decoder.hxx \
 src/mesh_compression/cmc_iface_mesh_encoder.hxx \
