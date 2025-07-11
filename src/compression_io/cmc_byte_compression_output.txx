@@ -6,7 +6,7 @@ namespace cmc::compression_io
 
 template<typename T>
 std::pair<std::vector<VariableLevelOffset>, std::vector<IntraLevelStreamOffset>>
-CommunicateOffsets(cmc::lossless::AbstractByteCompressionVariable<T>* variable, const MPI_Comm comm)
+CommunicateOffsets(cmc::IByteCompressionVariable<T>* variable, const MPI_Comm comm)
 {
     /* Get a reference to the encoded streams */
     const std::vector<std::vector<uint8_t>>& levelwise_entropy_codes = variable->GetEncodedEntropyCodes();
@@ -90,7 +90,7 @@ CommunicateOffsets(cmc::lossless::AbstractByteCompressionVariable<T>* variable, 
 
 template<typename T>
 void
-Writer::SetDataVariable(cmc::lossless::AbstractByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id)
+Writer::SetDataVariable(cmc::IByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id)
 {
     /* Get the encoded level-wise data */
     std::vector<std::vector<uint8_t>> levelwise_entropy_codes_;
@@ -165,7 +165,7 @@ Writer::SetDataVariable(cmc::lossless::AbstractByteCompressionVariable<T>* varia
 
 template<typename T>
 void
-Writer::SetMeshVariable(cmc::lossless::AbstractByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id)
+Writer::SetMeshVariable(cmc::IByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id)
 {
     /* Get the encoded mesh data */
     std::vector<std::vector<uint8_t>> levelwise_encoded_mesh;
@@ -228,7 +228,7 @@ Writer::SetMeshVariable(cmc::lossless::AbstractByteCompressionVariable<T>* varia
 
 template<typename T>
 void
-Writer::SetVariable(cmc::lossless::AbstractByteCompressionVariable<T>* variable)
+Writer::SetVariable(cmc::IByteCompressionVariable<T>* variable)
 {
     /* Get the communicator */
     MPI_Comm comm = variable->GetMPIComm();

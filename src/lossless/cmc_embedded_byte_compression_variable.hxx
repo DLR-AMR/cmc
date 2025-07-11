@@ -13,6 +13,7 @@
 #include "input/cmc_input_variable.hxx"
 #include "mesh_compression/cmc_iface_embedded_mesh_encoder.hxx"
 #include "utilities/cmc_embedded_mesh_utilities.hxx"
+#include "utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx"
 
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mpi.hxx"
@@ -87,45 +88,45 @@ using AdaptDestructor = std::function<void(IEmbeddedCompressionAdaptData<T>*)>;
  * @tparam T The origianl data type of the underlying data (e.g. float)
  */
 template <typename T>
-class AbstractEmbeddedByteCompressionVariable
+class AbstractEmbeddedByteCompressionVariable : public IEmbeddedByteCompressionVariable<T>
 {
 public:
-    void Compress();
+    void Compress() override;
 
-    const std::string& GetName() const {return name_;};
+    const std::string& GetName() const override {return name_;};
 
-    size_t Size() const {return data_.size();};
+    size_t Size() const override {return data_.size();};
 
-    const AmrMesh& GetAmrMesh() const {return mesh_;};
+    const AmrMesh& GetAmrMesh() const override {return mesh_;};
     const std::vector<CompressionValue<T>>& GetData() const {return data_;};
 
     virtual ~AbstractEmbeddedByteCompressionVariable(){};
 
-    void MoveEncodedEntropyCodesInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_entropy_codes)
+    void MoveEncodedEntropyCodesInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_entropy_codes) override
     {
         vec_to_hold_encoded_levelwise_entropy_codes = std::move(buffered_entropy_codes_);
         buffered_entropy_codes_ = std::vector<std::vector<uint8_t>>();
     };
 
-    void MoveEncodedDataInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_data)
+    void MoveEncodedDataInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_data) override
     {
         vec_to_hold_encoded_levelwise_data = std::move(buffered_encoded_data_);
         buffered_encoded_data_ = std::vector<std::vector<uint8_t>>();
     };
 
-    void MoveEncodedMeshInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_mesh)
+    void MoveEncodedMeshInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_mesh) override
     {
         vec_to_hold_encoded_levelwise_mesh = std::move(buffered_encoded_mesh_);
         buffered_encoded_mesh_ = std::vector<std::vector<uint8_t>>();
     };
 
-    const std::vector<std::vector<uint8_t>>& GetEncodedEntropyCodes() const {return buffered_entropy_codes_;}
-    const std::vector<std::vector<uint8_t>>& GetEncodedData() const {return buffered_encoded_data_;};
-    const std::vector<std::vector<uint8_t>>& GetEncodedMesh() const {return buffered_encoded_mesh_;};
+    const std::vector<std::vector<uint8_t>>& GetEncodedEntropyCodes() const override {return buffered_entropy_codes_;}
+    const std::vector<std::vector<uint8_t>>& GetEncodedData() const override {return buffered_encoded_data_;};
+    const std::vector<std::vector<uint8_t>>& GetEncodedMesh() const override {return buffered_encoded_mesh_;};
 
-    bool AreMeshRefinementBitsStored() const {return store_refinement_indication_bits_;};
-    MPI_Comm GetMPIComm() const {return comm_;};
-    const VariableAttributes<T>& GetVariableAttributes() const {return attributes_;};
+    bool AreMeshRefinementBitsStored() const override {return store_refinement_indication_bits_;};
+    MPI_Comm GetMPIComm() const override {return comm_;};
+    const VariableAttributes<T>& GetVariableAttributes() const override {return attributes_;};
 
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
