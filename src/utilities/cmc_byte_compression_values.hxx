@@ -135,6 +135,16 @@ private:
 };
 
 template<int N>
+inline
+SerializedCompressionValue<N>
+GetNullCompressionValue()
+{
+    SerializedCompressionValue<N> null_value;
+    null_value.SetTailBit(uint8_t{0});
+    return null_value;
+}
+
+template<int N>
 SerializedCompressionValue<N>::SerializedCompressionValue(const std::vector<uint8_t>& serialized_prefix, const int num_bits)
 {
     cmc_assert(N >= serialized_prefix.size());
@@ -438,7 +448,7 @@ SerializedCompressionValue<N>::ToggleTailUntilNextUnsetBit()
             }
         }
 
-        /* Update the trainling end */
+        /* Update the tail */
         indicators_.tail_bit_ += CHAR_BIT - bit_accessor;
 
         /* Reset the bit_accesor, for the next byte */
@@ -673,7 +683,7 @@ SerializedCompressionValue<N>::ClearNextSetBitFromTail()
             }
         }
 
-        /* Update the trainling end */
+        /* Update the tail */
         indicators_.tail_bit_ += CHAR_BIT - bit_accessor;
 
         /* Reset the bit accesor */

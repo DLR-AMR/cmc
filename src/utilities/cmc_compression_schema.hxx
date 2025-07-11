@@ -4,7 +4,7 @@
 namespace cmc
 {
 
-enum CompressionSchema {AdaptiveCoarsening, PrefixExtraction, PrefixExtractionPlainSuffixes, MultiResExtraction, EmbeddedPrefixExtraction, EmbeddedPrefixExtractionTrimmedSuffixes, EmbeddedPrefixExtractionPlainSuffixes, EmbeddedMultiResExtraction, EmbeddedMultiResExtractionTrimmedResiduals, _TestEmbeddedPCP4Extraction, _TestPCP4Extraction};
+enum CompressionSchema {AdaptiveCoarsening, TrimmedMultiResResiduals, PrefixExtraction, PrefixExtractionPlainSuffixes, MultiResExtraction, EmbeddedPrefixExtraction, EmbeddedPrefixExtractionTrimmedSuffixes, EmbeddedMultiResExtractionLinReconstruction, EmbeddedPrefixExtractionPlainSuffixes, EmbeddedQuantizedPrefixExtraction, EmbeddedMultiResExtraction, EmbeddedTrimmedMultiResExtraction, EmbeddedMultiResExtractionTrimmedResiduals, _TestEmbeddedPCP4Extraction, _TestPCP4Extraction};
 
 }
 
