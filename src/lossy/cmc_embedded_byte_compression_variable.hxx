@@ -844,7 +844,7 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
     this->PreCompressionProcessing(data_);
 
     cmc_assert(this->IsValidForCompression());
-    cmc_debug_msg("Lossless compression of variable ", this->name_, " starts...");
+    cmc_debug_msg("Lossy compression of variable ", this->name_, " starts...");
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
     IEmbeddedCompressionAdaptData<T>* adapt_data = this->CreateAdaptData();
