@@ -31,6 +31,8 @@
 namespace cmc::lossless
 {
 
+constexpr bool kCompressStrictlyLevelwise = true;
+
 /* A typedef for the sake of brevity */
 template <typename T>
 using CompressionValue = SerializedCompressionValue<sizeof(T)>;
@@ -126,7 +128,7 @@ public:
     const std::vector<std::vector<uint8_t>>& GetEncodedMesh() const override {return buffered_encoded_mesh_;};
 
     MPI_Comm GetMPIComm() const override {return comm_;};
-
+    int GetInitialMaximumRefinementLevel() const {return max_initial_refinement_level_;}
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
     friend ICompressionAdaptData<T>;
@@ -161,6 +163,7 @@ private:
     ICompressionAdaptData<T>* CreateAdaptData() {return adaptation_creator_(this);};
     t8_forest_t RepartitionMesh(t8_forest_t adapted_forest);
     void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
+    void DetermineInitialMaximumRefinementLevel();
 
     std::string name_; //!< The name of the variable
     AmrMesh mesh_; //!< The mesh on which the variable is defined
@@ -172,6 +175,7 @@ private:
     std::vector<std::vector<uint8_t>> buffered_encoded_mesh_; //!< Level-wwise storage for the encoded mesh
 
     MPI_Comm comm_{MPI_COMM_NULL}; //!< The MPI communicator to use
+    int max_initial_refinement_level_{-1};
 };
 
 
@@ -192,6 +196,7 @@ public:
 
     virtual void InitializeExtractionIteration() = 0;
     virtual void FinalizeExtractionIteration() = 0;
+    void FinalizingExtractionIteration();
     virtual void CompleteExtractionIteration(const t8_forest_t previous_forest, const t8_forest_t adapted_forest) = 0;
     virtual void RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest) = 0;
 
@@ -206,6 +211,10 @@ public:
     virtual ~ICompressionAdaptData(){};
 
     bool IsValidForCompression() const;
+
+    int GetInitialMaximumRefinementLevel() const {return base_variable_->GetInitialMaximumRefinementLevel();}
+    int GetCurrentCompressionStep() const {return compression_step_;}
+
 protected:
     virtual ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) = 0;
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
@@ -213,6 +222,7 @@ protected:
     std::unique_ptr<entropy_coding::IByteCompressionEntropyCoder> entropy_coder_{nullptr}; //!< The entropy coder to use in order to encode information
 private:
     AbstractByteCompressionVariable<T>* const base_variable_{nullptr};
+    int compression_step_{0};
 };
 
 template <typename T>
@@ -315,6 +325,27 @@ ICompressionAdaptData<T>::LeaveElementUnchanged(const int which_tree, const int 
     return cmc::t8::kLeaveElementUnchanged;
 }
 
+template <typename T>
+void
+ICompressionAdaptData<T>::FinalizingExtractionIteration()
+{
+    ++compression_step_;
+    this->FinalizeExtractionIteration();
+}
+
+
+inline
+bool CheckIfElementIsReadyForCoarsening(const int initial_max_ref_level, const int elem_level, const int compression_step)
+{
+    if (elem_level == initial_max_ref_level - compression_step)
+    {
+        return true;
+    } else
+    {
+        return false;
+    }
+}
+
 /**
  * @brief The adaptation function which is used for the lossless compression variables.
  * In case a family is passed to this callback, an extraction process is always performed.
@@ -339,7 +370,7 @@ LosslessByteCompression (t8_forest_t forest,
     cmc_assert(adapt_data != nullptr);
 
     /* Check if a family is supplied to the adaptation function */
-    if (is_family == 0)
+    if (is_family == 0 || (kCompressStrictlyLevelwise && not CheckIfElementIsReadyForCoarsening(adapt_data->GetInitialMaximumRefinementLevel(), ts->element_get_level(tree_class, elements[0]), adapt_data->GetCurrentCompressionStep())))
     {
         /* If there is no family, the element stays unchanged */
         const int ret_val = adapt_data->LeaveElementUnchanged(which_tree, lelement_id);
@@ -358,6 +389,13 @@ AbstractByteCompressionVariable<T>::Compress()
 {
     cmc_assert(this->IsValidForCompression());
     cmc_debug_msg("Lossless compression of variable ", this->name_, " starts...");
+
+    if (kCompressStrictlyLevelwise)
+    {
+        /* Determine the maximum present refinement level */
+        this->DetermineInitialMaximumRefinementLevel();
+        cmc_assert(this->GetInitialMaximumRefinementLevel() > 0);
+    }
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
     ICompressionAdaptData<T>* adapt_data = this->CreateAdaptData();
@@ -413,7 +451,7 @@ AbstractByteCompressionVariable<T>::Compress()
         mesh_.SetMesh(partitioned_forest);
 
         /* Finalize the comrpession iteration */
-        adapt_data->FinalizeExtractionIteration();
+        adapt_data->FinalizingExtractionIteration();
         mesh_encoder_->FinalizeCompressionIteration();
         cmc_debug_msg("The coarsening iteration is finished.");
     }
@@ -624,6 +662,39 @@ AbstractByteCompressionVariable<T>::IsValidForCompression() const
 #endif
 
     return true;
+}
+
+
+template <typename T>
+void
+AbstractByteCompressionVariable<T>::DetermineInitialMaximumRefinementLevel()
+{
+    t8_forest_t mesh = this->GetAmrMesh().GetMesh();
+    const t8_scheme_c* scheme =  t8_forest_get_scheme(mesh);
+
+    const t8_locidx_t num_local_trees = t8_forest_get_num_local_trees(mesh);
+    int val_idx = 0;
+
+    /* Iterate over all elements in all trees */
+    for (t8_locidx_t tree_idx = 0; tree_idx < num_local_trees; ++tree_idx)
+    {
+        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, tree_idx);
+        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_elements (mesh, tree_idx);
+        for (t8_locidx_t elem_idx = 0; elem_idx < num_elements_in_tree; ++elem_idx, ++val_idx)
+        {
+            /* Get the current element */
+            const t8_element_t* element = t8_forest_get_element_in_tree (mesh, tree_idx, elem_idx);
+
+            const int elem_level = scheme->element_get_level(tree_class, element);
+
+            if (max_initial_refinement_level_ < elem_level)
+            {
+                max_initial_refinement_level_ = elem_level;
+            }
+        }
+    }
+
+    cmc_debug_msg("The maximum present element refinement level is ", max_initial_refinement_level_);
 }
 
 }
