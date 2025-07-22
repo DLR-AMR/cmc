@@ -29,6 +29,8 @@
 namespace cmc::decompression
 {
 
+constexpr bool kWriteDecompressionStepToVTK = false;
+
 /* A typedef for the sake of brevity */
 template <typename T>
 using CompressionValue = SerializedCompressionValue<sizeof(T)>;
@@ -316,6 +318,30 @@ ByteVariableDecompressionAdaptation (t8_forest_t forest,
     }
 }
 
+static int step_count = 0;
+
+template <typename T>
+void
+WriteData(t8_forest_t forest, const std::vector<CompressionValue<T>>& data)
+{
+    std::vector<double> double_data;
+    double_data.reserve(data.size());
+
+    for (auto val_iter = data.begin(); val_iter != data.end(); ++val_iter)
+    {
+        double_data.push_back(static_cast<double>(val_iter->template ReinterpretDataAs<T>()));
+    }
+
+    t8_vtk_data_field_t vtk_data[1];
+    snprintf (vtk_data[0].description, BUFSIZ, "ExampleData");
+    vtk_data[0].type = T8_VTK_SCALAR;
+    vtk_data[0].data = double_data.data();
+
+    std::string name = std::string("cmc_decompression_hybrid_circlesquare_example_mesh_and_data_step_") + std::to_string(step_count);
+    t8_forest_write_vtk_ext (forest, name.c_str(), 0, 0, 0, 0, 0, 0, 0, 1, vtk_data);
+    ++step_count;
+}
+
 template <typename T>
 inline void
 AbstractByteDecompressionVariable<T>::Decompress()
@@ -332,6 +358,11 @@ AbstractByteDecompressionVariable<T>::Decompress()
 
     /* Decode the root level values */
     data_ = adapt_data->DecodeRootLevel(mesh_.GetNumberLocalElements());
+
+    if constexpr (kWriteDecompressionStepToVTK)
+    {    
+        WriteData<T>(mesh_.GetMesh(), data_);
+    }
 
     /* Perform decompression iterations until the mesh is completely reconstructed */
     while (mesh_decoder_->IsDecompressionProgressing())
@@ -378,6 +409,12 @@ AbstractByteDecompressionVariable<T>::Decompress()
         mesh_decoder_->FinalizeDecompressionIteration();
 
         cmc_debug_msg("The decompression iteration is finished.");
+        
+        if constexpr (kWriteDecompressionStepToVTK)
+        {
+            WriteData<T>(mesh_.GetMesh(), data_);
+            cmc_debug_msg("The decompression step has been written out in a .vtu file.");
+        }
     }
 
     /* Free the adapt data structure */
