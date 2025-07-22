@@ -21,6 +21,10 @@
 namespace cmc::lossless::multi_res
 {
 
+/* Indicate whether unchanged elements have an encoded zero reisdual or no residual at all (in this case information from the mesh refinement bits is needed)
+ * Moreover, this according setting needs to set in the decompression routine */
+constexpr bool kEncodeLessResiduals = false;
+
 template<typename T>
 class MultiResAdaptData : public ICompressionAdaptData<T>
 {
@@ -48,6 +52,8 @@ private:
 
     bit_map::BitMap resdiual_order_indications_;
     int count_adaptation_step_{0};
+
+    bit_map::BitMap test_less_residual_encoding_;
 };
 
 template <typename T>
@@ -55,6 +61,10 @@ void
 MultiResAdaptData<T>::InitializeExtractionIteration()
 {
     resdiual_order_indications_ = bit_map::BitMap();
+    if constexpr (kEncodeLessResiduals)
+    {    
+        test_less_residual_encoding_ = bit_map::BitMap();
+    }
 }
 
 template <typename T>
@@ -157,6 +167,8 @@ MultiResAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [
 
         /* Store the residual */
         fine_values.push_back(residual);
+
+        test_less_residual_encoding_.AppendSetBit();
     }
 
     return ExtractionData<T>(CompressionValue<T>(coarse_approximation), std::move(fine_values));
@@ -166,13 +178,20 @@ template <typename T>
 UnchangedData<T>
 MultiResAdaptData<T>::ElementStaysUnchanged([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, const CompressionValue<T>& value)
 {
-    /* Since the residual is zero, we indicate that with an unset bit (although it is not of relevance, since the residual will be empty) */
-    resdiual_order_indications_.AppendUnsetBit();
+    if constexpr (kEncodeLessResiduals)
+    {
+        test_less_residual_encoding_.AppendUnsetBit();
+        return UnchangedData<T>(value, CompressionValue<T>());
+    } else
+    {
+        /* Since the residual is zero, we indicate that with an unset bit (although it is not of relevance, since the residual will be empty) */
+        resdiual_order_indications_.AppendUnsetBit();
 
-    /* We drag this value along to the "coarser level" until it this element is passed with its siblings
-     * as a family of elements into the adaptation callback. Moreover, we leave an empty value 
-     * on the "finer level" */
-    return UnchangedData<T>(value, CompressionValue<T>());
+        /* We drag this value along to the "coarser level" until it this element is passed with its siblings
+        * as a family of elements into the adaptation callback. Moreover, we leave an empty value 
+        * on the "finer level" */
+        return UnchangedData<T>(value, CompressionValue<T>());
+    }
 }
 
 template <typename T>
@@ -182,14 +201,26 @@ MultiResAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector
     /* Get a view on the bitmap storing the residual addition/subtraction flags */
     bit_map::BitMapView residual_flags(resdiual_order_indications_);
 
+    bit_map::BitMapView test_less_residual_indication_flags(test_less_residual_encoding_);
+
     /* Collect the symbol frequencies */
     for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
     {
+        if constexpr (kEncodeLessResiduals)
+        {
+            /* If there is no family that could be coarsened, we do not need to encode a residual for the element since the value remained unchanged */
+            if (test_less_residual_indication_flags.GetNextBit() == false) {continue;}
+        }
+
         /* Get the current residual */
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
+        uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
+        if (val.GetNumberLeadingZeros() == sizeof(T) * bit_map::kCharBit)
+        {
+            signum = 0;
+        }
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
         /* Update this symbol for encoding */
@@ -374,9 +405,16 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
     /* Get a view on the residual flags */
     bit_map::BitMapView residual_flags(resdiual_order_indications_);
     
+    bit_map::BitMapView test_less_residual_indication_flags(test_less_residual_encoding_);
+
     /* Iterate over all values and encode them */
     for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
     {
+        if constexpr (kEncodeLessResiduals)
+        {
+            /* If there is no family that could be coarsened, we do not need to encode a residual for the element since the value remained unchanged */
+            if (test_less_residual_indication_flags.GetNextBit() == false) {continue;}
+        }
         /* Get the current value */
         CompressionValue<T> val = *val_iter;
 

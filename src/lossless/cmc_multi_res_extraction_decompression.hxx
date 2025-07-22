@@ -21,6 +21,8 @@
 namespace cmc::lossless::multi_res
 {
 
+constexpr bool kDecodeLessResiduals = false;
+
 /* A typedef for the sake of brevity */
 template <typename T>
 using CompressionValue = SerializedCompressionValue<sizeof(T)>;
@@ -293,10 +295,23 @@ template <typename T>
 cmc::decompression::UnchangedData<T>
 MultiResDecompressionAdaptData<T>::ElementStaysUnchanged([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, const CompressionValue<T>& value)
 {
-    /* Get the next suffixed value */
-    const CompressionValue<T> residual_applied_value = this->GetNextResidualAppliedValue(value);
+    if constexpr (kDecodeLessResiduals)
+    {
+        /* There is no residual to decode and the element remains unchanged */
+        return cmc::decompression::UnchangedData<T>(value);
+    } else
+    {
+        /* Get the next suffixed value */
+        const CompressionValue<T> residual_applied_value = this->GetNextResidualAppliedValue(value);
 
-    return cmc::decompression::UnchangedData<T>(residual_applied_value);
+        const T residual_applied_value_reinter = residual_applied_value.template ReinterpretDataAs<T>();
+        const T init_val = value.template ReinterpretDataAs<T>();
+        if (not ApproxCompare(residual_applied_value_reinter, init_val))
+        {
+            cmc_debug_msg("Hier ist der Wert vor element unchanged ein anderer als nachher: residual applied: ", residual_applied_value_reinter, ", init val: ", init_val);
+        }
+        return cmc::decompression::UnchangedData<T>(residual_applied_value);
+    }
 }
 
 template <typename T>
