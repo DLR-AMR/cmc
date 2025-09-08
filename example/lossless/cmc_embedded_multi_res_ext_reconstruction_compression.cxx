@@ -1,14 +1,10 @@
 #include "cmc.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "input/cmc_netcdf.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_compression.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_compression_plain_suffixes.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_decompression.hxx"
+#include "lossless/cmc_embedded_multi_res_extraction_lin_reconstruction_compression.hxx"
+#include "lossless/cmc_embedded_multi_res_extraction_nearest_neighbor_reconstruction.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "input/cmc_binary_reader.hxx"
-
-#include "utilities/cmc_hyperslab.hxx"
-#include "input/cmc_netcdf.hxx"
 
 #include "compression_io/cmc_compression_output.hxx"
 #include "compression_io/cmc_decompression_input.hxx"
@@ -27,8 +23,7 @@ main(void)
 
     /* Read in data */
     #if 1
-    //const std::string file = "../../programs/data/100x500x500/Uf48.bin.f32";
-    const std::string file = "../../programs/data/era5_reanalysis_t2m_tc03_13_12_23.nc";
+    const std::string file = "../../programs/data/100x500x500/Pf48.bin.f32";
     #else
     const std::string file = "../../programs/data/SDRBENCH-EXASKY-NYX-512x512x512/baryon_density.f32";
     #endif
@@ -40,7 +35,7 @@ main(void)
     //Missing Values Hurricane ISABEL Dataset
     //cmc::CmcUniversalType missing_value(static_cast<float>(0.0025));//CLOUD
     //cmc::CmcUniversalType missing_value(static_cast<float>(-2.5));//CLOUD.log10
-    //cmc::CmcUniversalType missing_value(static_cast<float>(3224.4)); //P
+    cmc::CmcUniversalType missing_value(static_cast<float>(3224.4)); //P
     //cmc::CmcUniversalType missing_value(static_cast<float>(0.00755)); //PRECIP
     //cmc::CmcUniversalType missing_value(static_cast<float>(-2.0)); //PRECIPf48.log10
     //cmc::CmcUniversalType missing_value(static_cast<float>(0.00205));//QCLOUD
@@ -58,7 +53,7 @@ main(void)
     //cmc::CmcUniversalType missing_value(static_cast<float>(40.0)); //UF
     //cmc::CmcUniversalType missing_value(static_cast<float>(48.25)); //VF
     //cmc::CmcUniversalType missing_value(static_cast<float>(13.4)); //WF
-    
+
     //Missing values NYX data
     //cmc::CmcUniversalType missing_value(static_cast<float>(31868.0)); //velocity x
     //cmc::CmcUniversalType missing_value(static_cast<float>(56507.0)); //velocity y
@@ -69,10 +64,8 @@ main(void)
 
     {
 
-    #if 0
-    
     #if 1
-    const size_t num_elements = 500 * 500 * 100;
+    const size_t num_elements = 500 * 500 * 100 ;
     cmc::DataLayout layout(cmc::DataLayout::Lev_Lat_Lon);
     cmc::GeoDomain domain(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 500),
                           cmc::DimensionInterval(cmc::Dimension::Lat, 0, 500),
@@ -93,58 +86,44 @@ main(void)
     variable.SetMPIComm(MPI_COMM_SELF);
     std::vector<cmc::input::Var> input_variables{std::move(variable)};
 
-    #else
-
-    /* Create an object which interatcs with the file and opens it */
-    cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
-
-    /* Define a hyperlsab corresponding to the data we want to read */
-    cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),
-                             cmc::DimensionInterval(cmc::Dimension::Lat, 0, 721));
-
-    /* Inquire the hyperslab of data for the given variables */
-    nc_data.InquireVariables(hyperslab, "tco3");
-
-    /* Close the file, since we have gathered the data we wanted */
-    nc_data.CloseFileHandle();
-    
-    std::vector<cmc::input::Var> input_variables = nc_data.TransferData();
-    
-    #endif
-
-    /* Setup an embedded PrefixAMR (with plain suffix encoding) compression variable from the input variables */           
-    cmc::lossless::embedded::prefix::plain_suffix::EmbeddedCompressionVariable<float> var(input_variables.front());
+    /* Setup an embedded MultiResAMR compression variable from the input variables */
+    //cmc::lossless::embedded::multi_res::ext_reconstruction::EmbeddedCompressionVariable<float> var(input_variables.front());
+    cmc::lossless::embedded::multi_res::nearest_neighbor_reconstruction::EmbeddedCompressionVariable<float> var(input_variables.front());
 
     /* Perform the compression */
     var.Compress();
 
     {
         /* Write out the compressed data to disk */
-        cmc::compression_io::Writer writer("prefix_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+        cmc::compression_io::Writer writer("multi_res_ext_reconstruction_example_lossless_compression_output.cmc", MPI_COMM_SELF);
         writer.SetVariable(&var);
         writer.Write();
     }
 
+    
     }
 
+    #if 0
     /* Create a reader for the compressed output that has been stored */
-    cmc::compression_io::Reader reader("prefix_example_lossless_compression_output.cmc", MPI_COMM_SELF);
-    
+    cmc::compression_io::Reader reader("multi_res_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+
     /* Create an embedded decompressor from the compressed data */
-    std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<float>> decompression_var = reader.ReadEmbeddedVariableForDecompression<float>("tco3");
+    std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<float>> decompression_var = reader.ReadEmbeddedVariableForDecompression<float>("compr_test_var");
 
     /* Decompress the encoded data */
     decompression_var->Decompress();
 
     /* De-Mortonize the data and obtain the initial ordering of the input data */
     const std::vector<float> decompressed_data = decompression_var->DeMortonizeData();
-    
+
     /* Write this decompressed data out to disk, in order to be able to compare it to the intiial data */
     FILE* file_out = fopen("decompressed_data.cmc", "wb");
     fwrite(decompressed_data.data(), sizeof(float), decompressed_data.size(), file_out);
     fclose(file_out);
 
     cmc::cmc_debug_msg("Size of decompressed data: ", decompressed_data.size());
+
+    #endif
 
     }
     /* Finalize cmc */

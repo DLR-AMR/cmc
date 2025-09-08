@@ -47,9 +47,13 @@
 namespace cmc::example
 {
 
+//constexpr int max_elem_level = 11;
+//constexpr int init_elem_level = 7;
+//constexpr double bandwidth = 64.0;
+
 constexpr int max_elem_level = 11;
 constexpr int init_elem_level = 7;
-constexpr double bandwidth = 64.0;
+constexpr double bandwidth = 26.5;
 
 typedef struct
 {
@@ -75,7 +79,15 @@ levelset_sphere_fn (const std::vector<double>  &x, void *data, const int level)
 
   T8_ASSERT (ls_data->radius > 0);
 
-  return (8) *std::fabs(cos(0.5 * x[0]))*(dist (x, ls_data->M) - ls_data->radius);
+  if (dist (x, ls_data->M) >= 2.0)
+  {
+    return (8/(dist (x, ls_data->M) * dist (x, ls_data->M) * dist (x, ls_data->M))) * fabs(std::sin(1.57079632679 * x[1])) * (fabs(x[0]) + 0.25 * fabs(x[1])) * std::cos(1.57079632679 - dist (x, ls_data->M) + 0.25) + 0.01*std::sin(1000*3.14*fabs(x[0]));
+  }
+  //return (8) *std::fabs(cos(0.5 * x[0]))*(dist (x, ls_data->M) - ls_data->radius);
+  //return x[0] * std::log(8*dist (x, ls_data->M)) - 2.5;
+  //return std::fabs(cos(0.55 * x[0]))*(dist (x, ls_data->M));
+  //return 2*fabs(std::cos(1.57079632679 * x[0] * x[1]));
+  return fabs(std::sin(1.57079632679 * x[1])) * (fabs(x[0]) + 0.25 * fabs(x[1])) * std::cos(1.57079632679 - dist (x, ls_data->M) + 0.25) + 0.01*std::sin(1000*3.14*fabs(x[0]));
 }
 
 template <typename T>
@@ -171,13 +183,30 @@ t8_advect_adapt (t8_forest_t forest, t8_forest_t forest_from, t8_locidx_t ltree_
                 
     t8_forest_element_centroid (forest_from, ltree_id, elements[0], midpoint.data());
 
+    #if 0
+    if (fabs(midpoint[0]) <= 0.7 && fabs(midpoint[1]) <= 0.7)
+    {
+         /* refine if level is not too large */
+        return level < max_elem_level;       
+    } else if (fabs(midpoint[0]) >= 0.9 && fabs(midpoint[1]>= 0.9))
+    {
+        return -(is_family && level > init_elem_level);
+    } else
+    {
+        return 0;
+    }
+    #endif
+
+    #if 1
     if (fabs (val) > 2 * bandwidth * elem_diam) {
         /* coarsen if this is a family and level is not too small */
         return -(is_family && level > init_elem_level);
-    } else if (fabs (val) < bandwidth * elem_diam) {
+    }
+    else if (fabs (val) < bandwidth * elem_diam) {
         /* refine if level is not too large */
         return level < max_elem_level;
     }
+    #endif
 
     return 0;
 }
@@ -207,10 +236,33 @@ BuildInitialForest()
         adapt_data.data = cmc::example::t8_advect_problem_init_elements(forest);
     }
 
+    //for (auto iter = adapt_data.data.begin(); iter != adapt_data.data.end(); ++iter)
+    //{
+    //    *iter = (-1.0) * (*iter);
+    //}
+
     for (auto iter = adapt_data.data.begin(); iter != adapt_data.data.end(); ++iter)
     {
-        *iter = (-1.0) * (*iter);
+        *iter = (2.25 - (*iter));
     }
+
+    double max = -1000.0;
+    double min = +1000.0;
+
+    for (auto iter = adapt_data.data.begin(); iter != adapt_data.data.end(); ++iter)
+    {
+        if (max < *iter)
+        {
+            max = *iter;
+        }
+
+        if (min > *iter)
+        {
+            min = *iter;
+        }
+    }
+
+    cmc_debug_msg("Data Values: Max: ", max, ", Min: ", min);
 
     return std::make_pair(forest, std::move(adapt_data.data));
 }

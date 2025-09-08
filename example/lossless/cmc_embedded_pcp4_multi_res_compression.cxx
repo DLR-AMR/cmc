@@ -106,7 +106,7 @@ main(void)
     cmc::compression_io::Reader reader("multi_res_pcp4_example_lossless_compression_output.cmc", MPI_COMM_SELF);
     
     /* Create an embedded decompressor from the compressed data */
-    std::unique_ptr<cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<float>> decompression_var = reader.ReadEmbeddedVariableForDecompression<float>("compr_test_var");
+    std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<float>> decompression_var = reader.ReadEmbeddedVariableForDecompression<float>("compr_test_var");
 
     /* Decompress the encoded data */
     decompression_var->Decompress();
