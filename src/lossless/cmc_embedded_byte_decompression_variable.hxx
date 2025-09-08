@@ -14,6 +14,7 @@
 #include "utilities/cmc_hyperslab.hxx"
 #include "utilities/cmc_geo_utilities.hxx"
 #include "utilities/cmc_embedded_variable_attributes.hxx"
+#include "utilities/cmc_iface_abstract_embedded_byte_decompression_variable.hxx"
 
 #include "mpi/cmc_mpi.hxx"
 
@@ -93,25 +94,25 @@ using AdaptDestructor = std::function<void(IEmbeddedDecompressionAdaptData<T>*)>
  * @tparam T The origianl data type of the underlying data (e.g. float)
  */
 template <typename T>
-class AbstractEmbeddedByteDecompressionVariable
+class AbstractEmbeddedByteDecompressionVariable : public IEmbeddedByteDecompressionVariable<T>
 {
 public:
-    void Decompress();
+    void Decompress() override;
 
-    const std::string& GetName() const {return name_;};
+    const std::string& GetName() const override {return name_;};
 
-    size_t Size() const {return data_.size();};
+    size_t Size() const override {return data_.size();};
 
-    const AmrMesh& GetAmrMesh() const {return mesh_;};
+    const AmrMesh& GetAmrMesh() const override {return mesh_;};
     const std::vector<CompressionValue<T>>& GetData() const {return data_;};
     
     virtual ~AbstractEmbeddedByteDecompressionVariable(){};
 
-    const std::vector<CompressionValue<T>>& GetDecompressedData() const {return data_;};
+    const std::vector<CompressionValue<T>>& GetDecompressedData() const override {return data_;};
 
-    MPI_Comm GetMPIComm() const {return comm_;};
+    MPI_Comm GetMPIComm() const override {return comm_;};
 
-    std::vector<T> DeMortonizeData() const;
+    std::vector<T> DeMortonizeData() const override;
 
     friend IEmbeddedDecompressionAdaptData<T>;
 protected:
@@ -351,6 +352,33 @@ AbstractEmbeddedByteDecompressionVariable<T>::WillNextElementBeRefined(t8_elemen
     }
 }
 
+#if 1
+static int step_count = 0;
+
+template <typename T>
+void
+WriteData(t8_forest_t forest, const std::vector<CompressionValue<T>>& data)
+{
+    std::vector<double> double_data;
+    double_data.reserve(data.size());
+
+    for (auto val_iter = data.begin(); val_iter != data.end(); ++val_iter)
+    {
+        double_data.push_back(static_cast<double>(val_iter->template ReinterpretDataAs<T>()));
+    }
+
+    t8_vtk_data_field_t vtk_data[1];
+    snprintf (vtk_data[0].description, BUFSIZ, "ExampleData");
+    vtk_data[0].type = T8_VTK_SCALAR;
+    vtk_data[0].data = double_data.data();
+
+    std::string name = std::string("cmc_decompression_hybrid_circlesquare_example_mesh_and_data_step_") + std::to_string(step_count);
+    t8_forest_write_vtk_ext (forest, name.c_str(), 0, 0, 0, 0, 0, 0, 0, 1, vtk_data);
+
+    ++step_count;
+}
+#endif
+
 template <typename T>
 inline void
 AbstractEmbeddedByteDecompressionVariable<T>::Decompress()
@@ -368,6 +396,8 @@ AbstractEmbeddedByteDecompressionVariable<T>::Decompress()
 
     /* Decode the root level values */
     data_ = adapt_data->DecodeRootLevel(mesh_.GetNumberLocalElements());
+
+    WriteData<T>(mesh_.GetMesh(), data_);
 
     /* Perform decompression iterations until the mesh is completely reconstructed */
     while (mesh_decoder_->IsDecompressionProgressing())
@@ -419,6 +449,7 @@ AbstractEmbeddedByteDecompressionVariable<T>::Decompress()
             mesh_decoder_->FinalizeDecompressionIteration();
         }
         cmc_debug_msg("The decompression iteration is finished.");
+        WriteData<T>(mesh_.GetMesh(), data_);
     }
 
     /* Free the adapt data structure */
@@ -508,7 +539,6 @@ AbstractEmbeddedByteDecompressionVariable<T>::StoreUnchangedElement(const Unchan
     /* Store the element value */
     data_new_.push_back(unchanged_value.fine_value);
 }
-
 
 template <typename T>
 inline t8_forest_t
