@@ -3,7 +3,10 @@
 
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_utilities.hxx"
+#include "utilities/cmc_iface_abstract_embedded_byte_decompression_variable.hxx"
+#include "utilities/cmc_iface_abstract_byte_decompression_variable.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
+
 #include "lossless/cmc_byte_decompression_variable.hxx"
 #include "lossless/cmc_prefix_extraction_decompression.hxx"
 #include "lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx"
@@ -15,8 +18,9 @@
 #include "lossless/cmc_embedded_multi_res_extraction_decompression.hxx"
 #include "lossless/cmc_test_pcp4_embedded_decompression.hxx"
 #include "lossless/cmc_test_pcp4_decompression.hxx"
-
 #include "utilities/cmc_embedded_variable_attributes.hxx"
+
+#include "lossy/cmc_embedded_prefix_quantization_decompression.hxx"
 
 #ifdef CMC_WITH_NETCDF
 #include "netcdf/cmc_netcdf.hxx"
@@ -49,7 +53,7 @@ public:
     : file_name_{file_name}, comm_{comm}, reader(file_name, comm) {};
 
     template <typename T> std::unique_ptr<decompression::AbstractByteDecompressionVariable<T>> ReadVariableForDecompression(const std::string& var_name);
-    template <typename T> std::unique_ptr<decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>> ReadEmbeddedVariableForDecompression(const std::string& var_name);
+    template <typename T> std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<T>> ReadEmbeddedVariableForDecompression(const std::string& var_name);
 
 private:
     const std::string file_name_;
@@ -133,7 +137,7 @@ Reader::ReadVariableForDecompression(const std::string& var_name)
 
 
 template <typename T>
-std::unique_ptr<decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>>
+std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<T>>
 Reader::ReadEmbeddedVariableForDecompression(const std::string& var_name)
 {
     /* First, we check the attributes of the variable */
@@ -233,6 +237,10 @@ Reader::ReadEmbeddedVariableForDecompression(const std::string& var_name)
         case CompressionSchema::_TestEmbeddedPCP4Extraction:
             cmc_debug_msg("Test MultiRes PCP4 Decompression is instantiated.");
             return std::make_unique<lossless::embedded::test_pcp4::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+        break;
+        case CompressionSchema::EmbeddedQuantizedPrefixExtraction:
+            cmc_debug_msg("Embedded Quantized PrefixAMR Decompression is instantiated.");
+            return std::make_unique<cmc::lossy::embedded::prefix::quantization::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         default:
             cmc_err_msg("The compression schema of the compressed variable is not recognized for an embedded variable.");
