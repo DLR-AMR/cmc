@@ -336,6 +336,9 @@ ComputeHexPrediction(const CompressionValue<T>& coarse_approximation, const Face
 
 #endif
 
+
+#if 1
+
 //constexpr double weight_coarse_approx = 0.25824569976124335585176;
 //constexpr double weight_face_neighbor = 0.24725143341291888138275;
 
@@ -441,6 +444,157 @@ ComputeHexPrediction(const CompressionValue<T>& coarse_approximation, const Face
     }
 }
 
+#else
+
+//Weights basd on metric:
+//coarse approx: sqrt(3) / 4
+//face neigh: sqrt(11) / 4
+//far face neigh: sqrt(27) / 4
+
+//Gesamt: 2.561207005157727 -> 6.817595611688743
+
+//  wca = 3; wfn = 1.566698903601281; wffn = 1;
+//Gesamt: 10.700096710803843
+
+constexpr double weight_coarse_approx = 1.0 / 5.0;
+constexpr double weight_face_neighbor = 1.0 / 6.0;
+constexpr double weight_far_face_neighbor = 1.0 / 10.0;
+
+//constexpr double weight_coarse_approx = 3.0 / 10.700096710803843;
+//constexpr double weight_face_neighbor = 1.566698903601281 / 10.700096710803843;
+//constexpr double weight_far_face_neighbor = 1.0 / 10.700096710803843;
+
+//constexpr double weight_coarse_approx = 1.0;
+//constexpr double weight_face_neighbor = 0.0;
+//constexpr double weight_far_face_neighbor = 0.0;
+
+constexpr double wca = weight_coarse_approx;
+constexpr double wfn = weight_face_neighbor;
+constexpr double wffn = weight_far_face_neighbor;
+
+template<typename T>
+T
+ComputeHexPrediction(const CompressionValue<T>& coarse_approximation, const FaceValues<T>& face_values, const int child_id)
+{
+    /* Get the actual value of the coarse approximation */
+    const T approximation = coarse_approximation.template ReinterpretDataAs<T>();
+
+    switch (child_id)
+    {
+        case 0:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f0 + wfn * f2 + wfn * f4 + wffn * f1 + wffn * f3 + wffn * f5);
+            return prediction;
+        }
+        break;
+        case 1:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f1 + wfn * f2 + wfn * f4 + wffn * f0 + wffn * f3 + wffn * f5);
+            return prediction;
+        }
+        break;
+        case 2:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f0 + wfn * f3 + wfn * f4 + wffn * f1 + wffn * f2 + wffn * f5);
+            return prediction;
+        }
+        break;
+        case 3:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f1 + wfn * f3 + wfn * f4 + wffn * f0 + wffn * f2 + wffn * f5);
+            return prediction;
+        }
+        break;
+        case 4:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f0 + wfn * f2 + wfn * f5 + wffn * f1 + wffn * f3 + wffn * f4);
+            return prediction;
+        }
+        break;
+        case 5:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f1 + wfn * f2 + wfn * f5 + wffn * f0 + wffn * f3 + wffn * f4);
+            return prediction;
+        }
+        break;
+        case 6:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f0 + wfn * f3 + wfn * f5 + wffn * f1 + wffn * f2 + wffn * f4);
+            return prediction;
+        }
+        break;
+        case 7:
+        {
+            const T f0 = face_values.values[0].template ReinterpretDataAs<T>();
+            const T f1 = face_values.values[1].template ReinterpretDataAs<T>();
+            const T f2 = face_values.values[2].template ReinterpretDataAs<T>();
+            const T f3 = face_values.values[3].template ReinterpretDataAs<T>();
+            const T f4 = face_values.values[4].template ReinterpretDataAs<T>();
+            const T f5 = face_values.values[5].template ReinterpretDataAs<T>();
+
+            const T prediction = (wca * approximation + wfn * f1 + wfn * f3 + wfn * f5 + wffn * f0 + wffn * f2 + wffn * f4);
+            return prediction;
+        }
+        break;
+        default:
+            cmc_err_msg("The child id (", child_id, ") does not coincide with a refinement of an hex element.");
+            return T();
+        break;
+    }
+}
+
+#endif
+
+
 template<typename T>
 auto
 PredictAndComputeResidual(const CompressionValue<T>& coarse_approximation, const FaceValues<T>& face_values, const CompressionValue<T>& initial_value, const int child_id)
@@ -535,7 +689,7 @@ PredictAndComputeResidual(const CompressionValue<T>& coarse_approximation, const
 
     ++iiiiiii;
 
-    if (iiiiiii >= 8000000 && iiiiiii < 8001000)
+    if (iiiiiii >= 8000000 && iiiiiii < 8000500)
     {
         const T initial_val = initial_value.template ReinterpretDataAs<T>();
         cmc_debug_msg("Index: ", iiiiiii, ", Residual: ", prediction - initial_val);
@@ -1135,7 +1289,11 @@ MultiResEmbeddedAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
+        uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
+        if (val.GetNumberLeadingZeros() == sizeof(T) * bit_map::kCharBit)
+        {
+            signum = 0;
+        }
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
         /* Update this symbol for encoding */
@@ -1183,9 +1341,15 @@ MultiResEmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue
     /* Get a view on the residual flags */
     bit_map::BitMapView residual_flags(resdiual_order_indications_);
     
+    size_t counter_implicit_residual = 0;
     /* Iterate over all values and encode them */
-    for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
+    for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter, ++counter_implicit_residual)
     {
+        //if (counter_implicit_residual % 8 == 0)
+        //{
+        //    residual_flags.GetNextBit();
+        //    continue;
+        //}
         /* Get the current value */
         CompressionValue<T> val = *val_iter;
 

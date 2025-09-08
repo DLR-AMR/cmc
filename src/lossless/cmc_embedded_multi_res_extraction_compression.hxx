@@ -88,6 +88,9 @@ template<typename T>
 T
 GetCoarseApproximationMaximizingResidualsLZC(const VectorView<CompressionValue<T>> values)
 {
+    //const std::vector<T> converted_valss = ConvertCompressionValues<T>(values);
+    //return InterpolateToArithmeticMean<T>(converted_valss);
+
     cmc_assert(values.size() >= 1);
 
     T current_best_predictor{T()};
@@ -158,8 +161,11 @@ MultiResEmbeddedAdaptData<T>::PerformExtraction([[maybe_unused]] const int which
         /* Compute the residual between approximation and actual value */
         auto [is_approximation_greater, residual] = cmc::lossless::multi_res::ComputeResidual<T>(coarse_approximation, *val_iter);
 
+        //if (val_iter != std::prev(values.end()))
+        //{
         /* Store whether the approximation is greater than the real value */
         resdiual_order_indications_.AppendBit(is_approximation_greater);
+        //}
 
         /* Store the residual */
         fine_values.push_back(residual);
@@ -195,7 +201,11 @@ MultiResEmbeddedAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std
         CompressionValue<T> val = *val_iter;
 
         /* Get the encoded LZC */
-        const uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
+        uint32_t signum = cmc::lossless::multi_res::util::GetSignumForEncoding(residual_flags.GetNextBit());
+        if (val.GetNumberLeadingZeros() == sizeof(T) * bit_map::kCharBit)
+        {
+            signum = 0;
+        }
         const uint32_t first_one_bit = val.GetNumberLeadingZeros();
 
         /* Update this symbol for encoding */

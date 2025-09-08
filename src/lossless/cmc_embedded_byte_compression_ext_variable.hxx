@@ -1,5 +1,5 @@
-#ifndef LOSSLESS_CMC_EMBEDDED_BYTE_COMPRESSION_VARIABLE_HXX
-#define LOSSLESS_CMC_EMBEDDED_BYTE_COMPRESSION_VARIABLE_HXX
+#ifndef LOSSLESS_CMC_EMBEDDED_BYTE_COMPRESSION_EXT_VARIABLE_HXX
+#define LOSSLESS_CMC_EMBEDDED_BYTE_COMPRESSION_EXT_VARIABLE_HXX
 
 #include "cmc_config.h"
 #include "t8code/cmc_t8_mesh.hxx"
@@ -26,7 +26,7 @@
 
 #include <type_traits>
 
-namespace cmc::lossless::embedded
+namespace cmc::lossless::embedded::ext
 {
 
 /* A typedef for the sake of brevity */
@@ -130,6 +130,8 @@ public:
 
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
+    int GetInitialMaximumRefinementLevel() const {return max_initial_refinement_level_;}
+
     friend IEmbeddedCompressionAdaptData<T>;
 protected:
     AbstractEmbeddedByteCompressionVariable() = delete;
@@ -158,6 +160,7 @@ protected:
 private:
     VectorView<CompressionValue<T>> GetView(const int start_index, const int count) const;
     VectorView<CompressionValue<T>> GetView(const int tree_id, const int lelement_index, const int count) const;
+    CompressionValue<T> GetDataValueAtIndex(const int local_index) const;
 
     void StoreExtractedValues(const int tree_id, const int lelement_id, const int num_elements, const ExtractionData<T>& extracted_values);
     void StoreUnchangedElement(const int tree_id, const int lelement_id, const UnchangedData<T>& extracted_value);
@@ -180,10 +183,7 @@ private:
     void SortInitialDataIntoVariables(input::Variable<T>& input_variable, const std::vector<VariableRecvMessage>& messages);
     std::vector<input::IndexReduction> UpdateLinearIndicesToTheInitialMesh();
     AmrMesh BuildInitialMesh(const input::Variable<T>& input_variable);
-
-
-    void PerformTailTruncationOnInitialData(); //TODO: delete
-
+    void DetermineInitialMaximumRefinementLevel();
 
     std::string name_; //!< The name of the variable
     AmrMesh mesh_; //!< The mesh on which the variable is defined
@@ -198,8 +198,7 @@ private:
     bool store_refinement_indication_bits_{true};
     
     MPI_Comm comm_{MPI_COMM_NULL}; //!< The MPI communicator to use
-
-    //std::vector<CompressionValue<T>> test_data_;
+    int max_initial_refinement_level_{-1};
 };
 
 /**
@@ -218,11 +217,12 @@ public:
     bool IsCompressionProgressing() const;
 
     virtual void InitializeExtractionIteration() = 0;
-    virtual void FinalizeExtractionIteration() = 0;
+    void FinalizeExtractionIteration();
     virtual void CompleteExtractionIteration(const t8_forest_t previous_forest, const t8_forest_t adapted_forest) = 0;
     virtual void RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest) = 0;
 
-    int ExtractValue(const int which_tree, const int lelement_id, const int num_elements);
+    int ExtractValue(t8_forest_t forest, t8_locidx_t which_tree, const t8_eclass_t tree_class, t8_locidx_t lelement_id,
+                     const t8_scheme_c * ts, const int num_elements, t8_element_t * elements[]);
     int LeaveElementUnchanged(const int which_tree, const int lelement_id);
 
     virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
@@ -234,306 +234,23 @@ public:
 
     bool IsValidForCompression() const;
     const VariableAttributes<T>& GetVariableAttributes() const {cmc_assert(base_variable_ != nullptr); return base_variable_->GetVariableAttributes();}
+    int GetInitialMaximumRefinementLevel() {return base_variable_->GetInitialMaximumRefinementLevel();}
+    int GetCurrentCompressionStep() const {return compression_step_;}
     
+    VectorView<CompressionValue<T>> GetView(const int start_index, const int count) const {return base_variable_->GetView(start_index, count);}
+    VectorView<CompressionValue<T>> GetView(const int tree_id, const int lelement_index, const int count) const {return base_variable_->GetView(tree_id, lelement_index, count);}
+    CompressionValue<T> GetDataValueAtIndex(const int local_index) const {return base_variable_->GetDataValueAtIndex(local_index);}
 protected:
-    virtual ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) = 0;
+    virtual ExtractionData<T> PerformExtraction(t8_forest_t forest, t8_locidx_t which_tree, const t8_eclass_t tree_class, t8_locidx_t lelement_id,
+                                                const t8_scheme_c * ts, const int num_elements, t8_element_t * elements[]) = 0;
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
+    virtual void FinalizingExtractionIteration() = 0;
 
     std::unique_ptr<entropy_coding::IByteCompressionEntropyCoder> entropy_coder_{nullptr}; //!< The entropy coder to use in order to encode information
 private:
     AbstractEmbeddedByteCompressionVariable<T>* const base_variable_{nullptr};
+    int compression_step_{0};
 };
-
-#if 1
-//TODO: delete block
-enum CompressionCriterion {CriterionUndefined, RelativeErrorThreshold, AbsoluteErrorThreshold};
-
-struct PermittedError
-{
-    PermittedError() = delete;
-    PermittedError(const CompressionCriterion etype, const double permitted_error)
-    : criterion{etype}, error{permitted_error}{};
-
-    const CompressionCriterion criterion{CompressionCriterion::CriterionUndefined};
-    const double error{0.0};
-};
-
-struct ErrorCompliance
-{
-    ErrorCompliance() = delete;
-    ErrorCompliance(const bool is_error_threshold_fulfilled, const double max_error)
-    : is_error_threshold_satisfied{is_error_threshold_fulfilled}, max_introduced_error{max_error}{};
-
-    const bool is_error_threshold_satisfied;
-    const double max_introduced_error;
-};
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    /* Calculate the relative deviation */
-    return static_cast<double>(std::abs(initial_value - nominal_value)) / static_cast<double>(std::abs(initial_value));
-}
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    /* Calculate the relative deviation */
-    return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value)) / static_cast<double>(initial_value);
-}
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    /* Calculate the absolute deviation */
-    return static_cast<double>(std::abs(initial_value - nominal_value));
-}
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    /* Calculate the absolute deviation */
-    return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value));
-}
-
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the absolute deviation */
-        return static_cast<double>(std::abs(initial_value - nominal_value));
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the absolute deviation */
-        return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value));
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the relative deviation */
-        return static_cast<double>(std::abs(initial_value - nominal_value)) / static_cast<double>(std::abs(initial_value));
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the relative deviation */
-        return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value)) / static_cast<double>(initial_value);
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<class T>
-ErrorCompliance
-IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const T& missing_value)
-{
-    /* Get the absolute inaccuracy for all values (the absolute error is needed in any case) */
-    const double abs_inaccuracy = ComputeSingleAbsoluteDeviationSkipMissingValues(initial_value, nominal_value, missing_value);
-
-    for (auto pe_iter = permitted_errors.begin(); pe_iter != permitted_errors.end(); ++pe_iter)
-    {
-        switch (pe_iter->criterion)
-        {
-            case CompressionCriterion::AbsoluteErrorThreshold:
-            {
-                /* Check if it is compliant with the permitted error */
-                if (abs_inaccuracy > pe_iter->error)
-                {
-                    return ErrorCompliance(false, 0.0);
-                }
-            }
-            break;
-            case CompressionCriterion::RelativeErrorThreshold:
-            {
-                /* Get the relative inaccuracy for all values */
-                const double rel_inaccuracy = ComputeSingleRelativeDeviationSkipMissingValues(initial_value, nominal_value, missing_value);
-                /* Check if it is compliant with the permitted error */
-                if (rel_inaccuracy > pe_iter->error)
-                {
-                    return ErrorCompliance(false, 0.0);
-                }
-            }
-            break;
-                default:
-                cmc_err_msg("The error specifications hold an unrecognized criterion.");
-                return ErrorCompliance(false, 0.0);
-        }
-    }
-
-    /* If the funciton reaches this point, the interpolated value complies with the permitted errors */
-    return ErrorCompliance(true, abs_inaccuracy);
-}
-
-template<typename T>
-CompressionValue<T>
-GetMaximumTailToggledValue(const int index, const std::vector<PermittedError>& permitted_errors, const CompressionValue<T>& initial_serialized_value, const T& missing_value)
-{
-    bool is_toogling_progressing = true;
-    CompressionValue<T> toggled_value = initial_serialized_value;
-
-    const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
-
-    int iteration_count = 0;
-    const int max_iteration_count = sizeof(T) * CHAR_BIT;
-
-    while (is_toogling_progressing && iteration_count < max_iteration_count)
-    {
-        const CompressionValue<T> save_previous_value = toggled_value;
-
-        /* Toggle all ones up until the next unset bit (inclusive) */
-        toggled_value.ToggleTailUntilNextUnsetBit();
-        const T reinterpreted_value = toggled_value.template ReinterpretDataAs<T>();
-
-        /* Check if it is error compliant */
-        const ErrorCompliance error_evaluation = IsValueErrorCompliant(permitted_errors, initial_val, reinterpreted_value, missing_value);
-
-        if (!error_evaluation.is_error_threshold_satisfied)
-        {
-            /* Revert the changes to the value */
-            toggled_value = save_previous_value;
-            is_toogling_progressing = false;
-        }
-
-        ++iteration_count;
-    }
-
-    return toggled_value;
-}
-
-
-template<typename T>
-CompressionValue<T>
-GetMaximumTailClearedValue(const int index, const std::vector<PermittedError>& permitted_errors, const CompressionValue<T>& initial_serialized_value, const T& missing_value)
-{
-    bool is_clearing_progressing = true;
-    CompressionValue<T> cleared_value = initial_serialized_value;
-
-    const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
-
-    int iteration_count = 0;
-    const int max_iteration_count = sizeof(T) * CHAR_BIT;
-
-    while (is_clearing_progressing && iteration_count < max_iteration_count)
-    {
-        const CompressionValue<T> save_previous_value = cleared_value;
-
-        /* Clear the next set bit from the tail */
-        cleared_value.ClearNextSetBitFromTail();
-        const T reinterpreted_value = cleared_value.template ReinterpretDataAs<T>();
-
-        /* Check if it is error compliant */
-        const ErrorCompliance error_evaluation = IsValueErrorCompliant(permitted_errors, initial_val, reinterpreted_value, missing_value);
-
-        if (!error_evaluation.is_error_threshold_satisfied)
-        {
-            /* Revert the changes to the value */
-            cleared_value = save_previous_value;
-            is_clearing_progressing = false;
-        }
-
-        ++iteration_count;
-    }
-
-    return cleared_value;
-}
-
-
-template<typename T>
-void
-AbstractEmbeddedByteCompressionVariable<T>::PerformTailTruncationOnInitialData()
-{
-    const T missing_value = attributes_.GetMissingValue();
-
-    /* Iterate through the serialized values and try to emplace as many zeros at the tail as possible (compliant to the error threshold) */
-    int index = 0;
-    for (auto val_iter = data_.begin(); val_iter != data_.end(); ++val_iter, ++index)
-    {
-        const T re_val = val_iter->template ReinterpretDataAs<T>();
-
-        if (!ApproxCompare(re_val, missing_value))
-        {
-            /* Get the permitted error for the current values */
-            const std::vector<PermittedError> permitted_errors = std::vector<PermittedError>{PermittedError(CompressionCriterion::RelativeErrorThreshold, 0.01)};
-
-            /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
-            const CompressionValue<T> toggled_value = GetMaximumTailToggledValue(index, permitted_errors, *val_iter, missing_value);
-
-            /* Get the value which has been transformed by clearing as many of the last set bits as possible */
-            const CompressionValue<T> cleared_value = GetMaximumTailClearedValue(index, permitted_errors, *val_iter, missing_value);
-
-            /* Check which approach leads to more zero bits at the end */
-            const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
-            const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
-
-            /* Replace the initial value with the transformed one */
-            if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
-            {
-                /* If the toggling approach has been more successfull */
-                *val_iter = toggled_value;
-            } else
-            {
-                /* If the clearing approach has been more successfull */
-                *val_iter = cleared_value;
-            }
-
-            /* Update the trail bit count for the new value */
-            val_iter->UpdateTailBitCount();
-            //cmc_debug_msg("Trailing Zeros: Toggled: ", num_toogled_trailing_zeros, ", Cleared: ", num_cleared_trailing_zeros);
-        } else
-        {
-            /* In order to not change missing values, we are just able to trim their trailing zeros */
-            val_iter->UpdateTailBitCount();
-        }
-    }
-}
-
-
-#endif
-
-
-
 
 template <typename T>
 void
@@ -673,7 +390,8 @@ IEmbeddedCompressionAdaptData<T>::IsCompressionProgressing() const
  */
 template <typename T>
 int
-IEmbeddedCompressionAdaptData<T>::ExtractValue(const int which_tree, const int lelement_id, const int num_elements)
+IEmbeddedCompressionAdaptData<T>::ExtractValue(t8_forest_t forest, t8_locidx_t which_tree, const t8_eclass_t tree_class, t8_locidx_t lelement_id,
+                                               const t8_scheme_c * ts, const int num_elements, t8_element_t * elements[])
 {
     cmc_assert(which_tree >= 0 && lelement_id >= 0);
     cmc_assert(num_elements > 1);
@@ -681,11 +399,8 @@ IEmbeddedCompressionAdaptData<T>::ExtractValue(const int which_tree, const int l
     /* We indicate to that a coarsening is applied to the family of elements */
     base_variable_->IndicateCoarsening();
 
-    /* Get the corresponding values */
-    const VectorView<CompressionValue<T>> values = base_variable_->GetView(which_tree, lelement_id, num_elements);
-
     /* Extract the coarse values, and potentially alter the remaining fine values */
-    const ExtractionData<T> extracted_values = PerformExtraction(which_tree, lelement_id, num_elements, values);
+    const ExtractionData<T> extracted_values = PerformExtraction(forest, which_tree, tree_class, lelement_id, ts, num_elements, elements);
 
     /* Store the extracted values wihtin the variable */
     base_variable_->StoreExtractedValues(which_tree, lelement_id, num_elements, extracted_values);
@@ -725,6 +440,27 @@ IEmbeddedCompressionAdaptData<T>::LeaveElementUnchanged(const int which_tree, co
     return cmc::t8::kLeaveElementUnchanged;
 }
 
+template <typename T>
+void
+IEmbeddedCompressionAdaptData<T>::FinalizeExtractionIteration()
+{
+    ++compression_step_;
+    this->FinalizingExtractionIteration();
+}
+
+
+inline
+bool CheckIfElementIsReadyForCoarsening(const int initial_max_ref_level, const int elem_level, const int compression_step)
+{
+    if (elem_level == initial_max_ref_level - compression_step)
+    {
+        return true;
+    } else
+    {
+        return false;
+    }
+}
+
 /**
  * @brief The adaptation function which is used for the lossless compression variables.
  * In case a family is passed to this callback, an extraction process is always performed.
@@ -734,30 +470,32 @@ IEmbeddedCompressionAdaptData<T>::LeaveElementUnchanged(const int which_tree, co
  */
 template<typename T>
 inline t8_locidx_t
-LosslessByteCompression (t8_forest_t forest,
-                         [[maybe_unused]] t8_forest_t forest_from,
+LosslessByteCompression ([[maybe_unused]] t8_forest_t forest,
+                         t8_forest_t forest_from,
                          t8_locidx_t which_tree,
-                         [[maybe_unused]] const t8_eclass_t tree_class,
+                         const t8_eclass_t tree_class,
                          t8_locidx_t lelement_id,
-                         [[maybe_unused]] const t8_scheme_c * ts,
+                         const t8_scheme_c * ts,
                          const int is_family,
                          const int num_elements,
-                         [[maybe_unused]] t8_element_t * elements[])
+                         t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
     IEmbeddedCompressionAdaptData<T>* adapt_data = static_cast<IEmbeddedCompressionAdaptData<T>*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
 
     /* Check if a family is supplied to the adaptation function */
-    if (is_family == 0)
+    if (is_family == 0 || not CheckIfElementIsReadyForCoarsening(adapt_data->GetInitialMaximumRefinementLevel(), ts->element_get_level(tree_class, elements[0]), adapt_data->GetCurrentCompressionStep()))
     {
+        //cmc_debug_msg("Element ", lelement_id, " remains unchanged.");
         /* If there is no family, the element stays unchanged */
         const int ret_val = adapt_data->LeaveElementUnchanged(which_tree, lelement_id);
         return ret_val;
     } else
     {
         /* Extract a value of the family and coarsen it */
-        const int ret_val = adapt_data->ExtractValue(which_tree, lelement_id, num_elements);
+        const int ret_val = adapt_data->ExtractValue(forest_from, which_tree, tree_class, lelement_id,
+                                                     ts, num_elements, elements);
         return ret_val;
     }
 }
@@ -771,6 +509,10 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
 
     cmc_assert(this->IsValidForCompression());
     cmc_debug_msg("Lossless compression of variable ", this->name_, " starts...");
+
+    /* Determine the maximum present refinement level */
+    this->DetermineInitialMaximumRefinementLevel();
+    cmc_assert(this->GetInitialMaximumRefinementLevel() > 0);
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
     IEmbeddedCompressionAdaptData<T>* adapt_data = this->CreateAdaptData();
@@ -790,11 +532,8 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
         t8_forest_t previous_forest = mesh_.GetMesh();
         t8_forest_ref(previous_forest);
 
-        //test_data_.clear();
-        //test_data_.reserve(t8_forest_get_local_num_elements(previous_forest));
-
         /* Perform a coarsening iteration */
-        t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, LosslessByteCompression<T>, 0, 0, static_cast<void*>(adapt_data));
+        t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, LosslessByteCompression<T>, 0, 1, static_cast<void*>(adapt_data)); //Adapt the forest accordingly and create a ghost layer
         cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_elements(adapted_forest), " global elements");
 
         /* Complete the interpolation step by storing the newly computed adapted data alongside its deviations */
@@ -804,7 +543,6 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
         t8_forest_unref(&previous_forest);
 
         /* Encode the data of this level and store it within a buffer */
-        //auto [encoded_entropy_codes, encoded_data] = adapt_data->EncodeLevelData(test_data_);
         auto [encoded_entropy_codes, encoded_data] = adapt_data->EncodeLevelData(data_);
         buffered_entropy_codes_.push_back(std::move(encoded_entropy_codes));
         buffered_encoded_data_.push_back(std::move(encoded_data));
@@ -911,6 +649,14 @@ AbstractEmbeddedByteCompressionVariable<T>::GetView(const int tree_id, const int
 }
 
 template <typename T>
+CompressionValue<T>
+AbstractEmbeddedByteCompressionVariable<T>::GetDataValueAtIndex(const int local_index) const
+{
+    cmc_assert(local_index < t8_forest_get_local_num_elements(mesh_.GetMesh()));
+    return data_[local_index];
+}
+
+template <typename T>
 void
 AbstractEmbeddedByteCompressionVariable<T>::StoreExtractedValues(const int tree_id, const int lelement_id, const int num_elements, const ExtractionData<T>& extracted_values)
 {
@@ -928,9 +674,6 @@ AbstractEmbeddedByteCompressionVariable<T>::StoreExtractedValues(const int tree_
 
     /* Store the extracted coarse value for the next coarsening iteration */
     data_new_.push_back(extracted_values.coarse_value);
-
-    //std::copy_n(extracted_values.fine_values.begin(), num_elements, std::back_inserter(test_data_));
-    //test_data_.pop_back(); //Remove last residual
 }
 
 template <typename T>
@@ -949,8 +692,6 @@ AbstractEmbeddedByteCompressionVariable<T>::StoreUnchangedElement(const int tree
 
     /* Set the new value for the next coarsening iteration */
     data_new_.push_back(extracted_value.coarse_value);
-
-    //test_data_.push_back(extracted_value.fine_value);
 }
 
 
@@ -968,6 +709,10 @@ AbstractEmbeddedByteCompressionVariable<T>::RepartitionMesh(t8_forest_t adapted_
     /* Partition the forest */
     const int partition_for_coarsening = 0; //TODO: change to 'one' when partition for coarsening is in t8code
     t8_forest_set_partition(partitioned_forest, adapted_forest, partition_for_coarsening);
+
+    /* Construct the ghost layer */
+    t8_forest_set_ghost (partitioned_forest, 1, T8_GHOST_FACES);
+
     t8_forest_commit(partitioned_forest);
 
     return partitioned_forest;
@@ -1095,7 +840,14 @@ AbstractEmbeddedByteCompressionVariable<T>::BuildInitialMesh(const input::Variab
     /* Build the actual embedded mesh based on the given features */
     auto [initial_forest, initial_refinement_level, dimensionality] = BuildInitialEmbeddedMesh(global_domain, initial_mesh_layout, GetMPIComm());
 
-    return AmrMesh(initial_forest, initial_refinement_level, dimensionality);
+    /* Balance the forest */
+    t8_forest_t initial_forest_balanced;
+    t8_forest_init(&initial_forest_balanced);
+    t8_forest_set_balance (initial_forest_balanced, initial_forest, 0);
+    t8_forest_set_ghost (initial_forest_balanced, 1, T8_GHOST_FACES);
+    t8_forest_commit (initial_forest_balanced);
+
+    return AmrMesh(initial_forest_balanced, initial_refinement_level, dimensionality);
 }
 
 template <typename T>
@@ -1366,6 +1118,37 @@ AbstractEmbeddedByteCompressionVariable<T>::DistributeDataOnInitialMesh(input::V
     #endif
 }
 
+template <typename T>
+void
+AbstractEmbeddedByteCompressionVariable<T>::DetermineInitialMaximumRefinementLevel()
+{
+    t8_forest_t mesh = this->GetAmrMesh().GetMesh();
+    const t8_scheme_c* scheme =  t8_forest_get_scheme(mesh);
+
+    const t8_locidx_t num_local_trees = t8_forest_get_num_local_trees(mesh);
+    int val_idx = 0;
+
+    /* Iterate over all elements in all trees */
+    for (t8_locidx_t tree_idx = 0; tree_idx < num_local_trees; ++tree_idx)
+    {
+        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, tree_idx);
+        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_elements (mesh, tree_idx);
+        for (t8_locidx_t elem_idx = 0; elem_idx < num_elements_in_tree; ++elem_idx, ++val_idx)
+        {
+            /* Get the current element */
+            const t8_element_t* element = t8_forest_get_element_in_tree (mesh, tree_idx, elem_idx);
+
+            const int elem_level = scheme->element_get_level(tree_class, element);
+
+            if (max_initial_refinement_level_ < elem_level)
+            {
+                max_initial_refinement_level_ = elem_level;
+            }
+        }
+    }
+
+    cmc_debug_msg("The maximum present element refinement level is ", max_initial_refinement_level_);
+}
 }
 
-#endif /* !LOSSLESS_CMC_EMBEDDED_BYTE_COMPRESSION_VARIABLE_HXX */
+#endif /* !LOSSLESS_CMC_EMBEDDED_BYTE_COMPRESSION_EXT_VARIABLE_HXX */

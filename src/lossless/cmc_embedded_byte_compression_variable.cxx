@@ -26,6 +26,7 @@ static t8_locidx_t
 RefineToInitialEmbeddedMesh (t8_forest_t forest,
                              [[maybe_unused]] t8_forest_t forest_from,
                              t8_locidx_t which_tree,
+                             const t8_eclass_t tree_class,
                              t8_locidx_t lelement_id,
                              const t8_scheme_c * ts,
                              [[maybe_unused]] const int is_family,
@@ -35,8 +36,6 @@ RefineToInitialEmbeddedMesh (t8_forest_t forest,
     AdaptDataInitialEmbeddedMesh* adapt_data = static_cast<AdaptDataInitialEmbeddedMesh*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
     
-    const t8_eclass_t tree_class = t8_forest_get_tree_class (forest, which_tree);
-
     /* Check if the element is already on the initial refinement level (or if it is still coarser) */
     if (ts->element_get_level(tree_class, elements[0]) >= adapt_data->initial_refinement_level)
     {
@@ -109,7 +108,7 @@ BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layou
     for (int adaptation_steps = 0; adaptation_steps <= initial_refinement_level; ++adaptation_steps)
     {
         t8_forest_init(&adapted_forest);
-        t8_forest_set_adapt(adapted_forest, initial_forest, RefineToInitialMesh, 0);
+        t8_forest_set_adapt(adapted_forest, initial_forest, RefineToInitialEmbeddedMesh, 0);
         const int set_partition_for_coarsening = 0; //TODO change to one later
         t8_forest_set_partition(adapted_forest, NULL, set_partition_for_coarsening);
         t8_forest_set_user_data(adapted_forest, static_cast<void*>(&adapt_data));
