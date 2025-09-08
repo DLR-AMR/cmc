@@ -3,7 +3,10 @@ example/cmc_t8_construct_mesh_and_data_for_compression \
 example/lossless/cmc_embedded_multi_res_compression \
 example/lossless/cmc_embedded_prefix_compression \
 example/lossless/cmc_embedded_pcp4_multi_res_compression \
-example/cmc_compare_bin_output
+example/cmc_compare_bin_output \
+example/cmc_compare_lossy_compression_output \
+example/lossless/cmc_embedded_multi_res_ext_reconstruction_compression \
+example/lossy/cmc_embedded_multi_res_ext_reconstruction_compression
 
 example_netcdf_cmc_gather_nc_data_SOURCES =  example/netcdf/cmc_gather_nc_data.cxx
 
@@ -13,4 +16,14 @@ example_lossless_cmc_embedded_multi_res_compression_SOURCES = example/lossless/c
 
 example_cmc_compare_bin_output_SOURCES = example/cmc_compare_bin_output.cxx
 
+example_cmc_compare_lossy_compression_output_SOURCES = example/cmc_compare_lossy_compression_output.cxx
+
 example_lossless_cmc_embedded_pcp4_multi_res_compression_SOURCES = example/lossless/cmc_embedded_pcp4_multi_res_compression.cxx
+
+example_lossy_cmc_trimmed_multi_res_compression_SOURCES = example/lossy/cmc_trimmed_multi_res_compression.cxx
+
+example_lossy_cmc_quantized_prefix_compression_SOURCES = example/lossy/cmc_quantized_prefix_compression.cxx
+
+example_lossless_cmc_embedded_multi_res_ext_reconstruction_compression_SOURCES = example/lossless/cmc_embedded_multi_res_ext_reconstruction_compression.cxx
+
+example_lossy_cmc_embedded_multi_res_ext_reconstruction_compression_SOURCES = example/lossy/cmc_embedded_multi_res_ext_reconstruction_compression.cxx

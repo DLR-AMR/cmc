@@ -81,6 +81,8 @@ install(FILES
     utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx 
     utilities/cmc_trimmed_multi_res_compression_entropy_alphabet.hxx 
     utilities/cmc_trimmed_multi_res_coder.hxx 
+    utilities/cmc_residual_quantization_entropy_alphabet.hxx 
+    utilities/cmc_residual_quantization_encoder.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 
@@ -128,6 +130,15 @@ install(FILES
     lossy/cmc_embedded_byte_compression_variable.hxx 
     lossy/cmc_embedded_trimmed_multi_res_extraction_compression.hxx 
     lossy/cmc_embedded_prefix_quantization_compression.hxx 
+    lossy/cmc_embedded_byte_compression_extended_variable.hxx 
+    lossy/cmc_embedded_multi_res_extraction_nearest_neighbor_reconstruction.hxx 
+    lossy/cmc_embedded_multi_res_extraction_nearest_neighbor_reconstruction_trimmed_residuals.hxx 
+    lossy/cmc_embedded_byte_compression_scanline_variable.hxx 
+    lossy/cmc_multi_res_scanline_compression.hxx 
+    lossy/cmc_embedded_idw_compression_variable.hxx 
+    lossy/cmc_embedded_idw_extraction_compression.hxx 
+    lossy/cmc_embedded_byte_decompression_variable.hxx 
+    lossy/cmc_embedded_prefix_quantization_decompression.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lossy
 )
 
