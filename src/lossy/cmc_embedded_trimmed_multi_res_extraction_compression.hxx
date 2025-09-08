@@ -263,6 +263,8 @@ MultiResEmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue
     
     cmc_assert(IEmbeddedCompressionAdaptData<T>::entropy_coder_ != nullptr);
 
+    cmc_debug_msg("Zero residuals in this iteration: ", cmc::lossy::multi_res::count_zero_res);
+    cmc::lossy::multi_res::count_zero_res = 0;
     /* Get the rank of the mpi process within the communicator */
     int rank{0};
     int ret_val = MPI_Comm_rank(this->GetMPIComm(), &rank);
@@ -470,11 +472,36 @@ public:
         return CompressionSchema::EmbeddedTrimmedMultiResExtraction;
     }
 
+    //void PreCompressionProcessing(std::vector<CompressionValue<T>>& initial_data) override;
+
 private:
 
 };
 
+#if 0
+template<class T>
+void
+EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<CompressionValue<T>>& initial_data) 
+{
+    //T val1 = initial_data[1].template ReinterpretDataAs<T>();
+    //T val2 = initial_data[2].template ReinterpretDataAs<T>();
+    //T val3 = initial_data[3].template ReinterpretDataAs<T>();
+    T val1(0);
+    T val2(0);
+    T val3(0);
 
+    for (auto init_val_iter = initial_data.begin(); init_val_iter != initial_data.end(); ++init_val_iter)
+    {
+        T prediciton = val3 - val2 + val1;
+        
+        val3 = val2;
+        val2 = val1;
+        val1 = (*init_val_iter - prediction);
+
+        initial_data
+    }
+}
+#endif
 
 }
 

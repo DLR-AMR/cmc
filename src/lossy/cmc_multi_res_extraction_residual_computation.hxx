@@ -682,7 +682,7 @@ GetMaximumTailToggledResidual(const std::vector<PermittedError>& permitted_error
     return std::make_pair(residual, inaccuracy);
 }
 
-
+static int count_zero_res = 0;
 
 template <typename T>
 std::tuple<bool, CompressionValue<T>, double>
@@ -697,6 +697,7 @@ ComputeMinimalResidual(const T& approximation, const CompressionValue<T>& real_v
     /* In case the residual is smaller than the permitted error */
     if (check_zero_residual.is_error_threshold_satisfied)
     {
+        ++count_zero_res;
         /* In this case the residual is zero */
         return std::make_tuple(false, CompressionValue<T>(), check_zero_residual.max_introduced_error);
     }
