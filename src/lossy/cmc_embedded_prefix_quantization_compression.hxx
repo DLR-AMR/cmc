@@ -19,7 +19,6 @@
 namespace cmc::lossy::embedded::prefix
 {
 
-
 /* A typedef for the sake of brevity */
 template <typename T>
 using CompressionValue = SerializedCompressionValue<sizeof(T)>;
@@ -603,6 +602,7 @@ template<typename T>
 void
 EmbeddedCompressionVariable<T>::PerformTailTruncation(CompressionValue<T>& initial_byte_value, const std::vector<PermittedError>& permitted_errors)
 {
+    #if 1
     const T missing_value = this->GetVariableAttributes().GetMissingValue();
 
     const T reinterpreted_val = initial_byte_value.template ReinterpretDataAs<T>();
@@ -646,10 +646,9 @@ EmbeddedCompressionVariable<T>::PerformTailTruncation(CompressionValue<T>& initi
     const int tail = initial_byte_value.GetTailBit();
     if (tail < sizeof(T) * CHAR_BIT)
         initial_byte_value.SetTailBit(tail + 1);
+    #endif
 }
 
-//TODO: Since we remove the trailing zeros, we can remove the implciit one at the end of the bit-sequence
-//!!!!!!
 /* Perform the tail truncation as a pre-processing step */
 template<class T>
 void
