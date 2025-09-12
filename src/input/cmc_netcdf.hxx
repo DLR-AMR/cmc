@@ -43,12 +43,14 @@ public:
     void InquireVariables(const Hyperslab& hyperslab, Ts&&... variable_names);
 
     void SetHintLongitudeDimension(const int longitude_dimension_id);
-
     void SetHintLatitudeDimension(const int latitude_dimension_id);
-
     void SetHintHeightDimension(const int height_dimension_id);
-
     void SetHintTimeDimension(const int time_dimension_id);
+
+    void SetHintLongitudeDimension(const std::string& longitude_dimension_name);
+    void SetHintLatitudeDimension(const std::string& latitude_dimension_name);
+    void SetHintHeightDimension(const std::string& height_dimension_name);
+    void SetHintTimeDimension(const std::string& time_dimension_name);
 
     [[nodiscard]] std::vector<input::Var>&& TransferData();
 

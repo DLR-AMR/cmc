@@ -33,6 +33,32 @@ Data::Open(const std::string& path_to_file, const nc::OpeningMode mode, const MP
     #endif
 }
 
+static
+int 
+GetDimensionId(const int ncid, const std::string& dimension_name)
+{
+    int dimension_id;
+
+    /* Inquire the netCDF internal variable id by the given variable's name */
+    const int err = nc_inq_dimid(ncid, dimension_name.c_str(), &dimension_id);
+    nc::CheckError(err);
+
+    return dimension_id;
+}
+
+static
+int 
+GetVariableId(const int ncid, const std::string& variable_name)
+{
+    int variable_id;
+
+    /* Inquire the netCDF internal variable id by the given variable's name */
+    const int err = nc_inq_varid(ncid, variable_name.c_str(), &variable_id);
+    nc::CheckError(err);
+
+    return variable_id;
+}
+
 void
 Data::SetHintLongitudeDimension(const int longitude_dimension_id)
 {
@@ -66,6 +92,43 @@ Data::SetHintTimeDimension(const int time_dimension_id)
     #ifdef CMC_WITH_NETCDF
     cmc_assert(time_dimension_id >= 0);
     coordinate_dimension_ids_[Dimension::Time] = time_dimension_id;
+    #endif
+}
+
+
+void
+Data::SetHintLongitudeDimension(const std::string& longitude_dimension_name)
+{
+    #ifdef CMC_WITH_NETCDF
+    cmc_assert(not longitude_dimension_name.empty());
+    coordinate_dimension_ids_[Dimension::Lon] = GetDimensionId(ncid_, longitude_dimension_name);
+    #endif
+}
+
+void
+Data::SetHintLatitudeDimension(const std::string& latitude_dimension_name)
+{
+    #ifdef CMC_WITH_NETCDF
+    cmc_assert(not latitude_dimension_name.empty());
+    coordinate_dimension_ids_[Dimension::Lat] = GetDimensionId(ncid_, latitude_dimension_name);
+    #endif
+}
+
+void
+Data::SetHintHeightDimension(const std::string& height_dimension_name)
+{
+    #ifdef CMC_WITH_NETCDF
+    cmc_assert(not height_dimension_name.empty());
+    coordinate_dimension_ids_[Dimension::Lev] = GetDimensionId(ncid_, height_dimension_name);
+    #endif
+}
+
+void
+Data::SetHintTimeDimension(const std::string& time_dimension_name)
+{
+    #ifdef CMC_WITH_NETCDF
+    cmc_assert(not time_dimension_name.empty());
+    coordinate_dimension_ids_[Dimension::Time] = GetDimensionId(ncid_, time_dimension_name);
     #endif
 }
 
@@ -152,19 +215,6 @@ Data::InquireCoordinates()
     InquireCoordinateDimensions();
 
     #endif
-}
-
-static
-int 
-GetVariableId(const int ncid, const std::string& variable_name)
-{
-    int variable_id;
-
-    /* Inquire the netCDF internal variable id by the given variable's name */
-    const int err = nc_inq_varid(ncid, variable_name.c_str(), &variable_id);
-    nc::CheckError(err);
-
-    return variable_id;
 }
 
 static
