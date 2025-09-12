@@ -36,6 +36,8 @@
 namespace cmc::decompression::embedded
 {
 
+constexpr bool kWriteDecompressionStepToVTK = false;
+
 /* A typedef for the sake of brevity */
 template <typename T>
 using CompressionValue = SerializedCompressionValue<sizeof(T)>;
@@ -397,7 +399,10 @@ AbstractEmbeddedByteDecompressionVariable<T>::Decompress()
     /* Decode the root level values */
     data_ = adapt_data->DecodeRootLevel(mesh_.GetNumberLocalElements());
 
-    WriteData<T>(mesh_.GetMesh(), data_);
+    if constexpr (kWriteDecompressionStepToVTK)
+    {    
+        WriteData<T>(mesh_.GetMesh(), data_);
+    }
 
     /* Perform decompression iterations until the mesh is completely reconstructed */
     while (mesh_decoder_->IsDecompressionProgressing())
@@ -449,7 +454,12 @@ AbstractEmbeddedByteDecompressionVariable<T>::Decompress()
             mesh_decoder_->FinalizeDecompressionIteration();
         }
         cmc_debug_msg("The decompression iteration is finished.");
-        WriteData<T>(mesh_.GetMesh(), data_);
+        
+        if constexpr (kWriteDecompressionStepToVTK)
+        {
+            WriteData<T>(mesh_.GetMesh(), data_);
+            cmc_debug_msg("The decompression step has been written out in a .vtu file.");
+        }
     }
 
     /* Free the adapt data structure */
