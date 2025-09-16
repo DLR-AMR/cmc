@@ -105,6 +105,13 @@ public:
         return bytes_;
     }
 
+    bool IsBitSetAtPosition(const int bit_position) const;
+    void ToggleBitAtPosition(const int bit_position);
+    void ToggleBitAtPositionAndResetPreviousBits(const int bit_position);
+
+
+    int GetTypeNumBits() const {return N * CHAR_BIT;}
+
     SerializedCompressionValue& operator^=(const SerializedCompressionValue& rhs)
     {
         for (int i = 0; i < N; ++i)
@@ -250,6 +257,7 @@ SerializedCompressionValue<N>::ApplySuffix(const std::vector<uint8_t>& serialize
     if (num_bits <= 0) {return;}
 
     cmc_assert(indicators_.tail_bit_ > 0);
+    cmc_assert(static_cast<int>(serialized_suffix.size() * CHAR_BIT) >= num_bits);
 
     int bits_written = 0;
 
@@ -365,6 +373,63 @@ SerializedCompressionValue<N>::IsExactlyEmpty() const
     } else
     {
         return false;
+    }
+}
+
+template<int N>
+bool
+SerializedCompressionValue<N>::IsBitSetAtPosition(const int bit_position) const
+{
+    const int byte_pos = bit_position / CHAR_BIT;
+    const int bit_pos = bit_position - byte_pos * CHAR_BIT;
+
+    int byte_id = GetLSBByteStart<N>();
+    for (int counter = 0; LSBContinueIteration<N>(byte_id) && counter < byte_pos; LSBByteIncrement(byte_id), ++counter)
+    {
+        //Iterate until the byte_id is correctly set
+    }
+
+    return (bytes_[byte_id] & (kLowBit << bit_pos) ? true : false);
+}
+
+template<int N>
+void
+SerializedCompressionValue<N>::ToggleBitAtPosition(const int bit_position)
+{
+    const int byte_pos = bit_position / CHAR_BIT;
+    const int bit_pos = bit_position - byte_pos * CHAR_BIT;
+
+    int byte_id = GetLSBByteStart<N>();
+    for (int counter = 0; LSBContinueIteration<N>(byte_id) && counter < byte_pos; LSBByteIncrement(byte_id), ++counter)
+    {
+        //Iterate until the byte_id is correctly set
+    }
+
+    bytes_[byte_id] ^= (kLowBit << bit_pos);
+}
+
+template<int N>
+void
+SerializedCompressionValue<N>::ToggleBitAtPositionAndResetPreviousBits(const int bit_position)
+{
+    const bool bit_value = IsBitSetAtPosition(bit_position);
+
+    const int byte_pos = bit_position / CHAR_BIT;
+    const int bit_pos = bit_position - byte_pos * CHAR_BIT;
+
+    int byte_id = GetLSBByteStart<N>();
+    for (int counter = 0; LSBContinueIteration<N>(byte_id) && counter <= byte_pos; LSBByteIncrement(byte_id), ++counter)
+    {
+        //Iterate until the byte_id is correctly set
+        if  (counter == byte_pos)
+        {
+            bytes_[byte_id] = (bytes_[byte_id] & ~(LowBitMask[CHAR_BIT - 1 - bit_pos])) ||
+                              ((bit_value == true) ?  uint8_t{0xFF} >> (CHAR_BIT - bit_pos) : uint8_t{0x01} << bit_pos);
+        } else
+        {
+            /* Fill the whole byte */
+            bytes_[byte_id] = (bit_value ==  true ? uint8_t{0x00} : uint8_t{0xFF});
+        }
     }
 }
 

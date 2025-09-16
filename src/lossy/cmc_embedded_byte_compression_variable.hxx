@@ -147,7 +147,9 @@ public:
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
     friend IEmbeddedCompressionAdaptData<T>;
-
+    /* For simplified testing of a version of the lossy PrefixAMR, the function has been made public instead of protected. Revert to protected when testing stage is finihsed */
+    std::vector<PermittedError> GetRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
+        const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
 protected:
     AbstractEmbeddedByteCompressionVariable() = delete;
     AbstractEmbeddedByteCompressionVariable(const CompressionSettings& settings, input::Var& input_variable)
@@ -175,8 +177,7 @@ protected:
         if (not is_inaccuracy_tracking_activated_) {return;}
         inaccuracy_storage_ = std::make_unique<FullInaccuracyTracker>(size_hint);
     }
-    std::vector<PermittedError> GetRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
-                                                     const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
+    
     void SetInaccuracyTracking(const bool activate_inaccuracy_tracking) {is_inaccuracy_tracking_activated_ = activate_inaccuracy_tracking;}
     AdaptCreator<T> adaptation_creator_; //!< A function pointer which is used to create the wished adaptation structure
     AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure

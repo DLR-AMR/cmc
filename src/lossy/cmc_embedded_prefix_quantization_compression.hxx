@@ -16,6 +16,8 @@
 #include <array>
 #include <algorithm>
 
+#define kPreferPrefixTruncationOverPrefixElongation 1
+
 namespace cmc::lossy::embedded::prefix
 {
 
@@ -371,8 +373,11 @@ public:
 
     void PreCompressionProcessing(std::vector<CompressionValue<T>>& initial_data) override;
 
-private:
+    /* For simplified testing, the Perform TailTruncation function has been made public. Revert when testing stage is done. */
     void PerformTailTruncation(CompressionValue<T>& initial_byte_value, const std::vector<PermittedError>& permitted_errors);
+    void PerformTailTruncationOnward(CompressionValue<T>& initial_byte_value, CompressionValue<T>& current_value, const std::vector<PermittedError>& permitted_errors, const int max_num_trunc_iter);
+
+private:
 };
 
 
@@ -526,7 +531,7 @@ IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const
 
 template<typename T>
 CompressionValue<T>
-GetMaximumTailToggledValue(const CompressionValue<T>& initial_serialized_value, const std::vector<PermittedError>& permitted_errors, const T& missing_value)
+GetMaximumTailToggledValue(const CompressionValue<T>& initial_serialized_value, const std::vector<PermittedError>& permitted_errors, const T& missing_value, const int max_iteration_count = sizeof(T) * CHAR_BIT)
 {
     bool is_toogling_progressing = true;
     CompressionValue<T> toggled_value = initial_serialized_value;
@@ -534,7 +539,6 @@ GetMaximumTailToggledValue(const CompressionValue<T>& initial_serialized_value, 
     const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
 
     int iteration_count = 0;
-    const int max_iteration_count = sizeof(T) * CHAR_BIT;
 
     while (is_toogling_progressing && iteration_count < max_iteration_count)
     {
@@ -563,7 +567,7 @@ GetMaximumTailToggledValue(const CompressionValue<T>& initial_serialized_value, 
 
 template<typename T>
 CompressionValue<T>
-GetMaximumTailClearedValue(const CompressionValue<T>& initial_serialized_value, const std::vector<PermittedError>& permitted_errors, const T& missing_value)
+GetMaximumTailClearedValue(const CompressionValue<T>& initial_serialized_value, const std::vector<PermittedError>& permitted_errors, const T& missing_value, const int max_iteration_count = sizeof(T) * CHAR_BIT)
 {
     bool is_clearing_progressing = true;
     CompressionValue<T> cleared_value = initial_serialized_value;
@@ -571,7 +575,6 @@ GetMaximumTailClearedValue(const CompressionValue<T>& initial_serialized_value, 
     const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
 
     int iteration_count = 0;
-    const int max_iteration_count = sizeof(T) * CHAR_BIT;
 
     while (is_clearing_progressing && iteration_count < max_iteration_count)
     {
@@ -597,6 +600,7 @@ GetMaximumTailClearedValue(const CompressionValue<T>& initial_serialized_value, 
     return cleared_value;
 }
 
+//TODO: Check for NaN and Infs during tail truncation
 static size_t bit_removal_trunc = 0;
 template<typename T>
 void
@@ -649,6 +653,8 @@ EmbeddedCompressionVariable<T>::PerformTailTruncation(CompressionValue<T>& initi
     #endif
 }
 
+#if kPreferPrefixTruncationOverPrefixElongation
+
 /* Perform the tail truncation as a pre-processing step */
 template<class T>
 void
@@ -681,6 +687,382 @@ EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<Compression
     cmc_debug_msg("Bit removal tail truncation: ", bit_removal_trunc, " in bytes: ", bit_removal_trunc / 8);
 }
 
+#else
+
+template<typename T>
+CompressionValue<T>
+GetMaximumTailToggledValue(const CompressionValue<T>& initial_serialized_value, const CompressionValue<T>& current_value, const std::vector<PermittedError>& permitted_errors, const T& missing_value, const int max_iteration_count = sizeof(T) * CHAR_BIT)
+{
+    bool is_toogling_progressing = true;
+    CompressionValue<T> toggled_value = current_value;
+
+    const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
+
+    int iteration_count = 0;
+
+    while (is_toogling_progressing && iteration_count < max_iteration_count)
+    {
+        const CompressionValue<T> save_previous_value = toggled_value;
+
+        /* Toggle all ones up until the next unset bit (inclusive) */
+        toggled_value.ToggleTailUntilNextUnsetBit();
+        const T reinterpreted_value = toggled_value.template ReinterpretDataAs<T>();
+
+        /* Check if it is error compliant */
+        const ErrorCompliance error_evaluation = IsValueErrorCompliant(permitted_errors, initial_val, reinterpreted_value, missing_value);
+
+        if (!error_evaluation.is_error_threshold_satisfied)
+        {
+            /* Revert the changes to the value */
+            toggled_value = save_previous_value;
+            is_toogling_progressing = false;
+        }
+
+        ++iteration_count;
+    }
+
+    return toggled_value;
+}
+
+
+template<typename T>
+CompressionValue<T>
+GetMaximumTailClearedValue(const CompressionValue<T>& initial_serialized_value, const CompressionValue<T>& current_value, const std::vector<PermittedError>& permitted_errors, const T& missing_value, const int max_iteration_count = sizeof(T) * CHAR_BIT)
+{
+    bool is_clearing_progressing = true;
+    CompressionValue<T> cleared_value = current_value;
+
+    const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
+
+    int iteration_count = 0;
+
+    while (is_clearing_progressing && iteration_count < max_iteration_count)
+    {
+        const CompressionValue<T> save_previous_value = cleared_value;
+
+        /* Clear the next set bit from the tail */
+        cleared_value.ClearNextSetBitFromTail();
+        const T reinterpreted_value = cleared_value.template ReinterpretDataAs<T>();
+
+        /* Check if it is error compliant */
+        const ErrorCompliance error_evaluation = IsValueErrorCompliant(permitted_errors, initial_val, reinterpreted_value, missing_value);
+
+        if (!error_evaluation.is_error_threshold_satisfied)
+        {
+            /* Revert the changes to the value */
+            cleared_value = save_previous_value;
+            is_clearing_progressing = false;
+        }
+
+        ++iteration_count;
+    }
+
+    return cleared_value;
+}
+
+
+template<typename T>
+void
+EmbeddedCompressionVariable<T>::PerformTailTruncationOnward(CompressionValue<T>& initial_byte_value, CompressionValue<T>& current_value, const std::vector<PermittedError>& permitted_errors, const int max_num_trunc_iter)
+{
+    #if 1
+    const T missing_value = this->GetVariableAttributes().GetMissingValue();
+
+    const T reinterpreted_val = initial_byte_value.template ReinterpretDataAs<T>();
+
+    const T reinterpreted_current_val = current_value.template ReinterpretDataAs<T>();
+     
+    if (!ApproxCompare(reinterpreted_val, missing_value))
+    {
+        /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
+        const CompressionValue<T> toggled_value = GetMaximumTailToggledValue(initial_byte_value, reinterpreted_current_val, permitted_errors, missing_value, max_num_trunc_iter);
+
+        /* Get the value which has been transformed by clearing as many of the last set bits as possible */
+        const CompressionValue<T> cleared_value = GetMaximumTailClearedValue(initial_byte_value, reinterpreted_current_val, permitted_errors, missing_value, max_num_trunc_iter);
+
+        /* Check which approach leads to more zero bits at the end */
+        const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
+        const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
+
+        /* Replace the initial value with the transformed one */
+        if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
+        {
+            /* If the toggling approach has been more successfull */
+            initial_byte_value = toggled_value;
+            bit_removal_trunc += num_toogled_trailing_zeros;
+            //initial_byte_value.SetTailBit(num_toogled_trailing_zeros);
+        } else
+        {
+            /* If the clearing approach has been more successfull */
+            initial_byte_value = cleared_value;
+            bit_removal_trunc += num_cleared_trailing_zeros;
+            //initial_byte_value.SetTailBit(num_cleared_trailing_zeros);
+        }
+
+        /* Update the trail bit count for the new value */
+        initial_byte_value.UpdateTailBitCount();
+    } else
+    {
+        /* In order to not change missing values, we are just able to trim their trailing zeros */
+        initial_byte_value.UpdateTailBitCount();
+    }
+
+    //Test implicit one before TZC 
+    const int tail = initial_byte_value.GetTailBit();
+    if (tail < sizeof(T) * CHAR_BIT)
+        initial_byte_value.SetTailBit(tail + 1);
+    #endif
+}
+
+template <typename T>
+struct MaximizeCommonPrefixAdaptData
+{
+    MaximizeCommonPrefixAdaptData(EmbeddedCompressionVariable<T>* variable, std::vector<CompressionValue<T>>& initial_vals, const T missing_val)
+    : var{variable}, compression_vals{initial_vals}, missing_value{missing_val} {};
+
+    EmbeddedCompressionVariable<T>* var;
+    std::vector<CompressionValue<T>>& compression_vals;
+    const T missing_value;
+};
+
+template<typename T>
+std::pair<bool, CompressionValue<T>>
+EvaluateInitialCommonPrefix(const VectorView<CompressionValue<T>>& compression_values)
+{
+    cmc_assert(compression_values.size() >= 2);
+
+    /* Check if all elements are holding an actual prefix */
+    for (auto cv_iter = compression_values.begin(); cv_iter != compression_values.end(); ++cv_iter)
+    {
+        if (cv_iter->IsEmpty())
+        {
+            /* Since this prefix value is empty, there cannot be a common prefix */
+            return std::make_pair(false, CompressionValue<T>());
+        }
+    }
+
+    /* Determine a common prefix of the first two values */
+    CompressionValue<T> prefix = GetCommonPrefix<sizeof(T)>(compression_values[0], compression_values[1]);
+
+    /* Check if there is common prefix between the first two values */
+    if (prefix.GetCountOfSignificantBits() == 0)
+    {
+        /* There is no common prefix */
+        return std::make_pair(false, CompressionValue<T>());
+    }
+
+    /* Check if there is a common prefix with the other values within the view */
+    for (size_t index = 2; index < compression_values.size(); ++index)
+    {
+        /* Find a common prefix of all variables */
+        prefix = GetCommonPrefix(prefix, compression_values[index]);
+
+        if (prefix.GetCountOfSignificantBits() == 0)
+        {
+            /* There is no common prefix */
+            return std::make_pair(false, CompressionValue<T>());
+        }
+    }
+
+    /* If the function arrives here, we do have found a common prefix which can be extracted from the 'previous prefixes' */
+    return std::make_pair(true, prefix);
+}
+
+template<typename T>
+std::pair<std::vector<CompressionValue<T>>, int>
+AlterToMaximizePrefix(const VectorView<CompressionValue<T>>& values, const CompressionValue<T>& prefix, const std::vector<std::vector<PermittedError>>& permitted_errors, const T& missing_value)
+{
+    /* Copy the values */
+    std::vector<CompressionValue<T>> data;
+    data.reserve(values.size());
+    for (auto iter = values.begin(); iter != values.end(); ++iter)
+    {
+        data.push_back(*iter);
+    }
+
+    std::vector<CompressionValue<T>> data_save;
+    bool is_altering_progressing = true;
+
+    /* Get the prefix length and the "unequal bit position" */
+    int pref_length = prefix.GetCountOfSignificantBits();
+    int bit_pos = prefix.GetTypeNumBits() - pref_length - 1;
+
+    while (is_altering_progressing && bit_pos > 0)
+    {
+        data_save = data;
+
+        bit_pos = prefix.GetTypeNumBits() - pref_length - 1;
+        cmc_assert(bit_pos >= 0);
+
+        int count_one_bits{0};
+
+        /* Count the bit difference */
+        for (auto iter = data.begin(); iter != data.end(); ++iter)
+        {
+            if (iter->IsBitSetAtPosition(bit_pos))
+            {
+                ++count_one_bits;
+            }
+        }
+
+        if (count_one_bits >= data.size() / 2)
+        {
+            /* More one bits are present */
+            for (auto data_iter = data.begin(); data_iter != data.end(); ++data_iter)
+            {
+                if (not data_iter->IsBitSetAtPosition(bit_pos))
+                {
+                    /* In case the bit is not set, we alter the value */
+                    data_iter->ToggleBitAtPositionAndResetPreviousBits(bit_pos);
+                }
+            }
+        } else
+        {
+            /* More zero bits are present */
+            for (auto data_iter = data.begin(); data_iter != data.end(); ++data_iter)
+            {
+                if (data_iter->IsBitSetAtPosition(bit_pos))
+                {
+                    /* In case the bit is set, we alter the value */
+                    data_iter->ToggleBitAtPositionAndResetPreviousBits(bit_pos);
+                }
+            }
+        }
+
+        bool is_error_compliant = true;
+        /* Check if the altered values are error-compliant */
+        int idx = 0;
+
+        for (auto data_iter = data.begin(); data_iter != data.end(); ++data_iter, ++idx)
+        {
+            const ErrorCompliance error_eval = IsValueErrorCompliant<T>(permitted_errors[idx], values[idx].template ReinterpretDataAs<T>(), data_iter->template ReinterpretDataAs<T>(), missing_value);
+
+            if (not error_eval.is_error_threshold_satisfied)
+            {
+                is_error_compliant = false;
+                break;
+            }
+        }
+
+        if (is_error_compliant && pref_length < prefix.GetTypeNumBits())
+        {
+            ++pref_length;
+            data_save = data;
+
+            //cmc_debug_msg("Successfull prefix elongation");
+        } else
+        {
+            is_altering_progressing = false;
+            data = data_save;
+        }
+
+    }
+
+    return std::make_pair(data, bit_pos);
+}
+
+
+template<typename T>
+inline t8_locidx_t
+MaximizeCommonPrefix (t8_forest_t forest,
+                      t8_forest_t forest_from,
+                         t8_locidx_t which_tree,
+                         [[maybe_unused]] const t8_eclass_t tree_class,
+                         t8_locidx_t lelement_id,
+                         [[maybe_unused]] const t8_scheme_c * ts,
+                         const int is_family,
+                         const int num_elements,
+                         [[maybe_unused]] t8_element_t * elements[])
+{
+    /* Retrieve the adapt_data */
+    MaximizeCommonPrefixAdaptData<T>* adapt_data = static_cast<MaximizeCommonPrefixAdaptData<T>*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    const int start_index = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
+
+    VectorView<CompressionValue<T>> data(&adapt_data->compression_vals[start_index], num_elements);
+
+    /* Collect the permitted errrors  */
+    std::vector<std::vector<PermittedError>> permitted_errors;
+    permitted_errors.reserve(num_elements);
+
+    for (int elem_id = 0; elem_id < num_elements; ++elem_id)
+    {
+        const t8_element_t* elem = elements[elem_id];
+        permitted_errors.push_back(adapt_data->var->GetRestrictingErrors(forest_from, which_tree, lelement_id + elem_id, ts, 1, &elem));
+    }
+
+
+    // If it is a family we try to maximize the common prefix
+    if (is_family)
+    {
+        auto [is_prefix_present, prefix] = EvaluateInitialCommonPrefix<T>(data);
+
+        /* If there is a common prefix, we try to maximize it, if there is no common prefix, we just perform the tail truncation */
+        if (is_prefix_present)
+        {
+            if (prefix.GetCountOfSignificantBits() == prefix.GetTypeNumBits())
+            {
+                /* If the prefix is full, nothing has to be done */
+                return -1;
+            }
+
+            const int pref_length = prefix.GetCountOfSignificantBits();
+            const int bit_pos = prefix.GetTypeNumBits() - pref_length - 1;
+
+            cmc_assert(bit_pos >= 0);
+
+            /* Maximize the prefixes */
+            auto [altered_values, new_bit_pos] = AlterToMaximizePrefix<T>(data, prefix, permitted_errors, adapt_data->missing_value);
+
+            /* Perform tail truncation */
+            int alt_idx = 0;
+            for (auto alt_data_iter = altered_values.begin(); alt_data_iter != altered_values.end(); ++alt_data_iter, ++alt_idx)
+            {
+                adapt_data->var->PerformTailTruncationOnward(adapt_data->compression_vals[start_index + alt_idx], *alt_data_iter, permitted_errors[alt_idx], new_bit_pos);
+            }
+
+        } else
+        {
+            //Perform tailt runcaiton on all family members here 
+            int d_idx = 0;
+            
+            for (auto data_iter = data.begin(); data_iter != data.end(); ++data_iter, ++d_idx)
+            {
+                adapt_data->var->PerformTailTruncation(adapt_data->compression_vals[start_index + d_idx], permitted_errors[d_idx]);
+            }
+
+        }
+        return -1;
+    } else
+    {
+        // If it is no family, we just perform the tail truncation 
+        //In the adaptive case, the element values needs to be checked for prefix maximizing the first time they would be coarsened and if it is not applicable tail truncation can be used
+
+        adapt_data->var->PerformTailTruncation(adapt_data->compression_vals[start_index], permitted_errors[0]);
+    }
+
+    return 0;
+}
+
+/* Try to maximize common prefixes */
+template<class T>
+void
+EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<CompressionValue<T>>& initial_data) 
+{
+    t8_forest_t mesh = this->GetAmrMesh().GetMesh();
+    const T missing_value = this->GetVariableAttributes().GetMissingValue();
+
+    t8_forest_ref(mesh);
+    MaximizeCommonPrefixAdaptData<T> adapt_data(this, initial_data, missing_value);
+
+    t8_forest_t mesh2 = t8_forest_new_adapt(mesh, MaximizeCommonPrefix<T>, 0, 0, &adapt_data);
+    t8_forest_unref(&mesh2);
+}
+
+
+
+#endif
 
 }
 
