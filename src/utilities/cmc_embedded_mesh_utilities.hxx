@@ -105,7 +105,7 @@ BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layou
     const int dimensionality = domain.GetDimensionality();
     cmc_debug_msg("Comm is: ", comm);
     /* Create the cmesh; either a quad or hex tree based on the dimension */
-    t8_cmesh_t cmesh = t8_cmesh_new_hypercube(EmbeddedMeshDimensionToElementClass(dimensionality), comm, 0, 0, 1);
+    t8_cmesh_t cmesh = t8_cmesh_new_hypercube(EmbeddedMeshDimensionToElementClass(dimensionality), comm, 0, 0, 0);
 
     /* Determine the initial refinement level for embedding the data */
     const int initial_refinement_level = CalculateInitialEmbeddedRefinementLevel(domain);
