@@ -261,7 +261,7 @@ PrefixEmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T
     /* Get the local encoded prefix lengths */
     cmc::bit_map::BitMap local_encoded_prefix_length_stream = IEmbeddedCompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
     const uint64_t local_encoded_prefix_length_stream_num_bytes = static_cast<uint64_t>(local_encoded_prefix_length_stream.size_bytes());
-
+    cmc_debug_msg("Num bytes for prefix length encoding: ", local_encoded_prefix_length_stream_num_bytes);
     /* We need exchange the encoded lengths */
     const std::vector<uint64_t> local_bytes{local_encoded_prefix_length_stream_num_bytes, local_remaining_significant_bits_num_bytes};
     std::vector<uint64_t> global_bytes{0, 0};
@@ -376,6 +376,7 @@ public:
     /* For simplified testing, the Perform TailTruncation function has been made public. Revert when testing stage is done. */
     void PerformTailTruncation(CompressionValue<T>& initial_byte_value, const std::vector<PermittedError>& permitted_errors);
     void PerformTailTruncationOnward(CompressionValue<T>& initial_byte_value, CompressionValue<T>& current_value, const std::vector<PermittedError>& permitted_errors, const int max_num_trunc_iter);
+    void PerformTailTruncationOnFamily(std::vector<CompressionValue<T>>& initial_byte_values, const int start_index, const int num_elements, const std::vector<std::vector<PermittedError>>& permitted_errors);
 
 private:
 };
@@ -655,6 +656,8 @@ EmbeddedCompressionVariable<T>::PerformTailTruncation(CompressionValue<T>& initi
 
 #if kPreferPrefixTruncationOverPrefixElongation
 
+#if 1
+
 /* Perform the tail truncation as a pre-processing step */
 template<class T>
 void
@@ -686,6 +689,8 @@ EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<Compression
 
     cmc_debug_msg("Bit removal tail truncation: ", bit_removal_trunc, " in bytes: ", bit_removal_trunc / 8);
 }
+#endif
+
 
 #else
 
@@ -1063,6 +1068,341 @@ EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<Compression
 
 
 #endif
+
+
+
+#if 0
+
+template <typename T>
+struct BlockTruncPrefixAdaptData
+{
+    BlockTruncPrefixAdaptData(EmbeddedCompressionVariable<T>* variable, std::vector<CompressionValue<T>>& initial_vals, const T missing_val)
+    : var{variable}, compression_vals{initial_vals}, missing_value{missing_val} {};
+
+    EmbeddedCompressionVariable<T>* var;
+    std::vector<CompressionValue<T>>& compression_vals;
+    const T missing_value;
+};
+
+
+template<typename T>
+void
+EmbeddedCompressionVariable<T>::PerformTailTruncationOnFamily(std::vector<CompressionValue<T>>& initial_byte_values, const int start_index, const int num_elements, const std::vector<std::vector<PermittedError>>& permitted_errors)
+{
+    #if 1
+    const T missing_value = this->GetVariableAttributes().GetMissingValue();
+
+    int min_num_tzc = 1000;
+    std::vector<CompressionValue<T>> truncated_vals;
+    truncated_vals.reserve(num_elements);
+
+    for (int idx = 0; idx < num_elements; ++idx)
+    {
+        CompressionValue<T> initial_byte_value = initial_byte_values[start_index + idx];
+
+        /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
+        const CompressionValue<T> toggled_value = GetMaximumTailToggledValue(initial_byte_value, permitted_errors[idx], missing_value);
+        /* Get the value which has been transformed by clearing as many of the last set bits as possible */
+        const CompressionValue<T> cleared_value = GetMaximumTailClearedValue(initial_byte_value, permitted_errors[idx], missing_value);
+
+        /* Check which approach leads to more zero bits at the end */
+        const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
+        const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
+
+        /* Replace the initial value with the transformed one */
+        if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
+        {
+            /* If the toggling approach has been more successfull */
+            truncated_vals.push_back(toggled_value);
+            if (min_num_tzc > num_toogled_trailing_zeros)
+            {
+                min_num_tzc = num_toogled_trailing_zeros;
+            }
+        } else
+        {
+            /* If the clearing approach has been more successfull */
+            truncated_vals.push_back(cleared_value);
+            if (min_num_tzc > num_cleared_trailing_zeros)
+            {
+                min_num_tzc = num_cleared_trailing_zeros;
+            }
+        }
+    }
+
+    /* Set the tail bit for this family */
+    for (auto iter = truncated_vals.begin(); iter != truncated_vals.end(); ++iter)
+    {
+        iter->SetTailBit(min_num_tzc);
+    }
+
+    /* Copy truncated values over */
+    for (int idx = 0; idx < num_elements; ++idx)
+    {
+        initial_byte_values[start_index + idx] = truncated_vals[idx];
+    }
+
+    #endif
+}
+
+
+template<typename T>
+inline t8_locidx_t
+BlockTruncatePrefixes (t8_forest_t forest,
+                      t8_forest_t forest_from,
+                         t8_locidx_t which_tree,
+                         [[maybe_unused]] const t8_eclass_t tree_class,
+                         t8_locidx_t lelement_id,
+                         [[maybe_unused]] const t8_scheme_c * ts,
+                         const int is_family,
+                         const int num_elements,
+                         [[maybe_unused]] t8_element_t * elements[])
+{
+    /* Retrieve the adapt_data */
+    BlockTruncPrefixAdaptData<T>* adapt_data = static_cast<BlockTruncPrefixAdaptData<T>*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    const int start_index = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
+
+    VectorView<CompressionValue<T>> data(&adapt_data->compression_vals[start_index], num_elements);
+
+    /* Collect the permitted errrors  */
+    std::vector<std::vector<PermittedError>> permitted_errors;
+    permitted_errors.reserve(num_elements);
+
+    for (int elem_id = 0; elem_id < num_elements; ++elem_id)
+    {
+        const t8_element_t* elem = elements[elem_id];
+        permitted_errors.push_back(adapt_data->var->GetRestrictingErrors(forest_from, which_tree, lelement_id + elem_id, ts, 1, &elem));
+    }
+
+
+    // If it is a family we try to maximize the common prefix
+    if (is_family)
+    {
+        adapt_data->var->PerformTailTruncationOnFamily(adapt_data->compression_vals, start_index, num_elements, permitted_errors);
+
+        return -1;
+    } else
+    {
+        // If it is no family, we just perform the tail truncation 
+        //In the adaptive case, the element values needs to be checked for prefix maximizing the first time they would be coarsened and if it is not applicable tail truncation can be used
+
+        adapt_data->var->PerformTailTruncation(adapt_data->compression_vals[start_index], permitted_errors[0]);
+    }
+
+    return 0;
+}
+
+
+/* Try to maximize common prefixes */
+template<class T>
+void
+EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<CompressionValue<T>>& initial_data) 
+{
+    t8_forest_t mesh = this->GetAmrMesh().GetMesh();
+    const T missing_value = this->GetVariableAttributes().GetMissingValue();
+
+    t8_forest_ref(mesh);
+    BlockTruncPrefixAdaptData<T> adapt_data(this, initial_data, missing_value);
+
+    t8_forest_t mesh2 = t8_forest_new_adapt(mesh, BlockTruncatePrefixes<T>, 0, 0, &adapt_data);
+    t8_forest_unref(&mesh2);
+}
+
+#endif
+
+
+#if 0
+
+template <typename T>
+struct TreeQuantAdaptData
+{
+    TreeQuantAdaptData(EmbeddedCompressionVariable<T>* variable, std::vector<CompressionValue<T>>& initial_vals, const T missing_val)
+    : var{variable}, compression_vals{initial_vals}, missing_value{missing_val} {};
+
+    EmbeddedCompressionVariable<T>* var;
+    std::vector<CompressionValue<T>>& compression_vals;
+    const T missing_value;
+};
+
+
+
+static int el_counter = 0;
+
+static size_t bit_counter = 0;
+
+template <typename T>
+T CalculateMidRange(const VectorView<CompressionValue<T>>& values)
+{
+    #if 1
+    //Mid Range
+    cmc_assert(!values.empty());
+    cmc_assert(values.size() >= 2);
+
+    T min = std::numeric_limits<T>::max();
+    T max = std::numeric_limits<T>::min();
+
+    for (auto iter = values.begin(); iter != values.end(); ++iter)
+    {
+        const T val = iter->template ReinterpretDataAs<T>();
+        if (min > val)
+        {
+            min = val;
+        }
+        if (max < val)
+        {
+            max = val;
+        }
+    }
+
+    return ((max / 2) + (min / 2));
+
+    #else
+    //Arithmetic Mean
+
+    double sum = 0;
+
+    for (auto iter = values.begin(); iter != values.end(); ++iter)
+    {
+        const T val = iter->template ReinterpretDataAs<T>();
+        sum += static_cast<double>(val);
+    }
+
+    return static_cast<T>(sum / static_cast<double>(values.size()));
+
+    #endif
+}
+
+template <typename T>
+std::pair<int, int>
+FindSFCEncoding(const T mid_val, const T init_val, const T init_res, const std::vector<PermittedError>& permitted_error)
+{
+    int lvl_count = 0;
+    bool encoding_continues = true;
+    T res_range = init_res;
+    T quant_val = mid_val;
+
+    int encoding{0};
+
+    while (encoding_continues)
+    {
+        /* Check if error compliance is fullfilled */
+        ErrorCompliance err_compl = IsValueErrorCompliant(permitted_error, init_val, quant_val, T(10000000000));
+
+        if (err_compl.is_error_threshold_satisfied)
+        {
+            encoding_continues = false;
+        } else
+        {
+            res_range = res_range / 2.0;
+
+            if (quant_val >= init_val)
+            {
+                quant_val -= res_range;
+                encoding <<= 1;
+            } else
+            {
+                quant_val += res_range;
+                encoding <<= 1;
+                encoding |= int{0x00000001};
+            }
+
+            ++lvl_count;
+        }
+    }
+
+    return std::make_pair(encoding, lvl_count);
+}
+
+template<typename T>
+inline t8_locidx_t
+TreeQuant (t8_forest_t forest,
+                      t8_forest_t forest_from,
+                         t8_locidx_t which_tree,
+                         [[maybe_unused]] const t8_eclass_t tree_class,
+                         t8_locidx_t lelement_id,
+                         [[maybe_unused]] const t8_scheme_c * ts,
+                         const int is_family,
+                         const int num_elements,
+                         [[maybe_unused]] t8_element_t * elements[])
+{
+    /* Retrieve the adapt_data */
+    TreeQuantAdaptData<T>* adapt_data = static_cast<TreeQuantAdaptData<T>*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    const int start_index = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
+
+    /* Collect the permitted errrors  */
+    std::vector<std::vector<PermittedError>> permitted_errors;
+    permitted_errors.reserve(num_elements);
+
+    for (int elem_id = 0; elem_id < num_elements; ++elem_id)
+    {
+        const t8_element_t* elem = elements[elem_id];
+        permitted_errors.push_back(adapt_data->var->GetRestrictingErrors(forest_from, which_tree, lelement_id + elem_id, ts, 1, &elem));
+    }
+
+    if (is_family)
+    {
+        VectorView<CompressionValue<T>> data(&adapt_data->compression_vals[start_index], num_elements);
+
+        /* Find the mid range */
+        const T mid_range = CalculateMidRange<T>(data);
+
+        if (el_counter >= 5000000 && el_counter < 5001000)
+        {
+            T max_res = T(0.0);
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                if (std::abs(mid_range - iter->template ReinterpretDataAs<T>()) > max_res)
+                {
+                    max_res = std::abs(mid_range - iter->template ReinterpretDataAs<T>());
+                }
+            }
+
+            int pe_idx = 0;
+            for (auto iter = data.begin(); iter != data.end(); ++iter, ++pe_idx)
+            {
+                cmc_debug_msg("Idx: ", el_counter, ", mid range: ", mid_range, ", init_val: ", iter->template ReinterpretDataAs<T>(), ", res: ", mid_range - iter->template ReinterpretDataAs<T>());
+                auto [encoding, lvl_count] = FindSFCEncoding(mid_range, iter->template ReinterpretDataAs<T>(), max_res, permitted_errors[pe_idx]);
+                cmc_debug_msg("Lvls for encoding: ", lvl_count, ", Encodiung: ", encoding, ", max_res was: ", max_res);
+                cmc_debug_msg("\n");
+
+            }
+        }
+
+
+
+        el_counter += num_elements;
+        return -1;
+    } else
+    {
+        ++el_counter;
+        return 0;
+    }
+}
+
+template<class T>
+void
+EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<CompressionValue<T>>& initial_data) 
+{
+    t8_forest_t mesh = this->GetAmrMesh().GetMesh();
+    const T missing_value = this->GetVariableAttributes().GetMissingValue();
+
+    t8_forest_ref(mesh);
+    TreeQuantAdaptData<T> adapt_data(this, initial_data, missing_value);
+
+    t8_forest_t mesh2 = t8_forest_new_adapt(mesh, TreeQuant<T>, 0, 0, &adapt_data);
+    t8_forest_unref(&mesh2);
+
+    cmc_err_msg("We stop here for testing purposes.");
+}
+
+
+
+#endif
+
 
 }
 
