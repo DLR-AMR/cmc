@@ -582,11 +582,11 @@ Variable<T>::RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned
     sc_array_t* in_data = sc_array_new_data (static_cast<void*>(data_.data()), sizeof(T), data_.size());
 
     cmc_debug_msg("Size of data_: ", data_.size());
-    cmc_debug_msg("Num local elems: ", t8_forest_get_local_num_elements(adapted_forest));
+    cmc_debug_msg("Num local elems: ", t8_forest_get_local_num_leaf_elements(adapted_forest));
     cmc_debug_msg("In Elem size: ", in_data->elem_size);
 
     /* Allocate memory for the partitioned data */
-    const t8_locidx_t new_num_elems = t8_forest_get_local_num_elements(partitioned_forest);
+    const t8_locidx_t new_num_elems = t8_forest_get_local_num_leaf_elements(partitioned_forest);
     data_new_ = std::vector<T>(new_num_elems);
 
     cmc_debug_msg("Size of data_new: ", data_new_.size());

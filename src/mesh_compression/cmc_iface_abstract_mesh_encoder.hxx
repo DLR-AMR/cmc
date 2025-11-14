@@ -197,11 +197,11 @@ IAbstractMeshEncoder::GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t
     const int root_rank = 0;
 
     /* Get the number of global bits/elements */
-    const uint64_t num_global_bits = t8_forest_get_global_num_elements (adapted_mesh);
+    const uint64_t num_global_bits = t8_forest_get_global_num_leaf_elements (adapted_mesh);
 
     /* The number of local bits should coincide the number of local elements in the adapted forest */
-    cmc_assert(static_cast<uint64_t>(encoded_level_data_.size()) == static_cast<uint64_t>(t8_forest_get_local_num_elements(adapted_mesh)));
-    cmc_assert(t8_forest_get_global_num_elements (adapted_mesh) == t8_forest_get_global_num_elements (partitioned_mesh));
+    cmc_assert(static_cast<uint64_t>(encoded_level_data_.size()) == static_cast<uint64_t>(t8_forest_get_local_num_leaf_elements(adapted_mesh)));
+    cmc_assert(t8_forest_get_global_num_leaf_elements (adapted_mesh) == t8_forest_get_global_num_leaf_elements (partitioned_mesh));
 
     /* Get the process-local global element offset */
     const uint64_t global_bit_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id (adapted_mesh)); 

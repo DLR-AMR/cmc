@@ -116,7 +116,7 @@ MultiResEmbeddedAdaptData<T>::GetFaceValue(t8_forest_t forest, const int tree_id
     {
         /* Since the forest is balanced, there should be exactly one face neighbor element */
         cmc_assert(num_neighbors == 1);
-        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
 
         CompressionValue<T> coarse_face_value = this->GetAdaptedDataValueAtIndex(neighbor_element_indices[0]);
 
@@ -865,7 +865,7 @@ MultiResEmbeddedAdaptData<T>::GatherElementFaceValues(t8_forest_t forest, t8_loc
                         /* In case they do not belong to the same family, we gather the value */
                         /* We obtain the local index of all local elements if the element is not a ghost.
                          * Therfore, we can directly access the corresponding value  */
-                        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+                        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
                         face_values.back().values.push_back(this->GetDataValueAtIndex(neighbor_element_indices[0]));
                     }
                 } else
@@ -874,7 +874,7 @@ MultiResEmbeddedAdaptData<T>::GatherElementFaceValues(t8_forest_t forest, t8_loc
                     /* In case they do not belong to the same family, we gather the value */
                     /* We obtain the local index of all local elements if the element is not a ghost.
                      * Therfore, we can directly access the corresponding value  */
-                    cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+                    cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
                     face_values.back().values.push_back(this->GetDataValueAtIndex(neighbor_element_indices[0]));
                 }
 

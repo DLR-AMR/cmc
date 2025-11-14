@@ -84,7 +84,7 @@ main(void)
     const t8_scheme_c* ts = t8_forest_get_scheme(forest);
 
     /* Create a variable for containing a value for each element */
-    const t8_locidx_t num_elements = t8_forest_get_local_num_elements(forest);
+    const t8_locidx_t num_elements = t8_forest_get_local_num_leaf_elements(forest);
     std::vector<float> data(num_elements);
     std::iota(data.begin(), data.end(), 0.0);
 

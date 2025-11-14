@@ -167,7 +167,7 @@ MultiResEmbeddedAdaptData<T>::GatherElementFaceValues(t8_forest_t forest, t8_loc
                         /* In case they do not belong to the same family, we gather the value */
                         /* We obtain the local index of all local elements if the element is not a ghost.
                          * Therfore, we can directly access the corresponding value  */
-                        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+                        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
                         face_values.back().values.push_back(this->GetDataValueAtIndex(neighbor_element_indices[0]));
                     }
                 } else
@@ -176,7 +176,7 @@ MultiResEmbeddedAdaptData<T>::GatherElementFaceValues(t8_forest_t forest, t8_loc
                     /* In case they do not belong to the same family, we gather the value */
                     /* We obtain the local index of all local elements if the element is not a ghost.
                      * Therfore, we can directly access the corresponding value  */
-                    cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+                    cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
                     face_values.back().values.push_back(this->GetDataValueAtIndex(neighbor_element_indices[0]));
                 }
 

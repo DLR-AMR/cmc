@@ -1301,14 +1301,14 @@ void
 ByteVariable<T>::PerformTailTruncationRegardingUncompressedStates()
 {
     cmc_assert(are_uncompressed_states_stored_ == true);
-    cmc_assert(t8_forest_get_local_num_elements(mesh_.GetMesh()) == byte_values_.size());
+    cmc_assert(t8_forest_get_local_num_leaf_elements(mesh_.GetMesh()) == byte_values_.size());
     cmc_assert(is_initial_data_kept_ == true);
 
     /* The misssing value associated with the variable */
     const T missing_value = attributes_.GetMissingValue();
     
     /* Number of local elements/data points*/
-    const t8_locidx_t num_elements = t8_forest_get_local_num_elements(mesh_.GetMesh());
+    const t8_locidx_t num_elements = t8_forest_get_local_num_leaf_elements(mesh_.GetMesh());
     
     /* We need the eclass of the tree as well as the scheme */
     const t8_eclass_t eclass = t8_forest_get_tree_class (mesh_.GetMesh(), 0);

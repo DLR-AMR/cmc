@@ -145,7 +145,7 @@ MultiResEmbeddedAdaptData<T>::GetFaceValues(t8_forest_t forest, const int tree_i
         {
             /* Since the forest is balanced, there should be exactly one face neighbor element */
             cmc_assert(num_neighbors == 1);
-            cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+            cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
 
             face_values.push_back(this->GetAdaptedDataValueAtIndex(neighbor_element_indices[0]));
 
@@ -246,7 +246,7 @@ MultiResEmbeddedAdaptData<T>::GetFaceValue(t8_forest_t forest, const int tree_id
     {
         /* Since the forest is balanced, there should be exactly one face neighbor element */
         cmc_assert(num_neighbors == 1);
-        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
 
         CompressionValue<T> coarse_face_value = this->GetAdaptedDataValueAtIndex(neighbor_element_indices[0]);
 

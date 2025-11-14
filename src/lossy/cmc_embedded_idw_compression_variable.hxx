@@ -413,7 +413,7 @@ AbstractEmbeddedByteCompressionVariable<T>::SetupInputVariableForCompression(inp
 
     vtk_data[0].data = converted_data.data();
     t8_forest_t forest = mesh_.GetMesh();
-    cmc_debug_msg("Vor vtk write: num local elems: ", t8_forest_get_local_num_elements(forest));
+    cmc_debug_msg("Vor vtk write: num local elems: ", t8_forest_get_local_num_leaf_elements(forest));
     const int vtk_err = t8_forest_vtk_write_file(forest, "example_t2m_input", 0, 1, 0, 0, 0, 1, vtk_data);
     
     if (vtk_err == 0)
@@ -589,7 +589,7 @@ IEmbeddedCompressionAdaptData<T>::GatherCoarseFaceRemainingPermittedErrors(t8_fo
         {
             /* Since the forest is balanced, there should be exactly one face neighbor element */
             cmc_assert(num_neighbors == 1);
-            cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+            cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
 
             /* Get the remaining permitted error of this face */
             const err_type_t coarse_face_remaining_permitted_error = this->GetAdaptedRemainingPermittedError(forest, tree_id, neighbor_element_indices[0]);
@@ -681,7 +681,7 @@ IEmbeddedCompressionAdaptData<T>::CompleteExtractionIteration(const t8_forest_t 
     t8_forest_set_user_data(adapted_forest, static_cast<void*>(this));
 
     /* ALlocate memory for the new remaining permitted errors */
-    this->base_variable_->ReserveAdaptedRemainingPermittedError(t8_forest_get_local_num_elements(adapted_forest));
+    this->base_variable_->ReserveAdaptedRemainingPermittedError(t8_forest_get_local_num_leaf_elements(adapted_forest));
 
     /* Perform the computation of the reisduals if a coarsening has been taken place */
     t8_forest_iterate_replace (adapted_forest, previous_forest, ResidualComputation<T>);
@@ -786,11 +786,11 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
         t8_forest_ref(previous_forest);
 
         //test_data_.clear();
-        //test_data_.reserve(t8_forest_get_local_num_elements(previous_forest));
+        //test_data_.reserve(t8_forest_get_local_num_leaf_elements(previous_forest));
 
         /* Perform a coarsening iteration */
         t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, LossyByteCompression<T>, 0, 1, static_cast<void*>(adapt_data)); //Adapt the forest accordingly and create a ghost layer
-        cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_elements(adapted_forest), " global elements.");
+        cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements.");
 
         /* Complete the interpolation step by storing the newly computed adapted data alongside its deviations */
         adapt_data->CompleteExtractionIteration(previous_forest, adapted_forest);
@@ -1019,17 +1019,17 @@ template <typename T>
 inline void
 AbstractEmbeddedByteCompressionVariable<T>::RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest)
 {
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)) == data_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(adapted_forest)) == data_.size());
 
     /* Create an sc_array_t wrapper of the variable's data */
     sc_array_t* in_data = sc_array_new_data (static_cast<void*>(data_.data()), sizeof(CompressionValue<T>), data_.size());
 
     cmc_debug_msg("Number of local data elements before partitioning: ", data_.size());
-    cmc_debug_msg("Number of local mesh elements before partitioning: ", t8_forest_get_local_num_elements(adapted_forest));
+    cmc_debug_msg("Number of local mesh elements before partitioning: ", t8_forest_get_local_num_leaf_elements(adapted_forest));
     cmc_debug_msg("Size of a single data element: ", in_data->elem_size);
 
     /* Allocate memory for the partitioned data */
-    const t8_locidx_t new_num_elems = t8_forest_get_local_num_elements(partitioned_forest);
+    const t8_locidx_t new_num_elems = t8_forest_get_local_num_leaf_elements(partitioned_forest);
     data_new_ = std::vector<CompressionValue<T>>(new_num_elems);
 
     cmc_debug_msg("Number of local data elements after partitioning: ", data_new_.size());
@@ -1038,8 +1038,8 @@ AbstractEmbeddedByteCompressionVariable<T>::RepartitionData(t8_forest_t adapted_
     /* Create a wrapper for the freshly allocated partitioned data */
     sc_array_t* out_data = sc_array_new_data (static_cast<void*>(data_new_.data()), sizeof(CompressionValue<T>), data_new_.size());
 
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)) == data_.size());
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(partitioned_forest)) == data_new_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(adapted_forest)) == data_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(partitioned_forest)) == data_new_.size());
 
     /* Partition the variables data */
     t8_forest_partition_data(adapted_forest, partitioned_forest, in_data, out_data);
@@ -1057,17 +1057,17 @@ template <typename T>
 inline void
 AbstractEmbeddedByteCompressionVariable<T>::RepartitionRemainingPermittedErrors(t8_forest_t adapted_forest, t8_forest_t partitioned_forest)
 {
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)) == remaining_permitted_error_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(adapted_forest)) == remaining_permitted_error_.size());
 
     /* Create an sc_array_t wrapper of the variable's remaining errors */
     sc_array_t* in_data = sc_array_new_data (static_cast<void*>(remaining_permitted_error_.data()), sizeof(err_type_t), remaining_permitted_error_.size());
 
     cmc_debug_msg("Number of local data elements before partitioning: ", remaining_permitted_error_.size());
-    cmc_debug_msg("Number of local mesh elements before partitioning: ", t8_forest_get_local_num_elements(adapted_forest));
+    cmc_debug_msg("Number of local mesh elements before partitioning: ", t8_forest_get_local_num_leaf_elements(adapted_forest));
     cmc_debug_msg("Size of a single data element: ", in_data->elem_size);
 
     /* Allocate memory for the partitioned remaining errors */
-    const t8_locidx_t new_num_elems = t8_forest_get_local_num_elements(partitioned_forest);
+    const t8_locidx_t new_num_elems = t8_forest_get_local_num_leaf_elements(partitioned_forest);
     remaining_permitted_error_new_ = std::vector<err_type_t>(new_num_elems);
 
     cmc_debug_msg("Number of local data elements after partitioning: ", remaining_permitted_error_new_.size());
@@ -1076,8 +1076,8 @@ AbstractEmbeddedByteCompressionVariable<T>::RepartitionRemainingPermittedErrors(
     /* Create a wrapper for the freshly allocated partitioned remaining errors */
     sc_array_t* out_data = sc_array_new_data (static_cast<void*>(remaining_permitted_error_new_.data()), sizeof(err_type_t), remaining_permitted_error_new_.size());
 
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)) == remaining_permitted_error_.size());
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(partitioned_forest)) == remaining_permitted_error_new_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(adapted_forest)) == remaining_permitted_error_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(partitioned_forest)) == remaining_permitted_error_new_.size());
 
     /* Partition the variables data */
     t8_forest_partition_data(adapted_forest, partitioned_forest, in_data, out_data);
@@ -1613,7 +1613,7 @@ void
 AbstractEmbeddedByteCompressionVariable<T>::UpdateNewRemainingPermittedError(t8_forest_t adapted_forest, const int tree_id, const int lelement_index, const err_type_t new_remaining_error)
 {
     cmc_assert(tree_id >= 0 && tree_id < t8_forest_get_num_local_trees(adapted_forest));
-    cmc_assert(t8_forest_get_tree_element_offset (adapted_forest, tree_id) + lelement_index < t8_forest_get_local_num_elements(adapted_forest));
+    cmc_assert(t8_forest_get_tree_element_offset (adapted_forest, tree_id) + lelement_index < t8_forest_get_local_num_leaf_elements(adapted_forest));
 
     /* Compute the start offset in the local contiguous array */
     const int start_index = t8_forest_get_tree_element_offset (adapted_forest, tree_id) + lelement_index;

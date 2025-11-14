@@ -122,7 +122,7 @@ MultiResEmbeddedAdaptData<T>::GetFaceValue(t8_forest_t forest, const int tree_id
     {
         /* Since the forest is balanced, there should be exactly one face neighbor element */
         cmc_assert(num_neighbors == 1);
-        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_elements(forest));
+        cmc_assert(neighbor_element_indices[0] < t8_forest_get_local_num_leaf_elements(forest));
 
         CompressionValue<T> coarse_face_value = this->GetAdaptedDataValueAtIndex(neighbor_element_indices[0]);
 
@@ -811,7 +811,7 @@ MultiResEmbeddedAdaptData<T>::GetScanline(t8_forest_t forest_new, t8_locidx_t wh
 {
     const t8_locidx_t offset = t8_forest_get_tree_element_offset (forest_new, which_tree);
     const int start_index = offset + first_incoming;
-    cmc_assert(start_index < t8_forest_get_local_num_elements(forest_new));
+    cmc_assert(start_index < t8_forest_get_local_num_leaf_elements(forest_new));
 
     const int half_scan = (scanline_length - 1) / 2;
     cmc_assert(half_scan >= 0);
@@ -819,7 +819,7 @@ MultiResEmbeddedAdaptData<T>::GetScanline(t8_forest_t forest_new, t8_locidx_t wh
 
     const int start_scan = std::max(0, start_index - half_scan);
 
-    const int end_scan = std::min(t8_forest_get_global_num_elements(forest_new), static_cast<t8_gloidx_t>(start_scan + scanline_length));
+    const int end_scan = std::min(t8_forest_get_global_num_leaf_elements(forest_new), static_cast<t8_gloidx_t>(start_scan + scanline_length));
 
     const int count  = end_scan - start_scan;
 

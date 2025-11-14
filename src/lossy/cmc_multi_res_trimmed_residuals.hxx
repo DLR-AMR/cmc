@@ -451,7 +451,7 @@ public:
     CompressionVariable(const CompressionSettings& settings, const std::string& name, t8_forest_t initial_mesh, const std::vector<T>& variable_data)
     : AbstractByteCompressionVariable<T>(settings)
     {
-        if (static_cast<size_t>(t8_forest_get_local_num_elements(initial_mesh)) != variable_data.size())
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
         {
             throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
         }
@@ -469,7 +469,7 @@ public:
     CompressionVariable(const CompressionSettings& settings, const std::string& name, t8_forest_t initial_mesh, const std::vector<CompressionValue<T>>& variable_data)
     : AbstractByteCompressionVariable<T>(settings)
     {
-        if (static_cast<size_t>(t8_forest_get_local_num_elements(initial_mesh)) != variable_data.size())
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
         {
             throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
         }
@@ -487,7 +487,7 @@ public:
     CompressionVariable(const CompressionSettings& settings, const std::string& name, t8_forest_t initial_mesh, std::vector<CompressionValue<T>>&& variable_data)
     : AbstractByteCompressionVariable<T>(settings)
     {
-        if (static_cast<size_t>(t8_forest_get_local_num_elements(initial_mesh)) != variable_data.size())
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
         {
             throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
         }

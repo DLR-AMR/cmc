@@ -116,14 +116,14 @@ t8_gloidx_t
 AmrMesh::GetNumberGlobalElements() const
 {
     cmc_assert(mesh_ != nullptr);
-    return t8_forest_get_global_num_elements(mesh_);
+    return t8_forest_get_global_num_leaf_elements(mesh_);
 }
 
 t8_locidx_t
 AmrMesh::GetNumberLocalElements() const
 {
     cmc_assert(mesh_ != nullptr);
-    return t8_forest_get_local_num_elements(mesh_);
+    return t8_forest_get_local_num_leaf_elements(mesh_);
 }
 
 int

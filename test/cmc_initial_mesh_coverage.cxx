@@ -55,7 +55,7 @@ int main(void)
     const int dimensionality = 2;
     cmc::AmrMesh mesh(forest, initial_level, dimensionality);
 
-    const t8_locidx_t num_initial_elements = t8_forest_get_local_num_elements (forest);
+    const t8_locidx_t num_initial_elements = t8_forest_get_local_num_leaf_elements (forest);
 
     cmc::ExpectTrue(num_initial_elements == 1024);
 
@@ -79,7 +79,7 @@ int main(void)
     /* Create a coarser forest */
     t8_forest_t forest_adapt = t8_forest_new_adapt (forest, coarsen_all_elements, 0, 0, NULL);
 
-    cmc::ExpectTrue(t8_forest_get_local_num_elements(forest_adapt) == 256);
+    cmc::ExpectTrue(t8_forest_get_local_num_leaf_elements(forest_adapt) == 256);
 
     /* Get a certain element of the mesh */
     const t8_locidx_t elem_id2 = 64;
@@ -104,7 +104,7 @@ int main(void)
     /* Create an even coarser forest */
     forest_adapt = t8_forest_new_adapt (forest_adapt, coarsen_all_elements, 0, 0, NULL);
 
-    cmc::ExpectTrue(t8_forest_get_local_num_elements(forest_adapt) == 64);
+    cmc::ExpectTrue(t8_forest_get_local_num_leaf_elements(forest_adapt) == 64);
 
     /* Get a certain element of the mesh */
     const t8_locidx_t elem_id3 = 8;

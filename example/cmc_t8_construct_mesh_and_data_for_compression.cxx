@@ -124,7 +124,7 @@ t8_advect_problem_init_elements (t8_forest_t forest)
     ls_data.M[2] = 0.0;
     ls_data.radius = 1.00;
 
-    t8_locidx_t num_local_elems = t8_forest_get_local_num_elements(forest);
+    t8_locidx_t num_local_elems = t8_forest_get_local_num_leaf_elements(forest);
 
     std::vector<double> values;
     values.reserve(num_local_elems);

@@ -672,7 +672,7 @@ public:
         sc_array_t* in_data = sc_array_new_data (static_cast<void*>(previous_deviations_.data()), sizeof(double), previous_deviations_.size());
 
         /* Allocate memory for the partitioned data */
-        const t8_locidx_t new_num_elems = t8_forest_get_local_num_elements(partitioned_forest);
+        const t8_locidx_t new_num_elems = t8_forest_get_local_num_leaf_elements(partitioned_forest);
         deviations_ = std::vector<double>(new_num_elems);
 
         /* Create a wrapper for the freshly allocated partitioned deviations */

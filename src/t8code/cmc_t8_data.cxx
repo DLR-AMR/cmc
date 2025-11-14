@@ -748,7 +748,7 @@ AmrData::CompressByAdaptiveCoarsening(const CompressionMode compression_mode)
             t8_forest_unref(&previous_forest);
             //cmc_debug_msg("Befroe set partitioned mesh");
             adapt_data.SetCurrentMesh(adapted_forest);
-            //cmc_debug_msg("\n\nNum elems mesh after adaptation: ", t8_forest_get_global_num_elements(adapted_forest), "\n\n");
+            //cmc_debug_msg("\n\nNum elems mesh after adaptation: ", t8_forest_get_global_num_leaf_elements(adapted_forest), "\n\n");
             adapt_data.FinalizeCompressionIteration();
         }
 
@@ -801,7 +801,7 @@ AmrData::CompressByAdaptiveCoarseningWithRegardToInitialData()
             t8_forest_unref(&previous_forest);
             cmc_debug_msg("Befroe set partitioned mesh");
             adapt_data.SetCurrentMesh(adapted_forest);
-            cmc_debug_msg("\n\nNum elems mesh after adaptation: ", t8_forest_get_global_num_elements(adapted_forest), "\n\n");
+            cmc_debug_msg("\n\nNum elems mesh after adaptation: ", t8_forest_get_global_num_leaf_elements(adapted_forest), "\n\n");
             adapt_data.FinalizeCompressionIteration();
         }
 
@@ -846,7 +846,7 @@ AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain
         const size_t memory_estimation = var_domain.GetNumberReferenceCoordsCovered() + (restrict_to_global_domain ? 0 : 0.1 * var_domain.GetNumberReferenceCoordsCovered());
         var_iter->AllocateForDecompression(memory_estimation);
 
-        const t8_locidx_t num_local_elements = t8_forest_get_local_num_elements(compressed_forest);
+        const t8_locidx_t num_local_elements = t8_forest_get_local_num_leaf_elements(compressed_forest);
 
         for (t8_locidx_t elem_id = 0; elem_id < num_local_elements; ++elem_id)
         {
@@ -960,7 +960,7 @@ AmrData::TransferToDecompressionData(OutputVar& output_variable, const Var& comp
     const t8_eclass_t eclass = t8_forest_get_eclass(initial_mesh_.GetMesh(), 0);
     const t8_scheme_c* ts =  t8_forest_get_scheme (initial_mesh_.GetMesh());
 
-    const t8_locidx_t num_local_elements = t8_forest_get_local_num_elements(compressed_forest);
+    const t8_locidx_t num_local_elements = t8_forest_get_local_num_leaf_elements(compressed_forest);
 
     for (t8_locidx_t elem_id = 0; elem_id < num_local_elements; ++elem_id)
     {
@@ -1060,9 +1060,9 @@ DetermineForestBits(t8_forest_t forest)
 
     t8_forest_t forest_adapt = nullptr;
 
-    while (t8_forest_get_local_num_elements(forest) > 1)
+    while (t8_forest_get_local_num_leaf_elements(forest) > 1)
     {
-        RefinementBits adapt_data(t8_forest_get_local_num_elements(forest));
+        RefinementBits adapt_data(t8_forest_get_local_num_leaf_elements(forest));
 
         forest_adapt = t8_forest_new_adapt(forest, FindRefinementBits, 0, 0, static_cast<void*>(&adapt_data));
 

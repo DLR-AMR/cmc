@@ -109,7 +109,7 @@ AbstractCompressionVariable<T>::Compress(const CompressionSettings& settings)
 
         /* Perform a coarsening iteration */
         t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, adapt_data->GetAdaptationFunction(), 0, 0, static_cast<void*>(adapt_data));
-        cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_elements(adapted_forest), " global elements");
+        cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements");
 
         /* Complete the interpolation step by storing the newly computed adapted data alongside its deviations */
         this->SwitchToAdaptedData();
@@ -170,11 +170,11 @@ AbstractCompressionVariable<T>::RepartitionData(t8_forest_t adapted_forest, t8_f
     sc_array_t* in_data = sc_array_new_data (static_cast<void*>(data_.data()), sizeof(T), data_.size());
 
     cmc_debug_msg("Number of local data elements before partitioning: ", data_.size());
-    cmc_debug_msg("Number of local mesh elements before partitioning: ", t8_forest_get_local_num_elements(adapted_forest));
+    cmc_debug_msg("Number of local mesh elements before partitioning: ", t8_forest_get_local_num_leaf_elements(adapted_forest));
     cmc_debug_msg("Size of a single data element: ", in_data->elem_size);
 
     /* Allocate memory for the partitioned data */
-    const t8_locidx_t new_num_elems = t8_forest_get_local_num_elements(partitioned_forest);
+    const t8_locidx_t new_num_elems = t8_forest_get_local_num_leaf_elements(partitioned_forest);
     data_new_ = std::vector<T>(new_num_elems);
 
     cmc_debug_msg("Number of local data elements after partitioning: ", data_new_.size());
@@ -183,8 +183,8 @@ AbstractCompressionVariable<T>::RepartitionData(t8_forest_t adapted_forest, t8_f
     /* Create a wrapper for the freshly allocated partitioned data */
     sc_array_t* out_data = sc_array_new_data (static_cast<void*>(data_new_.data()), sizeof(T), data_new_.size());
 
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(adapted_forest)) == data_.size());
-    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_elements(partitioned_forest)) == data_new_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(adapted_forest)) == data_.size());
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(partitioned_forest)) == data_new_.size());
 
     /* Partition the variables data */
     t8_forest_partition_data(adapted_forest, partitioned_forest, in_data, out_data);

@@ -61,9 +61,9 @@ DetermineForestRefinementBits(std::vector<uint8_t>& serialized_variable, t8_fore
 
     int num_bytes = 0;
 
-    while (t8_forest_get_local_num_elements(forest) > 1)
+    while (t8_forest_get_local_num_leaf_elements(forest) > 1)
     {
-        RefinementBits adapt_data(t8_forest_get_local_num_elements(forest));
+        RefinementBits adapt_data(t8_forest_get_local_num_leaf_elements(forest));
 
         forest_adapt = t8_forest_new_adapt(forest, FindRefinementBits, 0, 0, static_cast<void*>(&adapt_data));
 
