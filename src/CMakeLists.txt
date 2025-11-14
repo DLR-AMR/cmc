@@ -7,7 +7,6 @@ target_sources(cmc PRIVATE
     utilities/cmc_utilities.cxx 
     utilities/cmc_geo_domain.cxx 
     utilities/cmc_hyperslab.cxx 
-    utilities/cmc_input_variable.cxx 
     utilities/cmc_cart_coordinate.cxx 
     utilities/cmc_geo_utilities.cxx 
     mpi/cmc_mpi.cxx 
@@ -43,9 +42,7 @@ install(FILES
     utilities/cmc_dimension_interval.hxx 
     utilities/cmc_geo_domain.hxx 
     utilities/cmc_hyperslab.hxx 
-    utilities/cmc_cart_coordinate.hxx 
-    utilities/cmc_input_variable_forward.hxx  
-    utilities/cmc_input_variable.hxx  
+    utilities/cmc_cart_coordinate.hxx  
     utilities/cmc_bit_vector.hxx 
     utilities/cmc_bit_map.hxx 
     utilities/cmc_huffman.hxx 
