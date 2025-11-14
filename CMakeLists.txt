@@ -11,9 +11,9 @@ set(CMC_VERSION "${PROJECT_VERSION}")
 # Configuration options
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 option(ENABLE_MPI "Enable features that rely on MPI" ON)
-option(WITH_NETCDF "Enable features that rely on netCDF" ON)
-option(WITH_T8CODE "Link against an available t8code installation" OFF)
-option(ENABLE_ALL_WARNINGS "Use compilation flags -Wall -Wextra -Wpedantic" [ON])
+option(WITH_NETCDF "Enable features that rely on netCDF" OFF)
+option(WITH_T8CODE "Link against an available t8code installation" ON)
+option(ENABLE_ALL_WARNINGS "Use compilation flags -Wall -Wextra -Wpedantic" [OFF])
 
 # Define some paths for potential library linkage
 set(CMC_NETCDF_ROOT_DIR "" CACHE PATH "Directory containing netCDF installation")
@@ -35,8 +35,8 @@ set_target_properties(cmc PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(cmc PROPERTIES OUTPUT_NAME cmc)
 
 # Set C and C++ standard for compilations
-target_compile_features(cmc PUBLIC c_std_11 cxx_std_17)
-set(CMAKE_CXX_STANDARD 17)
+target_compile_features(cmc PUBLIC c_std_11 cxx_std_20)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set a default build type if none was specified
@@ -48,7 +48,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
         STRING "Choose the type of build. Build types available: Release Debug RelWithDebInfo" FORCE)
     # Set the possible values of build type for cmake-gui
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" )
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo")
 endif()
 
 # Add flags for a release configuration
@@ -58,7 +58,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 # Add flags for debug configuration
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
     set (cmc_CXXFLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
     set (cmc_CFLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_DEBUG}")
     target_compile_definitions(cmc PUBLIC ENABLE_DEBUG=1)
@@ -70,7 +70,6 @@ if(ENABLE_MPI)
     find_package(MPI COMPONENTS C REQUIRED)
     target_compile_definitions(cmc PUBLIC ENABLE_MPI=1)
     target_link_libraries(cmc MPI::MPI_C)
-#    set(CMC_ENABLE_MPI_FLAG ON)
     if(MPI_C_FOUND)
         message("-- An MPI installation has been found")
     endif ()
@@ -82,56 +81,101 @@ if(WITH_NETCDF)
     include(CheckCSourceCompiles)
     # Check if a netCDF library path has been set explicitly
     if (CMC_NETCDF_ROOT_DIR)
+        find_library(NETCDF netcdf HINTS ${CMC_NETCDF_ROOT_DIR}/lib REQUIRED)
+        message("-- Found netCDF installation: ${NETCDF}")
         set(CMAKE_REQUIRED_INCLUDES "${CMC_NETCDF_ROOT_DIR}/include")
-        set(CMAKE_REQUIRED_LIBRARIES "-lnetcdf")
+        set(CMAKE_REQUIRED_LIBRARIES "${NETCDF}")
         set(CMAKE_REQUIRED_LINK_DIRECTORIES "${CMC_NETCDF_ROOT_DIR}/lib")
-        # Check if parallel netCDF-4 functionality is available
         check_c_source_compiles(
+            "
+                #include <netcdf.h>
+                int main() {
+                int nc_nat_val = NC_NAT;
+                return 0;
+                }
+            "
+            HAVE_NETCDF_H)
+
+        target_compile_definitions(cmc PUBLIC WITH_NETCDF=${HAVE_NETCDF_H})
+        set(CMC_WITH_NETCDF ON)
+        target_include_directories(cmc PUBLIC ${CMC_NETCDF_ROOT_DIR}/include)
+        target_link_libraries(cmc ${NETCDF})
+        message("-- A netCDF installation has been found")
+
+        if (ENABLE_MPI)
+            set(CMAKE_REQUIRED_INCLUDES "${CMC_NETCDF_ROOT_DIR}/include;${MPI_C_INCLUDE_DIRS}")
+            set(CMAKE_REQUIRED_LIBRARIES "${NETCDF};MPI::MPI_C")
+            set(CMAKE_REQUIRED_LINK_DIRECTORIES "${CMC_NETCDF_ROOT_DIR}/lib")
+            check_c_source_compiles(
             "
                 #include <netcdf.h>
                 #include <netcdf_par.h>
                 int main() {
+                int nc_independent_val = NC_INDEPENDENT;
                 return 0;
                 }
             "
-            EXT_NETCDF_HAVE_NETCDF_PAR)
-            target_link_libraries(cmc netcdf)
-            target_compile_definitions(cmc PUBLIC WITH_NETCDF=1)
-            target_compile_definitions(cmc PUBLIC WITH_NETCDF_PAR=${EXT_NETCDF_HAVE_NETCDF_PAR})
-            set(CMC_WITH_NETCDF ON)
-            target_include_directories(cmc PUBLIC ${CMC_NETCDF_ROOT_DIR}/include)
-            target_link_directories(cmc PUBLIC ${CMC_NETCDF_ROOT_DIR}/lib)
-            message("-- A netCDF installation has been found")
-            if (EXT_NETCDF_HAVE_NETCDF_PAR)
+            HAVE_NETCDF_PAR_H)
+
+            if (HAVE_NETCDF_PAR_H)
                 set(CMC_WITH_NETCDF_PAR ON)    
+                target_compile_definitions(cmc PUBLIC WITH_NETCDF_PAR=${HAVE_NETCDF_PAR_H})
                 message("-- Found netcdf_par.h")
+            else()
+                set(CMC_WITH_NETCDF_PAR OFF)  
+                message("-- Not Found: netcdf_par.h")
+                target_compile_definitions(cmc PUBLIC WITH_NETCDF_PAR=0)
             endif()
+        endif()
     else()
         # Find cmake installed netCDF
         find_package(netCDF REQUIRED)
         if(netCDF_FOUND)
-            # Check if parallel netCDF-4 functionality is available
             set(CMAKE_REQUIRED_LIBRARIES netCDF::netcdf)
             check_c_source_compiles(
-                "
-                    #include <netcdf.h>
-                    #include <netcdf_par.h>
-                    int main() {
-                    return 0;
-                    }
-                "
-                NETCDF_HAVE_NETCDF_PAR)
+            "
+                #include <netcdf.h>
+                int main() {
+                int nc_nat_val = NC_NAT;
+                return 0;
+                }
+            "
+            HAVE_NETCDF_H)
         endif ()
         target_link_libraries(cmc netCDF::netcdf)
         target_compile_definitions(cmc PUBLIC WITH_NETCDF=1)
-        target_compile_definitions(cmc PUBLIC WITH_NETCDF_PAR=${NETCDF_HAVE_NETCDF_PAR})
         set(CMC_WITH_NETCDF ON) 
         message("-- A netCDF installation has been found")
-        if (NETCDF_HAVE_NETCDF_PAR)
-            set(CMC_WITH_NETCDF_PAR ON)
-            message("-- Found netcdf_par.h")
+
+        if (ENABLE_MPI)
+            set(CMAKE_REQUIRED_LIBRARIES netCDF::netcdf)
+            check_c_source_compiles(
+            "
+                #include <netcdf.h>
+                #include <netcdf_par.h>
+                int main() {
+                int nc_independent_val = NC_INDEPENDENT;
+                return 0;
+                }
+            "
+            HAVE_NETCDF_PAR_H)
+
+            if (HAVE_NETCDF_PAR_H)
+                set(CMC_WITH_NETCDF_PAR ON)    
+                target_compile_definitions(cmc PUBLIC WITH_NETCDF_PAR=${HAVE_NETCDF_PAR_H})
+                message("-- Found netcdf_par.h")
+            else()
+                set(CMC_WITH_NETCDF_PAR OFF)
+                message("-- Not Found: netcdf_par.h") 
+                target_compile_definitions(cmc PUBLIC WITH_NETCDF_PAR=0)
+            endif()
         endif()
     endif()
+else()
+    set(CMC_WITH_NETCDF OFF)
+    set(CMC_WITH_NETCDF_PAR OFF)
+    target_compile_definitions(cmc PUBLIC WITH_NETCDF=0)
+    target_compile_definitions(cmc PUBLIC WITH_NETCDF_PAR=0)
 endif()
 
 # Check if additional warnings should be activated
@@ -147,10 +191,13 @@ endif()
 # Check if t8code will be linked 
 if(WITH_T8CODE)
     find_package(T8CODE REQUIRED)
-    target_compile_definitions(cmc PUBLIC WITH_T8CODE=1)
     target_link_libraries(cmc T8CODE::T8)
-    message("-- A t8code installation has been found")
+    message("-- Found t8code installation")
     set(CMC_WITH_T8CODE ON) 
+    target_compile_definitions(cmc PUBLIC WITH_T8CODE=1)
+else()
+    set(CMC_WITH_T8CODE OFF) 
+    target_compile_definitions(cmc PUBLIC WITH_T8CODE=0)
 endif()
 
 # Define incldue-directories for building and installing
@@ -171,7 +218,6 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH true)
 
 # Configure an input file with some given flags
 configure_file(CmcConfig.h.in ${PROJECT_BINARY_DIR}/src/cmc_ac_config.h @ONLY)
-
 
 # Set some compile defintions regarding compialtion flags and versioning
 target_compile_definitions(cmc PUBLIC CMC_CC="${CMAKE_C_COMPILER}")
@@ -223,4 +269,13 @@ write_basic_package_version_file(
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CmcConfig.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/CmcConfigVersion.cmake
         DESTINATION ${CmcConfigPackageLocation})
-        
+
+message("-- Configuration results cmc ${cmc_VERSION_MAJOR}.${cmc_VERSION_MINOR}.${cmc_VERSION_PATCH}:")
+message("-- \tBUILD_SHARED_LIBS: \t${BUILD_SHARED_LIBS}")
+message("-- \tENABLE_MPI: \t\t${ENABLE_MPI}")
+message("-- \tWITH_NETCDF: \t\t${WITH_NETCDF}")
+if (WITH_NETCDF)
+message("-- \t-- with netcdf_par.h: \t${CMC_WITH_NETCDF_PAR}")
+endif()
+message("-- \tWITH_T8CODE: \t\t${WITH_T8CODE}")
+message("-- \tENABLE_ALL_WARNINGS: \t${ENABLE_ALL_WARNINGS}")
