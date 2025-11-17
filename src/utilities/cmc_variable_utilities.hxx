@@ -1,7 +1,6 @@
 #ifndef CMC_VARIABLE_UTILITIES_HXX
 #define CMC_VARIABLE_UTILITIES_HXX
 
-#include "t8code/cmc_t8_data_variables_forward.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "t8code/cmc_t8_interpolation.hxx"
