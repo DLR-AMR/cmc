@@ -33,7 +33,9 @@ install(FILES
 )
 
 install(FILES
-    utilities/cmc_constants_definitions.h 
+    utilities/cmc_iface_compression_variable.hxx 
+    utilities/cmc_iface_amr_compression_variable.hxx 
+    utilities/cmc_iface_embedded_amr_compression_variable.hxx 
     utilities/cmc_log_functions.hxx 
     utilities/cmc_fallbacks.h 
     utilities/cmc_vector_view.hxx 
