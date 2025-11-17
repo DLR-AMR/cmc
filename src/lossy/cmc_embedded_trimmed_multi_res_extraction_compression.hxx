@@ -478,31 +478,6 @@ private:
 
 };
 
-#if 0
-template<class T>
-void
-EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<CompressionValue<T>>& initial_data) 
-{
-    //T val1 = initial_data[1].template ReinterpretDataAs<T>();
-    //T val2 = initial_data[2].template ReinterpretDataAs<T>();
-    //T val3 = initial_data[3].template ReinterpretDataAs<T>();
-    T val1(0);
-    T val2(0);
-    T val3(0);
-
-    for (auto init_val_iter = initial_data.begin(); init_val_iter != initial_data.end(); ++init_val_iter)
-    {
-        T prediciton = val3 - val2 + val1;
-        
-        val3 = val2;
-        val2 = val1;
-        val1 = (*init_val_iter - prediction);
-
-        initial_data
-    }
-}
-#endif
-
 }
 
 
