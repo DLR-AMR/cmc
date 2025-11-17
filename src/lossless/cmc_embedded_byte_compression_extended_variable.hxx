@@ -1000,9 +1000,9 @@ AbstractEmbeddedByteCompressionVariable<T>::UpdateLinearIndicesToTheInitialMesh(
 
     const t8_locidx_t first_ltree_id = 0;
 
-    const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0));
+    const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_leaf_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0));
 
-    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(eclass, t8_forest_get_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0),
+    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(eclass, t8_forest_get_leaf_element_in_tree(mesh_.GetMesh(), first_ltree_id, 0),
                                                    scheme, t8_eclass_to_dimension[eclass], initial_refinement_level);
     
     /* Locally, this update function reduces the global_index to zero for the first local element */
@@ -1017,7 +1017,7 @@ AbstractEmbeddedByteCompressionVariable<T>::UpdateLinearIndicesToTheInitialMesh(
     /* Iterate through all local elements and find how the global Morton indices need to be adjusted in order to comply the local data ordering */
     for (auto iter = 0; iter < num_local_elements; ++iter)
     {
-        const t8_element_t* elem = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, iter);
+        const t8_element_t* elem = t8_forest_get_leaf_element_in_tree(mesh_.GetMesh(), 0, iter);
 
         if (scheme->element_get_level(eclass, elem) != initial_refinement_level)
         {
@@ -1267,11 +1267,11 @@ AbstractEmbeddedByteCompressionVariable<T>::DetermineInitialMaximumRefinementLev
     for (t8_locidx_t tree_idx = 0; tree_idx < num_local_trees; ++tree_idx)
     {
         const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, tree_idx);
-        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_elements (mesh, tree_idx);
+        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, tree_idx);
         for (t8_locidx_t elem_idx = 0; elem_idx < num_elements_in_tree; ++elem_idx, ++val_idx)
         {
             /* Get the current element */
-            const t8_element_t* element = t8_forest_get_element_in_tree (mesh, tree_idx, elem_idx);
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, tree_idx, elem_idx);
 
             const int elem_level = scheme->element_get_level(tree_class, element);
 

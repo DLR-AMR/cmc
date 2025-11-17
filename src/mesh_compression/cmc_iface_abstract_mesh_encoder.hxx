@@ -204,7 +204,7 @@ IAbstractMeshEncoder::GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t
     cmc_assert(t8_forest_get_global_num_leaf_elements (adapted_mesh) == t8_forest_get_global_num_leaf_elements (partitioned_mesh));
 
     /* Get the process-local global element offset */
-    const uint64_t global_bit_offset = static_cast<uint64_t>(t8_forest_get_first_local_element_id (adapted_mesh)); 
+    const uint64_t global_bit_offset = static_cast<uint64_t>(t8_forest_get_first_local_leaf_element_id (adapted_mesh)); 
 
     /* Gather all messages that need to be sent */
     const std::vector<ExchangeData> send_messages = DetermineSendMessages(num_global_bits, global_bit_offset, comm_size);

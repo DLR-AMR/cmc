@@ -657,10 +657,10 @@ AbstractEmbeddedByteDecompressionVariable<T>::DeMortonizeData() const
 
     for (t8_locidx_t tree_id = 0; tree_id < num_local_trees; ++tree_id) {
         const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, tree_id);
-        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_elements (mesh, tree_id);
+        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, tree_id);
         for (t8_locidx_t elem_id = 0; elem_id < num_elements_in_tree; ++elem_id, ++val_iter) {
             /* Get the current element */
-            const t8_element_t* element = t8_forest_get_element_in_tree (mesh, tree_id, elem_id);
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, tree_id, elem_id);
             /* Get the element anchor */
             scheme->element_get_anchor(tree_class, element, element_anchor.data());
 

@@ -35,7 +35,7 @@ GatherGlobalDataOffsets(const AmrMesh& mesh, const MPI_Comm comm)
     MortonIndex elem_offset{-1}; 
     if (rank != 0)
     {
-        elem_offset = static_cast<MortonIndex>(ts->element_get_linear_id(eclass, t8_forest_get_element_in_tree(forest, ltree_id, 0), mesh.GetInitialRefinementLevel()));
+        elem_offset = static_cast<MortonIndex>(ts->element_get_linear_id(eclass, t8_forest_get_leaf_element_in_tree(forest, ltree_id, 0), mesh.GetInitialRefinementLevel()));
     }
 
     /* Define a vector capable o holding all offsets */

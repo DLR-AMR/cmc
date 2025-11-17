@@ -240,6 +240,7 @@ public:
     friend Var MetaCopy(const Var& variable);
 
     template<typename T> void SetData([[maybe_unused]] const AccessKey& key, std::vector<T>&& data) {std::visit([&](auto& var){var.SetData(key, std::move(data));}, var_);}
+    friend class AccessKey;
 private:
     template<class T> void ApplyAxpyScalingAndOffset(const Variable<T>&);
     template<class T> void ApplyScaling(const Variable<T>&);

@@ -725,7 +725,7 @@ MultiResEmbeddedAdaptData<T>::ComputeResiduals(t8_forest_t forest_old, t8_forest
     cmc_assert(tree_class == T8_ECLASS_HEX);
 
     /* Get the adapted coarse element */
-    const t8_element_t* elem = t8_forest_get_element_in_tree(forest_new, which_tree, first_incoming);
+    const t8_element_t* elem = t8_forest_get_leaf_element_in_tree(forest_new, which_tree, first_incoming);
 
     /* Compute the id of the corresponding data value in the local contiguous array */
     const int local_coarse_elem_index = t8_forest_get_tree_element_offset (forest_new, which_tree) + first_incoming;

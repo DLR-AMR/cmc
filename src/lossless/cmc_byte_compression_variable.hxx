@@ -679,11 +679,11 @@ AbstractByteCompressionVariable<T>::DetermineInitialMaximumRefinementLevel()
     for (t8_locidx_t tree_idx = 0; tree_idx < num_local_trees; ++tree_idx)
     {
         const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, tree_idx);
-        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_elements (mesh, tree_idx);
+        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, tree_idx);
         for (t8_locidx_t elem_idx = 0; elem_idx < num_elements_in_tree; ++elem_idx, ++val_idx)
         {
             /* Get the current element */
-            const t8_element_t* element = t8_forest_get_element_in_tree (mesh, tree_idx, elem_idx);
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, tree_idx, elem_idx);
 
             const int elem_level = scheme->element_get_level(tree_class, element);
 

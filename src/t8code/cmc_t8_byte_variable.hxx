@@ -1330,7 +1330,7 @@ ByteVariable<T>::PerformTailTruncationRegardingUncompressedStates()
 
             //cmc_debug_msg("Permitted Error has been accessed");
             /* Get the current element */
-            const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, idx);
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree(mesh_.GetMesh(), 0, idx);
             //cmc_debug_msg("The element with idx ", idx, " has been accessed");
 
             /* Get all initial elements indices that are covered by this element */
@@ -1471,7 +1471,7 @@ ByteVariable<T>::GetPermittedError(const int index) const
 {
     const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
 
-    const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
+    const t8_element_t* element = t8_forest_get_leaf_element_in_tree(mesh_.GetMesh(), 0, index);
     
     const t8_scheme_c* ts =  t8_forest_get_scheme (mesh_.GetMesh());
 

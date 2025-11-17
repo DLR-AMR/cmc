@@ -165,9 +165,9 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
 
     const t8_locidx_t first_ltree_id = 0;
 
-    const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0));
+    const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_leaf_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0));
 
-    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(eclass, t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0),
+    const MortonIndex linear_index_start_elem = GetMortonIndexOnLevel(eclass, t8_forest_get_leaf_element_in_tree(initial_mesh_.GetMesh(), first_ltree_id, 0),
                                                    scheme, t8_eclass_to_dimension[eclass], initial_refinement_level);
     
     /* Locally, this update function reduces the global_index to zero for the first local element */
@@ -182,7 +182,7 @@ AmrData::UpdateLinearIndicesToTheInitialMesh()
     /* Iterate through all local elements and find how the global Morton indices need to be adjusted in order to comply the local data ordering */
     for (auto iter = 0; iter < num_local_elements; ++iter)
     {
-        const t8_element_t* elem = t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, iter);
+        const t8_element_t* elem = t8_forest_get_leaf_element_in_tree(initial_mesh_.GetMesh(), 0, iter);
 
         if (scheme->element_get_level(elem) != initial_refinement_level)
         {
@@ -840,7 +840,7 @@ AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain
         const t8_eclass_t eclass = t8_forest_get_eclass(initial_mesh_.GetMesh(), 0);
         const t8_scheme_c* scheme =  t8_forest_get_scheme (initial_mesh_.GetMesh());
 
-        const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_element_in_tree(initial_mesh_.GetMesh(), 0, 0));
+        const int num_children = scheme->element_get_num_children(eclass, t8_forest_get_leaf_element_in_tree(initial_mesh_.GetMesh(), 0, 0));
 
         /* An estimation for the memory allocation (we estimate 10% more elements if dummy elements are decompressed as well) */
         const size_t memory_estimation = var_domain.GetNumberReferenceCoordsCovered() + (restrict_to_global_domain ? 0 : 0.1 * var_domain.GetNumberReferenceCoordsCovered());
@@ -850,7 +850,7 @@ AmrData::DecompressToInitialRefinementLevel(const bool restrict_to_global_domain
 
         for (t8_locidx_t elem_id = 0; elem_id < num_local_elements; ++elem_id)
         {
-            const t8_element_t* element = t8_forest_get_element_in_tree(compressed_forest, 0, elem_id);
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree(compressed_forest, 0, elem_id);
 
             /* In case that the dummy elements are excluded from the decompression, we need to ensure that only the amount of elements within the domain 
              * are inserted in the decompressed vector (especially for relatively coarse elements). Therefore, we need a correction.
@@ -964,7 +964,7 @@ AmrData::TransferToDecompressionData(OutputVar& output_variable, const Var& comp
 
     for (t8_locidx_t elem_id = 0; elem_id < num_local_elements; ++elem_id)
     {
-        const t8_element_t* element = t8_forest_get_element_in_tree(compressed_forest, 0, elem_id);
+        const t8_element_t* element = t8_forest_get_leaf_element_in_tree(compressed_forest, 0, elem_id);
 
         const Hyperslab element_hyperslab = DetermineHyperslabOfDecompressedElements(element, ts, var_domain, initial_refinement_level, initial_data_layout);
 

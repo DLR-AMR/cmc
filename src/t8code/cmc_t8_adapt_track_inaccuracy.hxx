@@ -16,6 +16,8 @@
 #include <memory>
 #include <iostream>
 #include <unordered_map>
+#include <algorithm>
+#include <initializer_list>
 
 #include "utilities/cmc_log_functions.hxx"
 namespace cmc

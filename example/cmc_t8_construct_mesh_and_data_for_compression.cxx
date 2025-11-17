@@ -136,11 +136,11 @@ t8_advect_problem_init_elements (t8_forest_t forest)
     for (t8_locidx_t itree = 0, idata = 0; itree < num_trees; itree++)
     {
         const t8_eclass_t tree_class = t8_forest_get_tree_class (forest, itree);
-        t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_elements (forest, itree);
+        t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_leaf_elements (forest, itree);
 
         for (t8_locidx_t ielement = 0; ielement < num_elems_in_tree; ielement++)
         {
-            const t8_element_t *element = t8_forest_get_element_in_tree (forest, itree, ielement);
+            const t8_element_t *element = t8_forest_get_leaf_element_in_tree (forest, itree, ielement);
 
             const int level = scheme->element_get_level (tree_class, element);
 

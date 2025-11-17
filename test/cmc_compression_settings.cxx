@@ -99,7 +99,7 @@ main(void)
     settings.SetErrorDomain(error_domain);
     
     /* Get the first element from the mesh */
-    const t8_element_t* first_elem = t8_forest_get_element_in_tree(forest, 0, 0);
+    const t8_element_t* first_elem = t8_forest_get_leaf_element_in_tree(forest, 0, 0);
 
     /* Get the permitted error criteria for the element */
     std::vector<cmc::PermittedError> errors = settings.FindRestrictingErrors(forest, 0, 0, ts, 1, &first_elem);

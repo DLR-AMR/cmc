@@ -952,7 +952,7 @@ MultiResEmbeddedAdaptData<T>::ComputeResiduals(t8_forest_t forest_old, t8_forest
     cmc_assert(tree_class == T8_ECLASS_HEX);
 
     /* Get the adapted coarse element */
-    const t8_element_t* elem = t8_forest_get_element_in_tree(forest_new, which_tree, first_incoming);
+    const t8_element_t* elem = t8_forest_get_leaf_element_in_tree(forest_new, which_tree, first_incoming);
 
     /* Compute the id of the corresponding data value in the local contiguous array */
     const int local_coarse_elem_index = t8_forest_get_tree_element_offset (forest_new, which_tree) + first_incoming;
@@ -1043,7 +1043,7 @@ MultiResEmbeddedAdaptData<T>::ComputeResiduals(t8_forest_t forest_old, t8_forest
     cmc_assert(tree_class == T8_ECLASS_HEX);
 
     /* Get the adapted coarse element */
-    const t8_element_t* elem = t8_forest_get_element_in_tree(forest_new, which_tree, first_incoming);
+    const t8_element_t* elem = t8_forest_get_leaf_element_in_tree(forest_new, which_tree, first_incoming);
 
     /* Compute the id of the corresponding data value in the local contiguous array */
     const int local_coarse_elem_index = t8_forest_get_tree_element_offset (forest_new, which_tree) + first_incoming;
@@ -1070,7 +1070,7 @@ MultiResEmbeddedAdaptData<T>::ComputeResiduals(t8_forest_t forest_old, t8_forest
     for (int elem_child_idx = 0; elem_child_idx < num_outgoing; ++elem_child_idx)
     {
          /* get the child element from the previous forest */
-         const t8_element_t* element = t8_forest_get_element_in_tree (forest_old, which_tree, first_outgoing + elem_child_idx);
+         const t8_element_t* element = t8_forest_get_leaf_element_in_tree (forest_old, which_tree, first_outgoing + elem_child_idx);
 
          /* Get the midpoint */
          std::vector<double> elem_midpoint(3);
@@ -1164,7 +1164,7 @@ MultiResEmbeddedAdaptData<T>::ElementStaysUnchanged(const int which_tree, const 
     //resdiual_order_indications_.AppendUnsetBit();
 
     //Test something with IDW
-    //t8_element_t* element = t8_forest_get_element_in_tree (this->GetAmrMesh().GetMesh(), which_tree, lelement_id);
+    //t8_element_t* element = t8_forest_get_leaf_element_in_tree (this->GetAmrMesh().GetMesh(), which_tree, lelement_id);
     //std::vector<double> midpoint(3);
     /* Get the midpoint of the min element */
     //t8_forest_element_centroid (forest, ltreeid, element, midpoint.data());

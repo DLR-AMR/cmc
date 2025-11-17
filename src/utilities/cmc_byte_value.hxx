@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstring>
 #include <climits>
+#include <algorithm>
 
 namespace cmc
 {

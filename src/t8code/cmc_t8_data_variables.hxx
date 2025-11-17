@@ -509,7 +509,7 @@ Variable<T>::CheckErrorBoundsForValues(const std::vector<T>& alternative_values,
 {
     const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
 
-    const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
+    const t8_element_t* element = t8_forest_get_leaf_element_in_tree(mesh_.GetMesh(), 0, index);
     
     const t8_scheme_c* ts =  t8_forest_get_scheme (mesh_.GetMesh());
 
@@ -526,7 +526,7 @@ Variable<T>::GetRemainingMaxAllowedAbsoluteError(const int index) const
 {
     const t8_eclass_t eclass = t8_forest_get_eclass(mesh_.GetMesh(), 0);
 
-    const t8_element_t* element = t8_forest_get_element_in_tree(mesh_.GetMesh(), 0, index);
+    const t8_element_t* element = t8_forest_get_leaf_element_in_tree(mesh_.GetMesh(), 0, index);
     
     const t8_scheme_c* ts =  t8_forest_get_scheme (mesh_.GetMesh());
 
