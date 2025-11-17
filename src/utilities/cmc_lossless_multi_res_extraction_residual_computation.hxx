@@ -1,5 +1,5 @@
-#ifndef CMC_MULTI_RES_EXTRACTION_RESIDUAL_COMPUTATION_HXX
-#define CMC_MULTI_RES_EXTRACTION_RESIDUAL_COMPUTATION_HXX
+#ifndef CMC_LOSSLESS_MULTI_RES_EXTRACTION_RESIDUAL_COMPUTATION_HXX
+#define CMC_LOSSLESS_MULTI_RES_EXTRACTION_RESIDUAL_COMPUTATION_HXX
 
 #include "utilities/cmc_vector_view.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
@@ -358,4 +358,4 @@ ComputeResidual(const T& approximation, const CompressionValue<T>& real_value)
 }
 
 
-#endif /* !CMC_MULTI_RES_EXTRACTION_RESIDUAL_COMPUTATION_HXX */
+#endif /* !CMC_LOSSLESS_MULTI_RES_EXTRACTION_RESIDUAL_COMPUTATION_HXX */

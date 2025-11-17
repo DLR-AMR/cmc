@@ -80,7 +80,8 @@ install(FILES
     utilities/cmc_trimmed_multi_res_coder.hxx 
     utilities/cmc_residual_quantization_entropy_alphabet.hxx 
     utilities/cmc_residual_quantization_encoder.hxx 
-    utilities/cmc_multi_res_extraction_residual_computation.hxx 
+    utilities/cmc_lossy_multi_res_extraction_residual_computation.hxx 
+    utilities/cmc_lossless_multi_res_extraction_residual_computation.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 

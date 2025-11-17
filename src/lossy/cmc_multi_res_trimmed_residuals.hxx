@@ -11,7 +11,7 @@
 #include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
 #include "lossy/cmc_byte_compression_variable.hxx"
-#include "lossy/cmc_multi_res_extraction_residual_computation.hxx"
+#include "utilities/cmc_lossy_multi_res_extraction_residual_computation.hxx"
 
 #include <utility>
 #include <vector>

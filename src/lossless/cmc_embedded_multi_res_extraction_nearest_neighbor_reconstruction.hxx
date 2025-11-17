@@ -9,7 +9,7 @@
 #include "lossless/cmc_embedded_byte_compression_extended_variable.hxx"
 #include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
-#include "utilities/cmc_multi_res_extraction_residual_computation.hxx"
+#include "utilities/cmc_lossless_multi_res_extraction_residual_computation.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
 #include "mesh_compression/cmc_embedded_mesh_encoder.hxx"

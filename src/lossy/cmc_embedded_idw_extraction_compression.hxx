@@ -9,7 +9,7 @@
 #include "lossy/cmc_embedded_idw_compression_variable.hxx"
 #include "utilities/cmc_residual_quantization_encoder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
-#include "lossy/cmc_multi_res_extraction_residual_computation.hxx"
+#include "utilities/cmc_lossy_multi_res_extraction_residual_computation.hxx"
 #include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
