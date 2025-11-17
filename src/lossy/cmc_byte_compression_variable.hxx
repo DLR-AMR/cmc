@@ -11,7 +11,7 @@
 #include "mesh_compression/cmc_mesh_encoder.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 #include "t8code/cmc_t8_adapt_track_inaccuracy.hxx"
-#include "utilities/cmc_iface_abstract_byte_compression_variable.hxx"
+#include "utilities/cmc_iface_amr_compression_variable.hxx"
 
 #include "mpi/cmc_mpi.hxx"
 
@@ -94,7 +94,7 @@ using AdaptationDestructor = std::function<void(IByteCompressionAdaptData<T>*)>;
  * @tparam T The origianl data type of the underlying data (e.g. float)
  */
 template <typename T>
-class AbstractByteCompressionVariable : public IByteCompressionVariable<T>
+class AbstractByteCompressionVariable : public IAMRCompressionVariable<T>
 {
 public:
     void Compress() override;

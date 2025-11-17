@@ -76,8 +76,6 @@ install(FILES
     utilities/cmc_iface_arithmetic_encoding_freq_model.hxx 
     utilities/cmc_embedded_mesh_utilities.hxx 
     utilities/cmc_embedded_variable_attributes.hxx 
-    utilities/cmc_iface_abstract_byte_compression_variable.hxx 
-    utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx 
     utilities/cmc_trimmed_multi_res_compression_entropy_alphabet.hxx 
     utilities/cmc_trimmed_multi_res_coder.hxx 
     utilities/cmc_residual_quantization_entropy_alphabet.hxx 
@@ -167,35 +165,6 @@ install(FILES
     embedded/lossless/cmc_test_pcp4_embedded_decompression.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/embedded/lossless
 )
-
-#install(FILES
-#    lossless/cmc_byte_compression_variable.hxx 
-#    lossless/cmc_embedded_byte_compression_variable.hxx 
-#    lossless/cmc_embedded_byte_decompression_variable.hxx 
-#    lossless/cmc_embedded_prefix_extraction_compression.hxx 
-#    lossless/cmc_embedded_prefix_extraction_decompression.hxx 
-#    lossless/cmc_embedded_prefix_extraction_compression_plain_suffixes.hxx 
-#    lossless/cmc_embedded_prefix_extraction_decompression_plain_suffixes.hxx 
-#    lossless/cmc_embedded_multi_res_extraction_compression.hxx 
-#    lossless/cmc_embedded_multi_res_extraction_decompression.hxx 
-#    lossless/cmc_test_pcp4_embedded_compression.hxx 
-#    lossless/cmc_test_pcp4_embedded_decompression.hxx 
-#    lossless/cmc_test_pcp4_embedded_compression.hxx 
-#    lossless/cmc_test_pcp4_embedded_decompression.hxx 
-#    lossless/cmc_prefix_extraction_compression.hxx 
-#    lossless/cmc_prefix_extraction_compression_plain_suffixes.hxx 
-#    lossless/cmc_multi_res_extraction_compression.hxx 
-#    lossless/cmc_multi_res_extraction_decompression.hxx 
-#    lossless/cmc_multi_res_extraction_residual_computation.hxx 
-#    lossless/cmc_prefix_extraction_decompression.hxx 
-#    lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx 
-#    lossless/cmc_byte_decompression_variable.hxx 
-#    lossless/cmc_embedded_byte_compression_ext_variable.hxx 
-#    lossless/cmc_embedded_multi_res_extraction_lin_reconstruction_compression.hxx 
-#    lossless/cmc_embedded_byte_compression_extended_variable.hxx 
-#    lossless/cmc_embedded_multi_res_extraction_nearest_neighbor_reconstruction.hxx 
-#DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lossless
-#)
 
 install(FILES
     mesh_compression/cmc_iface_abstract_mesh_encoder.hxx 

@@ -4,7 +4,7 @@
 #include "cmc_config.h"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
-#include "utilities/cmc_iface_abstract_byte_compression_variable.hxx"
+#include "utilities/cmc_iface_amr_compression_variable.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_entropy_coder.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
@@ -92,7 +92,7 @@ using AdaptDestructor = std::function<void(ICompressionAdaptData<T>*)>;
  * @tparam T The origianl data type of the underlying data (e.g. float)
  */
 template <typename T>
-class AbstractByteCompressionVariable : public IByteCompressionVariable<T>
+class AbstractByteCompressionVariable : public IAMRCompressionVariable<T>
 {
 public:
     void Compress() override;

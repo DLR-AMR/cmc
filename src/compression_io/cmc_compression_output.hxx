@@ -2,9 +2,8 @@
 #define CMC_COMPRESSION_OUTPUT_HXX
 
 #include "lossy/cmc_ac_compression_variable.hxx"
-//#include "lossless/cmc_byte_compression_variable.hxx"
-#include "utilities/cmc_iface_abstract_byte_compression_variable.hxx"
-#include "utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx"
+#include "utilities/cmc_iface_amr_compression_variable.hxx"
+#include "utilities/cmc_iface_embedded_amr_compression_variable.hxx"
 #include "embedded/lossless/cmc_embedded_byte_compression_variable.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
 
@@ -33,8 +32,8 @@ public:
     Writer(const std::string& file_name, MPI_Comm comm)
     : file_name_{file_name}, nc_writer_(file_name, NC_NETCDF4, comm) {};
 
-    template<typename T> void SetVariable(cmc::IByteCompressionVariable<T>* variable);
-    template<typename T> void SetVariable(cmc::IEmbeddedByteCompressionVariable<T>* variable);
+    template<typename T> void SetVariable(cmc::IAMRCompressionVariable<T>* variable);
+    template<typename T> void SetVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable);
 
     void AddGlobalAttribute(const nc::Attribute& attribute);
     void AddGlobalAttribute(nc::Attribute&& attribute);
@@ -42,10 +41,10 @@ public:
     void Write();
 
 private:
-    template<typename T> void SetDataVariable(cmc::IByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
-    template<typename T> void SetMeshVariable(cmc::IByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
-    template<typename T> void SetDataVariable(cmc::IEmbeddedByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
-    template<typename T> void SetMeshVariable(cmc::IEmbeddedByteCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
+    template<typename T> void SetDataVariable(cmc::IAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
+    template<typename T> void SetMeshVariable(cmc::IAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
+    template<typename T> void SetDataVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
+    template<typename T> void SetMeshVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
 
     std::string file_name_;
     cmc::nc::Writer nc_writer_;

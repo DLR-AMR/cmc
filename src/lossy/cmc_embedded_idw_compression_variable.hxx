@@ -13,7 +13,7 @@
 #include "input/cmc_input_variable.hxx"
 #include "mesh_compression/cmc_iface_embedded_mesh_encoder.hxx"
 #include "utilities/cmc_embedded_mesh_utilities.hxx"
-#include "utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx"
+#include "utilities/cmc_iface_embedded_amr_compression_variable.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 
 #include "mpi/cmc_mpi.hxx"
@@ -134,7 +134,7 @@ using AdaptDestructor = std::function<void(IEmbeddedCompressionAdaptData<T>*)>;
  * @tparam T The origianl data type of the underlying data (e.g. float)
  */
 template <typename T>
-class AbstractEmbeddedByteCompressionVariable : public IEmbeddedByteCompressionVariable<T>
+class AbstractEmbeddedByteCompressionVariable : public IEmbeddedAMRCompressionVariable<T>
 {
 public:
     void Compress() override;
