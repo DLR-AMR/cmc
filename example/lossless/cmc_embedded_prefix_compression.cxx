@@ -1,9 +1,9 @@
 #include "cmc.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "input/cmc_netcdf.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_compression.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_compression_plain_suffixes.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_decompression.hxx"
+#include "embedded/lossless/cmc_embedded_prefix_extraction_compression.hxx"
+#include "embedded/lossless/cmc_embedded_prefix_extraction_compression_plain_suffixes.hxx"
+#include "embedded/lossless/cmc_embedded_prefix_extraction_decompression.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "input/cmc_binary_reader.hxx"
 

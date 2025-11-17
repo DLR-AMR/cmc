@@ -9,9 +9,8 @@
 #include "utilities/cmc_serialization.hxx"
 #include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
-#include "lossless/cmc_byte_compression_variable.hxx"
-#include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
-
+#include "utilities/cmc_multi_res_extraction_residual_computation.hxx"
+#include "amr/lossless/cmc_byte_compression_variable.hxx"
 
 #include <utility>
 #include <vector>

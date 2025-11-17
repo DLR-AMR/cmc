@@ -8,7 +8,7 @@
 #include "utilities/cmc_serialization.hxx"
 #include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
-#include "lossless/cmc_byte_decompression_variable.hxx"
+#include "amr/lossless/cmc_byte_decompression_variable.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_mesh_decoder.hxx"
 

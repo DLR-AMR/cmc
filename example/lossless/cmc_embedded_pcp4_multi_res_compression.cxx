@@ -1,7 +1,7 @@
 #include "cmc.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "input/cmc_netcdf.hxx"
-#include "lossless/cmc_test_pcp4_embedded_compression.hxx"
+#include "embedded/lossless/cmc_test_pcp4_embedded_compression.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "input/cmc_binary_reader.hxx"
 

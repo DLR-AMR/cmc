@@ -20,14 +20,14 @@
 #include "compression_io/cmc_decompression_input.hxx"
 #else
 
-#include "lossless/cmc_multi_res_extraction_compression.hxx"
-#include "lossless/cmc_multi_res_extraction_decompression.hxx"
+#include "amr/lossless/cmc_multi_res_extraction_compression.hxx"
+#include "amr/lossless/cmc_multi_res_extraction_decompression.hxx"
 
-#include "lossless/cmc_prefix_extraction_compression.hxx"
-#include "lossless/cmc_prefix_extraction_compression_plain_suffixes.hxx"
-#include "lossless/cmc_prefix_extraction_decompression.hxx"
+#include "amr/lossless/cmc_prefix_extraction_compression.hxx"
+#include "amr/lossless/cmc_prefix_extraction_compression_plain_suffixes.hxx"
+#include "amr/lossless/cmc_prefix_extraction_decompression.hxx"
 
-#include "lossless/cmc_test_pcp4_compression.hxx"
+#include "amr/lossless/cmc_test_pcp4_compression.hxx"
 
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_utilities.hxx"

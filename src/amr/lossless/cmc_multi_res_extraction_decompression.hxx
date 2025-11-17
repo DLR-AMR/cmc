@@ -1,16 +1,16 @@
-#ifndef CMC_EMBEDDED_MULTI_RES_EXTRACTION_DECOMPRESSION_HXX
-#define CMC_EMBEDDED_MULTI_RES_EXTRACTION_DECOMPRESSION_HXX
+#ifndef CMC_MULTI_RES_EXTRACTION_DECOMPRESSION_HXX
+#define CMC_MULTI_RES_EXTRACTION_DECOMPRESSION_HXX
 
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
-#include "lossless/cmc_embedded_byte_decompression_variable.hxx"
 #include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
+#include "amr/lossless/cmc_byte_decompression_variable.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
-#include "mesh_compression/cmc_embedded_mesh_decoder.hxx"
+#include "mesh_compression/cmc_mesh_decoder.hxx"
 
 #include <utility>
 #include <vector>
@@ -18,20 +18,22 @@
 #include <algorithm>
 #include <memory>
 
-namespace cmc::lossless::embedded::multi_res
+namespace cmc::lossless::multi_res
 {
+
+constexpr bool kDecodeLessResiduals = false;
 
 /* A typedef for the sake of brevity */
 template <typename T>
 using CompressionValue = SerializedCompressionValue<sizeof(T)>;
 
 template<typename T>
-class MultiResEmbeddedDecompressionAdaptData : public cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>
+class MultiResDecompressionAdaptData : public cmc::decompression::IDecompressionAdaptData<T>
 {
 public:
-    MultiResEmbeddedDecompressionAdaptData() = delete;
-    MultiResEmbeddedDecompressionAdaptData(cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>* variable)
-    : cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>(variable) {};
+    MultiResDecompressionAdaptData() = delete;
+    MultiResDecompressionAdaptData(cmc::decompression::AbstractByteDecompressionVariable<T>* variable)
+    : cmc::decompression::IDecompressionAdaptData<T>(variable) {};
 
     bool IsDecompressionProgressing() const override;
     void InitializeDecompressionIteration() override;
@@ -41,8 +43,8 @@ public:
 
     std::vector<CompressionValue<T>> DecodeRootLevel(const t8_locidx_t num_local_root_values) override;
 protected:
-    cmc::decompression::embedded::RefinementData<T> PerformRefinement(const int which_tree, const int lelement_id, const CompressionValue<T> value, const int num_refined_elements) override;
-    cmc::decompression::embedded::UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
+    cmc::decompression::RefinementData<T> PerformRefinement(const int which_tree, const int lelement_id, const CompressionValue<T> value, const int num_refined_elements) override;
+    cmc::decompression::UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
 
 private:
     uint32_t GetNextEncodedResidualLength();
@@ -62,14 +64,15 @@ private:
 
 template<typename T>
 inline bool
-MultiResEmbeddedDecompressionAdaptData<T>::IsDecompressionProgressing() const
+MultiResDecompressionAdaptData<T>::IsDecompressionProgressing() const
 {
-    return (level_byte_offset_ < cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>::encoded_data_byte_stream_.size());
+    return (level_byte_offset_ < cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.size());
 }
+
 
 template<typename T>
 inline uint32_t
-MultiResEmbeddedDecompressionAdaptData<T>::GetNextEncodedResidualLength()
+MultiResDecompressionAdaptData<T>::GetNextEncodedResidualLength()
 {
     cmc_assert(entropy_decoder_ != nullptr);
     return entropy_decoder_->DecodeNextSymbol();
@@ -77,7 +80,7 @@ MultiResEmbeddedDecompressionAdaptData<T>::GetNextEncodedResidualLength()
 
 template<typename T>
 inline std::vector<uint8_t>
-MultiResEmbeddedDecompressionAdaptData<T>::GetNextResidualBitSequence(const size_t num_residual_bits)
+MultiResDecompressionAdaptData<T>::GetNextResidualBitSequence(const size_t num_residual_bits)
 {
     return residual_bits_.GetNextBitSequence(num_residual_bits);
 }
@@ -85,7 +88,7 @@ MultiResEmbeddedDecompressionAdaptData<T>::GetNextResidualBitSequence(const size
 
 template <typename T>
 std::vector<CompressionValue<T>>
-MultiResEmbeddedDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num_local_root_values)
+MultiResDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num_local_root_values)
 {
     cmc_debug_msg("The setup of the root level values is performed.");
 
@@ -96,7 +99,7 @@ MultiResEmbeddedDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num
 
     for (t8_locidx_t idx = 0; idx < num_local_root_values; ++idx)
     {
-        const T val = GetValueFromByteStream<T>(cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>::encoded_data_byte_stream_.data() + offset * idx);
+        const T val = GetValueFromByteStream<T>(cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.data() + offset * idx);
         cmc_debug_msg("Root level value: ", val, ", fuer idx: ", idx);
         root_values.emplace_back(CompressionValue<T>(val));
     }
@@ -108,7 +111,7 @@ MultiResEmbeddedDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num
 
 template <typename T>
 void
-MultiResEmbeddedDecompressionAdaptData<T>::InitializeDecompressionIteration()
+MultiResDecompressionAdaptData<T>::InitializeDecompressionIteration()
 {
     cmc_debug_msg("A multi-resolution decompression iteration is initialized.");
 
@@ -117,7 +120,7 @@ MultiResEmbeddedDecompressionAdaptData<T>::InitializeDecompressionIteration()
     size_t processed_bytes = level_byte_offset_;
 
     /* Get a pointer to the beginning of the encoded data stream */
-    const auto data_start_ptr = cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>::encoded_data_byte_stream_.data();
+    const auto data_start_ptr = cmc::decompression::IDecompressionAdaptData<T>::encoded_data_byte_stream_.data();
 
     /* Get the amount of relevant bytes for this decompression level */
     const uint64_t current_level_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
@@ -153,13 +156,13 @@ MultiResEmbeddedDecompressionAdaptData<T>::InitializeDecompressionIteration()
     level_byte_offset_ = processed_bytes;
 
     /* Setup the entropy decoder */
-    entropy_decoder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResDecoder<T>>(alphabet_.begin(), encoded_lzcs_);
+    entropy_decoder_ = std::make_unique<typename cmc::entropy_coding::arithmetic_coding::MultiResDecoder<T>>(alphabet_.begin(), encoded_lzcs_);
     entropy_decoder_->SetupDecoding(); 
 }
 
 template <typename T>
 void
-MultiResEmbeddedDecompressionAdaptData<T>::FinalizeDecompressionIteration()
+MultiResDecompressionAdaptData<T>::FinalizeDecompressionIteration()
 {
     ++count_adaptation_step_;
     cmc_debug_msg("The multi-resolution decompression iteration (", count_adaptation_step_, ") has been finalized.");
@@ -167,22 +170,21 @@ MultiResEmbeddedDecompressionAdaptData<T>::FinalizeDecompressionIteration()
 
 template <typename T>
 void
-MultiResEmbeddedDecompressionAdaptData<T>::CompleteDecompressionIteration([[maybe_unused]] const t8_forest_t previous_forest, [[maybe_unused]] const t8_forest_t adapted_forest)
+MultiResDecompressionAdaptData<T>::CompleteDecompressionIteration([[maybe_unused]] const t8_forest_t previous_forest, [[maybe_unused]] const t8_forest_t adapted_forest)
 {
     //Nothing to be done here!
 }
 
 template <typename T>
 void
-MultiResEmbeddedDecompressionAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
+MultiResDecompressionAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
 {
     //Currently, nothing to be done here!
 }
 
-
 template <typename T>
 inline uint32_t
-MultiResEmbeddedDecompressionAdaptData<T>::ApplyProcessBoundarySymbol()
+MultiResDecompressionAdaptData<T>::ApplyProcessBoundarySymbol()
 {
     bool is_process_boundary = true;
     uint32_t next_symbol;
@@ -209,7 +211,7 @@ MultiResEmbeddedDecompressionAdaptData<T>::ApplyProcessBoundarySymbol()
 
 template <typename T>
 CompressionValue<T>
-MultiResEmbeddedDecompressionAdaptData<T>::GetNextResidualAppliedValue(const CompressionValue<T>& coarse_value)
+MultiResDecompressionAdaptData<T>::GetNextResidualAppliedValue(const CompressionValue<T>& coarse_value)
 {
     CompressionValue<T> value = coarse_value;
 
@@ -257,10 +259,7 @@ MultiResEmbeddedDecompressionAdaptData<T>::GetNextResidualAppliedValue(const Com
             /* And finally, we combine it with the actual remaining residual bits */
             residual.ApplySuffix(residual_bits, residual_length);
         }
-        if (residual.GetTailBit() != 0)
-        {
-            cmc_debug_msg("\n\n\nHier ist residual nocht komplett\n\n\n");
-        }
+
         /* Add or subtract the residual */
         if (residual_operation == cmc::lossless::multi_res::util::IntegerAddition)
         {
@@ -274,16 +273,15 @@ MultiResEmbeddedDecompressionAdaptData<T>::GetNextResidualAppliedValue(const Com
     return value;
 }
 
-
 template <typename T>
-cmc::decompression::embedded::RefinementData<T>
-MultiResEmbeddedDecompressionAdaptData<T>::PerformRefinement(const int which_tree, const int lelement_id, const CompressionValue<T> value, const int num_refined_elements)
+cmc::decompression::RefinementData<T>
+MultiResDecompressionAdaptData<T>::PerformRefinement([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, const CompressionValue<T> value, const int num_refined_elements)
 {
     /* Create the refinement data to return */
-    cmc::decompression::embedded::RefinementData<T> refinement_data;
+    cmc::decompression::RefinementData<T> refinement_data;
     refinement_data.fine_values.reserve(num_refined_elements);
 
-    /* Apply all children suffixes */
+    /* Apply all children residuals */
     for (int idx = 0; idx < num_refined_elements; ++idx)
     {
         /* Get the next value with the applied residual and store it wihtin the refinement data */
@@ -294,46 +292,61 @@ MultiResEmbeddedDecompressionAdaptData<T>::PerformRefinement(const int which_tre
 }
 
 template <typename T>
-cmc::decompression::embedded::UnchangedData<T>
-MultiResEmbeddedDecompressionAdaptData<T>::ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value)
+cmc::decompression::UnchangedData<T>
+MultiResDecompressionAdaptData<T>::ElementStaysUnchanged([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, const CompressionValue<T>& value)
 {
-    /* Get the netx suffixed value */
-    const CompressionValue<T> residual_applied_value = GetNextResidualAppliedValue(value);
+    if constexpr (kDecodeLessResiduals)
+    {
+        /* There is no residual to decode and the element remains unchanged */
+        return cmc::decompression::UnchangedData<T>(value);
+    } else
+    {
+        /* Get the next suffixed value */
+        const CompressionValue<T> residual_applied_value = this->GetNextResidualAppliedValue(value);
 
-    return cmc::decompression::embedded::UnchangedData<T>(residual_applied_value);
+        const T residual_applied_value_reinter = residual_applied_value.template ReinterpretDataAs<T>();
+        const T init_val = value.template ReinterpretDataAs<T>();
+        if (not ApproxCompare(residual_applied_value_reinter, init_val))
+        {
+            cmc_debug_msg("Hier ist der Wert vor element unchanged ein anderer als nachher: residual applied: ", residual_applied_value_reinter, ", init val: ", init_val);
+        }
+        return cmc::decompression::UnchangedData<T>(residual_applied_value);
+    }
 }
 
 template <typename T>
-inline cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>*
-CreateMultiResDecompressionAdaptationClass(cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>* abstract_var)
+inline cmc::decompression::IDecompressionAdaptData<T>*
+CreateMultiResDecompressionAdaptationClass(cmc::decompression::AbstractByteDecompressionVariable<T>* abstract_var)
 {
-    return new MultiResEmbeddedDecompressionAdaptData<T>(abstract_var);
+    return new MultiResDecompressionAdaptData<T>(abstract_var);
 }
 
 template <typename T>
 inline void
-DestroyMultiResDecompressionAdaptationClass(cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>* iadapt_data)
+DestroyMultiResDecompressionAdaptationClass(cmc::decompression::IDecompressionAdaptData<T>* iadapt_data)
 {
     delete iadapt_data;
 }
 
 template<class T>
-class DecompressionVariable : public cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>
+class DecompressionVariable : public cmc::decompression::AbstractByteDecompressionVariable<T>
 {
 public:
     DecompressionVariable() = delete;
 
-    DecompressionVariable(const std::string& name, std::vector<uint8_t>&& encoded_data_byte_stream, std::vector<uint8_t>&& encoded_mesh_byte_stream, VariableAttributes<T>&& attributes, const bool are_refinement_bits_stored, const MPI_Comm comm)
-    : cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>(std::move(encoded_data_byte_stream), std::move(encoded_mesh_byte_stream), std::move(attributes), are_refinement_bits_stored, comm)
+    DecompressionVariable(const std::string& name, std::vector<uint8_t>&& encoded_data_byte_stream, std::vector<uint8_t>&& encoded_mesh_byte_stream, const int max_num_decompression_iterations)
+    : cmc::decompression::AbstractByteDecompressionVariable<T>(std::move(encoded_data_byte_stream), std::move(encoded_mesh_byte_stream), max_num_decompression_iterations)
     {
         this->SetName(name);
-        cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>::adaptation_creator_ = CreateMultiResDecompressionAdaptationClass<T>;
-        cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>::adaptation_destructor_ = DestroyMultiResDecompressionAdaptationClass<T>;
-        cmc::decompression::embedded::AbstractEmbeddedByteDecompressionVariable<T>::mesh_decoder_ = std::make_unique<mesh_compression::EmbeddedMeshDecoder>(this->GetEncodedMeshStream());
+        cmc::decompression::AbstractByteDecompressionVariable<T>::adaptation_creator_ = CreateMultiResDecompressionAdaptationClass<T>;
+        cmc::decompression::AbstractByteDecompressionVariable<T>::adaptation_destructor_ = DestroyMultiResDecompressionAdaptationClass<T>;
+        cmc::decompression::AbstractByteDecompressionVariable<T>::mesh_decoder_ = std::make_unique<mesh_compression::MeshDecoder>(this->GetEncodedMeshStream());
     };
 };
+
 
 }
 
 
-#endif /* !CMC_EMBEDDED_MULTI_RES_EXTRACTION_DECOMPRESSION_HXX */
+
+#endif /* !CMC_MULTI_RES_EXTRACTION_DECOMPRESSION_HXX */

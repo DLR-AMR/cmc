@@ -1,39 +1,32 @@
-#ifndef CMC_TEST_PCP4_EMBEDDED_COMPRESSION_HXX
-#define CMC_TEST_PCP4_EMBEDDED_COMPRESSION_HXX
-
+#ifndef CMC_TEST_PCP4_COMPRESSION_HXX
+#define CMC_TEST_PCP4_COMPRESSION_HXX
 
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
-#include "lossless/cmc_embedded_byte_compression_variable.hxx"
-#include "utilities/cmc_multi_res_entropy_coder.hxx"
-#include "utilities/cmc_multi_res_extraction_util.hxx"
-#include "lossless/cmc_multi_res_extraction_residual_computation.hxx"
-#include "utilities/cmc_serialization.hxx"
 #include "utilities/cmc_interpolation_fn.hxx"
-#include "mesh_compression/cmc_embedded_mesh_encoder.hxx"
+#include "utilities/cmc_serialization.hxx"
+#include "utilities/cmc_multi_res_entropy_coder.hxx"
+#include "amr/lossless/cmc_byte_compression_variable.hxx"
+
 
 #include <utility>
 #include <vector>
 #include <array>
 #include <algorithm>
 
-namespace cmc::lossless::embedded::test_pcp4
+namespace cmc::lossless::test_pcp4
 {
-
-/* A typedef for the sake of brevity */
-template <typename T>
-using CompressionValue = SerializedCompressionValue<sizeof(T)>;
 
 template<typename T>
-class TestPcp4EmbeddedAdaptData : public IEmbeddedCompressionAdaptData<T>
+class TestPcp4AdaptData : public ICompressionAdaptData<T>
 {
 public:
-    TestPcp4EmbeddedAdaptData() = delete;
-    TestPcp4EmbeddedAdaptData(AbstractEmbeddedByteCompressionVariable<T>* variable)
-    : IEmbeddedCompressionAdaptData<T>(variable) {
-        IEmbeddedCompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResEncoder<T>>();
+    TestPcp4AdaptData() = delete;
+    TestPcp4AdaptData(AbstractByteCompressionVariable<T>* variable)
+    : ICompressionAdaptData<T>(variable) {
+        ICompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResEncoder<T>>();
     };
 
     void InitializeExtractionIteration() override;
@@ -43,50 +36,46 @@ public:
 
     std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const override;
     std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
-    std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLeafLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const;
+
 protected:
     ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) override;
     UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
 
 private:
     void CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const;
-    void CollectLeafLevelSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const;
-    
+
     bit_vector::BitVector fixed_four_byte_family_codes_;
 
     int count_adaptation_step_{0};
 };
 
-
 template <typename T>
 void
-TestPcp4EmbeddedAdaptData<T>::InitializeExtractionIteration()
+TestPcp4AdaptData<T>::InitializeExtractionIteration()
 {
     fixed_four_byte_family_codes_ = bit_vector::BitVector();
-    //fixed_four_byte_family_codes_.Reserve();
 }
 
 template <typename T>
 void
-TestPcp4EmbeddedAdaptData<T>::FinalizeExtractionIteration()
+TestPcp4AdaptData<T>::FinalizeExtractionIteration()
 {
     ++count_adaptation_step_;
 }
 
 template <typename T>
 void
-TestPcp4EmbeddedAdaptData<T>::CompleteExtractionIteration([[maybe_unused]] const t8_forest_t previous_forest, [[maybe_unused]] const t8_forest_t adapted_forest)
+TestPcp4AdaptData<T>::CompleteExtractionIteration([[maybe_unused]] const t8_forest_t previous_forest, [[maybe_unused]] const t8_forest_t adapted_forest)
 {
     fixed_four_byte_family_codes_.TrimToContent();
 }
 
 template <typename T>
 void
-TestPcp4EmbeddedAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
+TestPcp4AdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
 {
     //Currently, nothing to be done here!
 }
-
 
 template <typename T>
 std::vector<T>
@@ -103,9 +92,8 @@ GetCompressionValuesAs(const VectorView<CompressionValue<T>> values)
     return vals;
 }
 
-
 template<typename T>
-T
+std::pair<T, int>
 GetInterpoaltionMaximizingLZCInXOR(const VectorView<CompressionValue<T>> values)
 {
     if constexpr (std::is_same_v<float, T>)
@@ -193,58 +181,179 @@ GetInterpoaltionMaximizingLZCInXOR(const VectorView<CompressionValue<T>> values)
     /* Check which value to return */
     if (max_lzc >= mean_lzc_count && max_lzc >= mr_lzc_count)
     {
-        return value_view[index];
+        return std::make_pair(value_view[index], max_lzc);
     }  else if (mean_lzc_count >= max_lzc && mean_lzc_count >= mr_lzc_count)
     {
-        return mean;
+        return std::make_pair(mean, mean_lzc_count);
     } else if (mr_lzc_count >= max_lzc && mr_lzc_count >= mean_lzc_count)
     {
-        return mid_range;
+        return std::make_pair(mid_range, mr_lzc_count);
     } else
     {
         cmc_err_msg("One of the above cases should have been selected");
-        return T(0.0);
+        return std::make_pair(T(0.0), 0);
     }
 
+    } else if constexpr (std::is_same_v<double, T>)
+    {
+        const std::vector<T> vals = GetCompressionValuesAs<T>(values);
+
+        /* Get a view on the values */
+        const VectorView<T> value_view(vals);
+    
+        int max_lzc = -1;
+        int index = 0;
+    
+        int pred_idx = 0;
+        for (auto pred_iter = value_view.begin(); pred_iter != value_view.end(); ++pred_iter, ++pred_idx)
+        {
+            T current_predictor = *pred_iter;
+            uint64_t cp;
+            std::memcpy(&cp, &current_predictor, 8);
+    
+            uint64_t xor_result{0};
+    
+            for (auto val_iter = value_view.begin(); val_iter != value_view.end(); ++val_iter)
+            {
+                T val = *val_iter;
+                uint64_t uiv;
+                std::memcpy(&uiv, &val, 8);
+    
+                const uint64_t diff = cp ^ uiv;
+    
+                xor_result |= diff;
+            }        
+    
+            CompressionValue<T> crv(xor_result);
+            const int lzc_count = crv.GetNumberLeadingZeros();
+    
+            if (lzc_count > max_lzc)
+            {
+                max_lzc = lzc_count;
+                index = pred_idx;
+            }
+        }
+    
+        //Try midrange and arithmetic mean as well
+        const T mid_range = InterpolateToMidRange<T>(value_view);
+        uint64_t ui_mid_range;
+        std::memcpy(&ui_mid_range, &mid_range, 8);
+    
+        uint64_t mr_xor_result{0};
+    
+        for (auto val_iter = value_view.begin(); val_iter != value_view.end(); ++val_iter)
+        {
+            T val = *val_iter;
+            uint64_t uiv;
+            std::memcpy(&uiv, &val, 8);
+    
+            const uint64_t diff = ui_mid_range ^ uiv;
+    
+            mr_xor_result |= diff;
+        }    
+    
+        CompressionValue<T> mr_crv(mr_xor_result);
+        const int mr_lzc_count = mr_crv.GetNumberLeadingZeros();
+    
+        /* Check the arithmetic mean as well */
+        const T mean = InterpolateToArithmeticMean<T>(value_view);
+        uint64_t ui_mean;
+        std::memcpy(&ui_mean, &mean, 8);
+    
+        uint64_t mean_xor_result{0};
+    
+        for (auto val_iter = value_view.begin(); val_iter != value_view.end(); ++val_iter)
+        {
+            T val = *val_iter;
+            uint64_t uiv;
+            std::memcpy(&uiv, &val, 8);
+    
+            const uint64_t diff = ui_mean ^ uiv;
+    
+            mean_xor_result |= diff;
+        }
+    
+        CompressionValue<T> mean_crv(mean_xor_result);
+        const int mean_lzc_count = mean_crv.GetNumberLeadingZeros();
+    
+        /* Check which value to return */
+        if (max_lzc >= mean_lzc_count && max_lzc >= mr_lzc_count)
+        {
+            return std::make_pair(value_view[index], max_lzc);
+        }  else if (mean_lzc_count >= max_lzc && mean_lzc_count >= mr_lzc_count)
+        {
+            return std::make_pair(mean, mean_lzc_count);
+        } else if (mr_lzc_count >= max_lzc && mr_lzc_count >= mean_lzc_count)
+        {
+            return std::make_pair(mid_range, mr_lzc_count);
+        } else
+        {
+            cmc_err_msg("One of the above cases should have been selected");
+            return std::make_pair(T(0.0), 0);
+        }
     } else
     {
         cmc_err_msg("Only floating point data compression is enabled for this comparison test.");
-        return T();
+        return std::make_pair(T(),0);
     }
 }
 
 template <typename T>
 ExtractionData<T>
-TestPcp4EmbeddedAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, [[maybe_unused]] const int num_elements, const VectorView<CompressionValue<T>> values)
+TestPcp4AdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, [[maybe_unused]] const int num_elements, const VectorView<CompressionValue<T>> values)
 {
     /* Get the coarse approximation for these values which maximizes the cumulative residual LZC */
-    const T coarse_approximation = GetInterpoaltionMaximizingLZCInXOR<T>(values);
-
-    uint32_t interpolation_result;
-    std::memcpy(&interpolation_result, &coarse_approximation, sizeof(T));
+    auto [coarse_approximation, lzc] = GetInterpoaltionMaximizingLZCInXOR<T>(values);
 
     std::vector<CompressionValue<T>> fine_values;
     fine_values.reserve(values.size());
 
     const std::vector<T> vals = GetCompressionValuesAs<T>(values);
 
-    uint32_t xor_result{0};
-
-    /* Compute the residuals for the given predictor */
-    for (size_t idx = 0; idx < vals.size(); ++idx)
+    if constexpr (std::is_same_v<float, T>)
     {
-        uint32_t uiv;
-        std::memcpy(&uiv, &vals[idx], sizeof(T));
+        uint32_t xor_result{0};
+        uint32_t interpolation_result;
+        std::memcpy(&interpolation_result, &coarse_approximation, sizeof(T));
 
-        const uint32_t xor_residual = interpolation_result ^ uiv;
+        /* Compute the residuals for the given predictor */
+        for (size_t idx = 0; idx < vals.size(); ++idx)
+        {
+            uint32_t uiv;
+            std::memcpy(&uiv, &vals[idx], sizeof(T));
 
-        fine_values.push_back(CompressionValue<T>(xor_residual));
-     
-        xor_result |= xor_residual;
+            const uint32_t xor_residual = interpolation_result ^ uiv;
+
+            fine_values.push_back(CompressionValue<T>(xor_residual));
+        
+            xor_result |= xor_residual;
+        }
+        CompressionValue<T> crv(xor_result);
+        cmc_assert(crv.GetNumberLeadingZeros() == lzc);
+    } else if constexpr (std::is_same_v<double, T>)
+    {
+        uint64_t xor_result{0};
+        uint64_t interpolation_result;
+        std::memcpy(&interpolation_result, &coarse_approximation, sizeof(T));
+
+        /* Compute the residuals for the given predictor */
+        for (size_t idx = 0; idx < vals.size(); ++idx)
+        {
+            uint64_t uiv;
+            std::memcpy(&uiv, &vals[idx], sizeof(T));
+
+            const uint64_t xor_residual = interpolation_result ^ uiv;
+
+            fine_values.push_back(CompressionValue<T>(xor_residual));
+        
+            xor_result |= xor_residual;
+        }
+        CompressionValue<T> crv(xor_result);
+        cmc_assert(crv.GetNumberLeadingZeros() == lzc);
+    } else
+    {
+        cmc_err_msg("Only double and float compression is enabled for the testing purposes of the PCP4 scheme.");
     }
-
-    CompressionValue<T> crv(xor_result);
-    int lzc = crv.GetNumberLeadingZeros();
 
     /* Check whether the LZC exceeds 15 */
     if (lzc > 15)
@@ -267,11 +376,8 @@ TestPcp4EmbeddedAdaptData<T>::PerformExtraction([[maybe_unused]] const int which
 
 template <typename T>
 UnchangedData<T>
-TestPcp4EmbeddedAdaptData<T>::ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value)
+TestPcp4AdaptData<T>::ElementStaysUnchanged([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, const CompressionValue<T>& value)
 {
-    /* We drag this value along to the "coarser level" until it this element is passed with its siblings
-     * as a family of elements into the adaptation callback. Moreover, we leave an empty value 
-     * on the "finer level" */
     CompressionValue<T> coarse_val = value;
     fixed_four_byte_family_codes_.AppendFourBits(uint8_t(15));
     CompressionValue<T> fine_val;
@@ -280,6 +386,7 @@ TestPcp4EmbeddedAdaptData<T>::ElementStaysUnchanged(const int which_tree, const 
 
     return UnchangedData<T>(coarse_val, fine_val);
 }
+
 
 /**
  * @brief  We use an arithmetic encoder to encode the position of the first "one-bit" in the compression value
@@ -290,10 +397,12 @@ TestPcp4EmbeddedAdaptData<T>::ElementStaysUnchanged(const int which_tree, const 
  */
 template <typename T>
 std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
-TestPcp4EmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
+TestPcp4AdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
 {
     cmc_debug_msg("The encoding of the CompressionValues after the multi-resolution pcp4 extraction iteration starts...");
     
+    cmc_assert(ICompressionAdaptData<T>::entropy_coder_ != nullptr);
+
     /* Get the rank of the mpi process within the communicator */
     int rank{0};
     int ret_val = MPI_Comm_rank(this->GetMPIComm(), &rank);
@@ -305,7 +414,7 @@ TestPcp4EmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue
     /* The encoded data will be stored in a BitVector */
     cmc::bit_vector::BitVector encoding;
     encoding.Reserve(3 * level_byte_values.size());
-    
+
     /* Iterate over all values and encode them */
     for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
     {
@@ -325,9 +434,9 @@ TestPcp4EmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue
     /* Get the local remaining significant bits */
     const uint64_t local_remaining_significant_bits_num_bytes = static_cast<uint64_t>(encoding.size());
 
-    /* Get the local encoded LZC */
+    /* Get the local encoded LZC, respectively the encoded first "one-bit" positions */
     const uint64_t local_encoded_lzc_stream_num_bytes = static_cast<uint64_t>(fixed_four_byte_family_codes_.size());
-    cmc_debug_msg("Size of LZC for this level: ", local_encoded_lzc_stream_num_bytes);
+
     /* We need exchange the encoded lengths */
     const std::vector<uint64_t> local_bytes{local_encoded_lzc_stream_num_bytes, local_remaining_significant_bits_num_bytes};
     std::vector<uint64_t> global_bytes{0, 0};
@@ -376,8 +485,8 @@ TestPcp4EmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue
 }
 
 template <typename T>
-inline std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
-TestPcp4EmbeddedAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
+std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
+TestPcp4AdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
 {
     cmc_debug_msg("The encoding of the root level values of the multi-resolution pcp4 compression starts.");
 
@@ -395,53 +504,88 @@ TestPcp4EmbeddedAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionV
     return std::make_pair(std::vector<uint8_t>(), std::move(encoded_stream));
 }
 
+
 template <typename T>
-inline IEmbeddedCompressionAdaptData<T>*
-CreateTestPcp4EmbeddedExtractionAdaptationClass(AbstractEmbeddedByteCompressionVariable<T>* abstract_var)
+inline ICompressionAdaptData<T>*
+CreateTestPcp4ExtractionAdaptationClass(AbstractByteCompressionVariable<T>* abstract_var)
 {
-    return new TestPcp4EmbeddedAdaptData<T>(abstract_var);
+    return new TestPcp4AdaptData<T>(abstract_var);
 }
 
 template <typename T>
 inline void
-DestroyTestPcp4EmbeddedExtractionAdaptationClass(IEmbeddedCompressionAdaptData<T>* iadapt_data)
+DestroyTestPcp4ExtractionAdaptationClass(ICompressionAdaptData<T>* iadapt_data)
 {
     delete iadapt_data;
 }
 
 template<class T>
-class EmbeddedCompressionVariable : public AbstractEmbeddedByteCompressionVariable<T>
+class CompressionVariable : public AbstractByteCompressionVariable<T>
 {
 public:
-    EmbeddedCompressionVariable() = delete;
+    CompressionVariable() = delete;
 
-    EmbeddedCompressionVariable(input::Var& input_variable)
-    : AbstractEmbeddedByteCompressionVariable<T>(input_variable)
+    CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<T>& variable_data)
+    : AbstractByteCompressionVariable<T>()
     {
-        //cmc_assert(input_variable.IsValid());//TODO: implement 
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
+        {
+            throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
+        }
 
-        this->SetName(input_variable.GetName());
-        //this->SetMPIComm(input_variable.GetMPIComm());
-        //cmc_debug_msg("Here is comm: ", input_variable.GetMPIComm());
-        this->IndicateWhetherMeshRefinementBitsWillBeStored(true);
+        this->SetName(name);
+        this->SetAmrMesh(AmrMesh(initial_mesh));
+        this->SetData(variable_data);
+        StoreMeshMPIComm();
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreateTestPcp4ExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyTestPcp4ExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
+    };
 
-        AbstractEmbeddedByteCompressionVariable<T>::adaptation_creator_ = CreateTestPcp4EmbeddedExtractionAdaptationClass<T>;
-        AbstractEmbeddedByteCompressionVariable<T>::adaptation_destructor_ = DestroyTestPcp4EmbeddedExtractionAdaptationClass<T>;
-        AbstractEmbeddedByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::EmbeddedMeshEncoder>();
+    CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<CompressionValue<T>>& variable_data)
+    : AbstractByteCompressionVariable<T>()
+    {
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
+        {
+            throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
+        }
+
+        this->SetName(name);
+        this->SetAmrMesh(AmrMesh(initial_mesh));
+        this->SetData(variable_data);
+        StoreMeshMPIComm();
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreateTestPcp4ExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyTestPcp4ExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
+    };
+
+    CompressionVariable(const std::string& name, t8_forest_t initial_mesh, std::vector<CompressionValue<T>>&& variable_data)
+    : AbstractByteCompressionVariable<T>()
+    {
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
+        {
+            throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
+        }
+
+        this->SetName(name);
+        this->SetAmrMesh(AmrMesh(initial_mesh));
+        this->SetData(std::move(variable_data));
+        StoreMeshMPIComm();
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreateTestPcp4ExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyTestPcp4ExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
     };
 
     CompressionSchema GetCompressionSchema() const override
     {
-        return CompressionSchema::_TestEmbeddedPCP4Extraction;
+        return CompressionSchema::_TestPCP4Extraction;
     }
 
 private:
+    void StoreMeshMPIComm(){this->SetMPIComm(t8_forest_get_mpicomm(this->GetAmrMesh().GetMesh()));};
 
 };
 
-
-
 }
 
-
-#endif /* !CMC_TEST_PCP4_EMBEDDED_COMPRESSION_HXX */
+#endif /* !CMC_TEST_PCP4_COMPRESSION_HXX */

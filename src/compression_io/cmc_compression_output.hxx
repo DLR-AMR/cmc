@@ -5,7 +5,7 @@
 //#include "lossless/cmc_byte_compression_variable.hxx"
 #include "utilities/cmc_iface_abstract_byte_compression_variable.hxx"
 #include "utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx"
-#include "lossless/cmc_embedded_byte_compression_variable.hxx"
+#include "embedded/lossless/cmc_embedded_byte_compression_variable.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
 
 #ifdef CMC_WITH_NETCDF

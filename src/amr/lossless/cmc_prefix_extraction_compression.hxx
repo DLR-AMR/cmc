@@ -1,21 +1,20 @@
-#ifndef CMC_EMBEDDED_PREFIX_EXTRACTION_COMPRESSION_PLAIN_SUFFIXES_HXX
-#define CMC_EMBEDDED_PREFIX_EXTRACTION_COMPRESSION_PLAIN_SUFFIXES_HXX
+#ifndef CMC_PREFIX_EXTRACTION_COMPRESSION_HXX
+#define CMC_PREFIX_EXTRACTION_COMPRESSION_HXX
 
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
-#include "lossless/cmc_embedded_byte_compression_variable.hxx"
+#include "amr/lossless/cmc_byte_compression_variable.hxx"
 #include "utilities/cmc_prefix_entropy_coder.hxx"
 #include "utilities/cmc_serialization.hxx"
-#include "mesh_compression/cmc_embedded_mesh_encoder.hxx"
 
 #include <utility>
 #include <vector>
 #include <array>
 #include <algorithm>
 
-namespace cmc::lossless::embedded::prefix::plain_suffix
+namespace cmc::lossless::prefix
 {
 
 /* A typedef for the sake of brevity */
@@ -23,13 +22,13 @@ template <typename T>
 using CompressionValue = SerializedCompressionValue<sizeof(T)>;
 
 template<typename T>
-class PrefixEmbeddedAdaptData : public IEmbeddedCompressionAdaptData<T>
+class PrefixAdaptData : public ICompressionAdaptData<T>
 {
 public:
-    PrefixEmbeddedAdaptData() = delete;
-    PrefixEmbeddedAdaptData(AbstractEmbeddedByteCompressionVariable<T>* variable)
-    : IEmbeddedCompressionAdaptData<T>(variable) {
-        IEmbeddedCompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::PrefixEncoder<T>>();
+    PrefixAdaptData() = delete;
+    PrefixAdaptData(AbstractByteCompressionVariable<T>* variable)
+    : ICompressionAdaptData<T>(variable) {
+        ICompressionAdaptData<T>::entropy_coder_ = std::make_unique<cmc::entropy_coding::arithmetic_coding::PrefixEncoder<T>>();
     };
 
     void InitializeExtractionIteration() override;
@@ -46,45 +45,41 @@ protected:
 
 private:
     void CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const;
-    std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLeafLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const;
-    std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeInteriorLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const;
-    
+
     int count_adaptation_step_{0};
 };
 
-
 template <typename T>
 void
-PrefixEmbeddedAdaptData<T>::InitializeExtractionIteration()
+PrefixAdaptData<T>::InitializeExtractionIteration()
 {
     //There is currently nothing to be done here!
 }
 
 template <typename T>
 void
-PrefixEmbeddedAdaptData<T>::FinalizeExtractionIteration()
+PrefixAdaptData<T>::FinalizeExtractionIteration()
 {
     ++count_adaptation_step_;
 }
 
 template <typename T>
 void
-PrefixEmbeddedAdaptData<T>::CompleteExtractionIteration([[maybe_unused]] const t8_forest_t previous_forest, [[maybe_unused]] const t8_forest_t adapted_forest)
+PrefixAdaptData<T>::CompleteExtractionIteration([[maybe_unused]] const t8_forest_t previous_forest, [[maybe_unused]] const t8_forest_t adapted_forest)
 {
     //Nothing to be done here!
 }
 
 template <typename T>
 void
-PrefixEmbeddedAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
+PrefixAdaptData<T>::RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest)
 {
     //Currently, nothing to be done here!
 }
 
-
 template<typename T>
 std::pair<bool, CompressionValue<T>>
-EvaluateEmbeddedCommonPrefix(const VectorView<CompressionValue<T>>& compression_values)
+EvaluateCommonPrefix(const VectorView<CompressionValue<T>>& compression_values)
 {
     cmc_assert(compression_values.size() >= 2);
 
@@ -127,10 +122,10 @@ EvaluateEmbeddedCommonPrefix(const VectorView<CompressionValue<T>>& compression_
 
 template <typename T>
 ExtractionData<T>
-PrefixEmbeddedAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, [[maybe_unused]] const int num_elements, const VectorView<CompressionValue<T>> values)
+PrefixAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, [[maybe_unused]] const int num_elements, const VectorView<CompressionValue<T>> values)
 {
     /* Evaluate whether there is a common prefix to extract */
-    auto [is_prefix_found, prefix] = EvaluateEmbeddedCommonPrefix<T>(values);
+    auto [is_prefix_found, prefix] = EvaluateCommonPrefix<T>(values);
 
     if (is_prefix_found)
     {
@@ -164,17 +159,17 @@ PrefixEmbeddedAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_t
 
 template <typename T>
 UnchangedData<T>
-PrefixEmbeddedAdaptData<T>::ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value)
+PrefixAdaptData<T>::ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value)
 {
     /* We drag this value along to the "coarser level" until it this element is passed with its siblings
      *  as a family of elements into the adaptation callback. Moreover, we leave an empty value 
      * on the "finer level" */
-    return UnchangedData<T>(value, CompressionValue<T>{});
+    return UnchangedData<T>(value, CompressionValue<T>());
 }
 
 template <typename T>
 void
-PrefixEmbeddedAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const
+PrefixAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const
 {
     /* Collect the symbol frequencies */
     for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
@@ -183,34 +178,7 @@ PrefixEmbeddedAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::
         const uint32_t pref_length = static_cast<uint32_t>(val_iter->GetCountOfSignificantBits());
 
         /* Update the frequency */
-        IEmbeddedCompressionAdaptData<T>::entropy_coder_->UpdateSymbolFrequency(pref_length);
-    }
-}
-
-/* We will encode the leaf level differently (without entropy codes) */
-static bool is_leaf_level_encoding = true;
-
-/**
- * @brief  The encodig of the level-wise compression data is handled within the function, we encode the data
- * on the leaf level differently, than all other levels.
- * 
- * @tparam T The original data type of the underlying data (e.g. float)
- * @param level_byte_values The remaining "fine compression" values after an extraction iteration
- * @return std::vector<uint8_t> The encoded data stream
- */
-template <typename T>
-inline std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
-PrefixEmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
-{
-    if (not is_leaf_level_encoding)
-    {
-        /* In case, we are in an interioer level, we encode the prefixes and their lengths with entropy codes */
-        return EncodeInteriorLevelData(level_byte_values);
-    } else
-    {
-        /* The leaf level (holding the suffixes wont be encoded. Their length is implicitly given by all previous prefixes in the hierachy) */
-        is_leaf_level_encoding = false;
-        return EncodeLeafLevelData(level_byte_values);
+        ICompressionAdaptData<T>::entropy_coder_->UpdateSymbolFrequency(pref_length);
     }
 }
 
@@ -223,11 +191,11 @@ PrefixEmbeddedAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T
  */
 template <typename T>
 std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
-PrefixEmbeddedAdaptData<T>::EncodeInteriorLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
+PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
 {
     cmc_debug_msg("The encoding of the CompressionValues after the prefix extraction iteration starts...");
     
-    cmc_assert(IEmbeddedCompressionAdaptData<T>::entropy_coder_ != nullptr);
+    cmc_assert(ICompressionAdaptData<T>::entropy_coder_ != nullptr);
 
     /* Get the rank of the mpi process within the communicator */
     int rank{0};
@@ -242,18 +210,17 @@ PrefixEmbeddedAdaptData<T>::EncodeInteriorLevelData(const std::vector<Compressio
     encoding.Reserve(3 * level_byte_values.size());
 
     /* Reset the entropy coder and initialize the alphabet */
-    IEmbeddedCompressionAdaptData<T>::entropy_coder_->Reset(std::make_unique<cmc::entropy_coding::arithmetic_coding::PrefixCompressionAlphabet<T>>());
-    IEmbeddedCompressionAdaptData<T>::entropy_coder_->InitializeAlphabet(sizeof(T));
+    ICompressionAdaptData<T>::entropy_coder_->Reset(std::make_unique<cmc::entropy_coding::arithmetic_coding::PrefixCompressionAlphabet<T>>());
+    ICompressionAdaptData<T>::entropy_coder_->InitializeAlphabet(sizeof(T));
 
     /* Collect the symbols and their frequencies for the entropy coder */
     CollectSymbolFrequenciesForEntropyCoding(level_byte_values);
 
     /* Setup the interior structure for encoding */
-    IEmbeddedCompressionAdaptData<T>::entropy_coder_->SetupEncoding(this->GetMPIComm());
+    ICompressionAdaptData<T>::entropy_coder_->SetupEncoding(this->GetMPIComm());
 
     /* Iterate over all values and encode them */
-    int idxx = 0;
-    for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter, ++idxx)
+    for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
     {
         /* Get the current value */
         CompressionValue<T> current_val = *val_iter;
@@ -262,25 +229,20 @@ PrefixEmbeddedAdaptData<T>::EncodeInteriorLevelData(const std::vector<Compressio
         const int pref_length = current_val.GetCountOfSignificantBits();
 
         /* Encode the prefix length */
-        IEmbeddedCompressionAdaptData<T>::entropy_coder_->EncodeSymbol(static_cast<uint32_t>(pref_length));
+        ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(static_cast<uint32_t>(pref_length));
 
         /* In case there is a prefix, the actual bits of the prefix will be stored */
         if (pref_length > 0)
         {
             encoding.AppendBits(current_val.GetSignificantBitsInBigEndianOrdering(), pref_length);
         }
-
-        //if (level_byte_values.size() < 65)
-        //{
-        //    cmc_debug_msg("Idx: ", idxx, ", Current val front bit: ", static_cast<int>(current_val.GetFrontBit()), ", tail bit: ", static_cast<int>(current_val.GetTailBit()), ", pref_length: ", pref_length);
-        //}
     }
 
-    /* We set an indication symbol that the process local end of the values have been reached */
-    IEmbeddedCompressionAdaptData<T>::entropy_coder_->EncodeSymbol(entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte);
+    /* We set an indicaton symbol that the process local end of the values have been reached */
+    ICompressionAdaptData<T>::entropy_coder_->EncodeSymbol(entropy_coding::arithmetic_coding::kByteCompressionSymbolJumpToNextByte);
 
     /* Indicate that the encoding has been finished and flush all pending encodings */
-    IEmbeddedCompressionAdaptData<T>::entropy_coder_->FinishEncoding();
+    ICompressionAdaptData<T>::entropy_coder_->FinishEncoding();
 
     /* Set up the BitVector holding the encoded data for further use */
     encoding.TrimToContent();
@@ -289,7 +251,7 @@ PrefixEmbeddedAdaptData<T>::EncodeInteriorLevelData(const std::vector<Compressio
     const uint64_t local_remaining_significant_bits_num_bytes = static_cast<uint64_t>(encoding.size());
 
     /* Get the local encoded prefix lengths */
-    cmc::bit_map::BitMap local_encoded_prefix_length_stream = IEmbeddedCompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
+    cmc::bit_map::BitMap local_encoded_prefix_length_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
     const uint64_t local_encoded_prefix_length_stream_num_bytes = static_cast<uint64_t>(local_encoded_prefix_length_stream.size_bytes());
 
     /* We need exchange the encoded lengths */
@@ -307,7 +269,7 @@ PrefixEmbeddedAdaptData<T>::EncodeInteriorLevelData(const std::vector<Compressio
     if (rank == root_rank)
     {
         /* Get the encoded alphabet */
-        cmc::bit_vector::BitVector encoded_alphabet = IEmbeddedCompressionAdaptData<T>::entropy_coder_->EncodeAlphabet();
+        cmc::bit_vector::BitVector encoded_alphabet = ICompressionAdaptData<T>::entropy_coder_->EncodeAlphabet();
         const uint64_t encoded_alphabet_num_bytes = static_cast<uint64_t>(encoded_alphabet.size());
 
         /* Calculate the overall amount of bytes on the root rank */
@@ -334,7 +296,7 @@ PrefixEmbeddedAdaptData<T>::EncodeInteriorLevelData(const std::vector<Compressio
         std::copy_n(encoded_alphabet.begin(), encoded_alphabet_num_bytes, std::back_inserter(encoded_entropy_codes));
     
         /* Finally, copy the entropy codes */
-        std::copy_n(local_encoded_prefix_length_stream.begin_bytes(), local_encoded_prefix_length_stream_num_bytes, std::back_inserter(encoded_entropy_codes));
+        std::copy_n(local_encoded_prefix_length_stream.begin_bytes(), local_encoded_prefix_length_stream_num_bytes, std::back_insert_iterator(encoded_entropy_codes));
     } else
     {
         /* Otherwise, the rank only hold the entropy codes */
@@ -349,87 +311,9 @@ PrefixEmbeddedAdaptData<T>::EncodeInteriorLevelData(const std::vector<Compressio
     return std::make_pair(encoded_entropy_codes, encoded_data);
 }
 
-/**
- * @brief  The leaf level is encoded without an entropy coder since the amount of the remaining bits is implicitly given by all previous prefixes
- * 
- * @tparam T The original data type of the underlying data (e.g. float)
- * @param level_byte_values The remaining "fine compression" values after an extraction iteration
- * @return std::vector<uint8_t> The encoded data stream
- */
-template <typename T>
-std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
-PrefixEmbeddedAdaptData<T>::EncodeLeafLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
-{
-    cmc_debug_msg("The encoding of the leaf level CompressionValues by plain suffix encoding after the prefix extraction iteration starts...");
-    
-    cmc_assert(IEmbeddedCompressionAdaptData<T>::entropy_coder_ != nullptr);
-
-    /* Get the rank of the mpi process within the communicator */
-    int rank{0};
-    int ret_val = MPI_Comm_rank(this->GetMPIComm(), &rank);
-    MPICheckError(ret_val);
-
-    /* Define the root rank */
-    const int root_rank = 0;
-
-    /* The encoded data will be stored in a BitVector */
-    cmc::bit_vector::BitVector encoding;
-    encoding.Reserve(3 * level_byte_values.size());
-
-    /* Iterate over all values and encode them */
-    for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
-    {
-        /* Get the length of the prefix */
-        const int pref_length = val_iter->GetCountOfSignificantBits();
-
-        /* In case there is a prefix, the actual bits of the prefix will be stored */
-        if (pref_length > 0)
-        {
-            encoding.AppendBits(val_iter->GetSignificantBitsInBigEndianOrdering(), pref_length);
-        }
-    }
-
-    /* Set up the BitVector holding the encoded data for further use */
-    encoding.TrimToContent();
-
-    /* Get the local remaining significant bits */
-    const uint64_t local_remaining_significant_bits_num_bytes = static_cast<uint64_t>(encoding.size());
-
-    /* Declare the buffers for the encoded data */
-    std::vector<uint8_t> encoded_entropy_codes;
-    std::vector<uint8_t> encoded_data;
-
-    /* Only the root rank needs to encode the encoded sizes */
-    if (rank == root_rank)
-    {
-        /* Calculate the overall amount of bytes on the root rank */
-        const uint64_t num_locally_encoded_entropy_codes_bytes = 1 * sizeof(uint64_t);
-
-        /* Allocate memory for the encoded data */
-        encoded_entropy_codes.reserve(num_locally_encoded_entropy_codes_bytes);
-
-        /** We store global information about the encoded level **/
-        /* Push back the overall byte count for the level */
-        const uint64_t num_global_bytes_encoded_level = 1 * sizeof(uint64_t) + local_remaining_significant_bits_num_bytes;
-        PushBackValueToByteStream<uint64_t>(encoded_entropy_codes, num_global_bytes_encoded_level);
-
-    } else
-    {
-        /* Otherwise, the rank only hold the entropy codes */
-        //Currently, in a serial execution, there is nothing to be done
-    }
-
-    /* Get the encoded remaining significant bits */
-    encoding.MoveDataInto(encoded_data);
-
-    cmc_debug_msg("The entropy encoder of the prefix extraction compression completed the encoding of the CompressionValues of this iteration.");
-    
-    return std::make_pair(encoded_entropy_codes, encoded_data);
-}
-
 template <typename T>
 inline std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
-PrefixEmbeddedAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
+PrefixAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const
 {
     cmc_debug_msg("The encoding of the root level values of the prefix compression starts.");
 
@@ -441,60 +325,86 @@ PrefixEmbeddedAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionVal
 }
 
 template <typename T>
-inline IEmbeddedCompressionAdaptData<T>*
-CreatePrefixEmbeddedExtractionAdaptationClass(AbstractEmbeddedByteCompressionVariable<T>* abstract_var)
+inline ICompressionAdaptData<T>*
+CreatePrefixExtractionAdaptationClass(AbstractByteCompressionVariable<T>* abstract_var)
 {
-    return new PrefixEmbeddedAdaptData<T>(abstract_var);
+    return new PrefixAdaptData<T>(abstract_var);
 }
 
 template <typename T>
 inline void
-DestroyPrefixEmbeddedExtractionAdaptationClass(IEmbeddedCompressionAdaptData<T>* iadapt_data)
+DestroyPrefixExtractionAdaptationClass(ICompressionAdaptData<T>* iadapt_data)
 {
     delete iadapt_data;
 }
 
 template<class T>
-class EmbeddedCompressionVariable : public AbstractEmbeddedByteCompressionVariable<T>
+class CompressionVariable : public AbstractByteCompressionVariable<T>
 {
 public:
-    EmbeddedCompressionVariable() = delete;
+    CompressionVariable() = delete;
 
-    EmbeddedCompressionVariable(input::Var& input_variable)
-    : AbstractEmbeddedByteCompressionVariable<T>(input_variable)
+    CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<T>& variable_data)
+    : AbstractByteCompressionVariable<T>()
     {
-        //cmc_assert(input_variable.IsValid());//TODO: implement 
-        #ifdef CMC_ENABLE_MPI
-        const MPI_Comm comm = input_variable.GetMPIComm();
-        int size;
-        int ret_val = MPI_Comm_size(comm, &size);
-        MPICheckError(ret_val);
-        if (size > 1)
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
         {
-            cmc_err_msg("The prefix compression with plain suffix encoding does not work in parallel; the suffixes are not glues together beyon process boundaries.");
+            throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
         }
-        #endif
 
-        this->SetName(input_variable.GetName());
-        //this->SetMPIComm(input_variable.GetMPIComm());
-        //cmc_debug_msg("Here is comm: ", input_variable.GetMPIComm());
-        this->IndicateWhetherMeshRefinementBitsWillBeStored(true);
+        this->SetName(name);
+        this->SetAmrMesh(AmrMesh(initial_mesh));
+        this->SetData(variable_data);
+        StoreMeshMPIComm();
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();  
+    };
 
-        AbstractEmbeddedByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixEmbeddedExtractionAdaptationClass<T>;
-        AbstractEmbeddedByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixEmbeddedExtractionAdaptationClass<T>;
-        AbstractEmbeddedByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::EmbeddedMeshEncoder>();
+    CompressionVariable(const std::string& name, t8_forest_t initial_mesh, const std::vector<CompressionValue<T>>& variable_data)
+    : AbstractByteCompressionVariable<T>()
+    {
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
+        {
+            throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
+        }
+
+        this->SetName(name);
+        this->SetAmrMesh(AmrMesh(initial_mesh));
+        this->SetData(variable_data);
+        StoreMeshMPIComm();
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();
+    };
+
+    CompressionVariable(const std::string& name, t8_forest_t initial_mesh, std::vector<CompressionValue<T>>&& variable_data)
+    : AbstractByteCompressionVariable<T>()
+    {
+        if (static_cast<size_t>(t8_forest_get_local_num_leaf_elements(initial_mesh)) != variable_data.size())
+        {
+            throw std::invalid_argument("The number of local mesh elements does not match the amount of data elements.");
+        }
+
+        this->SetName(name);
+        this->SetAmrMesh(AmrMesh(initial_mesh));
+        this->SetData(std::move(variable_data));
+        StoreMeshMPIComm();
+        AbstractByteCompressionVariable<T>::adaptation_creator_ = CreatePrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::adaptation_destructor_ = DestroyPrefixExtractionAdaptationClass<T>;
+        AbstractByteCompressionVariable<T>::mesh_encoder_ = std::make_unique<mesh_compression::MeshEncoder>();
     };
 
     CompressionSchema GetCompressionSchema() const override
     {
-        return CompressionSchema::EmbeddedPrefixExtractionPlainSuffixes;
+        return CompressionSchema::PrefixExtraction;
     }
 
 private:
+    void StoreMeshMPIComm(){this->SetMPIComm(t8_forest_get_mpicomm(this->GetAmrMesh().GetMesh()));};
 
 };
 
 }
 
-
-#endif /* !CMC_EMBEDDED_PREFIX_EXTRACTION_COMPRESSION_PLAIN_SUFFIXES_HXX */
+#endif /* !CMC_PREFIX_EXTRACTION_COMPRESSION_HXX */

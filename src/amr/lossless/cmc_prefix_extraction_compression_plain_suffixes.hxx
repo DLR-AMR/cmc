@@ -1,11 +1,11 @@
-#ifndef CMC_PREFIX_EXTRACTION_COMPRESSION_HXX
-#define CMC_PREFIX_EXTRACTION_COMPRESSION_HXX
+#ifndef CMC_PREFIX_EXTRACTION_COMPRESSION_PLAIN_SUFFIXES_HXX
+#define CMC_PREFIX_EXTRACTION_COMPRESSION_PLAIN_SUFFIXES_HXX
 
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
-#include "lossless/cmc_byte_compression_variable.hxx"
+#include "amr/lossless/cmc_byte_compression_variable.hxx"
 #include "utilities/cmc_prefix_entropy_coder.hxx"
 #include "utilities/cmc_serialization.hxx"
 
@@ -14,7 +14,7 @@
 #include <array>
 #include <algorithm>
 
-namespace cmc::lossless::prefix
+namespace cmc::lossless::prefix::plain_suffix
 {
 
 /* A typedef for the sake of brevity */
@@ -45,7 +45,9 @@ protected:
 
 private:
     void CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const;
-
+    std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLeafLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const;
+    std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeInteriorLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const;
+    
     int count_adaptation_step_{0};
 };
 
@@ -120,6 +122,8 @@ EvaluateCommonPrefix(const VectorView<CompressionValue<T>>& compression_values)
     return std::make_pair(true, prefix);
 }
 
+static int extraction_iter = 0;
+
 template <typename T>
 ExtractionData<T>
 PrefixAdaptData<T>::PerformExtraction([[maybe_unused]] const int which_tree, [[maybe_unused]] const int lelement_id, [[maybe_unused]] const int num_elements, const VectorView<CompressionValue<T>> values)
@@ -164,9 +168,10 @@ PrefixAdaptData<T>::ElementStaysUnchanged(const int which_tree, const int leleme
     /* We drag this value along to the "coarser level" until it this element is passed with its siblings
      *  as a family of elements into the adaptation callback. Moreover, we leave an empty value 
      * on the "finer level" */
-    return UnchangedData<T>(value, CompressionValue<T>());
+    return UnchangedData<T>(value, CompressionValue<T>{});
 }
 
+static int cs_iter = 0;
 template <typename T>
 void
 PrefixAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const
@@ -182,6 +187,37 @@ PrefixAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector<C
     }
 }
 
+/* We will encode the leaf level differently (without entropy codes) */
+static bool is_leaf_level_encoding = true;
+
+/**
+ * @brief  The encodig of the level-wise compression data is handled within the function, we encode the data
+ * on the leaf level differently, than all other levels.
+ * 
+ * @tparam T The original data type of the underlying data (e.g. float)
+ * @param level_byte_values The remaining "fine compression" values after an extraction iteration
+ * @return std::vector<uint8_t> The encoded data stream
+ */
+template <typename T>
+inline std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
+PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
+{
+    cs_iter = 0;
+    extraction_iter = 0;
+
+    if (not is_leaf_level_encoding)
+    {
+        /* In case, we are in an interioer level, we encode the prefixes and their lengths with entropy codes */
+        return EncodeInteriorLevelData(level_byte_values);
+    } else
+    {
+        /* The leaf level (holding the suffixes wont be encoded. Their length is implicitly given by all previous prefixes in the hierachy) */
+        is_leaf_level_encoding = false;
+        return EncodeLeafLevelData(level_byte_values);
+    }
+}
+
+static int int_e_iter = 0;
 /**
  * @brief  We use an arithmetic encoder to encode the position of the first "one-bit" in the compression value
  * 
@@ -191,7 +227,7 @@ PrefixAdaptData<T>::CollectSymbolFrequenciesForEntropyCoding(const std::vector<C
  */
 template <typename T>
 std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
-PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
+PrefixAdaptData<T>::EncodeInteriorLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
 {
     cmc_debug_msg("The encoding of the CompressionValues after the prefix extraction iteration starts...");
     
@@ -252,6 +288,7 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
 
     /* Get the local encoded prefix lengths */
     cmc::bit_map::BitMap local_encoded_prefix_length_stream = ICompressionAdaptData<T>::entropy_coder_->GetEncodedBitStream();
+
     const uint64_t local_encoded_prefix_length_stream_num_bytes = static_cast<uint64_t>(local_encoded_prefix_length_stream.size_bytes());
 
     /* We need exchange the encoded lengths */
@@ -296,11 +333,90 @@ PrefixAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& leve
         std::copy_n(encoded_alphabet.begin(), encoded_alphabet_num_bytes, std::back_inserter(encoded_entropy_codes));
     
         /* Finally, copy the entropy codes */
-        std::copy_n(local_encoded_prefix_length_stream.begin_bytes(), local_encoded_prefix_length_stream_num_bytes, std::back_insert_iterator(encoded_entropy_codes));
+        std::copy_n(local_encoded_prefix_length_stream.begin_bytes(), local_encoded_prefix_length_stream_num_bytes, std::back_inserter(encoded_entropy_codes));
     } else
     {
         /* Otherwise, the rank only hold the entropy codes */
         local_encoded_prefix_length_stream.MoveDataInto(encoded_entropy_codes);
+    }
+
+    /* Get the encoded remaining significant bits */
+    encoding.MoveDataInto(encoded_data);
+
+    cmc_debug_msg("The entropy encoder of the prefix extraction compression completed the encoding of the CompressionValues of this iteration.");
+    
+    return std::make_pair(encoded_entropy_codes, encoded_data);
+}
+
+
+/**
+ * @brief  The leaf level is encoded without an entropy coder since the amount of the remaining bits is implicitly given by all previous prefixes
+ * 
+ * @tparam T The original data type of the underlying data (e.g. float)
+ * @param level_byte_values The remaining "fine compression" values after an extraction iteration
+ * @return std::vector<uint8_t> The encoded data stream
+ */
+template <typename T>
+std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
+PrefixAdaptData<T>::EncodeLeafLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const
+{
+    cmc_debug_msg("The encoding of the leaf level CompressionValues by plain suffix encoding after the prefix extraction iteration starts...");
+    
+    cmc_assert(ICompressionAdaptData<T>::entropy_coder_ != nullptr);
+
+    /* Get the rank of the mpi process within the communicator */
+    int rank{0};
+    int ret_val = MPI_Comm_rank(this->GetMPIComm(), &rank);
+    MPICheckError(ret_val);
+
+    /* Define the root rank */
+    const int root_rank = 0;
+
+    /* The encoded data will be stored in a BitVector */
+    cmc::bit_vector::BitVector encoding;
+    encoding.Reserve(3 * level_byte_values.size());
+
+    /* Iterate over all values and encode them */
+    for (auto val_iter = level_byte_values.begin(); val_iter != level_byte_values.end(); ++val_iter)
+    {
+        /* Get the length of the prefix */
+        const int pref_length = val_iter->GetCountOfSignificantBits();
+
+        /* In case there is a prefix, the actual bits of the prefix will be stored */
+        if (pref_length > 0)
+        {
+            encoding.AppendBits(val_iter->GetSignificantBitsInBigEndianOrdering(), pref_length);
+        }
+    }
+
+    /* Set up the BitVector holding the encoded data for further use */
+    encoding.TrimToContent();
+
+    /* Get the local remaining significant bits */
+    const uint64_t local_remaining_significant_bits_num_bytes = static_cast<uint64_t>(encoding.size());
+
+    /* Declare the buffers for the encoded data */
+    std::vector<uint8_t> encoded_entropy_codes;
+    std::vector<uint8_t> encoded_data;
+
+    /* Only the root rank needs to encode the encoded sizes */
+    if (rank == root_rank)
+    {
+        /* Calculate the overall amount of bytes on the root rank */
+        const uint64_t num_locally_encoded_entropy_codes_bytes = 1 * sizeof(uint64_t);
+
+        /* Allocate memory for the encoded data */
+        encoded_entropy_codes.reserve(num_locally_encoded_entropy_codes_bytes);
+
+        /** We store global information about the encoded level **/
+        /* Push back the overall byte count for the level */
+        const uint64_t num_global_bytes_encoded_level = 1 * sizeof(uint64_t) + local_remaining_significant_bits_num_bytes;
+        PushBackValueToByteStream<uint64_t>(encoded_entropy_codes, num_global_bytes_encoded_level);
+
+    } else
+    {
+        /* Otherwise, the rank only hold the entropy codes */
+        //Currently, in a serial execution, there is nothing to be done
     }
 
     /* Get the encoded remaining significant bits */
@@ -317,6 +433,7 @@ PrefixAdaptData<T>::EncodeRootLevelData(const std::vector<CompressionValue<T>>& 
 {
     cmc_debug_msg("The encoding of the root level values of the prefix compression starts.");
 
+    cmc_debug_msg("\n\nRoot Level Encoding\n\n");
     auto encoded_streams = EncodeLevelData(root_level_values);
     
     cmc_debug_msg("The entropy encoder of the prefix exctraction compression completed the encoding of the root-level CompressionValues.");
@@ -397,7 +514,7 @@ public:
 
     CompressionSchema GetCompressionSchema() const override
     {
-        return CompressionSchema::PrefixExtraction;
+        return CompressionSchema::PrefixExtractionPlainSuffixes;
     }
 
 private:
@@ -407,4 +524,4 @@ private:
 
 }
 
-#endif /* !CMC_PREFIX_EXTRACTION_COMPRESSION_HXX */
+#endif /* !CMC_PREFIX_EXTRACTION_COMPRESSION_PLAIN_SUFFIXES_HXX */

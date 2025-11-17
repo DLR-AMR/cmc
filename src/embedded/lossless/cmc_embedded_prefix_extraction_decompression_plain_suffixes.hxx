@@ -1,12 +1,12 @@
-#ifndef CMC_EMBEDDED_PREFIX_EXTRACTION_DECOMPRESSION_HXX
-#define CMC_EMBEDDED_PREFIX_EXTRACTION_DECOMPRESSION_HXX
+#ifndef CMC_EMBEDDED_PREFIX_EXTRACTION_DECOMPRESSION_PLAIN_SUFFIXES_HXX
+#define CMC_EMBEDDED_PREFIX_EXTRACTION_DECOMPRESSION_PLAIN_SUFFIXES_HXX
 
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_serialization.hxx"
-#include "lossless/cmc_embedded_byte_decompression_variable.hxx"
+#include "embedded/lossless/cmc_embedded_byte_decompression_variable.hxx"
 #include "utilities/cmc_prefix_entropy_coder.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "mesh_compression/cmc_embedded_mesh_decoder.hxx"
@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <memory>
 
-namespace cmc::lossless::embedded::prefix
+namespace cmc::lossless::embedded::prefix::plain_suffix
 {
 
 /* A typedef for the sake of brevity */
@@ -48,6 +48,12 @@ private:
     std::vector<uint8_t> GetNextPrefixBitSequence(const size_t num_bits);
     CompressionValue<T> GetNextSuffixedValue(const CompressionValue<T>& value);
     uint32_t ApplyProcessBoundarySymbol();
+    CompressionValue<T> GetNextInteriorSuffixedValue(const CompressionValue<T>& value);
+    CompressionValue<T> GetNextFinalSuffixedValue(const CompressionValue<T>& value);
+    bool GetIsLeafLevelDecompression() const;
+    bool IsNextIterationLeafLevelDecompression() const;
+    void InitializeInteriorDecompressionIteration();
+    void InitializeLeafDecompressionIteration();
 
     size_t level_byte_offset_{0};
     bit_vector::BitVectorView alphabet_;
@@ -57,6 +63,7 @@ private:
     std::unique_ptr<cmc::entropy_coding::arithmetic_coding::Decoder> entropy_decoder_{nullptr};
 
     int count_adaptation_step_{0};
+    bool is_leaf_level_decompression_{false};
 };
 
 template<typename T>
@@ -106,11 +113,36 @@ PrefixEmbeddedDecompressionAdaptData<T>::DecodeRootLevel(const t8_locidx_t num_l
 }
 
 template <typename T>
+bool
+PrefixEmbeddedDecompressionAdaptData<T>::IsNextIterationLeafLevelDecompression() const 
+{
+    /* We need to check against "count_adaptation_step_ - 1" because the root level decoding is counted as a decomrpession step as well */
+    return (this->GetAmrMesh().GetInitialRefinementLevel() == count_adaptation_step_);
+}
+
+template <typename T>
 void
 PrefixEmbeddedDecompressionAdaptData<T>::InitializeDecompressionIteration()
 {
-    cmc_debug_msg("A prefix decompression iteration is initialized.");
+    /* Check if the following decompression iteration is the leaf level decompression */
+    is_leaf_level_decompression_ = IsNextIterationLeafLevelDecompression();
+    cmc_debug_msg("\n\nIs this iteration a leaf level decompression? ", is_leaf_level_decompression_, " and init ref elvel: ", this->GetAmrMesh().GetInitialRefinementLevel(), "\n\n");
 
+    if (is_leaf_level_decompression_ == true)
+    {
+        InitializeLeafDecompressionIteration();
+    } else
+    {
+        InitializeInteriorDecompressionIteration();
+    }
+}
+
+template <typename T>
+void
+PrefixEmbeddedDecompressionAdaptData<T>::InitializeInteriorDecompressionIteration()
+{
+    cmc_debug_msg("A prefix decompression iteration is initialized.");
+    
     constexpr size_t offset = sizeof(uint64_t);
 
     size_t processed_bytes = level_byte_offset_;
@@ -156,6 +188,38 @@ PrefixEmbeddedDecompressionAdaptData<T>::InitializeDecompressionIteration()
     entropy_decoder_->SetupDecoding(); 
 }
 
+
+template <typename T>
+void
+PrefixEmbeddedDecompressionAdaptData<T>::InitializeLeafDecompressionIteration()
+{
+    cmc_debug_msg("A prefix decompression iteration is initialized.");
+    
+    /* Check if the following decompression iteration is the leaf level decompression */
+    is_leaf_level_decompression_ = IsNextIterationLeafLevelDecompression();
+    cmc_debug_msg("\n\nIs this iteration a leaf level decompression? ", is_leaf_level_decompression_, " and init ref elvel: ", this->GetAmrMesh().GetInitialRefinementLevel(), "\n\n");
+    constexpr size_t offset = sizeof(uint64_t);
+
+    size_t processed_bytes = level_byte_offset_;
+
+    /* Get a pointer to the beginning of the encoded data stream */
+    const auto data_start_ptr = cmc::decompression::embedded::IEmbeddedDecompressionAdaptData<T>::encoded_data_byte_stream_.data();
+
+    /* Get the amount of relevant bytes for this decompression level */
+    const uint64_t current_level_bytes = GetValueFromByteStream<uint64_t>(data_start_ptr + processed_bytes);
+    processed_bytes += offset;
+
+    cmc_debug_msg("The current refinement level is described by ", current_level_bytes, " bytes.");
+
+    /* Set the view on the remaining bits */
+    const uint64_t prefix_bytes = current_level_bytes - sizeof(uint64_t);
+    prefix_bits_ = bit_vector::BitVectorView(data_start_ptr + processed_bytes, prefix_bytes);
+    processed_bytes += prefix_bytes;
+
+    /* Update the byte count */
+    level_byte_offset_ = processed_bytes;
+}
+
 template <typename T>
 void
 PrefixEmbeddedDecompressionAdaptData<T>::FinalizeDecompressionIteration()
@@ -178,11 +242,18 @@ PrefixEmbeddedDecompressionAdaptData<T>::RepartitionData(const t8_forest_t adapt
     //Currently, nothing to be done here!
 }
 
+template <typename T>
+inline bool
+PrefixEmbeddedDecompressionAdaptData<T>::GetIsLeafLevelDecompression() const
+{
+    return is_leaf_level_decompression_;
+}
 
 template <typename T>
 inline uint32_t
 PrefixEmbeddedDecompressionAdaptData<T>::ApplyProcessBoundarySymbol()
 {
+    cmc_debug_msg("\n\nIs this process boundary symnbol happening\n\n");
     bool is_process_boundary = true;
     uint32_t next_symbol;
 
@@ -210,6 +281,20 @@ template <typename T>
 CompressionValue<T>
 PrefixEmbeddedDecompressionAdaptData<T>::GetNextSuffixedValue(const CompressionValue<T>& value)
 {
+    if (this->GetIsLeafLevelDecompression())
+    {
+        return GetNextFinalSuffixedValue(value);
+    } else
+    {
+        return GetNextInteriorSuffixedValue(value);
+    }
+}
+static int idxx = 0;
+
+template <typename T>
+CompressionValue<T>
+PrefixEmbeddedDecompressionAdaptData<T>::GetNextInteriorSuffixedValue(const CompressionValue<T>& value)
+{
     CompressionValue<T> suffixed_value = value;
 
     /* Get the length of the suffix to be appended */
@@ -224,8 +309,19 @@ PrefixEmbeddedDecompressionAdaptData<T>::GetNextSuffixedValue(const CompressionV
 
     const int suffix_length = static_cast<int>(encoded_suffix_length);
 
+    //if (count_adaptation_step_ < 3)
+    //{
+    //    cmc_debug_msg("Idx: ", idxx, ", Current val front bit: ", static_cast<int>(suffixed_value.GetFrontBit()), ", tail bit: ", static_cast<int>(suffixed_value.GetTailBit()), ", suff_length: ", suffix_length);
+    //    ++idxx;
+    //}
+
     if (suffix_length > 0)
     {
+        if (suffixed_value.GetTailBit() == 0)
+        {
+            cmc_debug_msg("\n\n\nNextInteriorSuffix: suffix_length: ", suffix_length, ", tail_bit: ", static_cast<int>(suffixed_value.GetTailBit()),"\n\n");
+            return suffixed_value;
+        }
         /* Get the actual suffix */
         const std::vector<uint8_t> suffix = this->GetNextPrefixBitSequence(suffix_length);
 
@@ -236,6 +332,28 @@ PrefixEmbeddedDecompressionAdaptData<T>::GetNextSuffixedValue(const CompressionV
     return suffixed_value;
 }
 
+
+template <typename T>
+CompressionValue<T>
+PrefixEmbeddedDecompressionAdaptData<T>::GetNextFinalSuffixedValue(const CompressionValue<T>& value)
+{
+    CompressionValue<T> suffixed_value = value;
+    cmc_assert(suffixed_value.GetFrontBit() == 0);
+
+    const int curernt_length = suffixed_value.GetCountOfSignificantBits();
+    const int num_missing_bits = suffixed_value.GetSizeBits() - curernt_length;
+
+    if (num_missing_bits > 0)
+    {
+        /* Get the actual suffix */
+        const std::vector<uint8_t> suffix = this->GetNextPrefixBitSequence(num_missing_bits);
+
+        /* Apply the suffix to the current value */
+        suffixed_value.ApplySuffix(suffix, num_missing_bits);
+    }
+    cmc_assert(suffixed_value.GetTailBit() == 0);
+    return suffixed_value;
+}
 
 template <typename T>
 cmc::decompression::embedded::RefinementData<T>
@@ -297,4 +415,4 @@ public:
 
 }
 
-#endif /* !CMC_EMBEDDED_PREFIX_EXTRACTION_DECOMPRESSION_HXX */
+#endif /* !CMC_EMBEDDED_PREFIX_EXTRACTION_DECOMPRESSION_PLAIN_SUFFIXES_HXX */

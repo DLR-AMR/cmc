@@ -7,17 +7,18 @@
 #include "utilities/cmc_iface_abstract_byte_decompression_variable.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
 
-#include "lossless/cmc_byte_decompression_variable.hxx"
-#include "lossless/cmc_prefix_extraction_decompression.hxx"
-#include "lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx"
-#include "lossless/cmc_multi_res_extraction_decompression.hxx"
+#include "amr/lossless/cmc_byte_decompression_variable.hxx"
+#include "amr/lossless/cmc_prefix_extraction_decompression.hxx"
+#include "amr/lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx"
+#include "amr/lossless/cmc_multi_res_extraction_decompression.hxx"
+#include "amr/lossless/cmc_test_pcp4_decompression.hxx"
 
-#include "lossless/cmc_embedded_byte_decompression_variable.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_decompression.hxx"
-#include "lossless/cmc_embedded_prefix_extraction_decompression_plain_suffixes.hxx" 
-#include "lossless/cmc_embedded_multi_res_extraction_decompression.hxx"
-#include "lossless/cmc_test_pcp4_embedded_decompression.hxx"
-#include "lossless/cmc_test_pcp4_decompression.hxx"
+#include "embedded/lossless/cmc_embedded_byte_decompression_variable.hxx"
+#include "embedded/lossless/cmc_embedded_prefix_extraction_decompression.hxx"
+#include "embedded/lossless/cmc_embedded_prefix_extraction_decompression_plain_suffixes.hxx" 
+#include "embedded/lossless/cmc_embedded_multi_res_extraction_decompression.hxx"
+#include "embedded/lossless/cmc_test_pcp4_embedded_decompression.hxx"
+
 #include "utilities/cmc_embedded_variable_attributes.hxx"
 
 #include "lossy/cmc_embedded_prefix_quantization_decompression.hxx"
