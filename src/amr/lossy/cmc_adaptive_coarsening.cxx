@@ -1,4 +1,4 @@
-#include "lossy/cmc_adaptive_coarsening.hxx"
+#include "amr/lossy/cmc_adaptive_coarsening.hxx"
 
 namespace cmc::lossy
 {

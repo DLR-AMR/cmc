@@ -1,7 +1,7 @@
 #ifndef CMC_ADAPTIVE_COARSENING_HXX
 #define CMC_ADAPTIVE_COARSENING_HXX
 
-#include "lossy/cmc_ac_compression_variable.hxx"
+#include "amr/lossy/cmc_ac_compression_variable.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_iface_compression_adapt_data.hxx"
 #include "utilities/cmc_compression_settings.hxx"

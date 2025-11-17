@@ -21,7 +21,7 @@
 
 #include "utilities/cmc_embedded_variable_attributes.hxx"
 
-#include "lossy/cmc_embedded_prefix_quantization_decompression.hxx"
+#include "embedded/lossy/cmc_embedded_prefix_quantization_decompression.hxx"
 
 #ifdef CMC_WITH_NETCDF
 #include "netcdf/cmc_netcdf.hxx"

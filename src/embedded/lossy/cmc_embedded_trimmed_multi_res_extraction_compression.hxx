@@ -6,7 +6,7 @@
 #include "utilities/cmc_bit_vector.hxx"
 #include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
-#include "lossy/cmc_embedded_byte_compression_variable.hxx"
+#include "embedded/lossy/cmc_embedded_byte_compression_variable.hxx"
 #include "utilities/cmc_multi_res_entropy_coder.hxx"
 #include "utilities/cmc_multi_res_extraction_util.hxx"
 #include "utilities/cmc_lossy_multi_res_extraction_residual_computation.hxx"

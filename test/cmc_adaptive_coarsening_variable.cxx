@@ -1,8 +1,8 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
-#include "lossy/cmc_ac_compression_variable.hxx"
-#include "lossy/cmc_adaptive_coarsening.hxx"
+#include "amr/lossy/cmc_ac_compression_variable.hxx"
+#include "amr/lossy/cmc_adaptive_coarsening.hxx"
 #include "utilities/cmc_compression_settings.hxx"
 
 #ifdef CMC_WITH_T8CODE

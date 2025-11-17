@@ -1,7 +1,7 @@
 #ifndef CMC_COMPRESSION_OUTPUT_HXX
 #define CMC_COMPRESSION_OUTPUT_HXX
 
-#include "lossy/cmc_ac_compression_variable.hxx"
+#include "amr/lossy/cmc_ac_compression_variable.hxx"
 #include "utilities/cmc_iface_amr_compression_variable.hxx"
 #include "utilities/cmc_iface_embedded_amr_compression_variable.hxx"
 #include "embedded/lossless/cmc_embedded_byte_compression_variable.hxx"

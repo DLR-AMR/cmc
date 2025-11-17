@@ -1,7 +1,7 @@
 #include "cmc.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "input/cmc_netcdf.hxx"
-#include "lossy/cmc_embedded_trimmed_multi_res_extraction_compression.hxx"
+#include "embedded/lossy/cmc_embedded_trimmed_multi_res_extraction_compression.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "input/cmc_binary_reader.hxx"
 

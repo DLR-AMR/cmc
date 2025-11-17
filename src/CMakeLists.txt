@@ -23,7 +23,7 @@ target_sources(cmc PRIVATE
     t8code/cmc_t8_mpi.cxx 
     input/cmc_netcdf.cxx 
     input/cmc_input_variable.cxx 
-    lossy/cmc_adaptive_coarsening.cxx
+    amr/lossy/cmc_adaptive_coarsening.cxx
 )
 
 install(FILES
@@ -121,24 +121,21 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/t8code
 )
 
 install(FILES
-    lossy/cmc_ac_compression_variable.hxx 
-    lossy/cmc_adaptive_coarsening.hxx 
-    lossy/cmc_byte_compression_variable.hxx 
-    lossy/cmc_multi_res_trimmed_residuals.hxx 
-    lossy/cmc_multi_res_extraction_residual_computation.hxx 
-    lossy/cmc_embedded_byte_compression_variable.hxx 
-    lossy/cmc_embedded_trimmed_multi_res_extraction_compression.hxx 
-    lossy/cmc_embedded_prefix_quantization_compression.hxx 
-    lossy/cmc_embedded_byte_compression_extended_variable.hxx 
-    lossy/cmc_embedded_multi_res_extraction_nearest_neighbor_reconstruction.hxx 
-    lossy/cmc_embedded_multi_res_extraction_nearest_neighbor_reconstruction_trimmed_residuals.hxx 
-    lossy/cmc_embedded_byte_compression_scanline_variable.hxx 
-    lossy/cmc_multi_res_scanline_compression.hxx 
-    lossy/cmc_embedded_idw_compression_variable.hxx 
-    lossy/cmc_embedded_idw_extraction_compression.hxx 
-    lossy/cmc_embedded_byte_decompression_variable.hxx 
-    lossy/cmc_embedded_prefix_quantization_decompression.hxx 
-DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/lossy
+    amr/lossy/cmc_ac_compression_variable.hxx 
+    amr/lossy/cmc_adaptive_coarsening.hxx 
+    amr/lossy/cmc_byte_compression_variable.hxx 
+    amr/lossy/cmc_multi_res_trimmed_residuals.hxx 
+    amr/lossy/cmc_multi_res_scanline_compression.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy
+)
+
+install(FILES
+    embedded/lossy/cmc_embedded_byte_compression_variable.hxx 
+    embedded/lossy/cmc_embedded_trimmed_multi_res_extraction_compression.hxx 
+    embedded/lossy/cmc_embedded_prefix_quantization_compression.hxx 
+    embedded/lossy/cmc_embedded_byte_decompression_variable.hxx 
+    embedded/lossy/cmc_embedded_prefix_quantization_decompression.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/embedded/lossy
 )
 
 install(FILES
