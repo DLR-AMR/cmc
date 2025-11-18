@@ -13,7 +13,6 @@
 #include "input/cmc_input_variable.hxx"
 #include "mesh_compression/cmc_iface_embedded_mesh_encoder.hxx"
 #include "utilities/cmc_embedded_mesh_utilities.hxx"
-//#include "utilities/cmc_iface_abstract_embedded_byte_compression_variable.hxx"
 #include "utilities/cmc_iface_embedded_amr_compression_variable.hxx"
 
 #include "mpi/cmc_mpi.hxx"
@@ -182,10 +181,6 @@ private:
     std::vector<input::IndexReduction> UpdateLinearIndicesToTheInitialMesh();
     AmrMesh BuildInitialMesh(const input::Variable<T>& input_variable);
 
-
-    void PerformTailTruncationOnInitialData(); //TODO: delete
-
-
     std::string name_; //!< The name of the variable
     AmrMesh mesh_; //!< The mesh on which the variable is defined
     std::vector<CompressionValue<T>> data_; //!< The current data of the variable 
@@ -199,8 +194,6 @@ private:
     bool store_refinement_indication_bits_{true};
     
     MPI_Comm comm_{MPI_COMM_NULL}; //!< The MPI communicator to use
-
-    //std::vector<CompressionValue<T>> test_data_;
 };
 
 /**
@@ -244,297 +237,6 @@ protected:
 private:
     AbstractEmbeddedByteCompressionVariable<T>* const base_variable_{nullptr};
 };
-
-#if 1
-//TODO: delete block
-enum CompressionCriterion {CriterionUndefined, RelativeErrorThreshold, AbsoluteErrorThreshold};
-
-struct PermittedError
-{
-    PermittedError() = delete;
-    PermittedError(const CompressionCriterion etype, const double permitted_error)
-    : criterion{etype}, error{permitted_error}{};
-
-    const CompressionCriterion criterion{CompressionCriterion::CriterionUndefined};
-    const double error{0.0};
-};
-
-struct ErrorCompliance
-{
-    ErrorCompliance() = delete;
-    ErrorCompliance(const bool is_error_threshold_fulfilled, const double max_error)
-    : is_error_threshold_satisfied{is_error_threshold_fulfilled}, max_introduced_error{max_error}{};
-
-    const bool is_error_threshold_satisfied;
-    const double max_introduced_error;
-};
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    /* Calculate the relative deviation */
-    return static_cast<double>(std::abs(initial_value - nominal_value)) / static_cast<double>(std::abs(initial_value));
-}
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    /* Calculate the relative deviation */
-    return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value)) / static_cast<double>(initial_value);
-}
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    /* Calculate the absolute deviation */
-    return static_cast<double>(std::abs(initial_value - nominal_value));
-}
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviation(const T initial_value, const T nominal_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    /* Calculate the absolute deviation */
-    return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value));
-}
-
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the absolute deviation */
-        return static_cast<double>(std::abs(initial_value - nominal_value));
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<typename T>
-auto
-ComputeSingleAbsoluteDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the absolute deviation */
-        return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value));
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_signed_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the relative deviation */
-        return static_cast<double>(std::abs(initial_value - nominal_value)) / static_cast<double>(std::abs(initial_value));
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<typename T>
-auto
-ComputeSingleRelativeDeviationSkipMissingValues(const T initial_value, const T nominal_value, const T& missing_value)
- -> std::enable_if_t<std::is_unsigned_v<T>, double>
-{
-    if (!ApproxCompare(missing_value, initial_value))
-    {
-        /* Calculate the relative deviation */
-        return static_cast<double>((initial_value > nominal_value ? initial_value - nominal_value : nominal_value - initial_value)) / static_cast<double>(initial_value);
-    } else
-    {
-        return 0.0;
-    }
-}
-
-template<class T>
-ErrorCompliance
-IsValueErrorCompliant(const std::vector<PermittedError>& permitted_errors, const T initial_value, const T nominal_value, const T& missing_value)
-{
-    /* Get the absolute inaccuracy for all values (the absolute error is needed in any case) */
-    const double abs_inaccuracy = ComputeSingleAbsoluteDeviationSkipMissingValues(initial_value, nominal_value, missing_value);
-
-    for (auto pe_iter = permitted_errors.begin(); pe_iter != permitted_errors.end(); ++pe_iter)
-    {
-        switch (pe_iter->criterion)
-        {
-            case CompressionCriterion::AbsoluteErrorThreshold:
-            {
-                /* Check if it is compliant with the permitted error */
-                if (abs_inaccuracy > pe_iter->error)
-                {
-                    return ErrorCompliance(false, 0.0);
-                }
-            }
-            break;
-            case CompressionCriterion::RelativeErrorThreshold:
-            {
-                /* Get the relative inaccuracy for all values */
-                const double rel_inaccuracy = ComputeSingleRelativeDeviationSkipMissingValues(initial_value, nominal_value, missing_value);
-                /* Check if it is compliant with the permitted error */
-                if (rel_inaccuracy > pe_iter->error)
-                {
-                    return ErrorCompliance(false, 0.0);
-                }
-            }
-            break;
-                default:
-                cmc_err_msg("The error specifications hold an unrecognized criterion.");
-                return ErrorCompliance(false, 0.0);
-        }
-    }
-
-    /* If the funciton reaches this point, the interpolated value complies with the permitted errors */
-    return ErrorCompliance(true, abs_inaccuracy);
-}
-
-template<typename T>
-CompressionValue<T>
-GetMaximumTailToggledValue(const int index, const std::vector<PermittedError>& permitted_errors, const CompressionValue<T>& initial_serialized_value, const T& missing_value)
-{
-    bool is_toogling_progressing = true;
-    CompressionValue<T> toggled_value = initial_serialized_value;
-
-    const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
-
-    int iteration_count = 0;
-    const int max_iteration_count = sizeof(T) * CHAR_BIT;
-
-    while (is_toogling_progressing && iteration_count < max_iteration_count)
-    {
-        const CompressionValue<T> save_previous_value = toggled_value;
-
-        /* Toggle all ones up until the next unset bit (inclusive) */
-        toggled_value.ToggleTailUntilNextUnsetBit();
-        const T reinterpreted_value = toggled_value.template ReinterpretDataAs<T>();
-
-        /* Check if it is error compliant */
-        const ErrorCompliance error_evaluation = IsValueErrorCompliant(permitted_errors, initial_val, reinterpreted_value, missing_value);
-
-        if (!error_evaluation.is_error_threshold_satisfied)
-        {
-            /* Revert the changes to the value */
-            toggled_value = save_previous_value;
-            is_toogling_progressing = false;
-        }
-
-        ++iteration_count;
-    }
-
-    return toggled_value;
-}
-
-
-template<typename T>
-CompressionValue<T>
-GetMaximumTailClearedValue(const int index, const std::vector<PermittedError>& permitted_errors, const CompressionValue<T>& initial_serialized_value, const T& missing_value)
-{
-    bool is_clearing_progressing = true;
-    CompressionValue<T> cleared_value = initial_serialized_value;
-
-    const T initial_val = initial_serialized_value.template ReinterpretDataAs<T>();
-
-    int iteration_count = 0;
-    const int max_iteration_count = sizeof(T) * CHAR_BIT;
-
-    while (is_clearing_progressing && iteration_count < max_iteration_count)
-    {
-        const CompressionValue<T> save_previous_value = cleared_value;
-
-        /* Clear the next set bit from the tail */
-        cleared_value.ClearNextSetBitFromTail();
-        const T reinterpreted_value = cleared_value.template ReinterpretDataAs<T>();
-
-        /* Check if it is error compliant */
-        const ErrorCompliance error_evaluation = IsValueErrorCompliant(permitted_errors, initial_val, reinterpreted_value, missing_value);
-
-        if (!error_evaluation.is_error_threshold_satisfied)
-        {
-            /* Revert the changes to the value */
-            cleared_value = save_previous_value;
-            is_clearing_progressing = false;
-        }
-
-        ++iteration_count;
-    }
-
-    return cleared_value;
-}
-
-
-template<typename T>
-void
-AbstractEmbeddedByteCompressionVariable<T>::PerformTailTruncationOnInitialData()
-{
-    const T missing_value = attributes_.GetMissingValue();
-
-    /* Iterate through the serialized values and try to emplace as many zeros at the tail as possible (compliant to the error threshold) */
-    int index = 0;
-    for (auto val_iter = data_.begin(); val_iter != data_.end(); ++val_iter, ++index)
-    {
-        const T re_val = val_iter->template ReinterpretDataAs<T>();
-
-        if (!ApproxCompare(re_val, missing_value))
-        {
-            /* Get the permitted error for the current values */
-            const std::vector<PermittedError> permitted_errors = std::vector<PermittedError>{PermittedError(CompressionCriterion::RelativeErrorThreshold, 0.01)};
-
-            /* Get the value which has been transformed by toggling as many ones from the back while setting the succeeding 'zero' bits to one */
-            const CompressionValue<T> toggled_value = GetMaximumTailToggledValue(index, permitted_errors, *val_iter, missing_value);
-
-            /* Get the value which has been transformed by clearing as many of the last set bits as possible */
-            const CompressionValue<T> cleared_value = GetMaximumTailClearedValue(index, permitted_errors, *val_iter, missing_value);
-
-            /* Check which approach leads to more zero bits at the end */
-            const int num_toogled_trailing_zeros = toggled_value.GetNumberTrailingZeros();
-            const int num_cleared_trailing_zeros = cleared_value.GetNumberTrailingZeros();
-
-            /* Replace the initial value with the transformed one */
-            if (num_toogled_trailing_zeros >= num_cleared_trailing_zeros)
-            {
-                /* If the toggling approach has been more successfull */
-                *val_iter = toggled_value;
-            } else
-            {
-                /* If the clearing approach has been more successfull */
-                *val_iter = cleared_value;
-            }
-
-            /* Update the trail bit count for the new value */
-            val_iter->UpdateTailBitCount();
-            //cmc_debug_msg("Trailing Zeros: Toggled: ", num_toogled_trailing_zeros, ", Cleared: ", num_cleared_trailing_zeros);
-        } else
-        {
-            /* In order to not change missing values, we are just able to trim their trailing zeros */
-            val_iter->UpdateTailBitCount();
-        }
-    }
-}
-
-
-#endif
-
-
-
 
 template <typename T>
 void
@@ -608,22 +310,10 @@ AbstractEmbeddedByteCompressionVariable<T>::SetupInputVariableForCompression(inp
     //fwrite(input_variable.GetDataForReading().data(), sizeof(T), input_variable.GetDataForReading().size(), file_out);
     //fclose(file_out);
 
-
-
     /* Get the data from the variable and store it as CompressionValues */
     this->SetData(input_variable.GetDataForReading());
     
     cmc_debug_msg("The setup of the InputVariable for compression has been succcessfull.");
-
-    /* Nur zum testen gerade; funktioniert nur für PrefixAMR */
-    //this->PerformTailTruncationOnInitialData();
-    //for (auto val_iter = data_.begin(); val_iter != data_.end(); ++val_iter)
-    //{
-    //    val_iter->UpdateTailBitCount();
-    //}
-
-    //const uint64_t num_bits_potentially_to_save = GetSpareBitCount();
-    //cmc_debug_msg("\n\n\nBits to spare: ", num_bits_potentially_to_save, "\n\n\n");
 }
 
 template <typename T>
@@ -929,9 +619,6 @@ AbstractEmbeddedByteCompressionVariable<T>::StoreExtractedValues(const int tree_
 
     /* Store the extracted coarse value for the next coarsening iteration */
     data_new_.push_back(extracted_values.coarse_value);
-
-    //std::copy_n(extracted_values.fine_values.begin(), num_elements, std::back_inserter(test_data_));
-    //test_data_.pop_back(); //Remove last residual
 }
 
 template <typename T>
@@ -950,8 +637,6 @@ AbstractEmbeddedByteCompressionVariable<T>::StoreUnchangedElement(const int tree
 
     /* Set the new value for the next coarsening iteration */
     data_new_.push_back(extracted_value.coarse_value);
-
-    //test_data_.push_back(extracted_value.fine_value);
 }
 
 
