@@ -36,6 +36,8 @@ install(FILES
     utilities/cmc_iface_compression_variable.hxx 
     utilities/cmc_iface_amr_compression_variable.hxx 
     utilities/cmc_iface_embedded_amr_compression_variable.hxx 
+    utilities/cmc_iface_patch_compression_variable.hxx 
+    utilities/cmc_iface_patch_decompression_variable.hxx 
     utilities/cmc_log_functions.hxx 
     utilities/cmc_fallbacks.h 
     utilities/cmc_vector_view.hxx 
@@ -163,6 +165,13 @@ install(FILES
     embedded/lossless/cmc_test_pcp4_embedded_compression.hxx 
     embedded/lossless/cmc_test_pcp4_embedded_decompression.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/embedded/lossless
+)
+
+install(FILES
+    patch/lossless/cmc_patch_byte_compression_variable.hxx 
+    patch/lossless/cmc_patch_byte_decompression_variable.hxx 
+
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
 install(FILES
