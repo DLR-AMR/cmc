@@ -227,11 +227,10 @@ Reader::ReadEmbeddedVariableForDecompression(const std::string& var_name)
             return std::make_unique<lossless::embedded::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         case CompressionSchema::EmbeddedPrefixExtractionPlainSuffixes:
-            cmc_debug_msg("\n\nPlain Suffix Version is instantiated \n\n");
+            cmc_debug_msg("Embedded Prefix Extraction Decompression with Plain Suffixes is instantiated.");
             return std::make_unique<lossless::embedded::prefix::plain_suffix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         case CompressionSchema::EmbeddedMultiResExtraction:
-            //return std::make_unique<lossless::embedded::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh));
             cmc_debug_msg("Embedded MultiRes Decompression is instantiated.");
             return std::make_unique<lossless::embedded::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
