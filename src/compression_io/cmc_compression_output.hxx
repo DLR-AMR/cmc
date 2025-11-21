@@ -4,6 +4,7 @@
 #include "amr/lossy/cmc_ac_compression_variable.hxx"
 #include "utilities/cmc_iface_amr_compression_variable.hxx"
 #include "utilities/cmc_iface_embedded_amr_compression_variable.hxx"
+#include "utilities/cmc_iface_patch_compression_variable.hxx"
 #include "embedded/lossless/cmc_embedded_byte_compression_variable.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
 
@@ -34,6 +35,7 @@ public:
 
     template<typename T> void SetVariable(cmc::IAMRCompressionVariable<T>* variable);
     template<typename T> void SetVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable);
+    template<typename T> void SetVariable(cmc::IPatchCompressionVariable<T>* variable);
 
     void AddGlobalAttribute(const nc::Attribute& attribute);
     void AddGlobalAttribute(nc::Attribute&& attribute);
@@ -45,6 +47,8 @@ private:
     template<typename T> void SetMeshVariable(cmc::IAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
     template<typename T> void SetDataVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
     template<typename T> void SetMeshVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
+    template<typename T> void SetDataVariable(cmc::IPatchCompressionVariable<T>* variable, const int var_id);
+
 
     std::string file_name_;
     cmc::nc::Writer nc_writer_;
@@ -170,5 +174,7 @@ Writer::Write()
 /* The implementation specific fuctionalities for the AbstractEmbeddedByteCompressionVariables are included */
 #include "compression_io/cmc_embedded_byte_compression_output.txx"
 
+/* The implementation specific fuctionalities for the AbstractPatchByteCompressionVariables are included */
+#include "compression_io/cmc_patch_byte_compression_output.txx"
 
 #endif /* !CMC_COMPRESSION_OUTPUT_HXX */
