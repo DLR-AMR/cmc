@@ -33,7 +33,7 @@ public:
     
     virtual ~AbstractPatchByteDecompressionVariable(){}
 
-    const std::vector<T>& GetDecompressedData() const override;
+    std::vector<T> GetDecompressedData() const override;
     const std::string& GetName() const override {return name_;}
     size_t Size() const override {return data_.size();}
     size_t GetDimensionality() const {return Dim;}
@@ -104,7 +104,7 @@ AbstractPatchByteDecompressionVariable<T, Dim>::SetInitDataValue(const Compressi
 }
 
 template <typename T, size_t Dim>
-const std::vector<T>&
+std::vector<T>
 AbstractPatchByteDecompressionVariable<T, Dim>::GetDecompressedData() const 
 {
     if (not has_been_decompressed_)
@@ -136,7 +136,7 @@ GetCoarseValue(const std::vector<CompressionValue<T>>& coarse_data, const std::v
     cmc_assert(coarse_lvl_lev < coarse_lvl_dims[0]);
     cmc_assert(coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat + coarse_lvl_dims[2] + coarse_lvl_lon < coarse_data.size());
 
-    return coarse_data[coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat + coarse_lvl_dims[2] + coarse_lvl_lon];
+    return coarse_data[coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat * coarse_lvl_dims[2] + coarse_lvl_lon];
 }
 
 template <typename T, size_t Dim>
@@ -160,12 +160,12 @@ AbstractPatchByteDecompressionVariable<T, Dim>::Decompress(AbstractPatchByteDeco
     cmc_debug_msg("Decompression of variable ", this->name_, " starts...");
 
     /* Decode the root level value */
-    data_ = this->GetInitDecompressionValue();
+    data_ = std::vector<CompressionValue<T>>{this->GetInitDecompressionValue()};
 
     cmc_assert(data_.size() == static_cast<size_t>(1));
 
     /* Perform the iterative decompression */
-    for (int decompression_iter{0}; decompression_iter < num_decompression_lvls_; ++decompression_iter)
+    for (int decompression_iter{0}; decompression_iter < num_decompression_lvls_ - 1; ++decompression_iter)
     {
         cmc_debug_msg("A decompression iteration is initialized (step: ", decompression_iter,").");
         this->InitializeDecompressionIteration();

@@ -66,9 +66,9 @@ public:
     const std::string& GetName() const override {return name_;}
     size_t Size() const override {return data_.size();}
     const std::vector<CompressionValue<T>>& GetData() const {return data_;}
-    const size_t GetDimensionality() const override {return Dim;}
-    std::vector<size_t> GetInitialDimensionLengths() const override {return dim_lengths_pyramid_.front();}
-    std::vector<std::vector<size_t>> GetDimensionLengthPyramid() const override {return dim_lengths_pyramid_;}
+    size_t GetDimensionality() const override {return Dim;}
+    const std::vector<size_t>& GetInitialDimensionLengths() const override {return dim_lengths_pyramid_.front();}
+    const std::vector<std::vector<size_t>>& GetDimensionLengthPyramid() const override {return dim_lengths_pyramid_;}
     DataLayout GetInitialDataLayout() const override {return init_data_layout_;}
     GeoDomain GetInitialDomain() const override {return init_domain_;}
     int GetNumCompressionIterations() const {return num_compression_lvls_;}
@@ -89,6 +89,8 @@ protected:
     virtual void InitializeExtractionIteration() {}
     virtual void FinalizeExtractionIteration() {}
     virtual ExtractionData<T> PerformExtraction(const std::vector<CompressionValue<T>>& patch) = 0;
+    virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const = 0;
+    virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
 
     void SetName(const std::string& name) {name_ = name;}
     void SetData(const std::vector<T>& initial_data);
@@ -148,6 +150,9 @@ AbstractPatchByteCompressionVariable<T, Dim>::SetupInputVariableForCompression(i
         cmc_err_msg("The data type of the input variable differs from the patch-based byte compression variable.");
     }
 
+    /* Get the name of the variable */
+    name_ = input_var.GetName();
+
     /* Get the actual variable from the input var wrapper */
     input::Variable<T> input_variable = std::get<input::Variable<T>>(input_var.GetInternalVariant());
 
@@ -181,7 +186,7 @@ AbstractPatchByteCompressionVariable<T, Dim>::SetupInputVariableForCompression(i
     const size_t max_dim_length = static_cast<size_t>(init_domain_.GetLargestDimensionLength());
 
     /* Determine the number of compression iterations */
-    const int num_compression_lvls_ = static_cast<int>(std::ceil(std::log2(max_dim_length) + std::numeric_limits<double>::epsilon()));
+    num_compression_lvls_ = static_cast<int>(std::ceil(std::log2(max_dim_length) + std::numeric_limits<double>::epsilon()));
 
     //FILE* file_out = fopen("initial_input_prefix_amr_data.cmc", "wb");
     //fwrite(input_variable.GetDataForReading().data(), sizeof(T), input_variable.GetDataForReading().size(), file_out);
@@ -226,17 +231,20 @@ AbstractPatchByteCompressionVariable<T, Dim>::Compress(AbstractPatchByteCompress
     size_t lat_length = dim_lengths_pyramid_.front()[1];
     size_t lon_length = dim_lengths_pyramid_.front()[2];
 
+    cmc_debug_msg("Number of compression iterations to perform: ", num_compression_lvls_);
+    
     /* Perform the iterative compression steps up until the root level */
-    for (int lvl_idx{0}; lvl_idx <= num_compression_lvls_; ++lvl_idx)
+    for (int lvl_idx{0}; lvl_idx < num_compression_lvls_; ++lvl_idx)
     {
-        cmc_assert(dim_lengths_pyramid_.back().size() == static_cast<size_t>(3));
-        cmc_debug_msg("A coarsening iteration is initialized.");
-
-        /* Intitialize the extraction iteration */
-        this->InitializeExtractionIteration();
-
         /* Define a reference for the ease of notation */
         const std::vector<size_t>& dim_lengths = dim_lengths_pyramid_.back();
+
+        cmc_assert(dim_lengths_pyramid_.back().size() == static_cast<size_t>(3));
+        cmc_debug_msg("A coarsening iteration is initialized (step: ", lvl_idx, ").");
+        cmc_debug_msg("Level's data dimensions: ", dim_lengths[0], ", ", dim_lengths[1], ", ", dim_lengths[2]);
+        
+        /* Intitialize the extraction iteration */
+        this->InitializeExtractionIteration();
 
         /* Allocate the coarse level */
         data_new_.reserve(((dim_lengths[0] / kDimReductionFactor) + 1) * ((dim_lengths[1] / kDimReductionFactor) + 1) * ((dim_lengths[2] / kDimReductionFactor) + 1));
@@ -325,9 +333,6 @@ AbstractPatchByteCompressionVariable<T, Dim>::Compress(AbstractPatchByteCompress
 
         cmc_debug_msg("The coarsening iteration is finished.");
     }
-
-    /* After the last iteration, the next dimension will no be needed */
-    dim_lengths_pyramid_.pop_back();
 
     /* At last, we need to encode the root level data */
     auto [encoded_root_entropy_codes, encoded_root_data] = this->EncodeRootLevelData(data_);
