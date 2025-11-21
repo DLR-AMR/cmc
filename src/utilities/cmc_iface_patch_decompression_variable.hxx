@@ -10,7 +10,7 @@ template <typename T>
 class IPatchDecompressionVariable : public IDecompressionVariable<T>
 {
 public:
-    virtual const std::vector<T>& GetDecompressedData() const = 0;
+    virtual std::vector<T> GetDecompressedData() const = 0;
 
     virtual const std::string& GetName() const = 0;
     virtual size_t Size() const = 0;

@@ -25,8 +25,8 @@ public:
     virtual const std::string& GetName() const = 0;
     virtual size_t Size() const = 0;
     virtual size_t GetDimensionality() const = 0;
-    virtual std::vector<size_t> GetInitialDimensionLengths() const = 0;
-    virtual std::vector<std::vector<size_t>> GetDimensionLengthPyramid() const = 0;
+    virtual const std::vector<size_t>& GetInitialDimensionLengths() const = 0;
+    virtual const std::vector<std::vector<size_t>>& GetDimensionLengthPyramid() const = 0;
     virtual CompressionSchema GetCompressionSchema() const = 0;
     virtual DataLayout GetInitialDataLayout() const = 0;
     virtual GeoDomain GetInitialDomain() const = 0;
