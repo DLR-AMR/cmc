@@ -17,7 +17,8 @@ namespace cmc::compression_io
     const std::string initial_data_layout_attr("init_data_layout");
     const std::string pre_compression_layout_attr("pre_compression_layout");
     const std::string global_context_information_attr("info");
-
+    const std::string dim_attr("dimensionality");
+    const std::string dim_lengths_pyra_lvls_attr("dim_lengths_pyramidal_lvls");
     inline std::string GenerateMeshVariableName(const int id)
     {
         return std::string("mesh_") + std::to_string(id);
