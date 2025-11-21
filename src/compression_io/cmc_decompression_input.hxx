@@ -218,34 +218,34 @@ Reader::ReadEmbeddedVariableForDecompression(const std::string& var_name)
     std::vector<uint8_t> encoded_mesh = reader.ReadVariableData<uint8_t>(mesh_name);
     
     /* We set up the attributes for the variable, the GeoDomain of the variable is encoded within the mesh and will be set later when decoded */
-    VariableAttributes<T> decomrpessed_var_attributes(GeoDomain(), missing_value, initial_layout, pre_compression_layout, global_context_information);
+    VariableAttributes<T> decompressed_var_attributes(GeoDomain(), missing_value, initial_layout, pre_compression_layout, global_context_information);
 
     /* Invoke the correct decompressor */
     switch (compression_scheme)
     {
         case CompressionSchema::EmbeddedPrefixExtraction:
-            return std::make_unique<lossless::embedded::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+            return std::make_unique<lossless::embedded::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         case CompressionSchema::EmbeddedPrefixExtractionPlainSuffixes:
             cmc_debug_msg("\n\nPlain Suffix Version is instantiated \n\n");
-            return std::make_unique<lossless::embedded::prefix::plain_suffix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+            return std::make_unique<lossless::embedded::prefix::plain_suffix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         case CompressionSchema::EmbeddedMultiResExtraction:
             //return std::make_unique<lossless::embedded::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh));
             cmc_debug_msg("Embedded MultiRes Decompression is instantiated.");
-            return std::make_unique<lossless::embedded::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+            return std::make_unique<lossless::embedded::multi_res::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         case CompressionSchema::_TestEmbeddedPCP4Extraction:
             cmc_debug_msg("Test MultiRes PCP4 Decompression is instantiated.");
-            return std::make_unique<lossless::embedded::test_pcp4::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+            return std::make_unique<lossless::embedded::test_pcp4::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         case CompressionSchema::EmbeddedQuantizedPrefixExtraction:
             cmc_debug_msg("Embedded Quantized PrefixAMR Decompression is instantiated.");
-            return std::make_unique<cmc::lossy::embedded::prefix::quantization::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+            return std::make_unique<cmc::lossy::embedded::prefix::quantization::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
         break;
         default:
             cmc_err_msg("The compression schema of the compressed variable is not recognized for an embedded variable.");
-            return std::make_unique<lossless::embedded::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decomrpessed_var_attributes), are_refinement_bits_stored, comm_);
+            return std::make_unique<lossless::embedded::prefix::DecompressionVariable<T>>(var_name, std::move(encoded_data), std::move(encoded_mesh), std::move(decompressed_var_attributes), are_refinement_bits_stored, comm_);
     }
 }
 
