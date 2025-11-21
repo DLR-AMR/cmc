@@ -170,7 +170,8 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/embedded/lossless
 install(FILES
     patch/lossless/cmc_patch_byte_compression_variable.hxx 
     patch/lossless/cmc_patch_byte_decompression_variable.hxx 
-
+    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx 
+    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
@@ -194,6 +195,7 @@ install(FILES
     compression_io/cmc_decompression_input.hxx 
     compression_io/cmc_byte_compression_output.txx 
     compression_io/cmc_embedded_byte_compression_output.txx 
+    compression_io/cmc_patch_byte_compression_output.txx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
 )
 
