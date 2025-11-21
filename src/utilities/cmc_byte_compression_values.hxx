@@ -68,8 +68,6 @@ public:
     std::vector<uint8_t> GetSignificantBitsInBigEndianOrdering() const;
     void ApplySuffix(const std::vector<uint8_t>& serialized_suffix, const int num_bits);
 
-    //void AddIntegerResidual(const uint32_t encoded_lzc, const std::vector<uint8_t>& residual_bits);
-    //void AddXORResidualWithoutImplicitOneBit(const uint32_t lzc, const std::vector<uint8_t>& residual_bits);
     void _TestPCP4ReverseXORResidual(const SerializedCompressionValue<N>& residual);
     int GatherEqualTailBitCount() const;
     void TrimEqualTailSequence();
@@ -137,7 +135,7 @@ public:
         return xor_val;
     };
 private:
-    std::array<uint8_t, N> bytes_{};
+    std::array<uint8_t, N> bytes_;
     SignificantBitsIndicator<N> indicators_;
 };
 
