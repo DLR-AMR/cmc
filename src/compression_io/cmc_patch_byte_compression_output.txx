@@ -53,7 +53,6 @@ Writer::SetDataVariable(cmc::IPatchCompressionVariable<T>* variable, const int v
 
     /* Get the pyramidal level dimension lengths */
     const std::vector<std::vector<size_t>>& dim_lengths_pyramid = variable->GetDimensionLengthPyramid();
-    cmc_assert(num_compression_iterations - 1 == dim_lengths_pyramid.size());
     attributes.emplace_back(dim_lengths_pyra_lvls_attr, static_cast<int32_t>(dim_lengths_pyramid.size()));
 
     for (int idx = dim_lengths_pyramid.size() - 1; idx >= 0; --idx)

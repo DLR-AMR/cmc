@@ -126,7 +126,6 @@ PrefixEmbeddedDecompressionAdaptData<T>::InitializeDecompressionIteration()
 {
     /* Check if the following decompression iteration is the leaf level decompression */
     is_leaf_level_decompression_ = IsNextIterationLeafLevelDecompression();
-    cmc_debug_msg("\n\nIs this iteration a leaf level decompression? ", is_leaf_level_decompression_, " and init ref elvel: ", this->GetAmrMesh().GetInitialRefinementLevel(), "\n\n");
 
     if (is_leaf_level_decompression_ == true)
     {
@@ -197,7 +196,7 @@ PrefixEmbeddedDecompressionAdaptData<T>::InitializeLeafDecompressionIteration()
     
     /* Check if the following decompression iteration is the leaf level decompression */
     is_leaf_level_decompression_ = IsNextIterationLeafLevelDecompression();
-    cmc_debug_msg("\n\nIs this iteration a leaf level decompression? ", is_leaf_level_decompression_, " and init ref elvel: ", this->GetAmrMesh().GetInitialRefinementLevel(), "\n\n");
+
     constexpr size_t offset = sizeof(uint64_t);
 
     size_t processed_bytes = level_byte_offset_;

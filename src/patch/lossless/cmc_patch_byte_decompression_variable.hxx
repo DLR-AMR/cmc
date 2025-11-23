@@ -134,7 +134,7 @@ GetCoarseValue(const std::vector<CompressionValue<T>>& coarse_data, const std::v
     const size_t coarse_lvl_lon = next_lvl_lon / kDimReductionFactor;
 
     cmc_assert(coarse_lvl_lev < coarse_lvl_dims[0]);
-    cmc_assert(coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat + coarse_lvl_dims[2] + coarse_lvl_lon < coarse_data.size());
+    cmc_assert(coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat * coarse_lvl_dims[2] + coarse_lvl_lon < coarse_data.size());
 
     return coarse_data[coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat * coarse_lvl_dims[2] + coarse_lvl_lon];
 }

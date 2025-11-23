@@ -1,8 +1,6 @@
 #ifndef CMC_T8_MPI_HXX
 #define CMC_T8_MPI_HXX
-/**
- * @file cmc_t8_morton.hxx
- */
+
 
 #include "utilities/cmc_utilities.hxx"
 #include "mpi/cmc_mpi.hxx"

@@ -2,7 +2,9 @@
 #include "input/cmc_netcdf.hxx"
 #include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx"
 #include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx"
-
+#include "patch/lossless/cmc_patch_multi_res_extraction_compression.hxx"
+#include "patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx"
+    
 #include "input/cmc_binary_reader.hxx"
 
 #include "utilities/cmc_hyperslab.hxx"
@@ -25,7 +27,7 @@ main(void)
 
     /* Read in data */
     #if 1
-    const std::string file = "../data/100x500x500/CLOUDf48.bin.f32";
+    const std::string file = "../data/100x500x500/TCf48.bin.f32";
     //const std::string file = "../data/era5_reanalysis_t2m_tc03_13_12_23.nc";
     #else
     const std::string file = "../data/SDRBENCH-EXASKY-NYX-512x512x512/baryon_density.f32";
@@ -85,6 +87,7 @@ main(void)
     {
     /* Setup an embedded PrefixAMR (with plain suffix encoding) compression variable from the input variables */           
     cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<float, 3> var(input_variables.front());
+    //cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 3> var(input_variables.front());
 
     /* Perform the compression */
     var.Compress();

@@ -9,7 +9,7 @@
 #include "utilities/cmc_iface_patch_compression_variable.hxx"
 
 #include <vector>
-#include <functional>
+#include <cmath>
 #include <memory>
 #include <algorithm>
 #include <type_traits>

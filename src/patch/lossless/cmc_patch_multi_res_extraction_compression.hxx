@@ -67,6 +67,7 @@ void
 PatchCompressionVariable<T, Dim>::CompleteExtraction(const std::vector<size_t>& fine_dim_lengths, const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals)
 {
     cmc_assert(fine_dim_lengths.size() == 3);
+    if (Dim != 3) {cmc_err_msg("Only 3D patch-based MultiRes is currently supported");}
     
     std::vector<uint8_t> res_indications(fine_dim_lengths[0] * fine_dim_lengths[1] * fine_dim_lengths[2]);
 

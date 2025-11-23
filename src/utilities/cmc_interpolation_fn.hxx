@@ -31,6 +31,11 @@ T InterpolateToMidRange(const VectorView<T>& values)
 {
     cmc_assert(std::is_arithmetic_v<T>);
     cmc_assert(!values.empty());
+    if (values.size() == 1)
+    {
+        return values.front();
+    }
+
     cmc_assert(values.size() >= 2);
 
     T min = std::numeric_limits<T>::max();
@@ -72,6 +77,11 @@ T InterpolateToMidRange(const std::vector<T>& values)
 {
     cmc_assert(std::is_arithmetic_v<T>);
     cmc_assert(!values.empty());
+    if (values.size() == 1)
+    {
+        return values.front();
+    }
+    
     cmc_assert(values.size() >= 2);
 
     T min = std::numeric_limits<T>::max();

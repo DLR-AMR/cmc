@@ -1,11 +1,16 @@
 #ifndef CMC_COMPRESSION_OUTPUT_HXX
 #define CMC_COMPRESSION_OUTPUT_HXX
 
+#include "cmc.hxx"
+
+#ifdef CMC_WITH_T8CODE
 #include "amr/lossy/cmc_ac_compression_variable.hxx"
 #include "utilities/cmc_iface_amr_compression_variable.hxx"
 #include "utilities/cmc_iface_embedded_amr_compression_variable.hxx"
-#include "utilities/cmc_iface_patch_compression_variable.hxx"
 #include "embedded/lossless/cmc_embedded_byte_compression_variable.hxx"
+#endif
+
+#include "utilities/cmc_iface_patch_compression_variable.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
 
 #ifdef CMC_WITH_NETCDF
@@ -33,8 +38,10 @@ public:
     Writer(const std::string& file_name, MPI_Comm comm)
     : file_name_{file_name}, nc_writer_(file_name, NC_NETCDF4, comm) {};
 
+#ifdef CMC_WITH_T8CODE
     template<typename T> void SetVariable(cmc::IAMRCompressionVariable<T>* variable);
     template<typename T> void SetVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable);
+#endif
     template<typename T> void SetVariable(cmc::IPatchCompressionVariable<T>* variable);
 
     void AddGlobalAttribute(const nc::Attribute& attribute);
@@ -43,10 +50,12 @@ public:
     void Write();
 
 private:
+#ifdef CMC_WITH_T8CODE
     template<typename T> void SetDataVariable(cmc::IAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
     template<typename T> void SetMeshVariable(cmc::IAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
     template<typename T> void SetDataVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
     template<typename T> void SetMeshVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
+#endif
     template<typename T> void SetDataVariable(cmc::IPatchCompressionVariable<T>* variable, const int var_id);
 
 
@@ -168,11 +177,15 @@ Writer::Write()
 
 }
 
+#ifdef CMC_WITH_T8CODE
+
 /* The implementation specific fuctionalities for the AbstractByteCompressionVariables are included */
 #include "compression_io/cmc_byte_compression_output.txx"
 
 /* The implementation specific fuctionalities for the AbstractEmbeddedByteCompressionVariables are included */
 #include "compression_io/cmc_embedded_byte_compression_output.txx"
+
+#endif
 
 /* The implementation specific fuctionalities for the AbstractPatchByteCompressionVariables are included */
 #include "compression_io/cmc_patch_byte_compression_output.txx"

@@ -7,6 +7,7 @@
 #include "utilities/cmc_geo_domain.hxx"
 #include "compression_io/cmc_compression_attr_names.hxx"
 
+#ifdef CMC_WITH_T8CODE
 #include "amr/lossless/cmc_byte_decompression_variable.hxx"
 #include "amr/lossless/cmc_prefix_extraction_decompression.hxx"
 #include "amr/lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx"
@@ -20,10 +21,13 @@
 #include "embedded/lossless/cmc_test_pcp4_embedded_decompression.hxx"
 #include "utilities/cmc_embedded_variable_attributes.hxx"
 
+#include "embedded/lossy/cmc_embedded_prefix_quantization_decompression.hxx"
+
+#endif
+
 #include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx"
 #include "patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx"
 
-#include "embedded/lossy/cmc_embedded_prefix_quantization_decompression.hxx"
 
 #ifdef CMC_WITH_NETCDF
 #include "netcdf/cmc_netcdf.hxx"
@@ -55,8 +59,10 @@ public:
     Reader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
     : file_name_{file_name}, comm_{comm}, reader(file_name, comm) {};
 
+#ifdef CMC_WITH_T8CODE
     template <typename T> std::unique_ptr<decompression::AbstractByteDecompressionVariable<T>> ReadVariableForDecompression(const std::string& var_name);
     template <typename T> std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<T>> ReadEmbeddedVariableForDecompression(const std::string& var_name);
+#endif
     template <typename T> std::unique_ptr<cmc::patch::IPatchDecompressionVariable<T>> ReadPatchVariableForDecompression(const std::string& var_name);
 
 private:
@@ -64,6 +70,8 @@ private:
     const MPI_Comm comm_;
     cmc::nc::Reader reader;
 };
+
+#ifdef CMC_WITH_T8CODE
 
 template <typename T>
 std::unique_ptr<decompression::AbstractByteDecompressionVariable<T>>
@@ -251,6 +259,7 @@ Reader::ReadEmbeddedVariableForDecompression(const std::string& var_name)
     }
 }
 
+#endif
 
 template <typename T>
 std::unique_ptr<cmc::patch::IPatchDecompressionVariable<T>>

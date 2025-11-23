@@ -50,10 +50,10 @@ PrintValuesFromFile(const std::string& file_name)
 
 int main(void)
 {
-    #if 0
-    const std::vector<float> initial_data = ReadDataFromStream<float>("../../programs/data/100x500x500/Wf48.bin.f32");
+    #if 1
+    const std::vector<float> initial_data = ReadDataFromStream<float>("../data/100x500x500/TCf48.bin.f32");
     #else
-    const std::vector<float> initial_data = ReadDataFromStream<float>("../../programs/data/SDRBENCH-EXASKY-NYX-512x512x512/baryon_density.f32");
+    const std::vector<float> initial_data = ReadDataFromStream<float>("../data/SDRBENCH-EXASKY-NYX-512x512x512/baryon_density.f32");
     #endif
 
     const std::vector<float> decompressed_data = ReadDataFromStream<float>("decompressed_data.cmc");

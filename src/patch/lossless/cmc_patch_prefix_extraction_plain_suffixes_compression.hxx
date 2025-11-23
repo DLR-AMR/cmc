@@ -56,6 +56,11 @@ template<typename T>
 std::pair<bool, CompressionValue<T>>
 EvaluatePatchCommonPrefix(const std::vector<CompressionValue<T>>& compression_values)
 {
+    cmc_assert(not compression_values.empty());
+    if (compression_values.size() == 1)
+    {
+        return std::make_pair(true, compression_values.front());
+    }
     cmc_assert(compression_values.size() >= 2);
 
     /* Check if all elements are holding an actual prefix */

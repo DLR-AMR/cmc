@@ -1,7 +1,7 @@
-#ifndef CMC_T8_MORTON_HXX
-#define CMC_T8_MORTON_HXX
+#ifndef CMC_MORTON_HXX
+#define CMC_MORTON_HXX
 /**
- * @file cmc_t8_morton.hxx
+ * @file cmc_morton.hxx
  */
 
 #include "utilities/cmc_utilities.hxx"
@@ -19,4 +19,4 @@ TransformHyperslabCoordinatesToMortonIndices(const std::vector<Hyperslab>& hyper
 
 }
 
-#endif /* !CMC_T8_MORTON_HXX */
+#endif /* !CMC_MORTON_HXX */

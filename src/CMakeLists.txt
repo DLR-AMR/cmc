@@ -16,14 +16,9 @@ target_sources(cmc PRIVATE
     netcdf/cmc_nc_writer.cxx 
     netcdf/cmc_nc_io.cxx 
     netcdf/cmc_nc_reader.cxx 
-    t8code/cmc_t8_mesh.cxx 
-    t8code/cmc_t8_interpolation.cxx 
-    t8code/cmc_t8_adapt_track_inaccuracy.cxx 
-    t8code/cmc_t8_morton.cxx 
-    t8code/cmc_t8_mpi.cxx 
     input/cmc_netcdf.cxx 
     input/cmc_input_variable.cxx 
-    amr/lossy/cmc_adaptive_coarsening.cxx
+    utilities/cmc_morton.cxx 
 )
 
 install(FILES
@@ -57,7 +52,6 @@ install(FILES
     utilities/cmc_error_domain.hxx 
     utilities/cmc_geo_utilities.hxx 
     utilities/cmc_error_domain_functions.hxx 
-    utilities/cmc_iface_compression_adapt_data.hxx 
     utilities/cmc_endian.hxx 
     utilities/cmc_byte_iteration.hxx 
     utilities/cmc_byte_value.hxx 
@@ -76,14 +70,13 @@ install(FILES
     utilities/cmc_prefix_compression_entropy_alphabet.hxx 
     utilities/cmc_prefix_entropy_coder.hxx 
     utilities/cmc_iface_arithmetic_encoding_freq_model.hxx 
-    utilities/cmc_embedded_mesh_utilities.hxx 
-    utilities/cmc_embedded_variable_attributes.hxx 
     utilities/cmc_trimmed_multi_res_compression_entropy_alphabet.hxx 
     utilities/cmc_trimmed_multi_res_coder.hxx 
     utilities/cmc_residual_quantization_entropy_alphabet.hxx 
     utilities/cmc_residual_quantization_encoder.hxx 
     utilities/cmc_lossy_multi_res_extraction_residual_computation.hxx 
     utilities/cmc_lossless_multi_res_extraction_residual_computation.hxx 
+    utilities/cmc_morton.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 
@@ -112,12 +105,29 @@ install(FILES
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
 )
 
+if (CMC_WITH_T8CODE)
+# If configured wit t8code
+
+target_sources(cmc PRIVATE 
+    amr/lossy/cmc_adaptive_coarsening.cxx 
+    t8code/cmc_t8_mesh.cxx 
+    t8code/cmc_t8_interpolation.cxx 
+    t8code/cmc_t8_adapt_track_inaccuracy.cxx 
+    t8code/cmc_t8_mpi.cxx 
+)
+
+install(FILES 
+    utilities/cmc_iface_compression_adapt_data.hxx 
+    utilities/cmc_embedded_mesh_utilities.hxx 
+    utilities/cmc_embedded_variable_attributes.hxx 
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
+)
+
 install(FILES
     t8code/cmc_t8_mesh.hxx 
     t8code/cmc_t8_interpolation.hxx 
     t8code/cmc_t8_adapt_track_inaccuracy.hxx 
-    t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx 
-    t8code/cmc_t8_morton.hxx 
+    t8code/cmc_t8_adapt_track_inaccuracy_forward.hxx  
     t8code/cmc_t8_mpi.hxx 
     t8code/cmc_t8_adaptation_callbacks.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/t8code
@@ -168,16 +178,6 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/embedded/lossless
 )
 
 install(FILES
-    patch/lossless/cmc_patch_byte_compression_variable.hxx 
-    patch/lossless/cmc_patch_byte_decompression_variable.hxx 
-    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx 
-    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx 
-    patch/lossless/cmc_patch_multi_res_extraction_compression.hxx 
-    patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx 
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
-)
-
-install(FILES
     mesh_compression/cmc_iface_abstract_mesh_encoder.hxx 
     mesh_compression/cmc_iface_abstract_mesh_decoder.hxx 
     mesh_compression/cmc_iface_mesh_encoder.hxx 
@@ -189,6 +189,21 @@ install(FILES
     mesh_compression/cmc_embedded_mesh_encoder.hxx 
     mesh_compression/cmc_embedded_mesh_decoder.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mesh_compression
+)
+
+
+#End if not configured with t8code
+endif()
+
+
+install(FILES
+    patch/lossless/cmc_patch_byte_compression_variable.hxx 
+    patch/lossless/cmc_patch_byte_decompression_variable.hxx 
+    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx 
+    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx 
+    patch/lossless/cmc_patch_multi_res_extraction_compression.hxx 
+    patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx 
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
 install(FILES

@@ -1,6 +1,6 @@
 #include "t8code/cmc_t8_mesh.hxx"
 #include "utilities/cmc_log_functions.hxx"
-#include "t8code/cmc_t8_morton.hxx"
+#include "utilities/cmc_morton.hxx"
 
 #ifdef CMC_WITH_T8CODE
 #include <t8_schemes/t8_default/t8_default.hxx>

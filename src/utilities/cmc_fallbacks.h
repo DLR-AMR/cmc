@@ -41,22 +41,5 @@ typedef MPI_Offset cmc_err_t;
 
 #endif
 
-/* Definitions to ensure compilation without t8code */
-#if 0
-#ifndef CMC_WITH_T8CODE
-typedef cmc_err_ptr_t t8_forest_t;
-typedef cmc_err_ptr_t t8_cmesh_t;
-typedef cmc_err_ptr_t t8_element_t;
-typedef cmc_err_ptr_t const t8_scheme_c*;
-typedef cmc_err_func_ptr_t t8_forest_adapt_t;
-typedef cmc_err_func_ptr_t t8_forest_replace_t;
-typedef int t8_locidx_t;
-typedef long long t8_gloidx_t;
-#define t8_forest_unref(err) void(0);
-#define t8_forest_ref(err) void(0);
-#endif
-#endif
-
-
 #endif /* Check existence of CMC_CONFIG_H */
 #endif /* CMC_FALLBACKS_H */

@@ -110,8 +110,6 @@ void
 DecompressionVariable<T, Dim>::InitializeDecompressionIteration()
 {
     /* Check if the following decompression iteration is the leaf level decompression */
-    cmc_debug_msg("\n\nIs this iteration a leaf level decompression? ", IsNextIterationLeafLevelDecompression(), "\n\n");
-
     if (IsNextIterationLeafLevelDecompression())
     {
         InitializeLeafDecompressionIteration();
@@ -179,7 +177,6 @@ DecompressionVariable<T, Dim>::InitializeLeafDecompressionIteration()
     cmc_debug_msg("A prefix decompression iteration is initialized.");
     
     /* Check if the following decompression iteration is the leaf level decompression */
-    cmc_debug_msg("\n\nIs this iteration a leaf level decompression? ", IsNextIterationLeafLevelDecompression(), "\n\n");
     constexpr size_t offset = sizeof(uint64_t);
 
     size_t processed_bytes = level_byte_offset_;
