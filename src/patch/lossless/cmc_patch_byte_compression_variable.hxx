@@ -88,6 +88,7 @@ protected:
     virtual void PreCompressionProcessing([[maybe_unused]] std::vector<CompressionValue<T>>& initial_data){}
     virtual void InitializeExtractionIteration() {}
     virtual void FinalizeExtractionIteration() {}
+    virtual void CompleteExtraction([[maybe_unused]] const std::vector<size_t>& fine_dim_lengths, [[maybe_unused]] const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals) {}
     virtual ExtractionData<T> PerformExtraction(const std::vector<CompressionValue<T>>& patch) = 0;
     virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const = 0;
     virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
@@ -307,6 +308,9 @@ AbstractPatchByteCompressionVariable<T, Dim>::Compress(AbstractPatchByteCompress
                 }
             }
         }
+
+        /* Potentially, perform a step after the coarse extraction */
+        this->CompleteExtraction(dim_lengths, kDimReductionFactor, data_, data_new_);
 
         /* Encode the data from this compression step */
         auto [encoded_entropy_codes, encoded_data] = this->EncodeLevelData(data_);
