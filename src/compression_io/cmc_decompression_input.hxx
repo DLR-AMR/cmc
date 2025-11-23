@@ -21,6 +21,7 @@
 #include "utilities/cmc_embedded_variable_attributes.hxx"
 
 #include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx"
+#include "patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx"
 
 #include "embedded/lossy/cmc_embedded_prefix_quantization_decompression.hxx"
 
@@ -344,6 +345,17 @@ Reader::ReadPatchVariableForDecompression(const std::string& var_name)
                 default:
                     cmc_err_msg("The dimensionality of the compressed variable is not recognized for a patch variable.");
                     return std::make_unique<patch::decompression::prefix::plain_suffix::DecompressionVariable<T, 3>>(std::move(encoded_data), var_name, std::move(dim_lengths_pyramid), init_domain, initial_layout, pyra_dim_lenghts_lvls);
+            }
+        break;
+        case CompressionSchema::PatchMultiResExtraction:
+            switch (dimensionality)
+            {
+                case 3:
+                    return std::make_unique<patch::decompression::multi_res::DecompressionVariable<T, 3>>(std::move(encoded_data), var_name, std::move(dim_lengths_pyramid), init_domain, initial_layout, pyra_dim_lenghts_lvls);
+                    break;
+                default:
+                    cmc_err_msg("The dimensionality of the compressed variable is not recognized for a patch variable.");
+                    return std::make_unique<patch::decompression::multi_res::DecompressionVariable<T, 3>>(std::move(encoded_data), var_name, std::move(dim_lengths_pyramid), init_domain, initial_layout, pyra_dim_lenghts_lvls);
             }
         break;
         default:

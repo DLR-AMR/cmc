@@ -172,7 +172,9 @@ install(FILES
     patch/lossless/cmc_patch_byte_decompression_variable.hxx 
     patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx 
     patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx 
-DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
+    patch/lossless/cmc_patch_multi_res_extraction_compression.hxx 
+    patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx 
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
 install(FILES
