@@ -320,14 +320,14 @@ main(void)
     var.Compress();
 
     /* Write out the compressed data to disk */
-    cmc::compression_io::Writer writer("example_lossless_compression_output.cmc", MPI_COMM_SELF);
+    cmc::compression_io::nc::Writer writer("example_lossless_compression_output.cmc", MPI_COMM_SELF);
     writer.SetVariable(&var);
     writer.Write();
 
     }
 
     /* Create a reader for the compressed output that has been stored */
-    cmc::compression_io::Reader reader("example_lossless_compression_output.cmc", MPI_COMM_SELF);
+    cmc::compression_io::nc::Reader reader("example_lossless_compression_output.cmc", MPI_COMM_SELF);
 
     /* Create an embedded decompressor from the compressed data */
     std::unique_ptr<cmc::decompression::AbstractByteDecompressionVariable<double>> decompression_var = reader.ReadVariableForDecompression<double>("test_var");

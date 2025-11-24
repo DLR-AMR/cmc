@@ -1,7 +1,7 @@
 #ifndef CMC_BYTE_COMPRESSION_OUTPUT_TXX
 #define CMC_BYTE_COMPRESSION_OUTPUT_TXX
 
-namespace cmc::compression_io
+namespace cmc::compression_io::nc
 {
 
 template<typename T>
@@ -115,7 +115,7 @@ Writer::SetDataVariable(cmc::IAMRCompressionVariable<T>* variable, const std::ve
     }
 
     /* Define a new variable for the mesh  */
-    nc::SpecificVariable<uint8_t> spec_variable(variable->GetName(), var_id);
+    cmc::nc::SpecificVariable<uint8_t> spec_variable(variable->GetName(), var_id);
 
     /* Set the global diemnsion length */
     spec_variable.SetGlobalDimensionLength(global_byte_count);
@@ -160,7 +160,7 @@ Writer::SetDataVariable(cmc::IAMRCompressionVariable<T>* variable, const std::ve
     }
 
     /* Add the variable for output */
-    nc_writer_.AddVariable(nc::Variable(std::move(spec_variable), std::move(attributes)));
+    nc_writer_.AddVariable(cmc::nc::Variable(std::move(spec_variable), std::move(attributes)));
 }
 
 template<typename T>
@@ -187,7 +187,7 @@ Writer::SetMeshVariable(cmc::IAMRCompressionVariable<T>* variable, const std::ve
     }
 
     /* Define a new variable for the mesh  */
-    nc::SpecificVariable<uint8_t> spec_variable(mesh_var_name, mesh_id);
+    cmc::nc::SpecificVariable<uint8_t> spec_variable(mesh_var_name, mesh_id);
 
     /* Set the global diemnsion length */
     spec_variable.SetGlobalDimensionLength(global_byte_count);
@@ -223,7 +223,7 @@ Writer::SetMeshVariable(cmc::IAMRCompressionVariable<T>* variable, const std::ve
     }
 
     /* Add the variable for output */
-    nc_writer_.AddVariable(nc::Variable(std::move(spec_variable), std::move(attributes)));
+    nc_writer_.AddVariable(cmc::nc::Variable(std::move(spec_variable), std::move(attributes)));
 }
 
 template<typename T>

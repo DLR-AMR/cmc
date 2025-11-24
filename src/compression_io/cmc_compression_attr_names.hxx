@@ -5,7 +5,7 @@
 
 #include <string>
 
-namespace cmc::compression_io
+namespace cmc::compression_io::nc
 {
     const std::string id_attr("id");
     const std::string data_type_attr("data_type");

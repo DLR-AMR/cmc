@@ -132,7 +132,7 @@ main(void)
 
     {
         /* Write out the compressed data to disk */
-        cmc::compression_io::Writer writer("trimmed_multi_res_example_lossy_compression_output.cmc", MPI_COMM_SELF);
+        cmc::compression_io::nc::Writer writer("trimmed_multi_res_example_lossy_compression_output.cmc", MPI_COMM_SELF);
         writer.SetVariable(&var);
         writer.Write();
     }
@@ -142,7 +142,7 @@ main(void)
 
     #if 1
     /* Create a reader for the compressed output that has been stored */
-    cmc::compression_io::Reader reader("trimmed_multi_res_example_lossy_compression_output.cmc", MPI_COMM_SELF);
+    cmc::compression_io::nc::Reader reader("trimmed_multi_res_example_lossy_compression_output.cmc", MPI_COMM_SELF);
 
     /* Create an embedded decompressor from the compressed data */
     std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<float>> decompression_var = reader.ReadEmbeddedVariableForDecompression<float>("tco3");

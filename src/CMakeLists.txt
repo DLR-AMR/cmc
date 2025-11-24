@@ -12,11 +12,6 @@ target_sources(cmc PRIVATE
     mpi/cmc_mpi.cxx 
     mpi/cmc_mpi_io.cxx 
     mpi/cmc_mpi_data.cxx 
-    netcdf/cmc_netcdf.cxx 
-    netcdf/cmc_nc_writer.cxx 
-    netcdf/cmc_nc_io.cxx 
-    netcdf/cmc_nc_reader.cxx 
-    input/cmc_netcdf.cxx 
     input/cmc_input_variable.cxx 
     utilities/cmc_morton.cxx 
 )
@@ -88,6 +83,22 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpi
 )
 
 install(FILES
+    input/cmc_input_variable.hxx 
+    input/cmc_forward_decl_input_variable.hxx 
+    input/cmc_binary_reader.hxx 
+    input/cmc_binary_reader_forward.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
+)
+
+if (CMC_WITH_NETCDF)
+# If configured with netCDF
+
+install(FILES
+    input/cmc_netcdf.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
+)
+
+install(FILES
     netcdf/cmc_netcdf.hxx 
     netcdf/cmc_nc_io.hxx 
     netcdf/cmc_nc_io_conventions.hxx 
@@ -96,14 +107,26 @@ install(FILES
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/netcdf
 )
 
-install(FILES
-    input/cmc_netcdf.hxx 
-    input/cmc_input_variable.hxx 
-    input/cmc_forward_decl_input_variable.hxx 
-    input/cmc_binary_reader.hxx 
-    input/cmc_binary_reader_forward.hxx 
-DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
+target_sources(cmc PRIVATE 
+    netcdf/cmc_netcdf.cxx 
+    netcdf/cmc_nc_writer.cxx 
+    netcdf/cmc_nc_io.cxx 
+    netcdf/cmc_nc_reader.cxx 
+    input/cmc_netcdf.cxx 
 )
+
+install(FILES
+    compression_io/cmc_compression_output.hxx 
+    compression_io/cmc_compression_attr_names.hxx 
+    compression_io/cmc_decompression_input.hxx 
+    compression_io/cmc_byte_compression_output.txx 
+    compression_io/cmc_embedded_byte_compression_output.txx 
+    compression_io/cmc_patch_byte_compression_output.txx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
+)
+
+# End if configured with netCDF
+endif()
 
 if (CMC_WITH_T8CODE)
 # If configured wit t8code
@@ -191,8 +214,7 @@ install(FILES
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mesh_compression
 )
 
-
-#End if not configured with t8code
+#End if configured with t8code
 endif()
 
 
@@ -204,16 +226,6 @@ install(FILES
     patch/lossless/cmc_patch_multi_res_extraction_compression.hxx 
     patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
-)
-
-install(FILES
-    compression_io/cmc_compression_output.hxx 
-    compression_io/cmc_compression_attr_names.hxx 
-    compression_io/cmc_decompression_input.hxx 
-    compression_io/cmc_byte_compression_output.txx 
-    compression_io/cmc_embedded_byte_compression_output.txx 
-    compression_io/cmc_patch_byte_compression_output.txx 
-DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
 )
 
 install(TARGETS cmc DESTINATION ${CMAKE_INSTALL_LIBDIR})

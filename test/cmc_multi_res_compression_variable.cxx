@@ -63,13 +63,13 @@ main(void)
 
     var.Compress();
 
-    cmc::compression_io::Writer writer("multi_res_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+    cmc::compression_io::nc::Writer writer("multi_res_example_lossless_compression_output.cmc", MPI_COMM_SELF);
     
     writer.SetVariable(&var);
 
     writer.Write();
 
-    cmc::compression_io::Reader reader("multi_res_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+    cmc::compression_io::nc::Reader reader("multi_res_example_lossless_compression_output.cmc", MPI_COMM_SELF);
 
     std::unique_ptr<cmc::decompression::AbstractByteDecompressionVariable<float>> decompression_var = reader.ReadVariableForDecompression<float>("test_var");
 

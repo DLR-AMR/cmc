@@ -26,7 +26,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace cmc::compression_io
+namespace cmc::compression_io::nc
 {
 
 struct VariableLevelOffset;
@@ -44,8 +44,8 @@ public:
 #endif
     template<typename T> void SetVariable(cmc::IPatchCompressionVariable<T>* variable);
 
-    void AddGlobalAttribute(const nc::Attribute& attribute);
-    void AddGlobalAttribute(nc::Attribute&& attribute);
+    void AddGlobalAttribute(const cmc::nc::Attribute& attribute);
+    void AddGlobalAttribute(cmc::nc::Attribute&& attribute);
 
     void Write();
 
@@ -158,13 +158,13 @@ MpiIntraLevelOffsetSum(void* input_buffer, void* output_buffer, int* count, [[ma
 }
 
 inline void
-Writer::AddGlobalAttribute(const nc::Attribute& attribute)
+Writer::AddGlobalAttribute(const cmc::nc::Attribute& attribute)
 {
     nc_writer_.AddGlobalAttribute(attribute);
 }
 
 inline void
-Writer::AddGlobalAttribute(nc::Attribute&& attribute)
+Writer::AddGlobalAttribute(cmc::nc::Attribute&& attribute)
 {
     nc_writer_.AddGlobalAttribute(std::move(attribute));
 }

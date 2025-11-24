@@ -1,7 +1,9 @@
 #include "netcdf/cmc_netcdf.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_log_functions.hxx"
+#ifdef CMC_WITH_NETCDF_PAR
 #include "mpi/cmc_mpi_io.hxx"
+#endif
 
 #include <utility>
 
@@ -33,6 +35,7 @@ OpenSerial(const char* path_to_file)
     #endif
 }
 
+#ifdef CMC_WITH_NETCDF_PAR
 int
 OpenParallel(const char* path_to_file, MPI_Comm comm)
 {
@@ -55,5 +58,6 @@ OpenParallel(const char* path_to_file, MPI_Comm comm)
     return CMC_ERR;
     #endif
 }
+#endif
 
 }

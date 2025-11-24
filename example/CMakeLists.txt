@@ -2,6 +2,9 @@ set(EXAMPLE_CMC_LOSSLESS_DIR ${CMAKE_INSTALL_BINDIR}/lossless)
 set(EXAMPLE_CMC_LOSSY_DIR ${CMAKE_INSTALL_BINDIR}/lossy)
 set(EXAMPLE_CMC_NETCDF_BIN_DIR ${CMAKE_INSTALL_BINDIR}/netcdf)
 
+if (CMC_WITH_NETCDF)
+# If configured with netCDF
+
 # Gather nc data example
 set(EXAMPLE_NETCDF_CMC_GATHER_NC_DATA cmc_gather_nc_data)
 add_executable(${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} ${CMAKE_CURRENT_LIST_DIR}/netcdf/cmc_gather_nc_data.cxx)
@@ -10,9 +13,13 @@ target_include_directories(${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} PRIVATE ${CMAKE_
 set_target_properties(${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_CMC_NETCDF_BIN_DIR}")
 install(TARGETS ${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} DESTINATION ${EXAMPLE_CMC_NETCDF_BIN_DIR})
 
-if (CMC_WITH_T8CODE)
-# If configured wit t8code
+# End If configured with netCDF
+endif()
 
+if (CMC_WITH_T8CODE)
+# If configured with t8code
+
+if (CMC_WITH_NETCDF)
 # Example for construction of a mesh and artifical data to compress
 set(EXAMPLE_CONSTRUCT_MESH_AND_DATA_FOR_COMPRESSION cmc_t8_construct_mesh_and_data_for_compression)
 add_executable(${EXAMPLE_CONSTRUCT_MESH_AND_DATA_FOR_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_t8_construct_mesh_and_data_for_compression.cxx)
@@ -81,6 +88,7 @@ target_include_directories(${EXAMPLE_LOSSY_CMC_EMBEDDED_MULTI_TEST_VARIATIONS_CO
 set_target_properties(${EXAMPLE_LOSSY_CMC_EMBEDDED_MULTI_TEST_VARIATIONS_COMPRESSION} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXAMPLE_CMC_LOSSY_DIR}")
 install(TARGETS ${EXAMPLE_LOSSY_CMC_EMBEDDED_MULTI_TEST_VARIATIONS_COMPRESSION} DESTINATION ${EXAMPLE_CMC_LOSSY_DIR})
 
+endif()
 
 #End if not configured with t8code
 endif()

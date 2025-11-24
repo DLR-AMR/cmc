@@ -7,6 +7,7 @@
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_geo_domain.hxx"
 #include "utilities/cmc_iface_patch_compression_variable.hxx"
+#include "input/cmc_input_variable.hxx"
 
 #include <vector>
 #include <cmath>

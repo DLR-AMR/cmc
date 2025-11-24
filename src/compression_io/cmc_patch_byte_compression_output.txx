@@ -1,7 +1,7 @@
 #ifndef CMC_PATCH_BYTE_COMPRESSION_OUTPUT_TXX
 #define CMC_PATCH_BYTE_COMPRESSION_OUTPUT_TXX
 
-namespace cmc::compression_io
+namespace cmc::compression_io::nc
 {
 
 
@@ -65,7 +65,7 @@ Writer::SetDataVariable(cmc::IPatchCompressionVariable<T>* variable, const int v
     }
 
     /* Define a new variable */
-    nc::SpecificVariable<uint8_t> spec_variable(variable->GetName(), var_id);
+    cmc::nc::SpecificVariable<uint8_t> spec_variable(variable->GetName(), var_id);
 
     /* Set the global diemnsion length */
     spec_variable.SetGlobalDimensionLength(global_byte_count);
@@ -92,7 +92,7 @@ Writer::SetDataVariable(cmc::IPatchCompressionVariable<T>* variable, const int v
     }
 
     /* Add the variable for output */
-    nc_writer_.AddVariable(nc::Variable(std::move(spec_variable), std::move(attributes)));
+    nc_writer_.AddVariable(cmc::nc::Variable(std::move(spec_variable), std::move(attributes)));
 }
 
 template<typename T>

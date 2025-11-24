@@ -95,7 +95,7 @@ main(void)
 
     {
         /* Write out the compressed data to disk */
-        cmc::compression_io::Writer writer("multi_res_pcp4_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+        cmc::compression_io::nc::Writer writer("multi_res_pcp4_example_lossless_compression_output.cmc", MPI_COMM_SELF);
         writer.SetVariable(&var);
         writer.Write();
     }
@@ -103,7 +103,7 @@ main(void)
     }
 
     /* Create a reader for the compressed output that has been stored */
-    cmc::compression_io::Reader reader("multi_res_pcp4_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+    cmc::compression_io::nc::Reader reader("multi_res_pcp4_example_lossless_compression_output.cmc", MPI_COMM_SELF);
     
     /* Create an embedded decompressor from the compressed data */
     std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<float>> decompression_var = reader.ReadEmbeddedVariableForDecompression<float>("compr_test_var");

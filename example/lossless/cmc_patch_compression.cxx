@@ -1,5 +1,4 @@
 #include "cmc.hxx"
-#include "input/cmc_netcdf.hxx"
 #include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx"
 #include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx"
 #include "patch/lossless/cmc_patch_multi_res_extraction_compression.hxx"
@@ -8,10 +7,11 @@
 #include "input/cmc_binary_reader.hxx"
 
 #include "utilities/cmc_hyperslab.hxx"
-#include "input/cmc_netcdf.hxx"
 
+#if 0
 #include "compression_io/cmc_compression_output.hxx"
 #include "compression_io/cmc_decompression_input.hxx"
+#endif
 
 #include <numeric>
 #include <algorithm>
@@ -84,13 +84,15 @@ main(void)
     std::vector<cmc::input::Var> input_variables{std::move(variable)};
 
 
-    {
+    //{
     /* Setup an embedded PrefixAMR (with plain suffix encoding) compression variable from the input variables */           
     cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<float, 3> var(input_variables.front());
     //cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 3> var(input_variables.front());
 
     /* Perform the compression */
     var.Compress();
+
+#if 0
 
     #if 1
     {
@@ -100,7 +102,7 @@ main(void)
         writer.Write();
     }
     #endif
-    }
+    //}
 
     #if 1
 
@@ -126,6 +128,8 @@ main(void)
     #endif
 
     #endif
+
+#endif
 
     }
     /* Finalize cmc */

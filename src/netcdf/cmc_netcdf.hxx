@@ -43,8 +43,10 @@ inline void CheckError_ (int err, const std::string file, const int line)
 int
 OpenSerial(const char* path_to_file);
 
+#ifdef CMC_WITH_NETCDF_PAR
 int
 OpenParallel(const char* path_to_file, MPI_Comm comm);
+#endif
 
 }
 
