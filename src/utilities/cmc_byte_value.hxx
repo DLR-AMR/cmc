@@ -223,17 +223,19 @@ DeserializeValue(Iter pos, const Endian endianness_of_bytes)
 {
     std::array<uint8_t, sizeof(T)> serialized_value;
 
+    const uint8_t* pos_ = reinterpret_cast<const uint8_t*>(&(*pos));
+
     /* Assign the bytes compliant to the native order */
     if (Endian::Native == endianness_of_bytes)
     {
         /* If the endianness_of_bytes of the serialized value equals the native format, we can just copy the values over */
-        std::copy_n(pos, sizeof(T), serialized_value.begin());
+        std::copy_n(pos_, sizeof(T), serialized_value.begin());
     } else
     {
         /* If the endianness_of_bytes does not equal the native endianness, the byte sequence needs to be reversed */
-        const auto end_iter = pos + sizeof(T);
+        const auto end_iter = pos_ + sizeof(T);
         int index = sizeof(T) - 1;
-        for (auto iter = pos; iter != end_iter; ++iter, --index)
+        for (auto iter = pos_; iter != end_iter; ++iter, --index)
         {
             serialized_value[index] = *iter;
         }
@@ -243,7 +245,7 @@ DeserializeValue(Iter pos, const Endian endianness_of_bytes)
 
 template <typename T, typename Iter>
 constexpr T
-ReconstructSerializedValue(Iter pos, const Endian endianness_of_bytes)
+ReconstructSerializedValue(Iter pos, const Endian endianness_of_bytes = Endian::Big)
 {
     /* Deserialize the bytes in the native order */
     const std::array<uint8_t, sizeof(T)> deserialized_memory = DeserializeValue<T>(pos, endianness_of_bytes);
