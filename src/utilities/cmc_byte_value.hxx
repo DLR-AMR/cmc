@@ -88,7 +88,6 @@ public:
         return bytes_;
     }
 
-
 private:
     std::array<uint8_t, N> bytes_;
 };
@@ -177,25 +176,38 @@ CheckIfBitIsSet(const uint8_t byte, const int bit_index)
 }
 
 template <typename T>
-std::array<uint8_t, sizeof(T)>
+constexpr std::array<uint8_t, sizeof(T)>
 SerializeValue(const T& value, const Endian desired_endianness = Endian::Big)
 {
     std::array<uint8_t, sizeof(T)> serialized_value;
-    Serialized<sizeof(T)> value_(value);
 
     /* Assign the bytes in the desired order */
     switch (desired_endianness)
     {
         case Endian::Big:
-            for (int byte_id = GetMSBByteStart<sizeof(T)>(), index = 0; MSBContinueIteration<sizeof(T)>(byte_id); MSBByteIncrement(byte_id), ++index)
+            if constexpr (IsBigEndian)
             {
-                serialized_value[index] = value_[byte_id];
+                std::memcpy(serialized_value.data(), &value, sizeof(T));
+            } else
+            {
+                Serialized<sizeof(T)> value_(value);
+                for (int byte_id = GetMSBByteStart<sizeof(T)>(), index = 0; MSBContinueIteration<sizeof(T)>(byte_id); MSBByteIncrement(byte_id), ++index)
+                {
+                    serialized_value[index] = value_[byte_id];
+                }
             }
         break;
         case Endian::Little:
-            for (int byte_id = GetLSBByteStart<sizeof(T)>(), index = 0; LSBContinueIteration<sizeof(T)>(byte_id); LSBByteIncrement(byte_id), ++index)
+            if constexpr (IsLittleEndian)
             {
-                serialized_value[index] = value_[byte_id];
+                std::memcpy(serialized_value.data(), &value, sizeof(T));
+            } else
+            {
+                Serialized<sizeof(T)> value_(value);
+                for (int byte_id = GetLSBByteStart<sizeof(T)>(), index = 0; LSBContinueIteration<sizeof(T)>(byte_id); LSBByteIncrement(byte_id), ++index)
+                {
+                    serialized_value[index] = value_[byte_id];
+                }
             }
         break;
         default:
@@ -206,7 +218,7 @@ SerializeValue(const T& value, const Endian desired_endianness = Endian::Big)
 }
 
 template <typename T, typename Iter>
-std::array<uint8_t, sizeof(T)>
+constexpr std::array<uint8_t, sizeof(T)>
 DeserializeValue(Iter pos, const Endian endianness_of_bytes)
 {
     std::array<uint8_t, sizeof(T)> serialized_value;
@@ -230,7 +242,7 @@ DeserializeValue(Iter pos, const Endian endianness_of_bytes)
 }
 
 template <typename T, typename Iter>
-T
+constexpr T
 ReconstructSerializedValue(Iter pos, const Endian endianness_of_bytes)
 {
     /* Deserialize the bytes in the native order */
