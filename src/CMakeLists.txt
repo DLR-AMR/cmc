@@ -76,6 +76,14 @@ install(FILES
 )
 
 install(FILES
+    compression_io/cmc_compression_serial_output.hxx 
+    compression_io/cmc_decompression_serial_input.hxx 
+    compression_io/cmc_patch_byte_compression_serial_output.txx 
+    compression_io/cmc_serial_io_util.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
+)
+
+install(FILES
     mpi/cmc_mpi_io.hxx 
     mpi/cmc_mpi.hxx 
     mpi/cmc_mpi_data.hxx 
