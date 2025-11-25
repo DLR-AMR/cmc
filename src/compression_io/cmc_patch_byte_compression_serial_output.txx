@@ -87,12 +87,6 @@ Writer::SetDataVariable(cmc::IPatchCompressionVariable<T>* variable)
         }
     }
 
-    cmc_debug_msg("File header bytes:");
-    for (auto iter = byte_stream.begin(); iter != byte_stream.end(); ++iter)
-    {
-        cmc_debug_msg("Byte_Stream: ", static_cast<int>(*iter));
-    }
-
     /* Copy the encoded data to the stream */
     for (int idx = num_compression_iterations - 1; idx >= 0; --idx)
     {

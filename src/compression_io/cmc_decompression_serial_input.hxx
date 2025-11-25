@@ -61,28 +61,15 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
         cmc_err_msg("The number of inquired information from the compressed file is not as expecetd.");
     }
 
-    cmc_debug_msg("Retrieved File header bytes:");
-    for (auto iter = info.begin(); iter != info.end(); ++iter)
-    {
-        cmc_debug_msg("Byte_Stream: ", static_cast<int>(*iter));
-    }
-
-
     /* Get the information from the header */
     const CmcType data_type = static_cast<CmcType>(GetValueFromByteStream<attr_type_t>(info.data()));
-    cmc_debug_msg("Convert: ", ConvertToCmcType<T>(), ", from file: ", data_type);
     if (ConvertToCmcType<T>() != data_type) {cmc_err_msg("The template parameter of the Reader functionality does not match the data_type of the compressed variable.");}
 
     const CompressionSchema compression_scheme = static_cast<cmc::CompressionSchema>(GetValueFromByteStream<attr_type_t>(info.data() + 1));
-    cmc_debug_msg("Compression scheme: ", compression_scheme);
     const DataLayout initial_data_layout = static_cast<DataLayout>(GetValueFromByteStream<attr_type_t>(info.data() + 2));
-    cmc_debug_msg("Data_Layout: ", initial_data_layout);
     const attr_type_t dimensionality = GetValueFromByteStream<attr_type_t>(info.data() + 3);
-    cmc_debug_msg("dimensionality: ", dimensionality);
     const attr_type_t num_compression_iterations = GetValueFromByteStream<attr_type_t>(info.data() + 4);
-    cmc_debug_msg("num_compression_iterations: ", num_compression_iterations);
     const attr_type_t num_pyramidal_dim_length_lvls = GetValueFromByteStream<attr_type_t>(info.data() + 5);
-    cmc_debug_msg("num_pyramidal_dim_length_lvls: ", num_pyramidal_dim_length_lvls);
 
     /* Allocat data for the pyramidal dimension lengths */
     std::vector<std::vector<size_t>> pyramidal_dim_lengths;
@@ -105,7 +92,6 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
         {
             const attr_type_t dim_length = GetValueFromByteStream<attr_type_t>(dim_lengths.data() + dim_iter);
             pyramidal_dim_lengths.back()[dim_iter] = static_cast<size_t>(dim_length);
-            cmc_debug_msg("Lvl: ", lvl_iter, ", dim: ", dim_iter, ", length: ", dim_length);
         }
     }
 
