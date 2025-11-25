@@ -5,7 +5,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_arithmetic_encoder.hxx"
-#include "utilities/cmc_bytes.hxx"
+#include "utilities/cmc_byte_value.hxx"
 
 #include <array>
 #include <vector>

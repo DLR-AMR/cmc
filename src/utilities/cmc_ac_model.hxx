@@ -4,7 +4,7 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_bit_vector.hxx"
-#include "utilities/cmc_bytes.hxx"
+#include "utilities/cmc_byte_value.hxx"
 #include "utilities/cmc_iface_entropy_alphabet.hxx"
 
 #include <vector>

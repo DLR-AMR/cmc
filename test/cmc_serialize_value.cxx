@@ -1,6 +1,6 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
-#include "utilities/cmc_bytes.hxx"
+#include "utilities/cmc_byte_value.hxx"
 
 #include <cstddef>
 #include <cstring>
