@@ -9,8 +9,8 @@
 #include "utilities/cmc_hyperslab.hxx"
 
 #if 0
-#include "compression_io/cmc_compression_output.hxx"
-#include "compression_io/cmc_decompression_input.hxx"
+#include "compression_io/cmc_compression_nc_output.hxx"
+#include "compression_io/cmc_decompression_nc_input.hxx"
 #endif
 
 #include <numeric>

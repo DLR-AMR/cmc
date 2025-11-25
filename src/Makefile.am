@@ -124,9 +124,9 @@ src/mesh_compression/cmc_iface_embedded_mesh_encoder.hxx \
 src/mesh_compression/cmc_iface_embedded_mesh_decoder.hxx \
 src/mesh_compression/cmc_embedded_mesh_encoder.hxx \
 src/mesh_compression/cmc_embedded_mesh_decoder.hxx \
-src/compression_io/cmc_compression_output.hxx \
+src/compression_io/cmc_compression_nc_output.hxx \
 src/compression_io/cmc_compression_attr_names.hxx \
-src/compression_io/cmc_decompression_input.hxx \
+src/compression_io/cmc_decompression_nc_input.hxx \
 src/compression_io/cmc_byte_compression_output.txx \
 src/compression_io/cmc_embedded_byte_compression_output.txx
 

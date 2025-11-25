@@ -16,8 +16,8 @@
 #include "lossless/cmc_multi_res_extraction_compression.hxx"
 #include "lossless/cmc_multi_res_extraction_decompression.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
-#include "compression_io/cmc_compression_output.hxx"
-#include "compression_io/cmc_decompression_input.hxx"
+#include "compression_io/cmc_compression_nc_output.hxx"
+#include "compression_io/cmc_decompression_nc_input.hxx"
 #else
 
 #include "amr/lossless/cmc_multi_res_extraction_compression.hxx"
@@ -31,8 +31,8 @@
 
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_utilities.hxx"
-#include "compression_io/cmc_compression_output.hxx"
-#include "compression_io/cmc_decompression_input.hxx"
+#include "compression_io/cmc_compression_nc_output.hxx"
+#include "compression_io/cmc_decompression_nc_input.hxx"
 #endif
 
 #include <vector>

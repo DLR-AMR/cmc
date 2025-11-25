@@ -5,8 +5,8 @@
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "input/cmc_binary_reader.hxx"
 
-#include "compression_io/cmc_compression_output.hxx"
-#include "compression_io/cmc_decompression_input.hxx"
+#include "compression_io/cmc_compression_nc_output.hxx"
+#include "compression_io/cmc_decompression_nc_input.hxx"
 
 #include <numeric>
 #include <algorithm>

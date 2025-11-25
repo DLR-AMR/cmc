@@ -116,9 +116,9 @@ target_sources(cmc PRIVATE
 )
 
 install(FILES
-    compression_io/cmc_compression_output.hxx 
+    compression_io/cmc_compression_nc_output.hxx 
     compression_io/cmc_compression_attr_names.hxx 
-    compression_io/cmc_decompression_input.hxx 
+    compression_io/cmc_decompression_nc_input.hxx 
     compression_io/cmc_byte_compression_output.txx 
     compression_io/cmc_embedded_byte_compression_output.txx 
     compression_io/cmc_patch_byte_compression_output.txx 

@@ -8,8 +8,8 @@
 #include "input/cmc_binary_reader.hxx"
 //#include "lossless/cmc_embedded_byte_decompression_variable.hxx"
 
-#include "compression_io/cmc_compression_output.hxx"
-#include "compression_io/cmc_decompression_input.hxx"
+#include "compression_io/cmc_compression_nc_output.hxx"
+#include "compression_io/cmc_decompression_nc_input.hxx"
 
 #include <numeric>
 #include <algorithm>

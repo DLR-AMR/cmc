@@ -5,8 +5,8 @@
 #include "amr/lossless/cmc_prefix_extraction_decompression.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_utilities.hxx"
-#include "compression_io/cmc_compression_output.hxx"
-#include "compression_io/cmc_decompression_input.hxx"
+#include "compression_io/cmc_compression_nc_output.hxx"
+#include "compression_io/cmc_decompression_nc_input.hxx"
 
 #ifdef CMC_WITH_T8CODE
 #include <t8_cmesh/t8_cmesh_examples.h>

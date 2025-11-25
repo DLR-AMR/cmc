@@ -1,5 +1,5 @@
-#ifndef CMC_COMPRESSION_OUTPUT_HXX
-#define CMC_COMPRESSION_OUTPUT_HXX
+#ifndef CMC_COMPRESSION_NC_OUTPUT_HXX
+#define CMC_COMPRESSION_NC_OUTPUT_HXX
 
 #include "cmc.hxx"
 
@@ -190,4 +190,4 @@ Writer::Write()
 /* The implementation specific fuctionalities for the AbstractPatchByteCompressionVariables are included */
 #include "compression_io/cmc_patch_byte_compression_output.txx"
 
-#endif /* !CMC_COMPRESSION_OUTPUT_HXX */
+#endif /* !CMC_COMPRESSION_NC_OUTPUT_HXX */

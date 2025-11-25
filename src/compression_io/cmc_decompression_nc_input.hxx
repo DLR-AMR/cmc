@@ -1,5 +1,5 @@
-#ifndef CMC_DECOMPRESSION_INPUT_HXX
-#define CMC_DECOMPRESSION_INPUT_HXX
+#ifndef CMC_DECOMPRESSION_NC_INPUT_HXX
+#define CMC_DECOMPRESSION_NC_INPUT_HXX
 
 #include "cmc.hxx"
 #include "utilities/cmc_log_functions.hxx"
@@ -376,4 +376,4 @@ Reader::ReadPatchVariableForDecompression(const std::string& var_name)
 }
 
 
-#endif /* !CMC_DECOMPRESSION_INPUT_HXX */
+#endif /* !CMC_DECOMPRESSION_NC_INPUT_HXX */
