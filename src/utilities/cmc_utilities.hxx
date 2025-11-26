@@ -181,6 +181,9 @@ ReinterpretValuesAs(const std::vector<T>& values)
     return reinterpreted_values;
 }
 
+DataLayout
+GetDefaultDataLayout(const int dimensionality);
+
 }
 
 #endif /* !CMC_UTILITIES_HXX */

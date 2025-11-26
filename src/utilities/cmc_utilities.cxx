@@ -225,4 +225,23 @@ GetDimensionName(const Dimension dimension)
     }
 }
 
+DataLayout
+GetDefaultDataLayout(const int dimensionality)
+{
+    switch (dimensionality)
+    {
+        case 2:
+            return DataLayout::Lat_Lon;
+        break;
+        case 3:
+            return DataLayout::Lev_Lat_Lon;
+        break;
+        default:
+            std::cout << "[cmc] ERROR: The specified dimensionality is not supported (only 2D and 3D)." << std::endl;
+            std::exit(EXIT_FAILURE);
+            return DataLayout::LayoutUndefined;
+        break;
+    }
+}
+
 }
