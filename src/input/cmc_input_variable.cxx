@@ -114,9 +114,106 @@ SetupVar(const CmcType type, const std::string& name, const int id, const size_t
     }
 }
 
+
+static GeneralVariable
+SetupVar(const CmcType type, const std::string& name, const int id, const size_t num_elements, const DataLayout layout, const GeoDomain& domain)
+{
+    switch(type)
+    {
+        case CmcType::Double:
+        {
+            Variable<double> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, double{0.0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Float:
+        {
+            Variable<float> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, float{0.0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Int32_t:
+        {
+            Variable<int32_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, int32_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Uint32_t:
+        {
+            Variable<uint32_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, uint32_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Int64_t:
+        {
+            Variable<int64_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, int64_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Uint64_t:
+        {
+            Variable<uint64_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, uint64_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Int16_t:
+        {
+            Variable<int16_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, int16_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Uint16_t:
+        {
+            Variable<uint16_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, uint16_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Int8_t:
+        {
+            Variable<int8_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, int8_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        case CmcType::Uint8_t:
+        {
+            Variable<uint8_t> var(name, id, layout);
+            var.SetUpFilledVariable(num_elements, uint8_t{0});
+            var.SetGlobalDomain(domain);
+            return GeneralVariable(std::move(var));
+        }
+        break;
+        default:
+            cmc_err_msg("The supplied data type (", type, ") is not supported");
+            return GeneralVariable(std::in_place_index<0>, "ErrorVariable", CMC_ERR, DataLayout::LayoutUndefined);
+    }
+}
+
 Var::Var(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value, const DataLayout layout, const GeoDomain& domain)
 {
     var_ = SetupVar(type, name, id, num_elements, missing_value, layout, domain);
+}
+
+Var::Var(const CmcType type, const std::string& name, const int id, const size_t num_elements, const DataLayout layout, const GeoDomain& domain)
+{
+    var_ = SetupVar(type, name, id, num_elements, layout, domain);
 }
 
 struct ObtainCmcType

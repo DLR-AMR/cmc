@@ -177,6 +177,7 @@ class Var
 {
 public:
     Var() = default;
+    Var(const CmcType type, const std::string& name, const int id, const size_t num_elements, const DataLayout layout, const GeoDomain& domain);
     Var(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value, const DataLayout layout, const GeoDomain& domain);
 
     template<typename T> Var(const Variable<T>& var);

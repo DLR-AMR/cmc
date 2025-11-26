@@ -29,6 +29,8 @@ public:
 
     input::Var CreateVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const size_t num_elements, const CmcUniversalType missing_value,
                                           const DataLayout layout, const GeoDomain& domain) const;
+    input::Var CreateVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const size_t num_elements,
+                                            const DataLayout layout, const GeoDomain& domain) const;
 
     input::Var CreateSubDomainVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const CmcUniversalType missing_value,
                                                    const DataLayout layout, const GeoDomain& global_domain, const GeoDomain& sub_domain) const;
@@ -306,6 +308,27 @@ Reader::CreateVariableFromBinaryData(const CmcType type, const std::string& name
 
     /* Create a variable with the given specifications */
     input::Var variable(type, name, id, num_elements, missing_value, layout, domain);
+
+    /* Read the data into the variable */
+    std::visit(ReadData(num_elements, this->file_name_), variable.GetInternalVariant(AccessKey()));
+
+    cmc_debug_msg("The binary reader created the input::Variable ", name, ".");
+
+    return variable;
+}
+
+
+inline input::Var
+Reader::CreateVariableFromBinaryData(const CmcType type, const std::string& name, const int id, const size_t num_elements,
+                                     const DataLayout layout, const GeoDomain& domain) const
+{
+    if (static_cast<size_t>(domain.GetNumberReferenceCoordsCovered()) != num_elements)
+    {
+        cmc_err_msg("The amount of elements to be read does not match the number of (reference) elements in the global domain.");
+    }
+
+    /* Create a variable with the given specifications */
+    input::Var variable(type, name, id, num_elements, layout, domain);
 
     /* Read the data into the variable */
     std::visit(ReadData(num_elements, this->file_name_), variable.GetInternalVariant(AccessKey()));
