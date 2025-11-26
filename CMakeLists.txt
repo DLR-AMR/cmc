@@ -246,6 +246,9 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/example)
 # Get in the test-directory
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/test)
 
+# Get in the workflows-directory
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/workflows)
+
 # Create config files such that cmc may be found by find_package etc.
 include(CMakePackageConfigHelpers)
 
