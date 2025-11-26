@@ -30,4 +30,23 @@ SubtractGeoDomainOffset(const Hyperslab& hyperslab, const GeoDomain& domain)
                      hyperslab.GetDimensionStart(Dimension::Time) - domain.GetDimensionStartIndex(Dimension::Time), hyperslab.GetDimensionLength(Dimension::Time));
 }
 
+GeoDomain
+GetDefaultDomain(const DataLayout layout, const std::vector<size_t>& dimension_lengths)
+{
+    cmc_assert(GetDimensionalityOfDataLayout(layout) == static_cast<int>(dimension_lengths.size()));
+
+    const std::vector<Dimension> dims = GetDimensionVectorFromLayout(layout);
+
+    GeoDomain init_domain;
+
+    int dim_int_idx{0};
+    for (auto dim_iter = dims.begin(); dim_iter != dims.end(); ++dim_iter, ++dim_int_idx)
+    {
+        const DimensionInterval dim(*dim_iter, 0, dimension_lengths[dim_int_idx]);
+        init_domain.UpdateDimension(dim);
+    }
+
+    return init_domain;
+}
+
 }
