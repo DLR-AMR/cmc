@@ -5,6 +5,7 @@
 #include "utilities/cmc_log_functions.hxx"
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_domain.hxx"
+#include "utilities/cmc_compression_schema.hxx"
 #include "compression_io/cmc_serial_io_util.hxx"
 
 #include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx"
@@ -65,8 +66,8 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
     const CmcType data_type = static_cast<CmcType>(GetValueFromByteStream<attr_type_t>(info.data()));
     if (ConvertToCmcType<T>() != data_type) {cmc_err_msg("The template parameter of the Reader functionality does not match the data_type of the compressed variable.");}
 
-    const CompressionSchema compression_scheme = static_cast<cmc::CompressionSchema>(GetValueFromByteStream<attr_type_t>(info.data() + 1));
-    const DataLayout initial_data_layout = static_cast<DataLayout>(GetValueFromByteStream<attr_type_t>(info.data() + 2));
+    const cmc::CompressionSchema compression_scheme = static_cast<cmc::CompressionSchema>(GetValueFromByteStream<attr_type_t>(info.data() + 1));
+    const cmc::DataLayout initial_data_layout = static_cast<DataLayout>(GetValueFromByteStream<attr_type_t>(info.data() + 2));
     const attr_type_t dimensionality = GetValueFromByteStream<attr_type_t>(info.data() + 3);
     const attr_type_t num_compression_iterations = GetValueFromByteStream<attr_type_t>(info.data() + 4);
     const attr_type_t num_pyramidal_dim_length_lvls = GetValueFromByteStream<attr_type_t>(info.data() + 5);
@@ -137,7 +138,7 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
     /* Invoke the correct decompressor */
     switch (compression_scheme)
     {
-        case CompressionSchema::PatchPrefixExtractionPlainSuffixes:
+        case cmc::CompressionSchema::PatchPrefixExtractionPlainSuffixes:
             switch (dimensionality)
             {
                 case 3:
@@ -148,7 +149,7 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
                     return std::make_unique<patch::decompression::prefix::plain_suffix::DecompressionVariable<T, 3>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
             }
         break;
-        case CompressionSchema::PatchMultiResExtraction:
+        case cmc::CompressionSchema::PatchMultiResExtraction:
             switch (dimensionality)
             {
                 case 3:
