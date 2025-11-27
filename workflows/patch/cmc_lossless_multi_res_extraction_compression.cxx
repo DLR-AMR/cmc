@@ -232,7 +232,7 @@ main(int argc, char *argv[])
     if (argc < kNumArgCRequired)
     {
         DisplayHelpMessage();
-        cmc::cmc_err_msg("The application requires arguments to execute the patch-based lossless prefix extraction compression.");
+        cmc::cmc_err_msg("The application requires arguments to execute the patch-based lossless multi resolution extraction compression.");
     }
 
     /* Check the input file */
