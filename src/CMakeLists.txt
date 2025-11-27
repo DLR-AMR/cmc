@@ -8,12 +8,10 @@ target_sources(cmc PRIVATE
     utilities/cmc_geo_domain.cxx 
     utilities/cmc_hyperslab.cxx 
     utilities/cmc_cart_coordinate.cxx 
-    utilities/cmc_geo_utilities.cxx 
-    mpi/cmc_mpi.cxx 
-    mpi/cmc_mpi_io.cxx 
-    mpi/cmc_mpi_data.cxx 
+    utilities/cmc_geo_utilities.cxx  
     input/cmc_input_variable.cxx 
     utilities/cmc_morton.cxx 
+    mpi/cmc_mpi.cxx 
 )
 
 install(FILES
@@ -76,6 +74,14 @@ install(FILES
 )
 
 install(FILES
+    input/cmc_input_variable.hxx 
+    input/cmc_forward_decl_input_variable.hxx 
+    input/cmc_binary_reader.hxx 
+    input/cmc_binary_reader_forward.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
+)
+
+install(FILES
     compression_io/cmc_compression_serial_output.hxx 
     compression_io/cmc_decompression_serial_input.hxx 
     compression_io/cmc_patch_byte_compression_serial_output.txx 
@@ -84,20 +90,43 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
 )
 
 install(FILES
-    mpi/cmc_mpi_io.hxx 
     mpi/cmc_mpi.hxx 
-    mpi/cmc_mpi_data.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpi
 )
 
 install(FILES
-    input/cmc_input_variable.hxx 
-    input/cmc_forward_decl_input_variable.hxx 
-    input/cmc_binary_reader.hxx 
-    input/cmc_binary_reader_forward.hxx 
-DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
+    patch/lossless/cmc_patch_byte_compression_variable.hxx 
+    patch/lossless/cmc_patch_byte_decompression_variable.hxx 
+    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx 
+    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx 
+    patch/lossless/cmc_patch_multi_res_extraction_compression.hxx 
+    patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx 
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
+######## Configuration dependant files ########
+######## WITH MPI
+if (CMC_ENABLE_MPI)
+# If configured with MPI
+
+target_sources(cmc PRIVATE 
+    mpi/cmc_mpi_io.cxx 
+    mpi/cmc_mpi_data.cxx
+)
+
+install(FILES
+    mpi/cmc_mpi_io.hxx 
+    mpi/cmc_mpi_data.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpi
+)
+
+# End if configured with MPI
+endif()
+######## END WITH MPI
+
+
+
+######## WITH NETCDF
 if (CMC_WITH_NETCDF)
 # If configured with netCDF
 
@@ -127,16 +156,28 @@ install(FILES
     compression_io/cmc_compression_nc_output.hxx 
     compression_io/cmc_compression_attr_names.hxx 
     compression_io/cmc_decompression_nc_input.hxx 
-    compression_io/cmc_byte_compression_output.txx 
-    compression_io/cmc_embedded_byte_compression_output.txx 
     compression_io/cmc_patch_byte_compression_output.txx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
 )
 
-# End if configured with netCDF
+if (CMC_ENABLE_MPI AND CMC_WITH_T8CODE)
+# If configured with netCDF, MPI and t8code
+install(FILES
+    compression_io/cmc_byte_compression_output.txx 
+    compression_io/cmc_embedded_byte_compression_output.txx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
+)
+# End If configured with netCDF, MPI and t8code
 endif()
 
-if (CMC_WITH_T8CODE)
+# End if configured with netCDF
+endif()
+######## END WITH NETCDF
+
+
+
+######## WITH T8CODE
+if (CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
 # If configured wit t8code
 
 target_sources(cmc PRIVATE 
@@ -144,7 +185,6 @@ target_sources(cmc PRIVATE
     t8code/cmc_t8_mesh.cxx 
     t8code/cmc_t8_interpolation.cxx 
     t8code/cmc_t8_adapt_track_inaccuracy.cxx 
-    t8code/cmc_t8_mpi.cxx 
 )
 
 install(FILES 
@@ -222,19 +262,25 @@ install(FILES
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mesh_compression
 )
 
-#End if configured with t8code
+if (CMC_ENABLE_MPI)
+# If configured with t8code and MPI
+target_sources(cmc PRIVATE 
+    t8code/cmc_t8_mpi.cxx 
+)
+install(FILES
+    t8code/cmc_t8_mpi.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/t8code
+)
+# End If configured with t8code and MPI
 endif()
 
+#End if configured with t8code
+endif()
+######## END WITH T8CODE
 
-install(FILES
-    patch/lossless/cmc_patch_byte_compression_variable.hxx 
-    patch/lossless/cmc_patch_byte_decompression_variable.hxx 
-    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx 
-    patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx 
-    patch/lossless/cmc_patch_multi_res_extraction_compression.hxx 
-    patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx 
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
-)
+
+
+######## END Configuration dependant files ########
 
 install(TARGETS cmc DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(TARGETS cmc EXPORT CmcTargets)

@@ -2,8 +2,9 @@
 #define CMC_IFACE_ENTROPY_ALPHABET_HXX
 
 #include "cmc.hxx"
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
-
+#endif
 #include <unordered_map>
 
 namespace cmc::entropy_coding
@@ -31,11 +32,14 @@ public:
     virtual void InitializeSymbols(const size_t type_size_in_bytes) = 0;
     virtual void UpdateSymbol(const uint32_t symbol) = 0;
     virtual size_t GetAlphabetSize() const = 0;
-    virtual std::vector<uint32_t> CommunicateSymbolFrequencies(const MPI_Comm comm) = 0;
     virtual const std::vector<uint32_t>& GetSymbolFrequencies() const = 0;
     virtual uint32_t RevertArrayIndexToSymbol(const uint32_t index) = 0;
     virtual uint32_t TransformSymbolToArrayIndex(const uint32_t symbol) = 0;
     virtual bool DoesSymbolExistInAlphabet(const uint32_t symbol) = 0;
+
+#ifdef CMC_ENABLE_MPI
+    virtual std::vector<uint32_t> CommunicateSymbolFrequencies(const MPI_Comm comm) = 0;
+#endif
 
     virtual ~IByteCompressionEntropyAlphabet(){};
 };
@@ -52,6 +56,7 @@ CheckIfJumpToNextByteIndicatorBitIsSet(const uint32_t symbol)
 }
 
 }
+
 }
 
 

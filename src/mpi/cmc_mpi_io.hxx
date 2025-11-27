@@ -11,11 +11,9 @@
 namespace cmc
 {
 
-
 std::vector<Hyperslab>
 DetermineSlicedDataDistribution(const Hyperslab& global_hyperslab, const MPI_Comm comm);
 
 }
-
 
 #endif /* CMC_MPI_IO_H */

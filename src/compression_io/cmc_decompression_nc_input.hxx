@@ -35,7 +35,9 @@
 #include "netcdf/cmc_nc_reader.hxx"
 #endif
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <string>
 #include <memory>
@@ -56,10 +58,15 @@ public:
     Reader(Reader&& other) = default;
     Reader& operator=(Reader&& other) = default;
 
+    Reader(const std::string& file_name)
+    : file_name_{file_name}, reader(file_name) {};
+
+#ifdef CMC_ENABLE_MPI
     Reader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
     : file_name_{file_name}, comm_{comm}, reader(file_name, comm) {};
+#endif
 
-#ifdef CMC_WITH_T8CODE
+#if defined (CMC_WITH_T8CODE) && defined (CMC_ENABLE_MPI)
     template <typename T> std::unique_ptr<decompression::AbstractByteDecompressionVariable<T>> ReadVariableForDecompression(const std::string& var_name);
     template <typename T> std::unique_ptr<cmc::IEmbeddedByteDecompressionVariable<T>> ReadEmbeddedVariableForDecompression(const std::string& var_name);
 #endif
@@ -67,11 +74,13 @@ public:
 
 private:
     const std::string file_name_;
-    const MPI_Comm comm_;
     cmc::nc::Reader reader;
+#ifdef CMC_ENABLE_MPI
+    const MPI_Comm comm_{MPI_COMM_SELF};
+#endif
 };
 
-#ifdef CMC_WITH_T8CODE
+#if defined (CMC_WITH_T8CODE) && defined (CMC_ENABLE_MPI)
 
 template <typename T>
 std::unique_ptr<decompression::AbstractByteDecompressionVariable<T>>

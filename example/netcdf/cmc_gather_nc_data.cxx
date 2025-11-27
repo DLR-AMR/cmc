@@ -12,7 +12,7 @@ int main(void)
         const std::string file = "../../data/era5_reanalysis_data_16_11_23.nc";
 
         /* Create an object which interatcs with the file and opens it */
-        cmc::input::netcdf::Data nc_data(file, cmc::nc::OpeningMode::Serial);
+        cmc::input::netcdf::Data nc_data(file);
 
         /* Define a hyperlsab corresponding to the data we want to read */
         cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, 1440),

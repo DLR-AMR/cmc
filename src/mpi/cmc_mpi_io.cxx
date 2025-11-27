@@ -5,7 +5,7 @@ namespace cmc
 {
 
 std::vector<Hyperslab>
-DetermineSlicedDataDistribution(const Hyperslab& global_hyperslab, const MPI_Comm comm)
+DetermineSlicedDataDistribution(const Hyperslab& global_hyperslab, [[maybe_unused]] const MPI_Comm comm)
 {
     #ifdef CMC_ENABLE_MPI
     int err, rank, size;

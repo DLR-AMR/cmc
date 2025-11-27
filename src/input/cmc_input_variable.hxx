@@ -12,8 +12,11 @@
 #include "utilities/cmc_morton.hxx"
 #include "input/cmc_binary_reader_forward.hxx"
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
-#include "mpi/cmc_mpi_data.hxx"
+//#include "mpi/cmc_mpi_data.hxx"
+#endif
+
 //#include "t8code/cmc_t8_mpi.hxx"
 
 
@@ -85,8 +88,12 @@ public:
     void SetScaleFactor(const T scale_factor);
     void SetAddOffset(const CmcUniversalType& add_offset);
     void SetAddOffset(const T add_offset);
-    void SetMPIComm(const MPI_Comm comm);
-    MPI_Comm GetMPIComm() const;
+#ifdef CMC_ENABLE_MPI
+    void SetMPIComm(const MPI_Comm comm) {comm_ = comm;}
+    MPI_Comm GetMPIComm() const {return comm_;}
+    ReceiverMap<T> GatherDataToBeDistributed(const DataOffsets& offsets);
+    void AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update);
+#endif
     int GetGlobalContextInformation() const;
     void SetGlobalContextInformation(const int global_context_information);
 
@@ -95,8 +102,6 @@ public:
 
     void Clear();
     bool IsValid() const;
-
-    ReceiverMap<T> GatherDataToBeDistributed(const DataOffsets& offsets);
 
     //TODO: Make domain index
     size_t GetIndexWithinDimension(const Dimension dimension, const size_t coordinate_position) const;
@@ -111,7 +116,6 @@ public:
 
     void AssignDataAtLinearIndices(const Var& var, const UpdateLinearIndices& update);
     void AssignDataAtLinearIndices(const Variable& source_var, const UpdateLinearIndices& update);
-    void AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update);
 
     struct ExtractedVar
     {
@@ -142,8 +146,6 @@ public:
     void MoveDataInto(std::vector<T>& vec_to_move_data_into);
 
 private:
-    void CreateInternIDForRedistribution();
-
     std::string name_;
     int id_;
     CmcType type_{ConvertToCmcType<T>()};
@@ -169,7 +171,10 @@ private:
     bool _has_been_invalidated_by_moving_{false};
     DataLayout pre_compression_layout_{DataLayout::LayoutUndefined};
 
+#ifdef CMC_ENABLE_MPI
     MPI_Comm comm_{MPI_COMM_NULL};
+    void CreateInternIDForRedistribution();
+#endif
 };
 
 
@@ -200,7 +205,6 @@ public:
     void TransformCoordinatesToLinearIndices();
     
     void AssignDataAtLinearIndices(const Var& variable, const UpdateLinearIndices& update);
-    void AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update);
 
     const GeoDomain& GetGlobalDomain() const;
 
@@ -223,12 +227,14 @@ public:
     void SetGlobalContextInformation(const int global_context_information);
     int GetInternID() const;
     void SetInternID(const int id);
+#ifdef CMC_ENABLE_MPI
     void SetMPIComm(const MPI_Comm comm);
     MPI_Comm GetMPIComm() const;
+    void AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update);
+    void GatherDistributionData(const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
+#endif
     DataFormat GetActiveDataFormat() const;
     void SetUpFilledVariable(const size_t num_elements, const CmcUniversalType& fill_value);
-
-    void GatherDistributionData(const DataOffsets& offsets, std::vector<VariableSendMessage>& messages);
 
     template<typename T> bool holds_alternative() const;
 
@@ -277,13 +283,6 @@ private:
     std::vector<IndexReduction> correction_;
 };
 
-
-
-/////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////
-
-
-
 class AccessKey
 {
 private:
@@ -321,7 +320,9 @@ Variable<T>::ObtainMetaCopy() const
     hollow_variable.has_split_dimension_ = has_split_dimension_;
     hollow_variable._has_been_invalidated_by_moving_ = _has_been_invalidated_by_moving_;
     hollow_variable.pre_compression_layout_ = pre_compression_layout_;
+#ifdef CMC_ENABLE_MPI
     hollow_variable.comm_ = comm_;
+#endif
     hollow_variable.intern_id_ = intern_id_;
     hollow_variable.cartesian_coordinates_ = cartesian_coordinates_;
     hollow_variable.linear_indices_ = linear_indices_;
@@ -441,18 +442,6 @@ template<class T>
 void Variable<T>::SetGlobalDomain(GeoDomain&& domain)
 {
     global_domain_ = std::move(domain);
-}
-
-template<class T>
-void Variable<T>::SetMPIComm(const MPI_Comm comm)
-{
-    comm_ = comm;
-}
-
-template<class T>
-MPI_Comm Variable<T>::GetMPIComm() const
-{
-    return comm_;
 }
 
 template<class T>
@@ -831,7 +820,9 @@ HollowCopy(const Variable<T>& variable)
     hollow_variable.has_split_dimension_ = variable.has_split_dimension_;
     hollow_variable._has_been_invalidated_by_moving_ = variable._has_been_invalidated_by_moving_;
     hollow_variable.pre_compression_layout_ = variable.pre_compression_layout_;
+#ifdef CMC_ENABLE_MPI
     hollow_variable.comm_ = variable.comm_;
+#endif
     hollow_variable.intern_id_ = variable.intern_id_;
     hollow_variable.cartesian_coordinates_ = variable.cartesian_coordinates_;
     hollow_variable.linear_indices_ = variable.linear_indices_;
@@ -869,107 +860,12 @@ ExtractSubVariables(const Variable<T>& variable, const Dimension split_dimension
         extracted_variables[iter].global_domain_.ClearDimension(split_dimension);
 
         extracted_variables[iter].has_split_dimension_ = split_dimension;
-
+#ifdef CMC_ENABLE_MPI
         extracted_variables[iter].comm_ = variable.GetMPIComm();
+#endif
     }
 
     return extracted_variables;
-}
-
-template<class T>
-void
-Variable<T>::CreateInternIDForRedistribution()
-{
-    if (GetGlobalContextInformation() != kNoGlobalContext)
-    {
-        /* If the variable is part of a higher dimensional one and resembles a subband of the variable */
-        const int intern_id = CreateSubbandID(GetID(), GetGlobalContextInformation());
-        SetInternID(intern_id);
-    } else
-    {
-        /* If the variable has not been split */
-        const int intern_id = GetID();
-        SetInternID(intern_id);
-    }
-}
-
-template <typename T>
-void
-AppendSendData(std::vector<VariableSendMessage>& messages, ReceiverMap<T>&& send_data)
-{
-    for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
-    {
-        messages.push_back(std::move(sd_iter->second));
-        sd_iter = send_data.erase(sd_iter);
-    }
-}
-
-template<class T>
-ReceiverMap<T>
-Variable<T>::GatherDataToBeDistributed(const DataOffsets& offsets)
-{
-    CreateInternIDForRedistribution();
-    
-    //TransformCoordinatesToMortonIndices();
-    
-    cmc_assert(GetActiveDataFormat() == DataFormat::LinearFormat);
-
-    ReceiverMap<T> send_messages;
-
-    const size_t num_coordinates = GetNumberCoordinates();
-    cmc_debug_msg("Num coordinates in gather data to be distributed: ", num_coordinates);
-
-    LinearIndex previous_lower_bound = 0;
-    LinearIndex previous_upper_bound = 0;
-    int owner_rank = -1;
-
-    for (size_t index = 0; index < num_coordinates; ++index)
-    {
-        const LinearIndex current_linear_index = GetLinearIndexCoordinate(index);
-
-        /* Check if the current linear index belongs to the same rank as the previous one, if not we need to find the new receiving rank */
-        if (!(previous_lower_bound <= current_linear_index && current_linear_index < previous_upper_bound))
-        {
-            /* Find an iterator to the rank which is ought to hold the value corresponding to this linear index */
-            auto owner_rank_iter = std::upper_bound(offsets.Begin(), offsets.End(), current_linear_index);
-
-            /* Get the integer number of the corresponding rank */
-            owner_rank = std::distance(offsets.Begin(), owner_rank_iter) - 1;
-            
-            previous_lower_bound = offsets[owner_rank];
-            previous_upper_bound = offsets[owner_rank + 1];
-
-            /* Check if the rank is already a receiving rank */
-            if (auto search_rk = send_messages.find(owner_rank); search_rk != send_messages.end())
-            {
-                /* If the rank is already listed in the ReceiverMap */
-                search_rk->second.data_.push_back(data_[index]);
-                search_rk->second.morton_indices_.push_back(current_linear_index);
-            } else
-            {
-                cmc_assert(GetInternID() != kNoInternalIDSet);
-                /* If the receiving rank is not yet listed within the ReceiverMap */
-                send_messages[owner_rank] = VariableMessage<T>(owner_rank, GetInternID());
-
-                const size_t estimate_receiving_data_points = 2 * (num_coordinates / offsets.size());
-
-                /* Reserve an estimate of data */
-                send_messages[owner_rank].data_.reserve(estimate_receiving_data_points);
-                send_messages[owner_rank].morton_indices_.reserve(estimate_receiving_data_points);
-                
-                /* Save the value and index */
-                send_messages[owner_rank].data_.push_back(data_[index]);
-                send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
-            }
-        } else
-        { 
-            /* If the current value belongs to same rank the previous value already belongs to */
-            send_messages[owner_rank].data_.push_back(data_[index]);
-            send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
-        }
-    }
-
-    return send_messages;
 }
 
 template<class T>
@@ -1246,24 +1142,6 @@ void Variable<T>::AssignDataAtLinearIndices(const Variable<T>& source_var, const
     }
 }
 
-
-template<typename T>
-void Variable<T>::AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update)
-{
-    cmc_assert(std::holds_alternative<VariableMessage<T>>(message.GetInternalVariant()));
-
-    /* Get the message holding the actual data and their Morton idnices from the message */
-    const VariableMessage<T>& msg = std::get<VariableMessage<T>>(message.GetInternalVariant());
-
-    /* Iterate throught the indices and the data and assign it accordingly */
-    auto data_iter = msg.DataBegin();
-    for (auto morton_idx_iter = msg.MortonIndicesBegin(); morton_idx_iter != msg.MortonIndicesEnd(); ++morton_idx_iter, ++data_iter)
-    {
-        //cmc_debug_msg("We will write at pos: ", update(*morton_idx_iter), " the val: ", *data_iter);
-        data_[update(*morton_idx_iter)] = *data_iter;
-    }
-}
-
 template<typename T>
 std::vector<T>
 Variable<T>::GetDataFromHyperslab(const Hyperslab& hyperslab) const
@@ -1318,6 +1196,125 @@ auto UpdateLinearIndices::operator()(T index_to_be_updated) const
 
     return index_to_be_updated - correction;
 }
+
+
+#ifdef CMC_ENABLE_MPI
+
+template<class T>
+void
+Variable<T>::CreateInternIDForRedistribution()
+{
+    if (GetGlobalContextInformation() != kNoGlobalContext)
+    {
+        /* If the variable is part of a higher dimensional one and resembles a subband of the variable */
+        const int intern_id = CreateSubbandID(GetID(), GetGlobalContextInformation());
+        SetInternID(intern_id);
+    } else
+    {
+        /* If the variable has not been split */
+        const int intern_id = GetID();
+        SetInternID(intern_id);
+    }
+}
+
+template <typename T>
+void
+AppendSendData(std::vector<VariableSendMessage>& messages, ReceiverMap<T>&& send_data)
+{
+    for (auto sd_iter = send_data.begin(); sd_iter != send_data.end();)
+    {
+        messages.push_back(std::move(sd_iter->second));
+        sd_iter = send_data.erase(sd_iter);
+    }
+}
+
+template<class T>
+ReceiverMap<T>
+Variable<T>::GatherDataToBeDistributed(const DataOffsets& offsets)
+{
+    CreateInternIDForRedistribution();
+    
+    //TransformCoordinatesToMortonIndices();
+    
+    cmc_assert(GetActiveDataFormat() == DataFormat::LinearFormat);
+
+    ReceiverMap<T> send_messages;
+
+    const size_t num_coordinates = GetNumberCoordinates();
+    cmc_debug_msg("Num coordinates in gather data to be distributed: ", num_coordinates);
+
+    LinearIndex previous_lower_bound = 0;
+    LinearIndex previous_upper_bound = 0;
+    int owner_rank = -1;
+
+    for (size_t index = 0; index < num_coordinates; ++index)
+    {
+        const LinearIndex current_linear_index = GetLinearIndexCoordinate(index);
+
+        /* Check if the current linear index belongs to the same rank as the previous one, if not we need to find the new receiving rank */
+        if (!(previous_lower_bound <= current_linear_index && current_linear_index < previous_upper_bound))
+        {
+            /* Find an iterator to the rank which is ought to hold the value corresponding to this linear index */
+            auto owner_rank_iter = std::upper_bound(offsets.Begin(), offsets.End(), current_linear_index);
+
+            /* Get the integer number of the corresponding rank */
+            owner_rank = std::distance(offsets.Begin(), owner_rank_iter) - 1;
+            
+            previous_lower_bound = offsets[owner_rank];
+            previous_upper_bound = offsets[owner_rank + 1];
+
+            /* Check if the rank is already a receiving rank */
+            if (auto search_rk = send_messages.find(owner_rank); search_rk != send_messages.end())
+            {
+                /* If the rank is already listed in the ReceiverMap */
+                search_rk->second.data_.push_back(data_[index]);
+                search_rk->second.morton_indices_.push_back(current_linear_index);
+            } else
+            {
+                cmc_assert(GetInternID() != kNoInternalIDSet);
+                /* If the receiving rank is not yet listed within the ReceiverMap */
+                send_messages[owner_rank] = VariableMessage<T>(owner_rank, GetInternID());
+
+                const size_t estimate_receiving_data_points = 2 * (num_coordinates / offsets.size());
+
+                /* Reserve an estimate of data */
+                send_messages[owner_rank].data_.reserve(estimate_receiving_data_points);
+                send_messages[owner_rank].morton_indices_.reserve(estimate_receiving_data_points);
+                
+                /* Save the value and index */
+                send_messages[owner_rank].data_.push_back(data_[index]);
+                send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
+            }
+        } else
+        { 
+            /* If the current value belongs to same rank the previous value already belongs to */
+            send_messages[owner_rank].data_.push_back(data_[index]);
+            send_messages[owner_rank].morton_indices_.push_back(current_linear_index);
+        }
+    }
+
+    return send_messages;
+}
+
+
+template<typename T>
+void Variable<T>::AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update)
+{
+    cmc_assert(std::holds_alternative<VariableMessage<T>>(message.GetInternalVariant()));
+
+    /* Get the message holding the actual data and their Morton idnices from the message */
+    const VariableMessage<T>& msg = std::get<VariableMessage<T>>(message.GetInternalVariant());
+
+    /* Iterate throught the indices and the data and assign it accordingly */
+    auto data_iter = msg.DataBegin();
+    for (auto morton_idx_iter = msg.MortonIndicesBegin(); morton_idx_iter != msg.MortonIndicesEnd(); ++morton_idx_iter, ++data_iter)
+    {
+        //cmc_debug_msg("We will write at pos: ", update(*morton_idx_iter), " the val: ", *data_iter);
+        data_[update(*morton_idx_iter)] = *data_iter;
+    }
+}
+
+#endif
 
 }
 

@@ -4,8 +4,9 @@
 #include "mesh_compression/cmc_iface_abstract_mesh_decoder.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "utilities/cmc_geo_domain.hxx"
-
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <vector>
 #include <tuple>

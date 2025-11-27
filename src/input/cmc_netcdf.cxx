@@ -2,30 +2,19 @@
 #include "utilities/cmc_utilities.hxx"
 #include "utilities/cmc_geo_utilities.hxx"
 #include "utilities/cmc_log_functions.hxx"
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi_io.hxx"
+#endif
 
 namespace cmc::input::netcdf
 {
 
 void
-Data::Open(const std::string& path_to_file, const nc::OpeningMode mode, const MPI_Comm comm)
+Data::Open(const std::string& path_to_file)
 {
     #ifdef CMC_WITH_NETCDF
-    #ifdef CMC_WITH_NETCDF_PAR
-    if (mode == nc::OpeningMode::Parallel)
-    {
-        ncid_ = nc::OpenParallel(path_to_file.c_str(), comm);
-    } else
 
-    #endif /* CMC_WITH_NETCDF_PAR */
-    {
-        if (mode == nc::OpeningMode::Parallel)
-        {
-            cmc_warn_msg("The netCDF file is ought to be opened for parallel access, although the parallel functionality is not accessible.");
-            cmc_warn_msg("The file is opened for serial access.");
-        }
-        ncid_ = nc::OpenSerial(path_to_file.c_str());
-    }
+    ncid_ = nc::OpenSerial(path_to_file.c_str());
 
     #else
     cmc_err_msg("CMC is not linked against netCDF. Please recompile the build with netCDF\n.");
@@ -374,14 +363,6 @@ GetDataLayout(const int dimensionality, const Hyperslab& global_hyperslab, const
     return GetLayoutFromDimensionOrdering(data_dimensions);
 }
 
-
-static
-std::vector<Hyperslab>
-DetermineDataDistribution(const Hyperslab& global_hyperslab, const MPI_Comm comm)
-{
-    return DetermineSlicedDataDistribution(global_hyperslab, comm);
-}
-
 static
 std::pair<std::vector<size_t>, std::vector<size_t>>
 GetStartAndCountValuesForVariable(const Hyperslab& hyperslab, const CoordinateArray<int>& coordinate_dimension_ids, int num_dimensions, const std::array<int, NC_MAX_VAR_DIMS>& dimension_ids)
@@ -477,6 +458,43 @@ Data::SetupVariableData(const int variable_nc_type, const int variable_id, std::
     }
 }
 
+
+#ifdef CMC_ENABLE_MPI
+void
+Data::Open(const std::string& path_to_file, const nc::OpeningMode mode, const MPI_Comm comm)
+{
+    #ifdef CMC_WITH_NETCDF
+    #ifdef CMC_WITH_NETCDF_PAR
+    if (mode == nc::OpeningMode::Parallel)
+    {
+        ncid_ = nc::OpenParallel(path_to_file.c_str(), comm);
+    } else
+
+    #endif /* CMC_WITH_NETCDF_PAR */
+    {
+        if (mode == nc::OpeningMode::Parallel)
+        {
+            cmc_warn_msg("The netCDF file is ought to be opened for parallel access, although the parallel functionality is not accessible.");
+            cmc_warn_msg("The file is opened for serial access.");
+        }
+        ncid_ = nc::OpenSerial(path_to_file.c_str());
+    }
+
+    #else
+    cmc_err_msg("CMC is not linked against netCDF. Please recompile the build with netCDF\n.");
+    return CMC_ERR;
+    #endif
+}
+
+static
+std::vector<Hyperslab>
+DetermineDataDistribution(const Hyperslab& global_hyperslab, const MPI_Comm comm)
+{
+    return DetermineSlicedDataDistribution(global_hyperslab, comm);
+}
+
+#endif
+
 input::Var
 Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
 {
@@ -502,9 +520,13 @@ Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
     /* Determine the data layout of the variable */
     const DataLayout data_layout = GetDataLayout(data_dimensionality, hyperslab, coordinate_dimension_ids_, dimension_ids);
 
+#ifdef CMC_ENABLE_MPI
     /* Calculate a sliced distribution of the data */
     //TODO: Make a blocked distribution
     std::vector<Hyperslab> local_hyperslabs = DetermineDataDistribution(hyperslab, comm_);
+#else
+    std::vector<Hyperslab> local_hyperslabs (1, hyperslab);
+#endif
 
     /* Get the number of values we will read from the file (for memory allocation) */
     DomainIndex num_local_data_values = 0;
@@ -512,7 +534,7 @@ Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
     {
         num_local_data_values += hs_iter->GetNumberCoordinates();
     }
-    cmc_debug_msg("in inquire variables: Num lcoal values: ", num_local_data_values);
+
     /* Inquire the data of the variable and construct a input variable with it */
     input::Var variable = SetupVariableData(variable_nc_type, variable_id, std::move(variable_name), data_layout, num_local_data_values, std::move(local_hyperslabs), TransformHyperslabToGeoDomain(hyperslab), num_dimensions, dimension_ids);
 
@@ -525,9 +547,11 @@ Data::InquireVariable(const Hyperslab& hyperslab, std::string&& variable_name)
     if (is_scale_factor_present)
         variable.SetScaleFactor(scale_factor);
 
+#ifdef CMC_ENABLE_MPI
     /* Set the MPI communcator */
     variable.SetMPIComm(comm_);
-    cmc_debug_msg("Comm is: ", comm_);
+#endif
+
     cmc_debug_msg("Variable ", variable.GetName(), " has been inquired.");
     
     return variable;

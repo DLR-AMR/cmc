@@ -60,6 +60,8 @@ GatherGlobalDataOffsets(const AmrMesh& mesh, const MPI_Comm comm)
     return offsets;
 
     #else
+    cmc_debug_msg("Calling GatherGlobalDataOffsets (with comm: ", comm, ") although CMC is not configured with MPI!");
+    
     /* Calculate the possible upper bound for Morton indices for the last entry to the offset array */
     const DomainIndex last_domain_integer_coord = std::pow(static_cast<DomainIndex>(2), static_cast<DomainIndex>(mesh.GetInitialRefinementLevel())) - 1;
     std::vector<DomainIndex> first_outside_of_domain_index;

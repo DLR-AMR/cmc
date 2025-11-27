@@ -18,11 +18,17 @@ class Data
 {
 public:
     Data() = delete;
+    Data(const std::string& path_to_file)
+    {
+        Open(path_to_file);
+    };
+#ifdef CMC_ENABLE_MPI
     Data(const std::string& path_to_file, const cmc::nc::OpeningMode mode, const MPI_Comm comm = MPI_COMM_WORLD)
     : comm_{comm}
     {
         Open(path_to_file, mode, comm);
     };
+#endif
     ~Data()
     {
         if (!_file_has_been_closed_)
@@ -55,7 +61,7 @@ public:
     [[nodiscard]] std::vector<input::Var>&& TransferData();
 
 private:
-    void Open(const std::string& path_to_file, const nc::OpeningMode mode, const MPI_Comm comm);
+    void Open(const std::string& path_to_file);
     void InquireCoordinates();
     void InquireCoordinateDimensions();
     input::Var SetupVariableData(int, int, std::string&&, DataLayout, DomainIndex, std::vector<Hyperslab>&&, GeoDomain&&, int, const std::array<int, NC_MAX_VAR_DIMS>&);
@@ -63,8 +69,6 @@ private:
     template<typename... Ts> void InquireAllVariables(const Hyperslab&, Ts&&...);
 
     int ncid_;
-    MPI_Comm comm_{MPI_COMM_WORLD};
-    
     int num_dimensions_{0};
     int num_global_attributes_{0};
     int id_unlimited_dimension_{-1};
@@ -80,6 +84,11 @@ private:
 
     bool _file_has_been_closed_{false};
     bool _data_has_been_transfered_{false};
+
+#ifdef CMC_ENABLE_MPI
+    MPI_Comm comm_{MPI_COMM_WORLD};
+    void Open(const std::string& path_to_file, const nc::OpeningMode mode, const MPI_Comm comm);
+#endif
 };
 
 template<typename... Ts>

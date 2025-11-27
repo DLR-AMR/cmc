@@ -19,7 +19,9 @@
 #include "netcdf/cmc_nc_writer.hxx"
 #endif
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <string>
 #include <vector>
@@ -35,10 +37,14 @@ struct IntraLevelStreamOffset;
 class Writer
 {
 public:
+    Writer(const std::string& file_name)
+    : file_name_{file_name}, nc_writer_(file_name, NC_NETCDF4) {};
+#ifdef CMC_ENABLE_MPI
     Writer(const std::string& file_name, MPI_Comm comm)
     : file_name_{file_name}, nc_writer_(file_name, NC_NETCDF4, comm) {};
+#endif
 
-#ifdef CMC_WITH_T8CODE
+#if defined (CMC_WITH_T8CODE) && defined (CMC_ENABLE_MPI)
     template<typename T> void SetVariable(cmc::IAMRCompressionVariable<T>* variable);
     template<typename T> void SetVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable);
 #endif
@@ -50,7 +56,7 @@ public:
     void Write();
 
 private:
-#ifdef CMC_WITH_T8CODE
+#if defined (CMC_WITH_T8CODE) && defined (CMC_ENABLE_MPI)
     template<typename T> void SetDataVariable(cmc::IAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
     template<typename T> void SetMeshVariable(cmc::IAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int mesh_id);
     template<typename T> void SetDataVariable(cmc::IEmbeddedAMRCompressionVariable<T>* variable, const std::vector<VariableLevelOffset>& level_byte_counts, const std::vector<IntraLevelStreamOffset>& intra_level_offsets, const int var_id, const int corresponding_mesh_id);
@@ -64,6 +70,8 @@ private:
     int var_id_counter_{0};
     int mesh_id_counter_{0};
 };
+
+#ifdef CMC_ENABLE_MPI
 
 struct IntraLevelStreamOffset
 {
@@ -157,6 +165,8 @@ MpiIntraLevelOffsetSum(void* input_buffer, void* output_buffer, int* count, [[ma
     }
 }
 
+#endif
+
 inline void
 Writer::AddGlobalAttribute(const cmc::nc::Attribute& attribute)
 {
@@ -177,7 +187,7 @@ Writer::Write()
 
 }
 
-#ifdef CMC_WITH_T8CODE
+#if defined (CMC_WITH_T8CODE) && defined (CMC_ENABLE_MPI)
 
 /* The implementation specific fuctionalities for the AbstractByteCompressionVariables are included */
 #include "compression_io/cmc_byte_compression_output.txx"

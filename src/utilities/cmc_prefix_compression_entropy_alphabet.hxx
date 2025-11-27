@@ -44,7 +44,9 @@ public:
         return alphabet_;
     }
 
+#ifdef CMC_ENABLE_MPI
     std::vector<uint32_t> CommunicateSymbolFrequencies(const MPI_Comm comm) override;
+#endif
 
     bool DoesSymbolExistInAlphabet(const uint32_t symbol) override;
     uint32_t TransformSymbolToArrayIndex(const uint32_t symbol) override;
@@ -105,6 +107,7 @@ PrefixCompressionAlphabet<T>::RevertArrayIndexToSymbol(const uint32_t index)
     }
 }
 
+#ifdef CMC_ENABLE_MPI
 /**
  * @brief The collected symbol frequencies are exchanged, such that each process holds the same frequencies.
  * This is important, because the decompression can be performed with a different amount of processes/distributions.
@@ -138,6 +141,7 @@ PrefixCompressionAlphabet<T>::CommunicateSymbolFrequencies(const MPI_Comm comm)
     return alphabet_;
 #endif
 }
+#endif
 
 }
 

@@ -5,8 +5,9 @@
 #include "utilities/cmc_utilities.hxx"
 #include "netcdf/cmc_nc_io.hxx"
 #include "netcdf/cmc_netcdf.hxx"
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
-
+#endif
 #include <vector>
 #include <cstring>
 
@@ -24,9 +25,12 @@ public:
     Reader(Reader&& other) = default;
     Reader& operator=(Reader&& other) = default;
 
-    Reader(const std::string& file_name, const MPI_Comm comm = MPI_COMM_SELF)
+    Reader(const std::string& file_name)
+    : file_name_{file_name} {};
+#ifdef CMC_ENABLE_MPI
+    Reader(const std::string& file_name, const MPI_Comm comm)
     : file_name_{file_name}, comm_{comm} {};
-
+#endif
     /* Read a single variable from the file */
     Variable ReadVariable(const std::string& variable_name);
 
@@ -90,7 +94,6 @@ private:
     void ReadVariableDataFromFile(const int ncid, const nc_type var_type, const std::string& var_name, const int var_id, const std::vector<GeneralHyperslab>& hyperslabs, Variable& variable);
     
     const std::string file_name_;
-    const MPI_Comm comm_;
 
     int netcdf_format_{-1};
     int num_dimensions_{0};
@@ -105,6 +108,10 @@ private:
     std::vector<StashedVariable> variable_stash_;
     bool is_file_opened_{false};
     bool has_general_information_been_inquired_{false};
+
+#ifdef CMC_ENABLE_MPI
+    const MPI_Comm comm_{MPI_COMM_SELF};
+#endif
 };
 
 struct Reader::StashedVariable

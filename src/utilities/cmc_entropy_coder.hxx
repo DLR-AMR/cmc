@@ -5,7 +5,9 @@
 #include "utilities/cmc_iface_entropy_alphabet.hxx"
 #include "utilities/cmc_iface_arithmetic_encoding_freq_model.hxx"
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <memory>
 
@@ -19,7 +21,10 @@ public:
     virtual void UpdateSymbolFrequency(const uint32_t symbol) = 0;
     virtual bit_vector::BitVector EncodeAlphabet() const = 0;
 
+    virtual void SetupEncoding() = 0;
+#ifdef CMC_ENABLE_MPI
     virtual void SetupEncoding(const MPI_Comm comm) = 0;
+#endif
     virtual void EncodeSymbol(const uint32_t symbol) = 0;
     virtual void FinishEncoding() = 0;
 
@@ -41,7 +46,10 @@ public:
     virtual void UpdateSymbolFrequency(const uint32_t symbol) = 0;
     virtual bit_vector::BitVector EncodeAlphabet() const = 0;
 
+    virtual void SetupEncoding() = 0;
+#ifdef CMC_ENABLE_MPI
     virtual void SetupEncoding(const MPI_Comm comm) = 0;
+#endif
     virtual void EncodeSymbol(const uint32_t symbol) = 0;
     virtual void FinishEncoding() = 0;
 

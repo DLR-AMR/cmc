@@ -225,7 +225,7 @@ PatchCompressionVariable<T, Dim>::EncodeLevelData(const std::vector<CompressionV
     CollectSymbolFrequenciesForEntropyCoding(level_byte_values);
 
     /* Setup the interior structure for encoding */
-    entropy_coder_->SetupEncoding(MPI_COMM_SELF);
+    entropy_coder_->SetupEncoding();
 
     /* Iterate over all values and encode them */
     size_t res_iter{0};

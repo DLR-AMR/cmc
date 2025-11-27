@@ -15,8 +15,10 @@
 #include "utilities/cmc_embedded_mesh_utilities.hxx"
 #include "utilities/cmc_iface_embedded_amr_compression_variable.hxx"
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mpi.hxx"
+#endif
 
 #include <vector>
 #include <functional>
@@ -125,12 +127,16 @@ public:
     const std::vector<std::vector<uint8_t>>& GetEncodedMesh() const override {return buffered_encoded_mesh_;};
 
     bool AreMeshRefinementBitsStored() const override {return store_refinement_indication_bits_;};
-    MPI_Comm GetMPIComm() const override {return comm_;};
     const VariableAttributes<T>& GetVariableAttributes() const override {return attributes_;};
 
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
     friend IEmbeddedCompressionAdaptData<T>;
+
+    #ifdef CMC_ENABLE_MPI
+    MPI_Comm GetMPIComm() const override {return comm_;};
+#endif
+
 protected:
     AbstractEmbeddedByteCompressionVariable() = delete;
     AbstractEmbeddedByteCompressionVariable(input::Var& input_variable)
@@ -146,11 +152,13 @@ protected:
     void SetData(const std::vector<T>& initial_data);
     void SetData(const std::vector<SerializedCompressionValue<sizeof(T)>>& initial_data);
     void SetData(std::vector<SerializedCompressionValue<sizeof(T)>>&& initial_data);
-    void SetMPIComm(const MPI_Comm comm) {comm_ = comm;};
     void SetAttributes(const cmc::VariableAttributes<T>& attributes) {attributes_ = attributes;}
     void SetAttributes(cmc::VariableAttributes<T>&& attributes) {attributes_ = std::move(attributes);}
     void IndicateWhetherMeshRefinementBitsWillBeStored(const bool store_indication_bits) {store_refinement_indication_bits_ = true;}
-    
+#ifdef CMC_ENABLE_MPI
+    void SetMPIComm(const MPI_Comm comm) {comm_ = comm;};
+#endif
+
     AdaptCreator<T> adaptation_creator_; //!< A function pointer which is used to create the wished adaptation structure
     AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure
     
@@ -175,9 +183,11 @@ private:
     void SetupInputVariableForCompression(input::Var& input_variable);
     void DistributeDataOnInitialMesh(input::Variable<T>& input_variable);
     void SortLocalDataOnInitialMesh(input::Variable<T>& input_variable);
+#ifdef CMC_ENABLE_MPI
     std::vector<VariableRecvMessage> ReceiveInitialData(input::Variable<T>& input_variable);
     std::pair<std::vector<VariableSendMessage>, std::vector<MPI_Request>> SendInitialData(input::Variable<T>& input_variable);
     void SortInitialDataIntoVariables(input::Variable<T>& input_variable, const std::vector<VariableRecvMessage>& messages);
+#endif
     std::vector<input::IndexReduction> UpdateLinearIndicesToTheInitialMesh();
     AmrMesh BuildInitialMesh(const input::Variable<T>& input_variable);
 
@@ -192,8 +202,9 @@ private:
 
     cmc::VariableAttributes<T> attributes_;
     bool store_refinement_indication_bits_{true};
-    
+#ifdef CMC_ENABLE_MPI
     MPI_Comm comm_{MPI_COMM_NULL}; //!< The MPI communicator to use
+#endif
 };
 
 /**
@@ -243,10 +254,10 @@ void
 AbstractEmbeddedByteCompressionVariable<T>::SetupInputVariableForCompression(input::Var& input_var)
 {
     cmc_debug_msg("The InputVariable will be set up for compression.");
-    //cmc_debug_msg("At the start: num coords:", input_variable.GetNumberCoordinates());
-    /* get the MPI communicator from the variable */
+#ifdef CMC_ENABLE_MPI
+    /* Get the MPI communicator from the variable */
     comm_ = input_var.GetMPIComm();
-
+#endif
     //const std::vector<T>& values = std::get<input::Variable<T>>(input_var.GetInternalVariant()).GetDataForReading();
     //FILE* file_out = fopen("direct_output_data_bin_reader.cmc", "wb");
     //fwrite(values.data(), sizeof(T), values.size(), file_out);
@@ -481,9 +492,6 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
         t8_forest_t previous_forest = mesh_.GetMesh();
         t8_forest_ref(previous_forest);
 
-        //test_data_.clear();
-        //test_data_.reserve(t8_forest_get_local_num_leaf_elements(previous_forest));
-
         /* Perform a coarsening iteration */
         t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, LosslessByteCompression<T>, 0, 0, static_cast<void*>(adapt_data));
         cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements");
@@ -495,7 +503,6 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
         t8_forest_unref(&previous_forest);
 
         /* Encode the data of this level and store it within a buffer */
-        //auto [encoded_entropy_codes, encoded_data] = adapt_data->EncodeLevelData(test_data_);
         auto [encoded_entropy_codes, encoded_data] = adapt_data->EncodeLevelData(data_);
         buffered_entropy_codes_.push_back(std::move(encoded_entropy_codes));
         buffered_encoded_data_.push_back(std::move(encoded_data));
@@ -503,6 +510,7 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
         /* Once the data is buffered, we can overwrite it with the adapted data */
         this->SwitchToExtractedData();
 
+#ifdef CMC_ENABLE_MPI
         /* Repartition the mesh */
         t8_forest_t partitioned_forest = RepartitionMesh(adapted_forest);
 
@@ -521,13 +529,17 @@ AbstractEmbeddedByteCompressionVariable<T>::Compress()
         /* Repartition the data */
         this->RepartitionData(adapted_forest, partitioned_forest);
         adapt_data->RepartitionData(adapted_forest, partitioned_forest);
-
+    
         cmc_debug_msg("The mesh and the data has been re-partitioned.");
 
         /* Free the former forest and store the adapted/repartitioned mesh */
         t8_forest_unref(&adapted_forest);
         mesh_.SetMesh(partitioned_forest);
-
+#else
+        std::vector<uint8_t> encoded_mesh_data = mesh_encoder_->GetEncodedLevelData();
+        buffered_encoded_mesh_.push_back(std::move(encoded_mesh_data));
+        mesh_.SetMesh(adapted_forest);
+#endif
         /* Finalize the compression iteration */
         adapt_data->FinalizeExtractionIteration();
         if (AreMeshRefinementBitsStored()){mesh_encoder_->FinalizeCompressionIteration();}
@@ -743,29 +755,6 @@ AbstractEmbeddedByteCompressionVariable<T>::IsValidForCompression() const
     return true;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-//////////////////////////////////
-/////////////////////////////////
-/////////////////////////////////
-
-
-
-
-
-
-
-
-
 template <typename T>
 AmrMesh
 AbstractEmbeddedByteCompressionVariable<T>::BuildInitialMesh(const input::Variable<T>& input_variable)
@@ -779,8 +768,11 @@ AbstractEmbeddedByteCompressionVariable<T>::BuildInitialMesh(const input::Variab
     const DataLayout initial_mesh_layout = input_variable.GetInitialDataLayout();
 
     /* Build the actual embedded mesh based on the given features */
+#ifdef CMC_ENABLE_MPI
     auto [initial_forest, initial_refinement_level, dimensionality] = BuildInitialEmbeddedMesh(global_domain, initial_mesh_layout, GetMPIComm());
-
+#else
+    auto [initial_forest, initial_refinement_level, dimensionality] = BuildInitialEmbeddedMesh(global_domain, initial_mesh_layout);
+#endif
     return AmrMesh(initial_forest, initial_refinement_level, dimensionality);
 }
 
@@ -836,6 +828,8 @@ AbstractEmbeddedByteCompressionVariable<T>::UpdateLinearIndicesToTheInitialMesh(
     /* Return the correction scheme for the global indices */
     return index_correction;
 }
+
+#ifdef CMC_ENABLE_MPI
 
 template <typename T>
 void
@@ -998,6 +992,8 @@ AbstractEmbeddedByteCompressionVariable<T>::ReceiveInitialData(input::Variable<T
     return recv_messages;
 }
 
+#endif
+
 /* Sorting the initial data only locally */
 template <typename T>
 void
@@ -1019,7 +1015,7 @@ template <typename T>
 void
 AbstractEmbeddedByteCompressionVariable<T>::DistributeDataOnInitialMesh(input::Variable<T>& input_variable)
 {
-    #ifdef CMC_ENABLE_MPI
+#ifdef CMC_ENABLE_MPI
     cmc_debug_msg("The intial data will be distributed on the embedded mesh.");
     cmc_assert(mesh_.IsValid());
 
@@ -1045,11 +1041,11 @@ AbstractEmbeddedByteCompressionVariable<T>::DistributeDataOnInitialMesh(input::V
 
     cmc_debug_msg("The intial data has been distributed successfully on the embedded mesh.");
 
-    #else
+#else
     /* Call a locally sorting function which setups the data compliant to the Morton order */
-    cmc_assert(mesh.IsValid());
+    cmc_assert(mesh_.IsValid());
     SortLocalDataOnInitialMesh();
-    #endif
+#endif
 }
 
 }

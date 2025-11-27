@@ -8,10 +8,8 @@
 
 #include "utilities/cmc_hyperslab.hxx"
 
-#if 0
-#include "compression_io/cmc_compression_nc_output.hxx"
-#include "compression_io/cmc_decompression_nc_input.hxx"
-#endif
+#include "compression_io/cmc_compression_serial_output.hxx"
+#include "compression_io/cmc_decompression_serial_input.hxx"
 
 #include <numeric>
 #include <algorithm>
@@ -80,34 +78,34 @@ main(void)
     /* Generate input variables from the binary file */
     cmc::input::binary::Reader binary_reader(file);
     cmc::input::Var variable = binary_reader.CreateVariableFromBinaryData(type, name, id, num_elements, arbitrary_missing_value, layout, domain);
-    variable.SetMPIComm(MPI_COMM_SELF);
+    //variable.SetMPIComm(MPI_COMM_SELF);
     std::vector<cmc::input::Var> input_variables{std::move(variable)};
 
 
-    //{
+    {
     /* Setup an embedded PrefixAMR (with plain suffix encoding) compression variable from the input variables */           
-    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<float, 3> var(input_variables.front());
-    //cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 3> var(input_variables.front());
+    //cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<float, 3> var(input_variables.front());
+    cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 3> var(input_variables.front());
 
     /* Perform the compression */
     var.Compress();
 
-#if 0
+#if 1
 
     #if 1
     {
         /* Write out the compressed data to disk */
-        cmc::compression_io::Writer writer("prefix_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+        cmc::compression_io::serial::Writer writer("prefix_example_lossless_compression_output");
         writer.SetVariable(&var);
         writer.Write();
     }
     #endif
-    //}
+    }
 
     #if 1
 
     /* Create a reader for the compressed output that has been stored */
-    cmc::compression_io::Reader reader("prefix_example_lossless_compression_output.cmc", MPI_COMM_SELF);
+    cmc::compression_io::serial::Reader reader("prefix_example_lossless_compression_output");
     
     /* Create an embedded decompressor from the compressed data */
     std::unique_ptr<cmc::patch::IPatchDecompressionVariable<float>> decompression_var = reader.ReadPatchVariableForDecompression<float>(name);

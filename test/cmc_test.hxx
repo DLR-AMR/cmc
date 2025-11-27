@@ -1,6 +1,8 @@
 #ifndef CMC_TEST_HXX
 #define CMC_TEST_HXX
 
+#include <cstdlib>
+
 namespace cmc
 {
 

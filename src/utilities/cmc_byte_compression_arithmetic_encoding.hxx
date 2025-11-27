@@ -9,7 +9,9 @@
 #include "utilities/cmc_byte_compression_arithmetic_encoding_frequency_model.hxx"
 #include "utilities/cmc_entropy_coder.hxx"
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <cstddef>
 #include <memory>
@@ -61,6 +63,20 @@ public:
         alphabet_->UpdateSymbol(symbol);
     };
 
+    void SetupEncoding() override
+    {
+        /* Get the symbol frequencies */
+        const std::vector<uint32_t> global_symbol_frequencies = alphabet_->GetSymbolFrequencies();
+        
+        /* Create the frequency model */ 
+        frequency_model_ = std::make_unique<ByteCompressionStaticFrequencyModel<T>>(std::move(alphabet_), global_symbol_frequencies);
+
+        /* Set the flag that the frequences have been fixed */
+        is_setup_complete_ = true;
+        alphabet_ = nullptr;
+    }
+
+#ifdef CMC_ENABLE_MPI
     void SetupEncoding(const MPI_Comm comm) override
     {
         /* Communicate the alphabet */
@@ -73,7 +89,7 @@ public:
         is_setup_complete_ = true;
         alphabet_ = nullptr;
     }
-
+#endif
     void EncodeSymbol(const uint32_t symbol) override;
     void FinishEncoding();
 

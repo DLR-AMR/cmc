@@ -11,7 +11,9 @@
 #include "utilities/cmc_compression_schema.hxx"
 #include "mesh_compression/cmc_mesh_encoder.hxx"
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
@@ -127,7 +129,9 @@ public:
     const std::vector<std::vector<uint8_t>>& GetEncodedData() const override {return buffered_encoded_data_;};
     const std::vector<std::vector<uint8_t>>& GetEncodedMesh() const override {return buffered_encoded_mesh_;};
 
+#ifdef CMC_ENABLE_MPI
     MPI_Comm GetMPIComm() const override {return comm_;};
+#endif
     int GetInitialMaximumRefinementLevel() const {return max_initial_refinement_level_;}
     virtual CompressionSchema GetCompressionSchema() const = 0;
 
@@ -141,7 +145,9 @@ protected:
     void SetData(const std::vector<T>& initial_data);
     void SetData(const std::vector<SerializedCompressionValue<sizeof(T)>>& initial_data);
     void SetData(std::vector<SerializedCompressionValue<sizeof(T)>>&& initial_data);
+#ifdef CMC_ENABLE_MPI
     void SetMPIComm(const MPI_Comm comm) {comm_ = comm;};
+#endif
 
     AdaptCreator<T> adaptation_creator_; //!< A function pointer which is used to create the wished adaptation structure
     AdaptDestructor<T> adaptation_destructor_; //!< A function pointer which is used to destruct the adaptation structure
@@ -174,8 +180,10 @@ private:
     std::vector<std::vector<uint8_t>> buffered_encoded_data_; //!< Level-wise storage for the encoded data
     std::vector<std::vector<uint8_t>> buffered_encoded_mesh_; //!< Level-wwise storage for the encoded mesh
 
-    MPI_Comm comm_{MPI_COMM_NULL}; //!< The MPI communicator to use
     int max_initial_refinement_level_{-1};
+#ifdef CMC_ENABLE_MPI
+    MPI_Comm comm_{MPI_COMM_NULL}; //!< The MPI communicator to use
+#endif
 };
 
 
@@ -205,8 +213,6 @@ public:
 
     virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
     virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
-    
-    MPI_Comm GetMPIComm() const {return base_variable_->GetMPIComm();};
 
     virtual ~ICompressionAdaptData(){};
 
@@ -214,7 +220,9 @@ public:
 
     int GetInitialMaximumRefinementLevel() const {return base_variable_->GetInitialMaximumRefinementLevel();}
     int GetCurrentCompressionStep() const {return compression_step_;}
-
+#ifdef CMC_ENABLE_MPI
+    MPI_Comm GetMPIComm() const {return base_variable_->GetMPIComm();};
+#endif
 protected:
     virtual ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) = 0;
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
@@ -433,6 +441,7 @@ AbstractByteCompressionVariable<T>::Compress()
         /* Once the data is buffered, we can overwrite it with the adapted data */
         this->SwitchToExtractedData();
 
+#ifdef CMC_ENABLE_MPI
         /* Repartition the mesh */
         t8_forest_t partitioned_forest = RepartitionMesh(adapted_forest);
 
@@ -449,7 +458,11 @@ AbstractByteCompressionVariable<T>::Compress()
         /* Free the former forest and store the adapted/repartitioned mesh */
         t8_forest_unref(&adapted_forest);
         mesh_.SetMesh(partitioned_forest);
-
+#else
+        std::vector<uint8_t> encoded_mesh_data = mesh_encoder_->GetEncodedLevelData();
+        buffered_encoded_mesh_.push_back(std::move(encoded_mesh_data));
+        mesh_.SetMesh(adapted_forest);
+#endif
         /* Finalize the comrpession iteration */
         adapt_data->FinalizingExtractionIteration();
         mesh_encoder_->FinalizeCompressionIteration();

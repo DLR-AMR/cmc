@@ -98,6 +98,50 @@ void ValidateInitialRefinementLevelForDimensionality([[maybe_unused]] const int 
 }
 
 inline std::tuple<t8_forest_t, int, int>
+BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layout)
+{
+    cmc_debug_msg("The intial embedded mesh will be constructed");
+    /* Get the dimensionality of the domain on which the variable is defined */
+    const int dimensionality = domain.GetDimensionality();
+
+    /* Create the cmesh; either a quad or hex tree based on the dimension */
+    t8_cmesh_t cmesh = t8_cmesh_new_hypercube(EmbeddedMeshDimensionToElementClass(dimensionality), sc_MPI_COMM_SELF, 0, 0, 0);
+
+    /* Determine the initial refinement level for embedding the data */
+    const int initial_refinement_level = CalculateInitialEmbeddedRefinementLevel(domain);
+    ValidateInitialRefinementLevelForDimensionality(initial_refinement_level, dimensionality);
+
+    /* Construct a forest from the cmesh */
+    t8_forest_t initial_forest;
+    t8_forest_init(&initial_forest);
+    t8_forest_set_cmesh(initial_forest, cmesh, sc_MPI_COMM_SELF);
+    t8_forest_set_scheme(initial_forest, t8_scheme_new_default());
+    t8_forest_set_level(initial_forest, 0);
+    t8_forest_commit(initial_forest);
+
+    AdaptDataInitialEmbeddedMesh adapt_data(domain, initial_refinement_level, initial_layout);
+
+    t8_forest_t adapted_forest;
+    for (int adaptation_steps = 0; adaptation_steps <= initial_refinement_level; ++adaptation_steps)
+    {
+        t8_forest_init(&adapted_forest);
+        t8_forest_set_adapt(adapted_forest, initial_forest, RefineToInitialEmbeddedMesh, 0);
+        const int set_partition_for_coarsening = 0; //TODO change to one later
+        t8_forest_set_partition(adapted_forest, NULL, set_partition_for_coarsening);
+        t8_forest_set_user_data(adapted_forest, static_cast<void*>(&adapt_data));
+        t8_forest_commit(adapted_forest);
+
+        initial_forest = adapted_forest;
+    }
+
+    cmc_debug_msg("The intial embedded mesh (of dimensionality ", dimensionality, " and with a maximum initial refinement level of ", initial_refinement_level, ") has been constructed");
+
+    return std::make_tuple(initial_forest, initial_refinement_level, dimensionality); 
+}
+
+#ifdef CMC_ENABLE_MPI
+
+inline std::tuple<t8_forest_t, int, int>
 BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layout, MPI_Comm comm)
 {
     cmc_debug_msg("The intial embedded mesh will be constructed");
@@ -138,6 +182,8 @@ BuildInitialEmbeddedMesh(const GeoDomain& domain, const DataLayout initial_layou
 
     return std::make_tuple(initial_forest, initial_refinement_level, dimensionality); 
 }
+
+#endif
 
 }
 

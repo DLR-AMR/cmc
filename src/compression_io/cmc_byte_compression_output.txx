@@ -247,7 +247,6 @@ Writer::SetVariable(cmc::IAMRCompressionVariable<T>* variable)
     ++var_id_counter_;
 }
 
-
 }
 
 #endif /* !CMC_BYTE_COMPRESSION_OUTPUT_TXX */

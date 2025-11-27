@@ -5,7 +5,9 @@
 #include "utilities/cmc_utilities.hxx"
 #include "netcdf/cmc_nc_io.hxx"
 #include "netcdf/cmc_netcdf.hxx"
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <vector>
 
@@ -16,8 +18,12 @@ class Writer
 {
 public:
     Writer() = delete;
-    Writer(const std::string& file_name, const int netcdf_format, const MPI_Comm comm = MPI_COMM_SELF)
+    Writer(const std::string& file_name, const int netcdf_format)
+    : file_name_{file_name}, netcdf_format_{netcdf_format} {};
+#ifdef CMC_ENABLE_MPI
+    Writer(const std::string& file_name, const int netcdf_format, const MPI_Comm comm)
     : file_name_{file_name}, netcdf_format_{netcdf_format}, comm_{comm} {};
+#endif
     ~Writer() = default;
 
     Writer(const Writer& other) = default;
@@ -52,10 +58,12 @@ private:
 
     const std::string file_name_;
     const int netcdf_format_;
-    const MPI_Comm comm_;
     std::vector<Variable> variables_;
     std::vector<Attribute> global_attributes_;
     bool file_has_been_created_{false};
+#ifdef CMC_ENABLE_MPI
+    const MPI_Comm comm_{MPI_COMM_SELF};
+#endif
 };
 
 template<typename T>

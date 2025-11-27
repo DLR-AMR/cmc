@@ -3,9 +3,12 @@
 
 #include "cmc.hxx"
 #include "utilities/cmc_iface_compression_variable.hxx"
-#include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "utilities/cmc_compression_schema.hxx"
+
+#ifdef CMC_ENABLE_MPI
+#include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <cstdint>
 #include <vector>
@@ -28,8 +31,10 @@ public:
     virtual const std::string& GetName() const = 0;
     virtual size_t Size() const = 0;
     virtual const AmrMesh& GetAmrMesh() const = 0;
-    virtual MPI_Comm GetMPIComm() const = 0;
     virtual CompressionSchema GetCompressionSchema() const = 0;
+#ifdef CMC_ENABLE_MPI
+    virtual MPI_Comm GetMPIComm() const = 0;
+#endif
 };
 
 }

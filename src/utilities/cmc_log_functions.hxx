@@ -7,14 +7,14 @@ namespace cmc
 {
 
 template<typename T>
-void
+inline void
 cmc_print_args(const T& msg)
 {
     std::cout << msg << std::endl;
 }
 
 template<typename T, typename... Ts>
-void
+inline void
 cmc_print_args(const T& msg, Ts... msgs)
 {
     std::cout << msg;
@@ -22,27 +22,7 @@ cmc_print_args(const T& msg, Ts... msgs)
 }
 
 template<typename... Ts>
-void
-cmc_global_msg(MPI_Comm comm, Ts... msgs)
-{
-    /* check for MPI_Comm_rank */
-    #ifdef CMC_ENABLE_MPI
-        int rank{0};
-        int err{MPI_Comm_rank(comm, &rank)};
-        MPICheckError(err);
-        if (rank == 0)
-        {
-            std::cout << "[cmc] ";
-            cmc_print_args(msgs...);
-        }
-    #else
-        std::cout << "[cmc] ";
-        cmc_print_args(msgs...);
-    #endif
-}
-
-template<typename... Ts>
-void
+inline void
 cmc_global_msg(Ts... msgs)
 {
     /* check for MPI_Comm_rank */
@@ -61,34 +41,12 @@ cmc_global_msg(Ts... msgs)
     #endif
 }
 
+#ifdef CMC_ENABLE_DEBUG
 template<typename... Ts>
-void
-cmc_debug_msg(MPI_Comm comm, Ts... msgs)
-{
-     #ifdef CMC_ENABLE_MPI
-        int rank{0}, size{0};
-        int err{MPI_Comm_rank(comm, &rank)};
-        MPICheckError(err);
-        err = MPI_Comm_size(comm, &size);
-        MPICheckError(err);
-        if (size > 1)
-        {
-            std::cout << "[cmc] [rank " << rank << "] DEBUG: ";
-        } else {
-            std::cout << "[cmc] DEBUG: ";
-        }
-        cmc_print_args(msgs...);
-    #else
-        std::cout << "[cmc] DEBUG: ";
-        cmc_print_args(msgs...);
-    #endif
-}
-
-template<typename... Ts>
-void
+inline void
 cmc_debug_msg(Ts... msgs)
 {
-     #ifdef CMC_ENABLE_MPI
+    #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
         MPICheckError(err);
@@ -107,28 +65,12 @@ cmc_debug_msg(Ts... msgs)
     #endif
 }
 
+#else
 template<typename... Ts>
-void
-cmc_msg(MPI_Comm comm, Ts... msgs)
-{
-    #ifdef CMC_ENABLE_MPI
-        int rank{0}, size{0};
-        int err{MPI_Comm_rank(comm, &rank)};
-        MPICheckError(err);
-        err = MPI_Comm_size(comm, &size);
-        MPICheckError(err);
-        if (size > 1)
-        {
-            std::cout << "[cmc] [rank " << rank << "] ";
-        } else {
-            std::cout << "[cmc] ";
-        }
-        cmc_print_args(msgs...);
-    #else
-        std::cout << "[cmc] ";
-        cmc_print_args(msgs...);
-    #endif
-}
+inline void
+cmc_debug_msg([[maybe_unused]] Ts... msgs) {}
+
+#endif
 
 template<typename... Ts>
 void
@@ -155,26 +97,6 @@ cmc_msg(Ts... msgs)
 
 template<typename... Ts>
 [[noreturn]] void
-cmc_err_msg(MPI_Comm comm, Ts... msgs)
-{
-    #ifdef CMC_ENABLE_MPI
-        int rank{0};
-        int err{MPI_Comm_rank(comm, &rank)};
-        MPICheckError(err);
-        std::cout << "[cmc] [rank " << rank << "] ERROR: ";
-        cmc_print_args(msgs...);
-        err = MPI_Abort(comm, MPI_ERR_OTHER);
-        MPICheckError(err);
-        exit(EXIT_FAILURE);
-    #else
-        std::cout << "[cmc] ERROR: ";
-        cmc_print_args(msgs...);
-        std::exit(EXIT_FAILURE);
-    #endif
-}
-
-template<typename... Ts>
-[[noreturn]] void
 cmc_err_msg(Ts... msgs)
 {
     #ifdef CMC_ENABLE_MPI
@@ -194,9 +116,33 @@ cmc_err_msg(Ts... msgs)
     
 }
 
+template<typename... Ts>
+inline void
+cmc_warn_msg(Ts... msgs)
+{
+    #ifdef CMC_ENABLE_MPI
+        int rank{0}, size{0};
+        int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
+        MPICheckError(err);
+        err = MPI_Comm_size(MPI_COMM_WORLD, &size);
+        MPICheckError(err);
+        if (size > 1)
+        {
+            std::cout << "[cmc] [rank " << rank << "] WARNING: ";
+        } else {
+            std::cout << "[cmc] WARNING: ";
+        }
+        cmc_print_args(msgs...);
+    #else
+        std::cout << "[cmc] WARNING: ";
+        cmc_print_args(msgs...);
+    #endif
+}
+
+#ifdef CMC_ENABLE_MPI
 
 template<typename... Ts>
-void
+inline void
 cmc_warn_msg(MPI_Comm comm, Ts... msgs)
 {
     #ifdef CMC_ENABLE_MPI
@@ -219,27 +165,100 @@ cmc_warn_msg(MPI_Comm comm, Ts... msgs)
 }
 
 template<typename... Ts>
-void
-cmc_warn_msg(Ts... msgs)
+[[noreturn]] void
+cmc_err_msg(MPI_Comm comm, Ts... msgs)
+{
+    #ifdef CMC_ENABLE_MPI
+        int rank{0};
+        int err{MPI_Comm_rank(comm, &rank)};
+        MPICheckError(err);
+        std::cout << "[cmc] [rank " << rank << "] ERROR: ";
+        cmc_print_args(msgs...);
+        err = MPI_Abort(comm, MPI_ERR_OTHER);
+        MPICheckError(err);
+        exit(EXIT_FAILURE);
+    #else
+        std::cout << "[cmc] ERROR: ";
+        cmc_print_args(msgs...);
+        std::exit(EXIT_FAILURE);
+    #endif
+}
+
+template<typename... Ts>
+inline void
+cmc_msg(MPI_Comm comm, Ts... msgs)
 {
     #ifdef CMC_ENABLE_MPI
         int rank{0}, size{0};
-        int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
+        int err{MPI_Comm_rank(comm, &rank)};
         MPICheckError(err);
-        err = MPI_Comm_size(MPI_COMM_WORLD, &size);
+        err = MPI_Comm_size(comm, &size);
         MPICheckError(err);
         if (size > 1)
         {
-            std::cout << "[cmc] [rank " << rank << "] WARNING: ";
+            std::cout << "[cmc] [rank " << rank << "] ";
         } else {
-            std::cout << "[cmc] WARNING: ";
+            std::cout << "[cmc] ";
         }
         cmc_print_args(msgs...);
     #else
-        std::cout << "[cmc] WARNING: ";
+        std::cout << "[cmc] ";
         cmc_print_args(msgs...);
     #endif
 }
+
+
+#ifdef CMC_ENABLE_DEBUG
+template<typename... Ts>
+inline void
+cmc_debug_msg(MPI_Comm comm, Ts... msgs)
+{
+    #ifdef CMC_ENABLE_MPI
+        int rank{0}, size{0};
+        int err{MPI_Comm_rank(comm, &rank)};
+        MPICheckError(err);
+        err = MPI_Comm_size(comm, &size);
+        MPICheckError(err);
+        if (size > 1)
+        {
+            std::cout << "[cmc] [rank " << rank << "] DEBUG: ";
+        } else {
+            std::cout << "[cmc] DEBUG: ";
+        }
+        cmc_print_args(msgs...);
+    #else
+        std::cout << "[cmc] DEBUG: ";
+        cmc_print_args(msgs...);
+    #endif
+}
+
+#else
+template<typename... Ts>
+inline void
+cmc_debug_msg([[maybe_unused]] Ts... msgs) {}
+#endif
+
+template<typename... Ts>
+void
+cmc_global_msg(MPI_Comm comm, Ts... msgs)
+{
+    /* check for MPI_Comm_rank */
+    #ifdef CMC_ENABLE_MPI
+        int rank{0};
+        int err{MPI_Comm_rank(comm, &rank)};
+        MPICheckError(err);
+        if (rank == 0)
+        {
+            std::cout << "[cmc] ";
+            cmc_print_args(msgs...);
+        }
+    #else
+        std::cout << "[cmc] ";
+        cmc_print_args(msgs...);
+    #endif
+}
+
+#endif
 
 }
 

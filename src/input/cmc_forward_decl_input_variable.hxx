@@ -2,8 +2,10 @@
 #define INPUT_CMC_FORWARD_DECL_INPUT_VARIABLE
 
 #include "utilities/cmc_utilities.hxx"
+
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi_data.hxx"
-//#include "t8code/cmc_t8_mpi.hxx"
+#endif
 
 #include <map>
 #include <variant>
@@ -12,9 +14,10 @@ namespace cmc::input
 {
 
 /** Forward declarations **/
-
+#ifdef CMC_ENABLE_MPI
 template<typename T>
 using ReceiverMap = std::map<int, VariableMessage<T>>;
+#endif
 
 template<class T> class Variable;
 class Var;

@@ -186,35 +186,6 @@ public:
     std::vector<MortonIndex> morton_indices_;
 };
 
-#if 0
-inline
-int
-CreateMortonIndicesTag(const int variable_id)
-{
-    return variable_id + MortonIndicesTagOffset;
-}
-
-inline
-int
-CreateVariableDataTag(const int variable_id) 
-{
-    return variable_id;
-}
-
-inline 
-int
-GetVariableIDFromTag(const int msg_tag)
-{
-    return (msg_tag >= MortonIndicesTagOffset ? msg_tag - MortonIndicesTagOffset : msg_tag);
-}
-
-inline
-bool IsMessageADataMessage(const int msg_tag)
-{
-    return (msg_tag < MortonIndicesTagOffset);
-}
-#endif
-
 template<typename T>
 static 
 void
@@ -284,6 +255,7 @@ template<typename T>
 constexpr MPI_Datatype
 ConvertToMPIType()
 {
+#ifdef CMC_ENABLE_MPI
     if constexpr (std::is_same_v<T, int8_t>)
     {
         return MPI_INT8_T;
@@ -322,6 +294,9 @@ ConvertToMPIType()
         cmc_err_msg("There is no supported conversion to an MPI_Datatype.");
         return MPI_DATATYPE_NULL;
     }
+#else
+    return MPI_DATATYPE_NULL;
+#endif
 }
 
 }

@@ -3,9 +3,11 @@
 
 
 #include "utilities/cmc_utilities.hxx"
+#include "t8code/cmc_t8_mesh.hxx"
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
 #include "mpi/cmc_mpi_data.hxx"
-#include "t8code/cmc_t8_mesh.hxx"
+#endif
 
 #include <iterator>
 

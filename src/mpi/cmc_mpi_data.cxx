@@ -6,6 +6,7 @@ namespace cmc
 MPI_Datatype
 ConvertCmcTypeToMPIType(const CmcType type)
 {
+#ifdef CMC_ENABLE_MPI
     switch (type)
     {
         case CmcType::Int8_t:
@@ -45,6 +46,10 @@ ConvertCmcTypeToMPIType(const CmcType type)
             return MPI_DATATYPE_NULL;
         
     }
+#else
+    cmc_warn_msg("CMC is not configured with MPI! Therefore, the CmcType (", type, ") could not be converted to an MPI_TYPE.");
+    return MPI_DATATYPE_NULL;
+#endif
 }
 
 VarMessage
@@ -98,7 +103,7 @@ public:
     SendMessage() = delete;
     SendMessage(const MPI_Comm comm)
     : comm_{comm} {};
-
+#ifdef CMC_ENABLE_MPI
     std::pair<MPI_Request, MPI_Request> operator()(const VariableMessage<int8_t>& msg) {
         MPI_Request morton_req, data_req;
         /* Send the Morton indices */
@@ -263,7 +268,7 @@ public:
         
         return std::make_pair(morton_req, data_req);
     }
-
+#endif
 private:
     const MPI_Comm comm_;
 };
@@ -271,7 +276,12 @@ private:
 std::pair<MPI_Request, MPI_Request>  
 VariableSendMessage::Send(const MPI_Comm comm)
 {
+#ifdef CMC_ENABLE_MPI
     return std::visit(SendMessage(comm), message_);
+#else
+    cmc_warn_msg("CMC is not configured with MPI!");
+    return std::make_pair(MPI_ERR_OTHER, comm);
+#endif
 }
 
 void*

@@ -4,8 +4,9 @@
 #include "utilities/cmc_bit_map.hxx"
 #include "utilities/cmc_serialization.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
-
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <vector>
 #include <utility>
@@ -26,7 +27,11 @@ public:
     void IndicateElementStaysUnchanged();
     int GetNumberOfCompressionIterations() const {return compression_iteration_count_;};
 
+    std::vector<uint8_t> GetEncodedLevelData();
+
+#ifdef CMC_ENABLE_MPI
     std::vector<uint8_t> GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t8_forest_t partitioned_mesh, MPI_Comm comm);
+#endif
 
     virtual ~IAbstractMeshEncoder(){};
 
@@ -34,8 +39,10 @@ protected:
     IAbstractMeshEncoder() = default;
     
 private:
+#ifdef CMC_ENABLE_MPI
     std::vector<ExchangeData> DetermineSendMessages(const uint64_t num_global_bits, const uint64_t global_bit_offset, const int comm_size);
     std::pair<uint64_t, uint64_t> DetermineSendingRange(const uint64_t current_local_bit_idx, const uint64_t current_global_bit_idx, const uint64_t num_global_byte_packages, const int comm_size);
+#endif
 
     bit_map::BitMap encoded_level_data_;
     int compression_iteration_count_{0};
@@ -65,6 +72,20 @@ IAbstractMeshEncoder::FinalizeCompressionIteration()
 {
     ++compression_iteration_count_;
 }
+
+
+inline std::vector<uint8_t>
+IAbstractMeshEncoder::GetEncodedLevelData()
+{
+    /* Get the vectorized data of the bitmap and return it */
+    std::vector<uint8_t> encoded_mesh;
+
+    encoded_level_data_.MoveDataInto(encoded_mesh);
+
+    return encoded_mesh;
+}
+
+#ifdef CMC_ENABLE_MPI
 
 struct ExchangeData
 {
@@ -293,7 +314,7 @@ IAbstractMeshEncoder::GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t
         return encoded_mesh;
     } else
     {
-        /* In case of the root ran, we add a small preamble indicating the number of bits on this level */
+        /* In case of the root rank, we add a small preamble indicating the number of bits on this level */
         std::vector<uint8_t> encoded_stream;
         encoded_stream.reserve(contiguous_bits.size_bytes() + sizeof(uint64_t));
         cmc_debug_msg("contiguous_bits.size_bytes(): ", contiguous_bits.size_bytes());
@@ -309,6 +330,8 @@ IAbstractMeshEncoder::GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t
         return encoded_stream;
     }
 }
+
+#endif
 
 }
 

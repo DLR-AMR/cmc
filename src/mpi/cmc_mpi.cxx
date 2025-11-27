@@ -1,4 +1,5 @@
 #include "mpi/cmc_mpi.hxx"
+#include "utilities/cmc_log_functions.hxx"
 
 namespace cmc
 {
@@ -7,7 +8,7 @@ namespace cmc
 void
 MPIInitialize()
 {
-    #ifdef CMC_ENABLE_MPI
+#ifdef CMC_ENABLE_MPI
     int init_flag{0};
 
     /* Check if MPI already has been initialized */
@@ -19,17 +20,21 @@ MPIInitialize()
         err = MPI_Init(NULL, NULL);
         MPICheckError(err);
     }
-    #endif
+#else
+    cmc_warn_msg("MPIInitialize is called although CMC is not configured with MPI!");
+#endif
 }
 
 /** Finalize MPI */
 void
 MPIFinalize()
 {
-    #ifdef CMC_ENABLE_MPI
+#ifdef CMC_ENABLE_MPI
     int err{MPI_Finalize()};
     MPICheckError(err);
-    #endif
+#else
+    cmc_warn_msg("MPIFinalize is called although CMC is not configured with MPI!");
+#endif
 }
 
 /** Abort MPI */
@@ -37,7 +42,7 @@ MPIFinalize()
 void
 MPIAbort(const int _err_code, const char* _location)
 {
-    #ifdef CMC_ENABLE_MPI
+#ifdef CMC_ENABLE_MPI
     int rank{0};
     int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
     if (err == MPI_SUCCESS)
@@ -48,16 +53,18 @@ MPIAbort(const int _err_code, const char* _location)
         }
     } else
     {
-        std::cout << "CMC_MPI_ABORT is invoked..." << std::endl << "The error-code: " << _err_code << " occured in: " << CMC_FILE_LOCATION;
+        std::cout << "CMC_MPI_ABORT is invoked..." << std::endl << "The error-code: " << _err_code << " occured in: " << _location;
     }
     err = MPI_Abort(MPI_COMM_WORLD, _err_code);
     if (err == MPI_SUCCESS)
     {
         std::exit(EXIT_FAILURE);
-    } else {
+    } else
+#endif
+    {
+        std::cout << "CMC_MPI_ABORT is invoked..." << std::endl << "The error-code: " << _err_code << " occured in: " << _location << std::endl;
         std::abort();
     }
-    #endif
 }
 
 

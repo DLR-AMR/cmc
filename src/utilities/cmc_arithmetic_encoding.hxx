@@ -9,7 +9,9 @@
 #include "utilities/cmc_iface_entropy_alphabet.hxx"
 #include "utilities/cmc_entropy_coder.hxx"
 
+#ifdef CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
+#endif
 
 #include <cstddef>
 #include <memory>
@@ -98,6 +100,15 @@ public:
         alphabet_->UpdateSymbol(symbol);
     };
 
+    void SetupEncoding() override
+    {
+        /* Get the symbol frequencies */
+        std::vector<Letter> vectorized_alphabet = this->GetSymbolFrequencies();
+        /* Create the frequency model */
+        frequency_model_ = std::make_unique<StaticFrequencyModel>(vectorized_alphabet);
+    }
+
+#ifdef CMC_ENABLE_MPI
     void SetupEncoding(const MPI_Comm comm) override
     {
         /* Communicate the alphabet */
@@ -106,6 +117,7 @@ public:
         /* Create the frequency model */
         frequency_model_ = std::make_unique<StaticFrequencyModel>(vectorized_alphabet);
     }
+#endif
 
     void EncodeSymbol(const uint32_t symbol) override;
     void FinishEncoding();
@@ -134,8 +146,9 @@ private:
     void Encode(const Uint32_t low, const Uint32_t high, const Uint32_t total);
     void ProcessCommunicatedSymbolFrequencies(Alphabet& update_alphabet, const std::vector<Letter>& received_alphabet);
     void RemovePlaceholderSymbolsFromAlphabet(std::vector<Letter>& broadcasted_alphabet);
+#ifdef CMC_ENABLE_MPI
     std::vector<Letter> CommunicateSymbolFrequencies(const MPI_Comm comm);
-
+#endif
     /* Initial maximum range spans 31 bits -> [0x00000000, 0x7FFFFFFF) */
     Uint32_t lower_{0};
     Uint32_t higher_{0x7FFFFFFF};
@@ -301,6 +314,7 @@ Encoder<T>::RemovePlaceholderSymbolsFromAlphabet(std::vector<Letter>& broadcaste
     broadcasted_alphabet.resize(num_non_placeholder_symbols);
 }
 
+#ifdef CMC_ENABLE_MPI
 /**
  * @brief The collected symbol frequencies are exchanged, such that each process holds the same frequencies.
  * This is important, because the decompression can be performed with a different amount of processes/distributions.
@@ -467,6 +481,16 @@ Encoder<T>::CommunicateSymbolFrequencies(const MPI_Comm comm)
 #else
     cmc_warn_msg("MPI-Communication of the entropy alphabet is called although cmc is not linked against MPI. However, the serial function call is perfomed.");
 
+    return this->GetSymbolFrequencies();
+#endif
+}
+
+#endif
+
+template <typename T>
+inline std::vector<Letter>
+Encoder<T>::GetSymbolFrequencies()
+{
     /* Cast the base pointer to the actual implementation to construct the needed vectorized alphabet */
     const ArithmeticEncoderAlphabet* const  alphabet = dynamic_cast<ArithmeticEncoderAlphabet*>(alphabet_.get());
     
@@ -484,9 +508,7 @@ Encoder<T>::CommunicateSymbolFrequencies(const MPI_Comm comm)
     vectorized_alphabet.emplace_back(Letter{kSymbolJumpToNextByte, 1});
 
     return vectorized_alphabet;
-#endif
 }
-
 
 class Decoder
 {

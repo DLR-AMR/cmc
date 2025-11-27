@@ -323,22 +323,6 @@ Var::SetScaleFactor(const CmcUniversalType& scale_factor)
     }, var_);
 }
 
-void
-Var::SetMPIComm(const MPI_Comm comm)
-{
-    std::visit([&](auto&& var){
-        var.SetMPIComm(comm);
-    }, var_);
-}
-
-MPI_Comm
-Var::GetMPIComm() const
-{
-    return std::visit([](auto&& var) -> MPI_Comm {
-        return var.GetMPIComm();
-    }, var_);
-}
-
 int
 Var::GetInternID() const
 {
@@ -382,14 +366,6 @@ Var::AssignDataAtLinearIndices(const Var& variable, const UpdateLinearIndices& u
 {
     std::visit([&](auto&& var){
         var.AssignDataAtLinearIndices(variable, update);
-    }, var_);
-}
-
-void
-Var::AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update)
-{
-    std::visit([&](auto&& var){
-        var.AssignDataAtLinearIndices(message, update);
     }, var_);
 }
 
@@ -550,6 +526,72 @@ SplitIntoSubVariables(const Var& variable, const Dimension dimension)
     return std::visit(SplitVariables(dimension), variable.var_);
 }
 
+CmcType
+GetDataTypeFromVariableViaID(const std::vector<Var>& input_variables, const int variable_id)
+{
+    /* Find the variable with the corresponding id */
+    auto var_iter = std::find_if(input_variables.begin(), input_variables.end(), [&](auto& var){
+        return (var.GetID() == variable_id);
+    });
+
+    /* Check if the variable has been found and return its corresponding CmcType */
+    if (var_iter != input_variables.end())
+    {
+        return var_iter->GetType();
+    } else
+    {
+        /* In case there is no variable with the corresponding ID */
+        return CmcType::TypeUndefined;
+    }
+}
+
+CmcType
+GetDataTypeFromVariableViaInternID(const std::vector<Var>& input_variables, const int intern_id)
+{
+    /* Find the variable with the corresponding id */
+    auto var_iter = std::find_if(input_variables.begin(), input_variables.end(), [&](auto& var){
+        return (var.GetInternID() == intern_id);
+    });
+
+    /* Check if the variable has been found and return its corresponding CmcType */
+    if (var_iter != input_variables.end())
+    {
+        return var_iter->GetType();
+    } else
+    {
+        /* In case there is no variable with the corresponding ID */
+        return CmcType::TypeUndefined;
+    }
+}
+
+
+#ifdef CMC_ENABLE_MPI
+
+void
+Var::SetMPIComm(const MPI_Comm comm)
+{
+    std::visit([&](auto&& var){
+        var.SetMPIComm(comm);
+    }, var_);
+}
+
+MPI_Comm
+Var::GetMPIComm() const
+{
+    return std::visit([](auto&& var) -> MPI_Comm {
+        return var.GetMPIComm();
+    }, var_);
+}
+
+void
+Var::AssignDataAtLinearIndices(const VariableRecvMessage& message, const UpdateLinearIndices& update)
+{
+    std::visit([&](auto&& var){
+        var.AssignDataAtLinearIndices(message, update);
+    }, var_);
+}
+
+
 void
 Var::GatherDistributionData(const DataOffsets& offsets, std::vector<VariableSendMessage>& messages)
 {
@@ -613,43 +655,7 @@ Var::GatherDistributionData(const DataOffsets& offsets, std::vector<VariableSend
         }, var_);
 }
 
-CmcType
-GetDataTypeFromVariableViaID(const std::vector<Var>& input_variables, const int variable_id)
-{
-    /* Find the variable with the corresponding id */
-    auto var_iter = std::find_if(input_variables.begin(), input_variables.end(), [&](auto& var){
-        return (var.GetID() == variable_id);
-    });
-
-    /* Check if the variable has been found and return its corresponding CmcType */
-    if (var_iter != input_variables.end())
-    {
-        return var_iter->GetType();
-    } else
-    {
-        /* In case there is no variable with the corresponding ID */
-        return CmcType::TypeUndefined;
-    }
-}
-
-CmcType
-GetDataTypeFromVariableViaInternID(const std::vector<Var>& input_variables, const int intern_id)
-{
-    /* Find the variable with the corresponding id */
-    auto var_iter = std::find_if(input_variables.begin(), input_variables.end(), [&](auto& var){
-        return (var.GetInternID() == intern_id);
-    });
-
-    /* Check if the variable has been found and return its corresponding CmcType */
-    if (var_iter != input_variables.end())
-    {
-        return var_iter->GetType();
-    } else
-    {
-        /* In case there is no variable with the corresponding ID */
-        return CmcType::TypeUndefined;
-    }
-}
+#endif
 
 }
 

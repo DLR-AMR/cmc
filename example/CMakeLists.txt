@@ -16,10 +16,11 @@ install(TARGETS ${EXAMPLE_NETCDF_CMC_GATHER_NC_DATA} DESTINATION ${EXAMPLE_CMC_N
 # End If configured with netCDF
 endif()
 
-if (CMC_WITH_T8CODE)
-# If configured with t8code
+if (CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
+# If configured with t8code and MPI
 
 if (CMC_WITH_NETCDF)
+
 # Example for construction of a mesh and artifical data to compress
 set(EXAMPLE_CONSTRUCT_MESH_AND_DATA_FOR_COMPRESSION cmc_t8_construct_mesh_and_data_for_compression)
 add_executable(${EXAMPLE_CONSTRUCT_MESH_AND_DATA_FOR_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_t8_construct_mesh_and_data_for_compression.cxx)
