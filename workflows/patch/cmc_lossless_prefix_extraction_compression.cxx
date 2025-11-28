@@ -295,7 +295,7 @@ main(int argc, char *argv[])
 
     }
     /* Finalize cmc */
-    cmc::CmcFinalize(cmc::kMinimumFinalization);
+    cmc::CmcFinalize();
 
     return 0;
 }

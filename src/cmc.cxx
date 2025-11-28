@@ -15,9 +15,19 @@
 namespace cmc
 {
 
+static bool CmcIsInitialized = false;
+static bool CmcIsFinalized = false;
+
+static bool kInitializationScheme;
+
 void
-CmcInitialize(const bool initilization)
+CmcInitialize(const bool initialization)
 {
+    if (CmcIsInitialized)
+    {
+        std::cout << "[cmc] WARNING: cmc has already been initialized." << std::endl;
+        return;
+    }
     #ifdef CMC_ENABLE_MPI
     MPIInitialize();
 
@@ -27,7 +37,7 @@ CmcInitialize(const bool initilization)
     MPICheckError(err);
 
     #ifdef CMC_WITH_T8CODE
-    if (initilization)
+    if (initialization)
     {
       sc_init (MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
       t8_init (SC_LP_DEBUG);
@@ -43,11 +53,19 @@ CmcInitialize(const bool initilization)
     std::cout << "[cmc] cmc has been initialized." << std::endl; 
     #endif
 
+    CmcIsInitialized = true;
+    kInitializationScheme = initialization;
 }
 
 void
-CmcFinalize(const bool finalization)
+CmcFinalize()
 {
+    if (not CmcIsInitialized || CmcIsFinalized)
+    {
+        std::cout << "[cmc] WARNING: cmc has not been initialized before or is already finalized." << std::endl; 
+        return;
+    }
+
     #ifdef CMC_ENABLE_MPI
     int err, rank;
     /* Get the rank of the process */
@@ -55,7 +73,7 @@ CmcFinalize(const bool finalization)
     MPICheckError(err);
   
     #ifdef CMC_WITH_T8CODE
-    if (finalization)
+    if (kInitializationScheme)
     {
        sc_finalize();
     }
@@ -71,6 +89,9 @@ CmcFinalize(const bool finalization)
     #else
     std::cout << "[cmc] cmc has been finalized." << std::endl;
     #endif
+
+    CmcIsFinalized = true;
+    CmcIsInitialized = false;
 }
 
 }
