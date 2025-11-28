@@ -100,6 +100,7 @@ protected:
     void SetData(std::vector<SerializedCompressionValue<sizeof(T)>>&& initial_data);
     
 private:
+    void Compress(kTag2D);
     void Compress(kTag3D);
     void SetupInputVariableForCompression(input::Var& input_variable);
 
@@ -121,7 +122,11 @@ template <typename T, size_t Dim>
 void
 AbstractPatchByteCompressionVariable<T, Dim>::Compress()
 {
-    if constexpr (Dim == 3)
+    if constexpr (Dim == 2)
+    {
+        cmc_debug_msg("Lossless 2D Compression.");
+        this->Compress(AbstractPatchByteCompressionVariable<T, Dim>::tag2D);
+    } else if constexpr (Dim == 3)
     {
         cmc_debug_msg("Lossless 3D Compression.");
         this->Compress(AbstractPatchByteCompressionVariable<T, Dim>::tag3D);
@@ -200,6 +205,7 @@ AbstractPatchByteCompressionVariable<T, Dim>::SetupInputVariableForCompression(i
     cmc_debug_msg("The setup of the InputVariable for compression has been successfull.");
 }
 
+/****** 3D Compression ******/
 template <typename T>
 inline CompressionValue<T>
 GetValue(const std::vector<CompressionValue<T>>& data, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  const int kLevLength)
@@ -346,6 +352,153 @@ AbstractPatchByteCompressionVariable<T, Dim>::Compress(AbstractPatchByteCompress
 
     cmc_debug_msg("Compression of variable ", this->name_, " is finished.");
 }
+
+/****************************/
+
+/****** 2D Compression ******/
+template <typename T>
+inline CompressionValue<T>
+GetValue(const std::vector<CompressionValue<T>>& data, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
+{
+    cmc_assert(lat * kLonLength + lon < data.size());
+    return data[lat * kLonLength + lon];
+}
+
+template <typename T>
+inline void
+SetValue(std::vector<CompressionValue<T>>& data, const CompressionValue<T>& value, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
+{
+    cmc_assert(lat * kLonLength + lon < data.size());
+    data[lat * kLonLength + lon] = value;
+}
+
+
+template <typename T, size_t Dim>
+void
+AbstractPatchByteCompressionVariable<T, Dim>::Compress(AbstractPatchByteCompressionVariable<T, Dim>::kTag2D)
+{
+    constexpr int kDim = 2;
+    constexpr int kLatID = 0;
+    constexpr int kLonID = 1;
+
+    /* Potentially, create a pre-compression processing step */
+    this->PreCompressionProcessing(data_);
+
+    cmc_debug_msg("Lossless patch-based compression of variable ", this->name_, " starts...");
+
+    cmc_assert(dim_lengths_pyramid_.size() == 1);
+    cmc_assert(dim_lengths_pyramid_.front().size() == kDim);
+
+    /* Store the intial dimension sizes */
+    size_t lat_length = dim_lengths_pyramid_.front()[kLatID];
+    size_t lon_length = dim_lengths_pyramid_.front()[kLonID];
+
+    cmc_debug_msg("Number of compression iterations to perform: ", num_compression_lvls_);
+    
+    /* Perform the iterative compression steps up until the root level */
+    for (int lvl_idx{0}; lvl_idx < num_compression_lvls_; ++lvl_idx)
+    {
+        /* Define a reference for the ease of notation */
+        const std::vector<size_t>& dim_lengths = dim_lengths_pyramid_.back();
+
+        cmc_assert(dim_lengths_pyramid_.back().size() == static_cast<size_t>(kDim));
+        cmc_debug_msg("A coarsening iteration is initialized (step: ", lvl_idx, ").");
+        cmc_debug_msg("Level's data dimensions: ", dim_lengths[kLatID], ", ", dim_lengths[kLonID]);
+        
+        /* Intitialize the extraction iteration */
+        this->InitializeExtractionIteration();
+
+        /* Allocate the coarse level */
+        data_new_.reserve(((dim_lengths[kLatID] / kDimReductionFactor) + 1) * ((dim_lengths[kLonID] / kDimReductionFactor) + 1));
+
+        /* Iterate over patches */
+        for (size_t lat = 0; lat < dim_lengths[kLatID]; lat += kDimReductionFactor)
+        {
+            for (size_t lon = 0; lon < dim_lengths[kLonID]; lon += kDimReductionFactor)
+            {
+                /* Allocate avector for the values of the current patch */
+                std::vector<CompressionValue<T>> patch;
+                patch.reserve(kDim * kDimReductionFactor);
+
+                /* Gather the values for this patch */
+
+                    for (size_t lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
+                    {
+                        for (size_t lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
+                        {
+                            if (lat + lat_idx >= dim_lengths[kLatID] || lon + lon_idx >= dim_lengths[kLonID])
+                            {
+                                continue;
+                            } else
+                            {
+                                patch.push_back(GetValue<T>(data_, lat + lat_idx, lon + lon_idx, dim_lengths[kLonID], dim_lengths[kLatID]));
+                            }
+                        }
+                    }
+
+                /* Perform an extraction operation on this patch of values */
+                const ExtractionData<T> extracted_values = this->PerformExtraction(patch);
+
+                /* Re-Assign the fine values */
+                int extracted_val_idx{0};
+
+                for (size_t lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
+                {
+                    for (size_t lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
+                    {
+                        if (lat + lat_idx >= dim_lengths[kLatID] || lon + lon_idx >= dim_lengths[kLonID])
+                        {
+                            continue;
+                        } else
+                        {
+                            /* Update the fine value accordingly */
+                            SetValue<T>(data_, extracted_values.fine_values[extracted_val_idx], lat + lat_idx, lon + lon_idx, dim_lengths[kLonID], dim_lengths[kLatID]);
+                            ++extracted_val_idx;
+                        }
+                    }
+                }
+
+                /* Store the extracted information */
+                data_new_.push_back(extracted_values.coarse_value);
+            }
+        }
+
+        /* Potentially, perform a step after the coarse extraction */
+        this->CompleteExtraction(dim_lengths, kDimReductionFactor, data_, data_new_);
+
+        /* Encode the data from this compression step */
+        auto [encoded_entropy_codes, encoded_data] = this->EncodeLevelData(data_);
+        buffered_entropy_codes_.push_back(std::move(encoded_entropy_codes));
+        buffered_encoded_data_.push_back(std::move(encoded_data));
+
+        /* Switch to the coarser data for the next extraction iteration */
+        data_ = std::move(data_new_);
+        data_new_.clear();
+
+        /* Finalize the extraction iteration */
+        this->FinalizeExtractionIteration();
+
+        /* Update the dimension sizes */
+        lat_length = (lat_length % kDimReductionFactor == 0 ? (lat_length / kDimReductionFactor) : (lat_length / kDimReductionFactor) + 1);
+        lon_length = (lon_length % kDimReductionFactor == 0 ? (lon_length / kDimReductionFactor) : (lon_length / kDimReductionFactor) + 1);
+        
+        /* Store the dimensions for the next iteration */
+        dim_lengths_pyramid_.emplace_back(kDim);
+        dim_lengths_pyramid_.back()[kLatID] = lat_length;
+        dim_lengths_pyramid_.back()[kLonID] = lon_length;
+
+        cmc_debug_msg("The coarsening iteration is finished.");
+    }
+
+    /* At last, we need to encode the root level data */
+    auto [encoded_root_entropy_codes, encoded_root_data] = this->EncodeRootLevelData(data_);
+    buffered_entropy_codes_.push_back(std::move(encoded_root_entropy_codes));
+    buffered_encoded_data_.push_back(std::move(encoded_root_data));
+
+    cmc_debug_msg("Compression of variable ", this->name_, " is finished.");
+}
+
+/****************************/
 
 template <typename T, size_t Dim>
 inline void

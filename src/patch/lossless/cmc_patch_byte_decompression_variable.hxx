@@ -68,6 +68,7 @@ protected:
     
 private:
     void SetupDecompression();
+    void Decompress(kTag2D);
     void Decompress(kTag3D);
 
     std::vector<CompressionValue<T>> data_; //!< The current data of the variable 
@@ -125,10 +126,31 @@ AbstractPatchByteDecompressionVariable<T, Dim>::GetDecompressedData() const
     return data;
 }
 
+template <typename T, size_t Dim>
+void
+AbstractPatchByteDecompressionVariable<T, Dim>::Decompress()
+{
+    if constexpr (Dim == 2)
+    {
+        cmc_debug_msg("Lossless 2D Decompression.");
+        this->Decompress(AbstractPatchByteDecompressionVariable<T, Dim>::tag2D);
+    } else if constexpr (Dim == 3)
+    {
+        cmc_debug_msg("Lossless 3D Decompression.");
+        this->Decompress(AbstractPatchByteDecompressionVariable<T, Dim>::tag3D);
+    } else
+    {
+        cmc_err_msg("Unsupported variable's dimensionality (Dim = ", Dim, ").");
+    }
+}
+
+/****** 3D Decompression ******/
+
 template <typename T>
 inline CompressionValue<T>
 GetCoarseValue(const std::vector<CompressionValue<T>>& coarse_data, const std::vector<size_t>& coarse_lvl_dims, const size_t next_lvl_lev, const size_t next_lvl_lat, const size_t next_lvl_lon)
 {
+    cmc_assert(coarse_lvl_dims.size() == static_cast<size_t>(3));
     const size_t coarse_lvl_lev = next_lvl_lev / kDimReductionFactor;
     const size_t coarse_lvl_lat = next_lvl_lat / kDimReductionFactor;
     const size_t coarse_lvl_lon = next_lvl_lon / kDimReductionFactor;
@@ -137,20 +159,6 @@ GetCoarseValue(const std::vector<CompressionValue<T>>& coarse_data, const std::v
     cmc_assert(coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat * coarse_lvl_dims[2] + coarse_lvl_lon < coarse_data.size());
 
     return coarse_data[coarse_lvl_lev * coarse_lvl_dims[1] * coarse_lvl_dims[2] + coarse_lvl_lat * coarse_lvl_dims[2] + coarse_lvl_lon];
-}
-
-template <typename T, size_t Dim>
-void
-AbstractPatchByteDecompressionVariable<T, Dim>::Decompress()
-{
-    if constexpr (Dim == 3)
-    {
-        cmc_debug_msg("Lossless 3D Decompression.");
-        this->Decompress(AbstractPatchByteDecompressionVariable<T, Dim>::tag3D);
-    } else
-    {
-        cmc_err_msg("Unsupported variable's dimensionality (Dim = ", Dim, ").");
-    }
 }
 
 template <typename T, size_t Dim>
@@ -208,7 +216,85 @@ AbstractPatchByteDecompressionVariable<T, Dim>::Decompress(AbstractPatchByteDeco
     cmc_debug_msg("Decompression of variable ", this->name_, " is finished.");
 }
 
+/******************************/
 
+
+/****** 2D Decompression ******/
+
+template <typename T>
+inline CompressionValue<T>
+GetCoarseValue(const std::vector<CompressionValue<T>>& coarse_data, const std::vector<size_t>& coarse_lvl_dims, const size_t next_lvl_lat, const size_t next_lvl_lon)
+{
+    cmc_assert(coarse_lvl_dims.size() == static_cast<size_t>(2));
+    constexpr int kLatID = 0;
+    constexpr int kLonID = 1;
+
+    const size_t coarse_lvl_lat = next_lvl_lat / kDimReductionFactor;
+    const size_t coarse_lvl_lon = next_lvl_lon / kDimReductionFactor;
+
+    cmc_assert(coarse_lvl_lat < coarse_lvl_dims[kLatID]);
+    cmc_assert(coarse_lvl_lat * coarse_lvl_dims[kLonID] + coarse_lvl_lon < coarse_data.size());
+
+    return coarse_data[coarse_lvl_lat * coarse_lvl_dims[kLonID] + coarse_lvl_lon];
+}
+
+template <typename T, size_t Dim>
+void
+AbstractPatchByteDecompressionVariable<T, Dim>::Decompress(AbstractPatchByteDecompressionVariable<T, Dim>::kTag2D)
+{
+    constexpr int kDim = 2;
+    constexpr int kLatID = 0;
+    constexpr int kLonID = 1;
+
+    cmc_debug_msg("Decompression of variable ", this->name_, " starts...");
+
+    /* Decode the root level value */
+    data_ = std::vector<CompressionValue<T>>{this->GetInitDecompressionValue()};
+
+    cmc_assert(data_.size() == static_cast<size_t>(1));
+
+    /* Perform the iterative decompression */
+    for (int decompression_iter{0}; decompression_iter < num_decompression_lvls_ - 1; ++decompression_iter)
+    {
+        cmc_debug_msg("A decompression iteration is initialized (step: ", decompression_iter,").");
+        this->InitializeDecompressionIteration();
+
+        /* Get the dimensions of this and the next level */
+        const std::vector<size_t>& curr_lvl_dims = dim_lengths_pyramid_[decompression_iter];
+        const std::vector<size_t>& next_lvl_dims = dim_lengths_pyramid_[decompression_iter + 1];
+
+        /* Allocate the data_new_*/
+        data_new_.reserve(next_lvl_dims[kLatID] * next_lvl_dims[kLonID]);
+
+        /* Iterate over the finer level */
+        for (size_t lat = 0; lat < next_lvl_dims[kLatID]; ++lat)
+        {
+            for (size_t lon = 0; lon < next_lvl_dims[kLonID]; ++lon)
+            {
+                /* Get the corresponding coarse level value */
+                const CompressionValue<T> coarse_val = GetCoarseValue<T>(data_, curr_lvl_dims, lat, lon);
+
+                /* Refine the value */
+                const CompressionValue<T> fine_val = this->RefineNextValue(coarse_val);
+
+                /* Store the refined value */
+                data_new_.push_back(fine_val);
+            }
+        }
+
+        /* Switch to the new refined data for the next iteration */
+        data_ = std::move(data_new_);
+        data_new_.clear();
+
+        this->FinalizeDecompressionIteration();
+        cmc_debug_msg("The decompression iteration is finished.");
+    }
+
+    has_been_decompressed_ = true;
+    cmc_debug_msg("Decompression of variable ", this->name_, " is finished.");
+}
+
+/******************************/
 
 }
 
