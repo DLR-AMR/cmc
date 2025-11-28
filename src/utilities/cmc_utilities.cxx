@@ -230,6 +230,9 @@ GetDefaultDataLayout(const int dimensionality)
 {
     switch (dimensionality)
     {
+        case 1:
+            return DataLayout::Lon_;
+        break;
         case 2:
             return DataLayout::Lat_Lon;
         break;
@@ -237,7 +240,7 @@ GetDefaultDataLayout(const int dimensionality)
             return DataLayout::Lev_Lat_Lon;
         break;
         default:
-            std::cout << "[cmc] ERROR: The specified dimensionality is not supported (only 2D and 3D)." << std::endl;
+            std::cout << "[cmc] ERROR: The specified dimensionality is not supported (only 1D, 2D and 3D)." << std::endl;
             std::exit(EXIT_FAILURE);
             return DataLayout::LayoutUndefined;
         break;

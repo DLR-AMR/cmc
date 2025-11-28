@@ -48,6 +48,7 @@ protected:
     void CompleteExtraction(const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals) override;
 private:
     void CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const;
+    void CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag1D, const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals);
     void CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag2D, const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals);
     void CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag3D, const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals);
 
@@ -59,7 +60,11 @@ template <typename T, size_t Dim>
 void
 PatchCompressionVariable<T, Dim>::CompleteExtraction(const std::vector<size_t>& fine_dim_lengths, const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals)
 {
-    if constexpr (Dim == 2)
+    if constexpr (Dim == 1)
+    {
+        cmc_debug_msg("Complete Patch-Based Lossless MultiRes 1D Extraction Compression Iteration.");
+        this->CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::tag1D, fine_dim_lengths, kDimReductionFactor, fine_vals, coarse_vals);
+    } else if constexpr (Dim == 2)
     {
         cmc_debug_msg("Complete Patch-Based Lossless MultiRes 2D Extraction Compression Iteration.");
         this->CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::tag2D, fine_dim_lengths, kDimReductionFactor, fine_vals, coarse_vals);
@@ -175,6 +180,54 @@ PatchCompressionVariable<T, Dim>::CompleteExtraction(AbstractPatchByteCompressio
                         ++res_lin_idx;
                     }
                 }
+            }
+        }
+    }
+
+    std::swap(res_indications, resdiual_order_indications_);
+}
+
+/****************************/
+
+
+/****** 1D Compression ******/
+
+template <typename T>
+inline void
+SetValue(std::vector<T>& data, const T& value, const int lon, [[maybe_unused]] const int kLonLength)
+{
+    cmc_assert(lon < kLonLength);
+    cmc_assert(lon < data.size());
+    data[lon] = value;
+}
+
+
+template<class T, size_t Dim>
+void
+PatchCompressionVariable<T, Dim>::CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag1D, const std::vector<size_t>& fine_dim_lengths, const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals)
+{
+    constexpr int kDim = 1;
+    constexpr int kLonID = 0;
+
+    cmc_assert(fine_dim_lengths.size() == static_cast<size_t>(kDim));
+    
+    std::vector<uint8_t> res_indications( fine_dim_lengths[kLonID]);
+
+    size_t res_lin_idx{0};
+
+    /* Iterate over patches */
+    for (size_t lon = 0; lon < fine_dim_lengths[kLonID]; lon += kDimReductionFactor)
+    {
+        /* Gather the values for this patch */
+        for (size_t lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
+        {
+            if (lon + lon_idx >= fine_dim_lengths[kLonID])
+            {
+                continue;
+            } else
+            {
+                SetValue<uint8_t>(res_indications, resdiual_order_indications_[res_lin_idx], lon + lon_idx, fine_dim_lengths[kLonID]);
+                ++res_lin_idx;
             }
         }
     }
