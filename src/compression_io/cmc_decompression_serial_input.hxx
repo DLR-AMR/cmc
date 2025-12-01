@@ -141,6 +141,9 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
         case cmc::CompressionSchema::PatchPrefixExtractionPlainSuffixes:
             switch (dimensionality)
             {
+                case 1:
+                    return std::make_unique<patch::decompression::prefix::plain_suffix::DecompressionVariable<T, 1>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
+                    break;
                 case 2:
                     return std::make_unique<patch::decompression::prefix::plain_suffix::DecompressionVariable<T, 2>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
                     break;
@@ -155,6 +158,9 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
         case cmc::CompressionSchema::PatchMultiResExtraction:
             switch (dimensionality)
             {
+                case 1:
+                    return std::make_unique<patch::decompression::multi_res::DecompressionVariable<T, 1>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
+                    break;
                 case 2:
                     return std::make_unique<patch::decompression::multi_res::DecompressionVariable<T, 2>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
                     break;
