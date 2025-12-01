@@ -150,6 +150,9 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
                 case 3:
                     return std::make_unique<patch::decompression::prefix::plain_suffix::DecompressionVariable<T, 3>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
                     break;
+                case 4:
+                    return std::make_unique<patch::decompression::prefix::plain_suffix::DecompressionVariable<T, 4>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
+                    break;
                 default:
                     cmc_err_msg("The dimensionality of the compressed variable is not recognized for a patch variable.");
                     return std::make_unique<patch::decompression::prefix::plain_suffix::DecompressionVariable<T, 3>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
@@ -166,6 +169,9 @@ Reader::ReadPatchVariableForDecompression(const std::string& variable_name)
                     break;
                 case 3:
                     return std::make_unique<patch::decompression::multi_res::DecompressionVariable<T, 3>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
+                    break;
+                case 4:
+                    return std::make_unique<patch::decompression::multi_res::DecompressionVariable<T, 4>>(std::move(encoded_data), variable_name, std::move(pyramidal_dim_lengths), init_domain, initial_data_layout, num_pyramidal_dim_length_lvls);
                     break;
                 default:
                     cmc_err_msg("The dimensionality of the compressed variable is not recognized for a patch variable.");

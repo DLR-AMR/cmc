@@ -51,6 +51,7 @@ private:
     void CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag1D, const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals);
     void CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag2D, const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals);
     void CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag3D, const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals);
+    void CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag4D, const std::vector<size_t>& fine_dim_lengths,  const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals);
 
     std::unique_ptr<entropy_coding::IByteCompressionEntropyCoder> entropy_coder_{std::make_unique<cmc::entropy_coding::arithmetic_coding::MultiResEncoder<T>>()}; //!< The entropy coder to use in order to encode information
     std::vector<uint8_t> resdiual_order_indications_;
@@ -72,11 +73,83 @@ PatchCompressionVariable<T, Dim>::CompleteExtraction(const std::vector<size_t>& 
     {
         cmc_debug_msg("Complete Patch-Based Lossless MultiRes 3D Extraction Compression Iteration.");
         this->CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::tag3D, fine_dim_lengths, kDimReductionFactor, fine_vals, coarse_vals);
+    }  else if constexpr (Dim == 4)
+    {
+        cmc_debug_msg("Complete Patch-Based Lossless MultiRes 4D Extraction Compression Iteration.");
+        this->CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::tag4D, fine_dim_lengths, kDimReductionFactor, fine_vals, coarse_vals);
     } else
     {
         cmc_err_msg("Unsupported variable's dimensionality (Dim = ", Dim, ").");
     }
 }
+
+
+/****** 4D Compression ******/
+
+template <typename T>
+inline void
+SetValue(std::vector<T>& data, const T& value, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  const int kLevLength, const int kTimeLength)
+{
+    cmc_assert(time * (kLatLength * kLonLength * kLevLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    data[time * (kLatLength * kLonLength * kLevLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
+}
+
+
+template<class T, size_t Dim>
+void
+PatchCompressionVariable<T, Dim>::CompleteExtraction(AbstractPatchByteCompressionVariable<T, Dim>::kTag4D, const std::vector<size_t>& fine_dim_lengths, const size_t kDimReductionFactor, [[maybe_unused]] const std::vector<CompressionValue<T>>& fine_vals, [[maybe_unused]] const std::vector<CompressionValue<T>>& coarse_vals)
+{
+    constexpr int kDim = 4;
+    constexpr int kTimeID = 0;
+    constexpr int kLevID = 1;
+    constexpr int kLatID = 2;
+    constexpr int kLonID = 3;
+
+    cmc_assert(fine_dim_lengths.size() == kDim);
+    
+    std::vector<uint8_t> res_indications(fine_dim_lengths[kTimeID] * fine_dim_lengths[kLevID] * fine_dim_lengths[kLatID] * fine_dim_lengths[kLonID]);
+
+    size_t res_lin_idx{0};
+
+    /* Iterate over patches */
+    for (size_t time = 0; time < fine_dim_lengths[kTimeID]; time += kDimReductionFactor)
+    {
+        for (size_t lev = 0; lev < fine_dim_lengths[kLevID]; lev += kDimReductionFactor)
+        {
+            for (size_t lat = 0; lat < fine_dim_lengths[kLatID]; lat += kDimReductionFactor)
+            {
+                for (size_t lon = 0; lon < fine_dim_lengths[kLonID]; lon += kDimReductionFactor)
+                {
+                    /* Gather the values for this patch */
+                    for (size_t time_idx = 0; time_idx < kDimReductionFactor; ++time_idx)
+                    {
+                        for (size_t lev_idx = 0; lev_idx < kDimReductionFactor; ++lev_idx)
+                        {
+                            for (size_t lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
+                            {
+                                for (size_t lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
+                                {
+                                    if (time + time_idx >= fine_dim_lengths[kTimeID] || lev + lev_idx >= fine_dim_lengths[kLevID] || lat + lat_idx >= fine_dim_lengths[kLatID] || lon + lon_idx >= fine_dim_lengths[kLonID])
+                                    {
+                                        continue;
+                                    } else
+                                    {
+                                        SetValue<uint8_t>(res_indications, resdiual_order_indications_[res_lin_idx], time + time_idx, lev + lev_idx, lat + lat_idx, lon + lon_idx, fine_dim_lengths[kLonID], fine_dim_lengths[kLatID], fine_dim_lengths[kLevID], fine_dim_lengths[kTimeID]);
+                                        ++res_lin_idx;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }   
+    std::swap(res_indications, resdiual_order_indications_);
+}
+
+/****************************/
+
 
 /****** 3D Compression ******/
 

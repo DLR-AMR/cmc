@@ -291,8 +291,90 @@ Compress(const cmc::CmcType data_type, const std::string& input_file, const std:
                 break;
             }
         break;
+        /** 4D Compression **/
+        case 4:
+            switch (data_type)
+            {
+                case cmc::CmcType::Float:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<float, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                case cmc::CmcType::Double:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<double, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                case cmc::CmcType::Int16_t:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<int16_t, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                case cmc::CmcType::Uint16_t:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<uint16_t, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                case cmc::CmcType::Int32_t:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<int32_t, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                case cmc::CmcType::Uint32_t:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<uint32_t, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                case cmc::CmcType::Int64_t:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<int64_t, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                case cmc::CmcType::Uint64_t:
+                {
+                    cmc::patch::lossless::prefix::plain_suffix::PatchCompressionVariable<uint64_t, 4> var(input_variables.front());
+                    var.Compress();
+                    cmc::compression_io::serial::Writer writer(output_file);
+                    writer.SetVariable(&var);
+                    writer.Write();
+                }
+                break;
+                default:
+                    DisplayHelpMessage();
+                    cmc::cmc_err_msg("A not supported/recognized data type has been specified.");
+                break;
+            }
+        break;
         default:
-            cmc::cmc_err_msg("Only 1D, S2D and 3D compression is currently supported.");
+            cmc::cmc_err_msg("Only 1D, 2D, 3D and 4D compression is currently supported.");
     }
 }
 
@@ -426,10 +508,10 @@ main(int argc, char *argv[])
     }
 
     /* Check if the dimensionality is supported */
-    if (dim < 1 || dim > 3)
+    if (dim < 1 || dim > 4)
     {
         DisplayHelpMessage();
-        cmc::cmc_err_msg("The specified dimensionality (", dim, ") is not supported. Currently, only 1D, 2D and 3D compression is supported.");
+        cmc::cmc_err_msg("The specified dimensionality (", dim, ") is not supported. Currently, only 1D, 2D, 3D and 4D compression is supported.");
     }
 
     int offset{0};
