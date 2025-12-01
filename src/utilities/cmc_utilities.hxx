@@ -36,7 +36,12 @@ enum CmcType {TypeUndefined = -1, Int8_t, Char, Int16_t, Int32_t, Float, Double,
 
 //TODO: Maybe make a nicer design of the layout, such that there is a pattern between layouts 
 enum DataLayout {LayoutUndefined, Lon_, Lat_, Lev_, _InternEnd1DLayouts, Lat_Lon, Lon_Lat, Lat_Lev, Lev_Lat, Lon_Lev, Lev_Lon, _InternEnd2DLayouts,
-                  Lat_Lon_Lev, Lat_Lev_Lon, Lev_Lat_Lon, Lev_Lon_Lat, Lon_Lev_Lat, Lon_Lat_Lev, _InternEnd3DLayouts};
+                 Lat_Lon_Lev, Lat_Lev_Lon, Lev_Lat_Lon, Lev_Lon_Lat, Lon_Lev_Lat, Lon_Lat_Lev, _InternEnd3DLayouts,
+                 Time_Lev_Lat_Lon, Time_Lev_Lon_Lat, Time_Lat_Lev_Lon, Time_Lat_Lon_Lev, Time_Lon_Lev_Lat, Time_Lon_Lat_Lev,
+                 Lev_Time_Lat_Lon, Lev_Time_Lon_Lat, Lev_Lat_Time_Lon, Lev_Lat_Lon_Time, Lev_Lon_Time_Lat, Lev_Lon_Lat_Time,
+                 Lat_Time_Lev_Lon, Lat_Time_Lon_Lev, Lat_Lev_Time_Lon, Lat_Lev_Lon_Time, Lat_Lon_Time_Lev, Lat_Lon_Lev_Time,
+                 Lon_Time_Lev_Lat, Lon_Time_Lat_Lev, Lon_Lev_Time_Lat, Lon_Lev_Lat_Time, Lon_Lat_Time_Lev, Lon_Lat_Lev_Time,
+                _InternEnd4DLayouts};
 
 enum DataRepresentation {RepresentationUndefined, SpaceFillingCurve, CartesianCoordinates, HyperslabCoordinates};
 
