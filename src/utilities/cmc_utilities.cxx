@@ -21,7 +21,12 @@ int
 GetDimensionalityOfDataLayout(const DataLayout layout)
 {
     if (layout > DataLayout::LayoutUndefined &&
-        layout < DataLayout::_InternEnd2DLayouts)
+        layout < DataLayout::_InternEnd1DLayouts)
+    {
+        /* If one-diemnsional */
+        return 1;
+    } else if (layout > DataLayout::_InternEnd1DLayouts &&
+               layout < DataLayout::_InternEnd2DLayouts)
     {
         /* If two-dimensional */
         return 2;
@@ -30,6 +35,11 @@ GetDimensionalityOfDataLayout(const DataLayout layout)
     {
         /* If three-dimensional */
         return 3;
+    } else if (layout > DataLayout::_InternEnd3DLayouts &&
+               layout < DataLayout::_InternEnd4DLayouts)
+    {
+        /* If four-dimensional */
+        return 4;
     } else
     {
         /* Return an error if a unsupported DataLayout has been supplied */
@@ -44,6 +54,20 @@ GetDimensionVectorFromLayout(const DataLayout layout)
 {
     switch (layout)
     {
+        /* 1D layouts */
+        case DataLayout::Lon_:
+            return std::vector<Dimension>{Dimension::Lon};
+        break;
+        case DataLayout::Lat_:
+            return std::vector<Dimension>{Dimension::Lat};
+        break;
+        case DataLayout::Lev_:
+            return std::vector<Dimension>{Dimension::Lev};
+        break;
+        case DataLayout::Time_:
+            return std::vector<Dimension>{Dimension::Time};
+        break;
+        /* 2D layouts */
         case DataLayout::Lat_Lon:
             return std::vector<Dimension>{Dimension::Lat, Dimension::Lon};
         break;
@@ -62,6 +86,7 @@ GetDimensionVectorFromLayout(const DataLayout layout)
         case DataLayout::Lev_Lon:
             return std::vector<Dimension>{Dimension::Lev, Dimension::Lon};
         break;
+        /* 3D layouts */
         case DataLayout::Lat_Lon_Lev:
             return std::vector<Dimension>{Dimension::Lat, Dimension::Lon, Dimension::Lev};
         break;
@@ -80,7 +105,81 @@ GetDimensionVectorFromLayout(const DataLayout layout)
         case DataLayout::Lon_Lat_Lev:
             return std::vector<Dimension>{Dimension::Lon, Dimension::Lat, Dimension::Lev};
         break;
+        /* 4D layouts */
+        case DataLayout::Time_Lev_Lat_Lon:
+            return std::vector<Dimension>{Dimension::Time, Dimension::Lev, Dimension::Lat, Dimension::Lon};
+        break;
+        case DataLayout::Time_Lev_Lon_Lat:
+            return std::vector<Dimension>{Dimension::Time, Dimension::Lev, Dimension::Lon, Dimension::Lat};
+        break;
+        case DataLayout::Time_Lat_Lev_Lon:
+            return std::vector<Dimension>{Dimension::Time, Dimension::Lat, Dimension::Lev, Dimension::Lon};
+        break;
+        case DataLayout::Time_Lat_Lon_Lev:
+            return std::vector<Dimension>{Dimension::Time, Dimension::Lat, Dimension::Lon, Dimension::Lev};
+        break;
+        case DataLayout::Time_Lon_Lev_Lat:
+            return std::vector<Dimension>{Dimension::Time, Dimension::Lon, Dimension::Lev, Dimension::Lat};
+        break;
+        case DataLayout::Time_Lon_Lat_Lev:
+            return std::vector<Dimension>{Dimension::Time, Dimension::Lon, Dimension::Lat, Dimension::Lev};
+        break;
+        case DataLayout::Lev_Time_Lat_Lon:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Time, Dimension::Lat, Dimension::Lon};
+        break;
+        case DataLayout::Lev_Time_Lon_Lat:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Time, Dimension::Lon, Dimension::Lat};
+        break;
+        case DataLayout::Lev_Lat_Time_Lon:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lat, Dimension::Time, Dimension::Lon};
+        break;
+        case DataLayout::Lev_Lat_Lon_Time:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lat, Dimension::Lon, Dimension::Time};
+        break;
+        case DataLayout::Lev_Lon_Time_Lat:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lon, Dimension::Time, Dimension::Lat};
+        break;
+        case DataLayout::Lev_Lon_Lat_Time:
+            return std::vector<Dimension>{Dimension::Lev, Dimension::Lon, Dimension::Lat, Dimension::Time};
+        break;
+        case DataLayout::Lat_Time_Lev_Lon:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Time, Dimension::Lev, Dimension::Lon};
+        break;
+        case DataLayout::Lat_Time_Lon_Lev:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Time, Dimension::Lon, Dimension::Lev};
+        break;
+        case DataLayout::Lat_Lev_Time_Lon:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lev, Dimension::Time, Dimension::Lon};
+        break;
+        case DataLayout::Lat_Lev_Lon_Time:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lev, Dimension::Lon, Dimension::Time};
+        break;
+        case DataLayout::Lat_Lon_Time_Lev:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lon, Dimension::Time, Dimension::Lev};
+        break;
+        case DataLayout::Lat_Lon_Lev_Time:
+            return std::vector<Dimension>{Dimension::Lat, Dimension::Lon, Dimension::Lev, Dimension::Time};
+        break;
+        case DataLayout::Lon_Time_Lev_Lat:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Time, Dimension::Lev, Dimension::Lat};
+        break;
+        case DataLayout::Lon_Time_Lat_Lev:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Time, Dimension::Lat, Dimension::Lev};
+        break;
+        case DataLayout::Lon_Lev_Time_Lat:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lev, Dimension::Time, Dimension::Lat};
+        break;
+        case DataLayout::Lon_Lev_Lat_Time:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lev, Dimension::Lat, Dimension::Time};
+        break;
+        case DataLayout::Lon_Lat_Time_Lev:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lat, Dimension::Time, Dimension::Lev};
+        break;
+        case DataLayout::Lon_Lat_Lev_Time:
+            return std::vector<Dimension>{Dimension::Lon, Dimension::Lat, Dimension::Lev, Dimension::Time};
+        break;
         default:
+            cmc_err_msg("The dimension vector could not be retrieved from the DataLayout since it is not recognized.");
             return std::vector<Dimension>();
     }
 }

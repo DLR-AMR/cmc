@@ -35,7 +35,8 @@ enum Dimension {DimensionUndefined = -1, Lon = 0, Lat = 1, Lev = 2, Time = 3, Nu
 enum CmcType {TypeUndefined = -1, Int8_t, Char, Int16_t, Int32_t, Float, Double, Uint8_t, Uint16_t, Uint32_t, Int64_t, Uint64_t, NumTypes};
 
 //TODO: Maybe make a nicer design of the layout, such that there is a pattern between layouts 
-enum DataLayout {LayoutUndefined, Lon_, Lat_, Lev_, _InternEnd1DLayouts, Lat_Lon, Lon_Lat, Lat_Lev, Lev_Lat, Lon_Lev, Lev_Lon, _InternEnd2DLayouts,
+//Extend 2D and 3D with Time dimension 
+enum DataLayout {LayoutUndefined, Lon_, Lat_, Lev_, Time_, _InternEnd1DLayouts, Lat_Lon, Lon_Lat, Lat_Lev, Lev_Lat, Lon_Lev, Lev_Lon, _InternEnd2DLayouts,
                  Lat_Lon_Lev, Lat_Lev_Lon, Lev_Lat_Lon, Lev_Lon_Lat, Lon_Lev_Lat, Lon_Lat_Lev, _InternEnd3DLayouts,
                  Time_Lev_Lat_Lon, Time_Lev_Lon_Lat, Time_Lat_Lev_Lon, Time_Lat_Lon_Lev, Time_Lon_Lev_Lat, Time_Lon_Lat_Lev,
                  Lev_Time_Lat_Lon, Lev_Time_Lon_Lat, Lev_Lat_Time_Lon, Lev_Lat_Lon_Time, Lev_Lon_Time_Lat, Lev_Lon_Lat_Time,
