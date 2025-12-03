@@ -235,7 +235,7 @@ cmc_debug_msg(MPI_Comm comm, Ts... msgs)
 #else
 template<typename... Ts>
 inline void
-cmc_debug_msg([[maybe_unused]] Ts... msgs) {}
+cmc_debug_msg([[maybe_unused]] MPI_Comm comm, [[maybe_unused]] Ts... msgs) {}
 #endif
 
 template<typename... Ts>
