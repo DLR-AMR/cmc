@@ -209,7 +209,6 @@ install(FILES
     amr/lossy/cmc_adaptive_coarsening.hxx 
     amr/lossy/cmc_byte_compression_variable.hxx 
     amr/lossy/cmc_multi_res_trimmed_residuals.hxx 
-    amr/lossy/cmc_multi_res_scanline_compression.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy
 )
 
