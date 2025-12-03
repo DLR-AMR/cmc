@@ -413,6 +413,32 @@ EvaluateDataType(const std::string& type)
     }
 }
 
+void
+DisplayCompressionResult(cmc::CmcType data_type, const std::vector<size_t>& dim_lengths, const std::string& output_file_prefix, const std::string& var_name)
+{
+    /* Create the file name */
+    const std::string output_file = cmc::compression_io::serial::CreateFileName(output_file_prefix, var_name);
+
+    /* Check if the output file exists */
+    const std::filesystem::path output_file_path(output_file);
+    if (not std::filesystem::exists(output_file_path))
+    {
+        cmc::cmc_err_msg("The compression output file ", output_file, " does not exist.");
+    }
+
+    /* Check the file size */
+    const auto file_size = std::filesystem::file_size(output_file_path);
+
+    /* Compute the intial data amount */
+    const size_t num_elements = std::reduce(dim_lengths.begin(), dim_lengths.end(), 1, std::multiplies<size_t>());
+    const size_t data_amount = num_elements * cmc::CmcTypeToBytes(data_type);
+
+    cmc::cmc_msg("The patch-based lossless prefix compression extraction has been applied successfully.");
+    cmc::cmc_msg("The compressed data has been written to ", output_file, ".");
+    cmc::cmc_msg("The intial data amount accumulated to: \t", data_amount, " bytes.");
+    cmc::cmc_msg("The compressed data storage amounts to: \t", file_size, " bytes.");
+}
+
 constexpr int kNumArgCRequired = 13;
 
 int
@@ -539,6 +565,8 @@ main(int argc, char *argv[])
 
     /* Perform the compresison */
     Compress(data_type, input_file, output_file, var_name, dim, dim_lengths);
+
+    DisplayCompressionResult(data_type, dim_lengths, output_file, var_name);
 
     }
     /* Finalize cmc */
