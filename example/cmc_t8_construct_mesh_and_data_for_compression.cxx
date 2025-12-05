@@ -47,10 +47,6 @@
 namespace cmc::example
 {
 
-//constexpr int max_elem_level = 11;
-//constexpr int init_elem_level = 7;
-//constexpr double bandwidth = 64.0;
-
 constexpr int max_elem_level = 11;
 constexpr int init_elem_level = 7;
 constexpr double bandwidth = 26.5;
@@ -83,10 +79,7 @@ levelset_sphere_fn (const std::vector<double>  &x, void *data, const int level)
   {
     return (8/(dist (x, ls_data->M) * dist (x, ls_data->M) * dist (x, ls_data->M))) * fabs(std::sin(1.57079632679 * x[1])) * (fabs(x[0]) + 0.25 * fabs(x[1])) * std::cos(1.57079632679 - dist (x, ls_data->M) + 0.25) + 0.01*std::sin(1000*3.14*fabs(x[0]));
   }
-  //return (8) *std::fabs(cos(0.5 * x[0]))*(dist (x, ls_data->M) - ls_data->radius);
-  //return x[0] * std::log(8*dist (x, ls_data->M)) - 2.5;
-  //return std::fabs(cos(0.55 * x[0]))*(dist (x, ls_data->M));
-  //return 2*fabs(std::cos(1.57079632679 * x[0] * x[1]));
+
   return fabs(std::sin(1.57079632679 * x[1])) * (fabs(x[0]) + 0.25 * fabs(x[1])) * std::cos(1.57079632679 - dist (x, ls_data->M) + 0.25) + 0.01*std::sin(1000*3.14*fabs(x[0]));
 }
 
@@ -236,11 +229,6 @@ BuildInitialForest()
         adapt_data.data = cmc::example::t8_advect_problem_init_elements(forest);
     }
 
-    //for (auto iter = adapt_data.data.begin(); iter != adapt_data.data.end(); ++iter)
-    //{
-    //    *iter = (-1.0) * (*iter);
-    //}
-
     for (auto iter = adapt_data.data.begin(); iter != adapt_data.data.end(); ++iter)
     {
         *iter = (2.25 - (*iter));
@@ -300,7 +288,6 @@ main(void)
     
     /* Construct the initial mesh and the data*/
     auto [mesh, data] = cmc::example::BuildInitialForest();
-    //cmc::example::WriteData(mesh, data);
 
     /* Write out the data in order for other compressors to compress it */
     init_data = data;
