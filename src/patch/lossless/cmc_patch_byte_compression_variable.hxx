@@ -41,8 +41,6 @@ struct ExtractionData
     std::vector<CompressionValue<T>> fine_values;
 };
 
-struct kTag3D {};
-
 /**
  * @brief The Interface/Template for a variable that performs lossless compression on the serialized data
  * in a byte-/bit-wise fashion. The compression algorithm is fixed and may be specialized in a derived class
