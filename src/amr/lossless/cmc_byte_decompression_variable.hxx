@@ -93,6 +93,7 @@ class AbstractByteDecompressionVariable
 {
 public:
     void Decompress();
+    void DecompressToLevel(const int level);
 
     const std::string& GetName() const {return name_;};
 
@@ -343,7 +344,28 @@ WriteData(t8_forest_t forest, const std::vector<CompressionValue<T>>& data)
 }
 
 template <typename T>
-inline void
+void
+AbstractByteDecompressionVariable<T>::DecompressToLevel(const int level)
+{
+    cmc_assert(level >= 0 && level + 1 <= max_num_decompression_iterations_);
+
+    max_num_decompression_iterations_ = level;
+
+    /* Check if the specified decompression level is possible */
+    if (level < 0 || level + 1 > max_num_decompression_iterations_)
+    {
+        cmc_err_msg("The specified decompression level (", level,") is not in range of all possible decompression levels [0, ", max_num_decompression_iterations_ - 1, "].");
+    }
+
+    /* Update the number of compression iterations */
+    max_num_decompression_iterations_ = level + 1;
+
+    /* Perform the decompression */
+    this->Decompress();
+}
+
+template <typename T>
+void
 AbstractByteDecompressionVariable<T>::Decompress()
 {
     cmc_assert(this->IsValidForDecompression());
@@ -364,8 +386,9 @@ AbstractByteDecompressionVariable<T>::Decompress()
         WriteData<T>(mesh_.GetMesh(), data_);
     }
 
-    /* Perform decompression iterations until the mesh is completely reconstructed */
-    while (mesh_decoder_->IsDecompressionProgressing())
+    /* Perform decompression iterations until the mesh is completely reconstructed or the specified level is reached */
+    int decompression_step{0};
+    while (mesh_decoder_->IsDecompressionProgressing() && decompression_step < this->GetMaxNumDecompressionIterations())
     {
         cmc_debug_msg("A decompression iteration is initialized.");
 
@@ -415,6 +438,8 @@ AbstractByteDecompressionVariable<T>::Decompress()
             WriteData<T>(mesh_.GetMesh(), data_);
             cmc_debug_msg("The decompression step has been written out in a .vtu file.");
         }
+
+        ++decompression_step;
     }
 
     /* Free the adapt data structure */
