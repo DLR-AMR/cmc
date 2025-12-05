@@ -30,7 +30,8 @@ class AbstractPatchByteDecompressionVariable : public IPatchDecompressionVariabl
 {
 public:
     void Decompress() override;
-    
+    void DecompressToLevel(const int level) override;
+
     virtual ~AbstractPatchByteDecompressionVariable(){}
 
     std::vector<T> GetDecompressedData() const override;
@@ -156,6 +157,24 @@ AbstractPatchByteDecompressionVariable<T, Dim>::Decompress()
     }
 }
 
+template <typename T, size_t Dim>
+void
+AbstractPatchByteDecompressionVariable<T, Dim>::DecompressToLevel(const int level)
+{
+    cmc_assert(level >= 0 && level + 1 <= num_decompression_lvls_);
+
+    /* Check if the specified decompression level is possible */
+    if (level < 0 || level + 1 > num_decompression_lvls_)
+    {
+        cmc_err_msg("The specified decompression level (", level,") is not in range of all possible decompression levels [0, ", num_decompression_lvls_ - 1, "].");
+    }
+
+    /* Update the number of compression iterations */
+    num_decompression_lvls_ = level + 1;
+
+    /* Perform the decompression */
+    this->Decompress();
+}
 
 /****** 4D Decompression ******/
 
