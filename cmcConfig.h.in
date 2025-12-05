@@ -1,3 +1,6 @@
+#ifndef CMC_AC_CONFIG_H_
+#define CMC_AC_CONFIG_H_
+
 #cmakedefine CMC_VERSION "@CMC_VERSION@"
 
 #cmakedefine CMAKE_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
@@ -7,10 +10,28 @@
 #cmakedefine cmc_CXXFLAGS "@cmc_CXXFLAGS@"
 #cmakedefine CMAKE_SHARED_LINKER_FLAGS "@CMAKE_SHARED_LINKER_FLAGS@"
 
+#ifndef CMC_ENABLE_DEBUG
 #cmakedefine CMC_ENABLE_DEBUG 
+#endif
 
+#ifndef CMC_ENABLE_MPI
 #cmakedefine CMC_ENABLE_MPI 
-#cmakedefine CMC_WITH_NETCDF 
-#cmakedefine CMC_WITH_NETCDF_PAR 
-#cmakedefine CMC_WITH_T8CODE 
+#endif
 
+#ifndef CMC_WITH_NETCDF
+#cmakedefine CMC_WITH_NETCDF 
+#endif
+
+#ifndef CMC_WITH_NETCDF_PAR
+#cmakedefine CMC_WITH_NETCDF_PAR 
+#endif
+
+#ifndef CMC_WITH_T8CODE
+#cmakedefine CMC_WITH_T8CODE 
+#endif
+
+#ifndef CMC_ENABLE_ALL_WARNINGS
+#cmakedefine CMC_ENABLE_ALL_WARNINGS
+#endif
+
+#endif

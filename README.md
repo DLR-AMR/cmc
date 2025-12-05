@@ -41,23 +41,23 @@ mkdir cmc_build && cd cmc_build
 
 With `cmake -LH ../cmc` all possible configuration options can be displayed with their default values.
 A sample of the configuration options reads:
-| Option              | Default Value |
-| ------------------- | ------------- |
-| WITH_T8CODE         | ON            |
-| WITH_NETCDF         | ON            |
-| ENABLE_MPI          | ON            |
-| ENABLE_ALL_WARNINGS | OFF           |
+| Option                  | Default Value |
+| ----------------------- | ------------- |
+| CMC_WITH_T8CODE         | ON            |
+| CMC_WITH_NETCDF         | ON            |
+| CMC_ENABLE_MPI          | ON            |
+| CMC_ENABLE_ALL_WARNINGS | OFF           |
 
 Additional `<lib>_DIR`, `<lib>_ROOT` or `<lib>_ROOT_DIR` might help CMake to find the correct dependencies.
 
 A configuration with t8code and MPI may look similar to
 ```
-CC=mpicc CXX=mpicxx cmake -DCMAKE_BUILD_TYPE=Release -DT8CODE_DIR:PATH=<t8code_install_directory>/cmake -DP4EST_DIR:PATH=<t8code_install_directory>/cmake -DSC_DIR:PATH=<t8code_install_directory>/cmake -DENABLE_MPI=ON -DWITH_NETCDF=OFF -DCMAKE_INSTALL_PREFIX=<cmc_install_directory> ../cmc
+CC=mpicc CXX=mpicxx cmake -DCMAKE_BUILD_TYPE=Release -DCMC_ENABLE_MPI=ON -DCMC_WITH_T8CODE=ON -DT8CODE_DIR:PATH=<t8code_install_directory>/cmake -DP4EST_DIR:PATH=<t8code_install_directory>/cmake -DSC_DIR:PATH=<t8code_install_directory>/cmake -DCMC_WITH_NETCDF=OFF -DCMAKE_INSTALL_PREFIX=<cmc_install_directory> ../cmc
 ```
 
 In order to quickly test the patch-based compression approaches, the configuration may look like:
 ```
-cmake -DCMAKE_BUILD_TYPE=Release -DWITH_T8CODE=OFF -DENABLE_MPI=OFF -DWITH_NETCDF=OFF ../cmc
+cmake -DCMAKE_BUILD_TYPE=Release -DCMC_WITH_T8CODE=OFF -DCMC_ENABLE_MPI=OFF -DCMC_WITH_NETCDF=OFF ../cmc
 ```
 
 After the configuration the available options are summarized and displayed.

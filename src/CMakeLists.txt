@@ -281,5 +281,3 @@ endif()
 
 ######## END Configuration dependant files ########
 
-install(TARGETS cmc DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(TARGETS cmc EXPORT CmcTargets)
