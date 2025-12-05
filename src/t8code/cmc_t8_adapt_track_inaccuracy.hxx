@@ -643,12 +643,23 @@ public:
 
     void TransferPreviousDeviations(const int start_index_previous_values, const int num_previous_values) override
     {
+        if (previous_deviations_.empty())
+        {
+            std::fill_n(std::back_inserter(deviations_), num_previous_values, 0.0);
+            return;
+        }
+
         std::copy(previous_deviations_.begin() + start_index_previous_values,
                   previous_deviations_.begin() + start_index_previous_values + num_previous_values,
                   std::back_inserter(deviations_));
     }
     void TransferPreviousDeviation(const int start_index_previous_values) override
     {
+        if (previous_deviations_.empty())
+        {
+            deviations_.push_back(0.0);
+            return;
+        }
         deviations_.push_back(previous_deviations_[start_index_previous_values]);
     }
 

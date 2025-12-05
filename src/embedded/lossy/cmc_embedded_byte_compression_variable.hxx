@@ -148,8 +148,8 @@ public:
 
     friend IEmbeddedCompressionAdaptData<T>;
     /* For simplified testing of a version of the lossy PrefixAMR, the function has been made public instead of protected. Revert to protected when testing stage is finihsed */
-    std::vector<PermittedError> GetRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
-        const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
+    std::vector<PermittedError> GetRestrictingErrors(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
+                                                     const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
 protected:
     AbstractEmbeddedByteCompressionVariable() = delete;
     AbstractEmbeddedByteCompressionVariable(const CompressionSettings& settings, input::Var& input_variable)
@@ -257,8 +257,8 @@ public:
     virtual void CompleteExtractionIteration(const t8_forest_t previous_forest, const t8_forest_t adapted_forest) = 0;
     virtual void RepartitionData(const t8_forest_t adapted_forest, const t8_forest_t partitioned_forest) = 0;
 
-    int ExtractValue(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]);
-    int LeaveElementUnchanged(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]);
+    int ExtractValue(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]);
+    int LeaveElementUnchanged(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]);
 
     virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
     virtual std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
@@ -271,12 +271,13 @@ public:
     const VariableAttributes<T>& GetVariableAttributes() const {cmc_assert(base_variable_ != nullptr); return base_variable_->GetVariableAttributes();}
     
 protected:
-    virtual ExtractionData<T> PerformExtraction(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+    virtual ExtractionData<T> PerformExtraction(t8_forest_t forest, int tree_id,const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
         const t8_element_t* elements[], const VectorView<CompressionValue<T>> values) = 0;
-    virtual UnchangedData<T> ElementStaysUnchanged(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
-        const t8_element_t* elements[], const CompressionValue<T>& value) = 0;
+    virtual UnchangedData<T> ElementStaysUnchanged(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+         const t8_element_t* elements[], const CompressionValue<T>& value) = 0;
     
-    std::vector<PermittedError> GetRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
+    std::vector<PermittedError> GetRestrictingErrors(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
+                                                     const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
     double GetPreviousAbsoluteError(int tree_id, int lelement_id);
 
     std::unique_ptr<entropy_coding::IByteCompressionEntropyCoder> entropy_coder_{nullptr}; //!< The entropy coder to use in order to encode information
@@ -714,7 +715,7 @@ IEmbeddedCompressionAdaptData<T>::IsCompressionProgressing() const
  */
 template <typename T>
 int
-IEmbeddedCompressionAdaptData<T>::ExtractValue(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[])
+IEmbeddedCompressionAdaptData<T>::ExtractValue(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[])
 {
     cmc_assert(tree_id >= 0 && lelement_id >= 0);
     cmc_assert(num_elements > 1);
@@ -726,7 +727,7 @@ IEmbeddedCompressionAdaptData<T>::ExtractValue(t8_forest_t forest, int tree_id, 
     const VectorView<CompressionValue<T>> values = base_variable_->GetView(tree_id, lelement_id, num_elements);
 
     /* Extract the coarse values, and potentially alter the remaining fine values */
-    const ExtractionData<T> extracted_values = PerformExtraction(forest, tree_id, lelement_id, ts, num_elements, elements, values);
+    const ExtractionData<T> extracted_values = PerformExtraction(forest, tree_id, tree_class, lelement_id, ts, num_elements, elements, values);
 
     /* Store the extracted values wihtin the variable */
     base_variable_->StoreExtractedValues(tree_id, lelement_id, num_elements, extracted_values);
@@ -747,7 +748,7 @@ IEmbeddedCompressionAdaptData<T>::ExtractValue(t8_forest_t forest, int tree_id, 
  */
 template <typename T>
 int
-IEmbeddedCompressionAdaptData<T>::LeaveElementUnchanged(t8_forest_t forest, int tree_id, int lelement_id,
+IEmbeddedCompressionAdaptData<T>::LeaveElementUnchanged(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id,
     const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[])
 {
     cmc_assert(tree_id >= 0 && lelement_id >= 0);
@@ -759,7 +760,7 @@ IEmbeddedCompressionAdaptData<T>::LeaveElementUnchanged(t8_forest_t forest, int 
     const VectorView<CompressionValue<T>> value = base_variable_->GetView(tree_id, lelement_id, 1);
 
     /* Leave the element unchanged */
-    const UnchangedData<T> extracted_values = this->ElementStaysUnchanged(forest, tree_id, lelement_id, ts, num_elements, elements, value.front());
+    const UnchangedData<T> extracted_values = this->ElementStaysUnchanged(forest, tree_id, tree_class, lelement_id, ts, num_elements, elements, value.front());
 
     /* Store the unchanged data */
     base_variable_->StoreUnchangedElement(tree_id, lelement_id, extracted_values);
@@ -769,16 +770,16 @@ IEmbeddedCompressionAdaptData<T>::LeaveElementUnchanged(t8_forest_t forest, int 
 
 template <typename T>
 std::vector<PermittedError>
-IEmbeddedCompressionAdaptData<T>::GetRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
-                                              const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+IEmbeddedCompressionAdaptData<T>::GetRestrictingErrors(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
+                                                       const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
 {
     cmc_assert(num_elements > 0);
-    cmc_assert(tree_id >= 0 && tree_id < base_variable_->GetAmrMesh().GetNumberGlobalTrees());
+    cmc_assert(which_tree >= 0 && which_tree < base_variable_->GetAmrMesh().GetNumberGlobalTrees());
     cmc_assert(lelement_id >= 0 && lelement_id < base_variable_->GetAmrMesh().GetNumberLocalElements());
     cmc_assert(ts != nullptr);
     cmc_assert(elements != nullptr);
 
-    return settings_.FindRestrictingErrors(forest, tree_id, lelement_id, ts, num_elements, elements);
+    return settings_.FindRestrictingErrors(forest, which_tree, tree_class, lelement_id, ts, num_elements, elements);
 }
 
 template <typename T>
@@ -804,12 +805,12 @@ inline t8_locidx_t
 LossyByteCompression (t8_forest_t forest,
                          [[maybe_unused]] t8_forest_t forest_from,
                          t8_locidx_t which_tree,
-                         [[maybe_unused]] const t8_eclass_t tree_class,
+                         const t8_eclass_t tree_class,
                          t8_locidx_t lelement_id,
                          [[maybe_unused]] const t8_scheme_c * ts,
                          const int is_family,
                          const int num_elements,
-                         [[maybe_unused]] t8_element_t * elements[])
+                         t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
     IEmbeddedCompressionAdaptData<T>* adapt_data = static_cast<IEmbeddedCompressionAdaptData<T>*>(t8_forest_get_user_data(forest));
@@ -827,12 +828,12 @@ LossyByteCompression (t8_forest_t forest,
     if (is_family == 0)
     {
         /* If there is no family, the element stays unchanged */
-        const int ret_val = adapt_data->LeaveElementUnchanged(forest, which_tree, lelement_id, ts, num_elements, const_elem_ptr);
+        const int ret_val = adapt_data->LeaveElementUnchanged(forest, which_tree, tree_class, lelement_id, ts, num_elements, const_elem_ptr);
         return ret_val;
     } else
     {
         /* Extract a value of the family and coarsen it */
-        const int ret_val = adapt_data->ExtractValue(forest, which_tree, lelement_id, ts, num_elements, const_elem_ptr);
+        const int ret_val = adapt_data->ExtractValue(forest, which_tree, tree_class, lelement_id, ts, num_elements, const_elem_ptr);
         return ret_val;
     }
 }
@@ -986,16 +987,16 @@ AbstractEmbeddedByteCompressionVariable<T>::GetView(const int tree_id, const int
 
 template <typename T>
 std::vector<PermittedError>
-AbstractEmbeddedByteCompressionVariable<T>::GetRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
-                                              const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+AbstractEmbeddedByteCompressionVariable<T>::GetRestrictingErrors(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
+                                                                 const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
 {
     cmc_assert(num_elements > 0);
-    cmc_assert(tree_id >= 0 && tree_id < this->GetAmrMesh().GetNumberGlobalTrees());
+    cmc_assert(which_tree >= 0 && which_tree < this->GetAmrMesh().GetNumberGlobalTrees());
     cmc_assert(lelement_id >= 0 && lelement_id < this->GetAmrMesh().GetNumberLocalElements());
     cmc_assert(ts != nullptr);
     cmc_assert(elements != nullptr);
 
-    return settings_.FindRestrictingErrors(forest, tree_id, lelement_id, ts, num_elements, elements);
+    return settings_.FindRestrictingErrors(forest, which_tree, tree_class, lelement_id, ts, num_elements, elements);
 }
 
 template <typename T>

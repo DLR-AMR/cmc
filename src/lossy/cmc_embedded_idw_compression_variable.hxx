@@ -1531,7 +1531,7 @@ AbstractEmbeddedByteCompressionVariable<T>::DetermineInitialMaximumRefinementLev
             }
 
             /* Check the permitted error for this element */
-            std::vector<PermittedError> permitted_errors = settings_.FindRestrictingErrors(mesh, tree_idx, elem_idx, scheme, 1, &element);
+            std::vector<PermittedError> permitted_errors = settings_.FindRestrictingErrors(mesh, tree_idx, tree_class, elem_idx, scheme, 1, &element);
 
             /* Compute the start offset in the local contiguous array */
             const int start_index = t8_forest_get_tree_element_offset (mesh_.GetMesh(), tree_idx) + elem_idx;

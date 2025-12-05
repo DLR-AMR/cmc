@@ -44,9 +44,9 @@ public:
     std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
 
 protected:
-    ExtractionData<T> PerformExtraction(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+    ExtractionData<T> PerformExtraction(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
         const t8_element_t* elements[], const VectorView<CompressionValue<T>> values) override;
-    UnchangedData<T> ElementStaysUnchanged(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+    UnchangedData<T> ElementStaysUnchanged(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
         const t8_element_t* elements[], const CompressionValue<T>& value) override;
 private:
     void CollectSymbolFrequenciesForEntropyCoding(const std::vector<CompressionValue<T>>& level_byte_values) const;
@@ -128,7 +128,7 @@ EvaluateEmbeddedCommonPrefix(const VectorView<CompressionValue<T>>& compression_
 
 template <typename T>
 ExtractionData<T>
-PrefixEmbeddedAdaptData<T>::PerformExtraction(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+PrefixEmbeddedAdaptData<T>::PerformExtraction(t8_forest_t forest, int tree_id, [[maybe_unused]] const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
     const t8_element_t* elements[], const VectorView<CompressionValue<T>> values)
 {
     /* Evaluate whether there is a common prefix to extract */
@@ -166,8 +166,8 @@ PrefixEmbeddedAdaptData<T>::PerformExtraction(t8_forest_t forest, int tree_id, i
 
 template <typename T>
 UnchangedData<T>
-PrefixEmbeddedAdaptData<T>::ElementStaysUnchanged(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
-    const t8_element_t* elements[], const CompressionValue<T>& value)
+PrefixEmbeddedAdaptData<T>::ElementStaysUnchanged([[maybe_unused]] t8_forest_t forest, [[maybe_unused]] int tree_id, [[maybe_unused]] const t8_eclass_t tree_class, [[maybe_unused]] int lelement_id, [[maybe_unused]] const t8_scheme_c* ts, [[maybe_unused]] const int num_elements,
+    [[maybe_unused]] const t8_element_t* elements[], const CompressionValue<T>& value)
 {
     /* We drag this value along to the "coarser level" until it this element is passed with its siblings
      *  as a family of elements into the adaptation callback. Moreover, we leave an empty value 
@@ -680,7 +680,7 @@ EmbeddedCompressionVariable<T>::PreCompressionProcessing(std::vector<Compression
             const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, tree_idx, elem_idx);
 
             /* Get the permitted error for this element */
-            std::vector<PermittedError> permitted_errors = this->GetRestrictingErrors(mesh, tree_idx, elem_idx, scheme, 1, &element);
+            std::vector<PermittedError> permitted_errors = this->GetRestrictingErrors(mesh, tree_idx, tree_class, elem_idx, scheme, 1, &element);
 
             /* Perform the tail truncation */
             this->PerformTailTruncation(initial_data[val_idx], permitted_errors);

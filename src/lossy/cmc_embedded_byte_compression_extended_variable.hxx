@@ -1511,7 +1511,7 @@ AbstractEmbeddedByteCompressionVariable<T>::DetermineInitialMaximumRefinementLev
             }
 
             /* Check the permitted error for this element */
-            std::vector<PermittedError> permitted_errors = settings_.FindRestrictingErrors(mesh, tree_idx, elem_idx, scheme, 1, &element);
+            std::vector<PermittedError> permitted_errors = settings_.FindRestrictingErrors(mesh, tree_idx, tree_class, elem_idx, scheme, 1, &element);
 
             /* Get the initial value if the element */
             const T initial_value = GetDataValueAtIndex(tree_idx, elem_idx).template ReinterpretDataAs<T>();

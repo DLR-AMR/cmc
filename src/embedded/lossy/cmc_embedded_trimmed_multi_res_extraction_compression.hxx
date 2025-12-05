@@ -45,9 +45,9 @@ public:
     std::pair<std::vector<uint8_t>, std::vector<uint8_t>> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
 
     protected:
-    ExtractionData<T> PerformExtraction(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+    ExtractionData<T> PerformExtraction(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
         const t8_element_t* elements[], const VectorView<CompressionValue<T>> values) override;
-    UnchangedData<T> ElementStaysUnchanged(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+    UnchangedData<T> ElementStaysUnchanged(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
         const t8_element_t* elements[], const CompressionValue<T>& value) override;
 
 private:
@@ -146,7 +146,7 @@ GetCoarseApproximationMaximizingResidualsLZC(const VectorView<CompressionValue<T
 
 template <typename T>
 ExtractionData<T>
-MultiResEmbeddedAdaptData<T>::PerformExtraction(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+MultiResEmbeddedAdaptData<T>::PerformExtraction(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
         const t8_element_t* elements[], const VectorView<CompressionValue<T>> values)
 {
     cmc_assert(num_elements == values.size());
@@ -165,7 +165,7 @@ MultiResEmbeddedAdaptData<T>::PerformExtraction(t8_forest_t forest, int tree_id,
         T current_value = values[idx].template ReinterpretDataAs<T>();
 
         /* Get the restricting error for this element */
-        std::vector<PermittedError> permitted_errors = this->GetRestrictingErrors(forest, tree_id, lelement_id, ts, 1, &elements[idx]);
+        std::vector<PermittedError> permitted_errors = this->GetRestrictingErrors(forest, tree_id, tree_class, lelement_id, ts, 1, &elements[idx]);
 
         /* Get the previous absolute deviation */
         const double previous_absolute_error = this->GetPreviousAbsoluteError(tree_id, lelement_id);
@@ -191,7 +191,7 @@ MultiResEmbeddedAdaptData<T>::PerformExtraction(t8_forest_t forest, int tree_id,
 
 template <typename T>
 UnchangedData<T>
-MultiResEmbeddedAdaptData<T>::ElementStaysUnchanged(t8_forest_t forest, int tree_id, int lelement_id, const t8_scheme_c* ts, const int num_elements,
+MultiResEmbeddedAdaptData<T>::ElementStaysUnchanged(t8_forest_t forest, int tree_id, const t8_eclass_t tree_class, int lelement_id, const t8_scheme_c* ts, const int num_elements,
     const t8_element_t* elements[], const CompressionValue<T>& value)
 {
     /* Since the residual is zero, we indicate that with an unset bit (although it is not of relevance, since the residual will be empty) */

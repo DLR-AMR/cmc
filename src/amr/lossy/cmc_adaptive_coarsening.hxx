@@ -29,7 +29,7 @@ public:
     int EvaluateCoarsening(const int tree_id, const int elem_id, const int num_elements, const std::vector<PermittedError> permitted_errors) override;
     int EvaluateCoarsening([[maybe_unused]] const int tree_id, [[maybe_unused]] const int elem_id, [[maybe_unused]] const int num_elements, [[maybe_unused]] const std::vector<PermittedError> permitted_errors, [[maybe_unused]] const CmcUniversalType missing_value) override {return CMC_ERR;};
     int LeaveElementUnchanged(const int tree_id, const int local_elem_id) override;
-
+    const CompressionSettings& GetCompressionSettings() const;
 protected:
     AbstractCompressionVariable<T>* base_variable_{nullptr};
     const CompressionSettings& compression_settings_;
@@ -54,14 +54,14 @@ DestroyAdaptationClass(ICompressionAdaptData* iadapt_data)
 template<typename T>
 inline t8_locidx_t
 DefaultAdaptiveCoarsening (t8_forest_t forest,
-                           [[maybe_unused]] t8_forest_t forest_from,
+                           t8_forest_t forest_from,
                            t8_locidx_t which_tree,
-                           [[maybe_unused]] const t8_eclass_t tree_class,
+                           const t8_eclass_t tree_class,
                            t8_locidx_t lelement_id,
-                           [[maybe_unused]] const t8_scheme_c * ts,
+                           const t8_scheme_c * ts,
                            const int is_family,
                            const int num_elements,
-                           [[maybe_unused]] t8_element_t * elements[])
+                           t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
     ICompressionAdaptData* _adapt_data = static_cast<ICompressionAdaptData*>(t8_forest_get_user_data(forest));
@@ -78,8 +78,16 @@ DefaultAdaptiveCoarsening (t8_forest_t forest,
         return ret_val;
     }
 
+    /* Create const t8_element_t pointers */
+    std::vector<const t8_element_t*> const_elems(num_elements);
+    for (int idx = 0; idx < num_elements; ++idx)
+    {
+        const_elems[0] = elements[idx];
+    }
+    const t8_element_t** const_elem_ptr = const_elems.data();
+
     /* Get the permitted errors for the element */
-    const std::vector<PermittedError> permitted_errors;
+    const std::vector<PermittedError> permitted_errors = iadapt_data->GetCompressionSettings().FindRestrictingErrors(forest_from, which_tree, tree_class, lelement_id, ts, num_elements, const_elem_ptr);
 
     /* Check if the coarsening complies to the error bound */
     const int ret_val = iadapt_data->EvaluateCoarsening(which_tree, lelement_id, num_elements, permitted_errors);
@@ -106,6 +114,13 @@ public:
         AbstractCompressionVariable<T>::adaptation_destructor_ = DestroyAdaptationClass;
     };
 };
+
+template <typename T>
+const CompressionSettings&
+DefaultAdaptData<T>::GetCompressionSettings() const
+{
+    return compression_settings_;
+}
 
 template <typename T>
 bool

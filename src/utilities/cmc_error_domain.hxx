@@ -31,19 +31,19 @@ public:
     : error_criterion_{error_criterion}, is_inside_domain_check_{is_inside_domain_check}{};
     
     inline bool
-    IsElementWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
+    IsElementWithinDomain(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
                           const t8_scheme_c* ts, const t8_element_t* element) const
     {
-        return is_inside_domain_check_(forest, tree_id, lelement_id, ts, element);
+        return is_inside_domain_check_(forest, which_tree, tree_class, lelement_id, ts, element);
     }
     
     inline bool
-    IsAnyElementWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
+    IsAnyElementWithinDomain(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
                              const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
     {
         for (int idx = 0; idx < num_elements; ++idx)
         {
-            const bool is_inside = is_inside_domain_check_(forest, tree_id, lelement_id + idx, ts, elements[idx]);
+            const bool is_inside = is_inside_domain_check_(forest, which_tree, tree_class, lelement_id + idx, ts, elements[idx]);
 
             if (is_inside == true)
             {
@@ -54,12 +54,12 @@ public:
     }
 
     inline bool
-    AreAllElementsWithinDomain(t8_forest_t forest, int tree_id, int lelement_id,
-                              const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+    AreAllElementsWithinDomain(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
+                               const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
     {
         for (int idx = 0; idx < num_elements; ++idx)
         {
-            const bool is_inside = is_inside_domain_check_(forest, tree_id, lelement_id + idx, ts, elements[idx]);
+            const bool is_inside = is_inside_domain_check_(forest, which_tree, tree_class, lelement_id + idx, ts, elements[idx]);
 
             if (is_inside == false)
             {

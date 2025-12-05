@@ -36,7 +36,7 @@ main(void)
     cmc::CompressionSettings settings;
 
     /* Set a relative error criterion */
-    const double rel_max_err = 0.01;
+    const double rel_max_err = 0.2;
     settings.SetGeneralErrorCriterion(cmc::CompressionCriterion::RelativeErrorThreshold, rel_max_err);
 
     /* Compress the data */

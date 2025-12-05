@@ -22,7 +22,7 @@ public:
     void SetErrorDomain(ErrorDomain&& error_domain){error_domains_.push_back(std::move(error_domain));};
 
     std::vector<PermittedError>
-    FindRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
+    FindRestrictingErrors(t8_forest_t forest, t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
                           const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const;
 
 private:
@@ -31,7 +31,7 @@ private:
 
 
 std::vector<PermittedError>
-CompressionSettings::FindRestrictingErrors(t8_forest_t forest, int tree_id, int lelement_id,
+CompressionSettings::FindRestrictingErrors(t8_forest_t forest, t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
                                            const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
 {
     bool is_absolute_error_found = false;
@@ -43,7 +43,7 @@ CompressionSettings::FindRestrictingErrors(t8_forest_t forest, int tree_id, int 
     for (auto error_domain_iter = error_domains_.begin(); error_domain_iter != error_domains_.end(); ++error_domain_iter)
     {
         /* Check if any of the considered elements is within the domain of this error criterion */
-        const bool is_any_element_in_domain = error_domain_iter->IsAnyElementWithinDomain(forest, tree_id,lelement_id, ts, num_elements, elements);
+        const bool is_any_element_in_domain = error_domain_iter->IsAnyElementWithinDomain(forest, which_tree, tree_class, lelement_id, ts, num_elements, elements);
 
         if (is_any_element_in_domain == true)
         {
