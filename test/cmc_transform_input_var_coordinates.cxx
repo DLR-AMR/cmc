@@ -1,6 +1,6 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
-#include "utilities/cmc_input_variable.hxx"
+#include "input/cmc_input_variable.hxx"
 
 #include <numeric>
 #include <vector>
@@ -13,7 +13,7 @@ main(void)
 
     {
     
-    cmc::InputVariable<double> test_var("ex_double_data", 0, cmc::DataLayout::Lon_Lat);
+    cmc::input::Variable<double> test_var("ex_double_data", 0, cmc::DataLayout::Lon_Lat);
 
     const cmc::DomainIndex lon_length = 10;
     const cmc::DomainIndex lat_length = 5;
@@ -29,7 +29,7 @@ main(void)
     cmc::Hyperslab hyperslab(cmc::DimensionInterval(cmc::Dimension::Lon, 0, lon_length),
                              cmc::DimensionInterval(cmc::Dimension::Lat, 0, lat_length));
 
-    test_var.PushBack(double_data, std::move(hyperslab));
+    test_var.SetDataAndCoordinates(std::move(double_data), std::vector<cmc::Hyperslab>{std::move(hyperslab)});
 
     /* Transform Hyperslab coordinates to Morton indices */
     test_var.TransformCoordinatesToMortonIndices();
