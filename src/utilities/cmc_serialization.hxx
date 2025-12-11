@@ -21,10 +21,10 @@ namespace cmc
  */
 template <typename T>
 void
-PushBackValueToByteStream(std::vector<uint8_t>& byte_stream, const T& value)
+PushBackValueToByteStream(std::vector<uint8_t>& byte_stream, const T& value, Endian endianness = Endian::Big)
 {
     /* Serialize the value to a collection of bytes (in big endian order) */
-    const std::array<uint8_t, sizeof(T)> serialized_value = SerializeValue(value, Endian::Big);
+    const std::array<uint8_t, sizeof(T)> serialized_value = SerializeValue(value, endianness);
 
     /* Append the bytes to the byte stream */
     std::copy_n(serialized_value.begin(), sizeof(T), std::back_insert_iterator(byte_stream));
@@ -33,14 +33,14 @@ PushBackValueToByteStream(std::vector<uint8_t>& byte_stream, const T& value)
 /* A value is extracted from the byte stream starting at position \a pos to which the iterator points to.
  * The serialized value is stored in big endian order.  */
 template <typename T, typename Iter>
-auto GetValueFromByteStream(Iter pos)
+auto GetValueFromByteStream(Iter pos, Endian endianness = Endian::Big)
     -> std::enable_if_t<std::is_fundamental_v<T>, T>
 {
     /* Get the number of bytes for this data type */
     const size_t type_length = sizeof(T);
 
     /* Deserialize the given */
-    const std::array<uint8_t, sizeof(T)> deserialized_value = DeserializeValue<T>(pos, Endian::Big);
+    const std::array<uint8_t, sizeof(T)> deserialized_value = DeserializeValue<T>(pos, endianness);
 
     T value;
 
