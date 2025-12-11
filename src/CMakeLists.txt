@@ -38,6 +38,7 @@ install(FILES
     utilities/cmc_bit_vector.hxx 
     utilities/cmc_bit_map.hxx 
     utilities/cmc_huffman.hxx 
+    utilities/cmc_huffman_coder.hxx 
     utilities/cmc_arithmetic_encoder.hxx 
     utilities/cmc_ac_model.hxx 
     utilities/cmc_iface_entropy_alphabet.hxx 

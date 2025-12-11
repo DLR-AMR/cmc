@@ -58,6 +58,13 @@ target_link_libraries(${CMC_TEST_BITVECTOR_VIEW} PUBLIC cmc)
 target_include_directories(${CMC_TEST_BITVECTOR_VIEW} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
 add_test(NAME ${CMC_TEST_BITVECTOR_VIEW} COMMAND ${CMC_TEST_BITVECTOR_VIEW})
 
+# Add the test for the bitmap
+set(CMC_TEST_HUFFMAN_CODER cmc_test_huffman_coder)
+add_executable(${CMC_TEST_HUFFMAN_CODER} ${CMAKE_CURRENT_LIST_DIR}/cmc_huffman_coder.cxx)
+target_link_libraries(${CMC_TEST_HUFFMAN_CODER} PUBLIC cmc)
+target_include_directories(${CMC_TEST_HUFFMAN_CODER} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_HUFFMAN_CODER} COMMAND ${CMC_TEST_HUFFMAN_CODER})
+
 if (CMC_ENABLE_MPI)
 # Add the test for the arithmetic encoder of the prefix compression
 set(CMC_TEST_PREFIX_COMPRESSION_ARITHMETIC_CODING cmc_test_prefix_compression_arithmetic_coding)
