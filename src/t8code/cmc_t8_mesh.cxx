@@ -8,21 +8,6 @@
 #include <p8est.h>
 #endif
 
-#if 0
-#ifdef CMC_WITH_T8CODE
-#include <t8_eclass.h>
-#include <t8_element.h>
-#include <t8_schemes/t8_scheme.hxx>
-#include <t8_schemes/t8_default/t8_default_common/t8_default_common_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_quad/t8_default_quad_cxx.hxx>
-#include <t8_schemes/t8_default/t8_default_hex/t8_default_hex_cxx.hxx>
-#include "t8_schemes/t8_default/t8_default_c_interface.h"
-#include "t8_element_c_interface.h"
-#include <p4est.h>
-#include <p8est.h>
-#endif
-#endif
-
 namespace cmc
 {
 
