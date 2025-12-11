@@ -98,7 +98,6 @@ struct NodeCompare
     bool operator()(const INode<T>* lhs, const INode<T>* rhs) const { return lhs->frequency > rhs->frequency; }
 };
 
-
 template<typename T>
 class HuffmanCoder 
 {
@@ -224,46 +223,6 @@ private:
     INode<FrequencyType>* root_{nullptr};
 };
 
-#if 0
-
-template<typename T>
-T
-HuffmanTree<T>::GetNextSymbol(bit_vector::BitVectorView& view) const
-{
-    /* Start at the root element */
-    INode<FrequencyType>* node = root_;
-
-    /* Iterate until we will find a leaf element */
-    const InternalNode<T>* current_node = dynamic_cast<const InternalNode<T>*>(node);
-    bool is_internal_node = (current_node != nullptr);
-    while (is_internal_node)
-    {
-        const bool flag = view.IsCurrentBitSet();
-        view.MoveToNextBit();
-
-        if (flag == kLeftBranch)
-        {
-            node = current_node->left;
-        } else
-        {
-            cmc_assert(flag == kRightBranch);
-            node = current_node->right;
-        }
-        
-        current_node = dynamic_cast<const InternalNode<T>*>(node);
-        is_internal_node = (current_node != nullptr);
-    }
-
-    /* If a leaf element is reached, we will get the symbol from it and return it */
-    const LeafNode<T>* leaf = dynamic_cast<const LeafNode<T>*>(node);
-
-    cmc_assert(leaf != nullptr);
-    
-    return leaf->symbol;
-}
-
-#else
-
 template<typename T>
 T
 HuffmanTree<T>::GetNextSymbol(bit_vector::BitVectorView& view) const
@@ -294,7 +253,6 @@ HuffmanTree<T>::GetNextSymbol(bit_vector::BitVectorView& view) const
     
     return leaf->symbol;
 }
-#endif
 
 template<typename T>
 void HuffmanTree<T>::ConstructTree(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies)
