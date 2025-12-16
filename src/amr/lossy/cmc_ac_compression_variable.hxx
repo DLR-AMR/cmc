@@ -296,9 +296,22 @@ template <typename T>
 inline void
 AbstractCompressionVariable<T>::WriteVTKFile(const std::string& file_name)
 {
+    std::vector<double> double_data;
+    double_data.reserve(data_.size());
+
+    for (auto val_iter = data_.begin(); val_iter != data_.end(); ++val_iter)
+    {
+        double_data.push_back(static_cast<double>(*val_iter));
+    }
+
+    t8_vtk_data_field_t vtk_data[1];
+    snprintf (vtk_data[0].description, BUFSIZ, "ExampleData");
+    vtk_data[0].type = T8_VTK_SCALAR;
+    vtk_data[0].data = double_data.data();
+
+    t8_forest_write_vtk_ext (mesh_.GetMesh(), file_name.c_str(), 0, 0, 0, 0, 0, 0, 0, 1, vtk_data);
+
     cmc_debug_msg("The variable ", this->name_, " has been written to the file: ", file_name);
-
-
 }
 
 }
