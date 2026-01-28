@@ -340,9 +340,13 @@ public:
         }
     };
 
-    void StartDecoding(const bit_vector::BitVectorView& encoding);
+    void StartDecoding(const bit_vector::BitVectorView encoding);
     T DecodeNextSymbol() {cmc_assert(tree_ != nullptr); return tree_->GetNextSymbol(encoded_stream_view_);}
+    void SkipNextNumberOfBits(const size_t num_bits_to_skip) {encoded_stream_view_.SkipNumberOfBits(num_bits_to_skip);}
+    std::vector<uint8_t> GetNextRawBitSequenceFromStream(const size_t num_bits) {return encoded_stream_view_.GetNextBitSequence(num_bits);}
+
     size_t GetNumberOfProcessedBytesForSymbolFrequencyTable() const {return num_processed_bytes_sym_freq_table_;}
+
 private:
     std::pair<std::vector<HuffmanSymbol<T>>, size_t> ReconstructHuffmanSymbolFrequencyTable(const uint8_t* start_encoding_pos);
 
@@ -366,7 +370,7 @@ HuffmanDecoder<T>::HuffmanDecoder(const uint8_t* start_encoding_pos)
 
 template <typename T>
 void
-HuffmanDecoder<T>::StartDecoding(const bit_vector::BitVectorView& encoding)
+HuffmanDecoder<T>::StartDecoding(const bit_vector::BitVectorView encoding)
 {
     encoded_stream_view_ = encoding;
 }
