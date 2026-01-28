@@ -23,7 +23,8 @@ enum CompressionSchema
     _TestEmbeddedPCP4Extraction,
     _TestPCP4Extraction,
     PatchPrefixExtractionPlainSuffixes,
-    PatchMultiResExtraction
+    PatchMultiResExtraction,
+    ParallelMultiResExtraction
 };
 
 }
