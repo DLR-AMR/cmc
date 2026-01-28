@@ -120,6 +120,13 @@ install(FILES
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpi
 )
 
+install(FILES
+    compression_io/cmc_compression_mpi_io_output.hxx 
+    compression_io/cmc_decompression_mpi_io_input.hxx 
+    compression_io/cmc_compression_mpi_io_util.hxx  
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/compression_io
+)
+
 # End if configured with MPI
 endif()
 ######## END WITH MPI
@@ -232,6 +239,9 @@ install(FILES
     amr/lossless/cmc_prefix_extraction_decompression.hxx 
     amr/lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx 
     amr/lossless/cmc_byte_decompression_variable.hxx 
+    amr/lossless/cmc_byte_par_compression_variable.hxx 
+    amr/lossless/cmc_multi_res_par_extraction_compression.hxx 
+    amr/lossless/cmc_multi_res_par_extraction_util.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossless
 )
 
