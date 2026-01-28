@@ -22,6 +22,8 @@ namespace cmc
 #define MPI_MORTON_INDEX_T MPI_INT64_T
 #endif
 
+constexpr int kRootRank = 0;
+
 /**
  * @brief Initialize MPI execution environment 
  * 
