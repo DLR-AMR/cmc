@@ -202,6 +202,26 @@ public:
         return bit_sequence;
     }
 
+    void SkipNumberOfBits(const size_t num_bits)
+    {
+        cmc_assert(num_bits != 0);
+        
+        /* Number of bytes and bits needed to be extracted */
+        const size_t num_bytes_ = num_bits / kCharBit;
+        const size_t num_bits_ = num_bits % kCharBit;
+
+        /* Update the byte and bit position correctly  */
+        byte_position_ += (num_bits_ <= bit_position_ ? 0 : 1) + num_bytes_;
+
+        if (num_bits_ <= bit_position_)
+        {
+            bit_position_ = bit_position_ - num_bits_;
+        } else
+        {
+            bit_position_ = kCharBit - (num_bits_ - bit_position_);
+        }
+    }
+
 private:
     const uint8_t* data_;
     std::size_t byte_position_{0};
