@@ -22,8 +22,10 @@ namespace cmc {
 
 #ifdef CMC_ENABLE_DEBUG
 #define cmc_assert(condition) assert(condition)
+#define cmc_static_assert(condition) static_assert(condition)
 #else
 #define cmc_assert(condition) ((void)0)
+#define cmc_static_assert(condition) ((void)0)
 #endif
 
 [[noreturn]] void cmc_exit(const char* _err_msg, const char* _location);
