@@ -37,6 +37,28 @@ public:
 #endif
 };
 
+#ifdef CMC_ENABLE_MPI
+template <typename T>
+class IAMRParallelCompressionVariable : public ICompressionVariable<T>
+{
+public:
+    virtual void MoveEncodedDataInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_data) = 0;
+    virtual void MoveEncodedMeshInto(std::vector<std::vector<uint8_t>>& vec_to_hold_encoded_levelwise_mesh) = 0;
+
+    virtual const std::vector<std::vector<uint8_t>>& GetEncodedData() const = 0;
+    virtual const std::vector<std::vector<uint8_t>>& GetEncodedMesh() const = 0;
+    virtual const std::vector<std::vector<uint8_t>>& GetEncodedPartitionTable() const = 0;
+    
+    virtual const std::string& GetName() const = 0;
+    virtual size_t Size() const = 0;
+    virtual const AmrMesh& GetAmrMesh() const = 0;
+    virtual CompressionSchema GetCompressionSchema() const = 0;
+
+    virtual MPI_Comm GetMPIComm() const = 0;
+
+};
+#endif
+
 }
 
 #endif /* !CMC_IFACE_AMR_COMPRESSION_VARIABLE_HXX */
