@@ -95,6 +95,7 @@ public:
     void AppendBit(const bool bit);
     void AppendSetBit();
     void AppendUnsetBit();
+    void PadZeroBits(const int num_zero_bits);
 
     void ToggleBit(const size_t& byte_position, const size_t& bit_position);
     void ClearBit(const size_t& byte_position, const size_t& bit_position);
@@ -292,6 +293,41 @@ BitMap::AppendBit(const bool bit)
     {
         AppendUnsetBit();
     }
+}
+
+/**
+ * @brief Append some zero bits (number of bits >= 0) to the current position in the BitMap
+ * 
+ * @param num_zero_bits The amount of bits to be added to the bit-stream
+ */
+inline void
+BitMap::PadZeroBits(const int num_zero_bits)
+{
+    cmc_assert(num_zero_bits >= 0);
+
+    if (bit_position_ + num_zero_bits <= kCharBit)
+    {
+        /* If only some bits will be padded, sucht that no new byte needs to be added to the stream */
+        bit_position_ += num_zero_bits;
+    } else
+    { 
+        /* Subtract the bits until the next full byte will be reached and compute the full bytes and leftover bits to append */
+        const int _num_bits_tmp = num_zero_bits - (kCharBit - bit_position_);
+        const int num_full_bytes_to_add = _num_bits_tmp / kCharBit;
+        const int num_leftover_bits = _num_bits_tmp % kCharBit;
+
+        /* At least a single byte plus potentially some more bytes need to be added */
+        for (int byte_iter{0}; byte_iter <= num_full_bytes_to_add; ++byte_iter)
+        {   
+            vector_.emplace_back(0);
+            ++byte_position_;
+        }
+
+        /* Poetntially, some leftover bits need to be added */
+        bit_position_ = num_leftover_bits;
+    }
+
+    num_bits_ += num_zero_bits;
 }
 
 /**
