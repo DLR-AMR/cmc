@@ -92,9 +92,10 @@ private:
     SizeType num_global_bytes_encoding_{0};
     SizeType num_global_bytes_mesh_{0};
     SizeType num_global_bytes_partition_table_{0}; //!< This value is only correct on the root rank
-    std::vector<uint8_t> data_header_;
-    std::vector<uint8_t> mesh_header_;
+
     std::vector<uint8_t> partition_header_;
+    std::vector<uint8_t> mesh_header_;
+    std::vector<uint8_t> data_header_;
 };
 
 template <typename T>
@@ -120,6 +121,7 @@ SerializedVariableInfo<T>::DetermineNumGlobalBytes()
         num_global_bytes_partition_table_ += lvl_encoded_partition_table[lvl_iter].size(); //!< This sum is only correct on the root rank, all other rank obtain a zero
     }
 
+    //TODO: Add the partition table or Bcast it
     /* Reduce the global byte counts */
     const int rv_allreduce = MPI_Allreduce(local_bytes.data(), global_bytes.data(), 2, ConvertToMPIType<SizeType>(), MPI_SUM, comm_);
     MPICheckError(rv_allreduce);
@@ -137,7 +139,7 @@ SerializedVariableInfo<T>::GenerateVariableHeaders()
     const int rv_rank = MPI_Comm_rank(comm_, &rank);
     MPICheckError(rv_rank);
     int size{1};
-    const int rv_size = MPI_Comm_rank(comm_, &size);
+    const int rv_size = MPI_Comm_size(comm_, &size);
     MPICheckError(rv_size);
 
     if (rank == kRootRank)
@@ -324,7 +326,7 @@ private:
 };
 
 template <typename T>
-size_t
+static size_t
 DefaultFileHeader<T>::GetFileHeaderSize(const size_t num_variables) const
 {
     /* The file header consists of the file singature, the num header bytes, the number of variables and for each variable of a id, name, num bytes mesh and num bytes data */
