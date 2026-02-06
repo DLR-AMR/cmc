@@ -17,7 +17,7 @@ public:
     std::vector<uint8_t> EncodeRootLevelMesh(t8_forest_t root_level_mesh) override;    
 
 #ifdef CMC_ENABLE_MPI
-    std::vector<uint8_t> EncodeRootLevelMeshPar(t8_forest_t root_level, const MPI_Comm comm) override;
+    std::vector<uint8_t> GatherRootLevelMeshEncodingOnTheRootRank(const t8_forest_t root_level, const MPI_Comm comm) override;
 #endif
 };
 
@@ -40,7 +40,7 @@ MeshEncoder::EncodeRootLevelMesh([[maybe_unused]] t8_forest_t root_level_mesh)
 
 #ifdef CMC_ENABLE_MPI
 inline std::vector<uint8_t>
-MeshEncoder::EncodeRootLevelMeshPar([[maybe_unused]] t8_forest_t root_level, const MPI_Comm comm)
+MeshEncoder::GatherRootLevelMeshEncodingOnTheRootRank(const t8_forest_t root_level, const MPI_Comm comm)
 {
     #ifdef CMC_ENABLE_DEBUG
     MPI_Comm mesh_comm = t8_forest_get_mpicomm(root_level);
@@ -57,13 +57,10 @@ MeshEncoder::EncodeRootLevelMeshPar([[maybe_unused]] t8_forest_t root_level, con
     const int rv_rank = MPI_Comm_rank(comm, &rank);
     MPICheckError(rv_rank);
 
-    /* Define a root rank */
-    const int root_rank{0};
-
     /* Declare an encoded output vector (only to be filled by the root rank) */
     std::vector<uint8_t> encoded_root_level;
 
-    if (rank == root_rank)
+    if (rank == kRootRank)
     {
         encoded_root_level.reserve(sizeof(uint64_t));
 

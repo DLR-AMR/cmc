@@ -17,7 +17,7 @@ public:
 
     virtual std::vector<uint8_t> EncodeRootLevelMesh(t8_forest_t root_level) = 0;
 #ifdef CMC_ENABLE_MPI
-    virtual std::vector<uint8_t> EncodeRootLevelMeshPar(t8_forest_t root_level, const MPI_Comm comm) = 0;
+    virtual std::vector<uint8_t> GatherRootLevelMeshEncodingOnTheRootRank(const t8_forest_t root_level, const MPI_Comm comm) = 0;
 #endif
 
     virtual ~IMeshEncoder(){};
