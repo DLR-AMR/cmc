@@ -331,6 +331,146 @@ IAbstractMeshEncoder::GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t
     }
 }
 
+constexpr int kSendMeshEncoding = 100;
+
+inline std::vector<uint8_t>
+IAbstractMeshEncoder::GatherMeshEncodingOnTheRootRank(t8_forest_t coarsened_mesh, MPI_Comm comm)
+{
+    /* Get the rank of the mpi process within the communicator */
+    int comm_size{0};
+    int ret_val = MPI_Comm_size(comm, &comm_size);
+    MPICheckError(ret_val);
+
+    int rank;
+    ret_val = MPI_Comm_rank(comm, &rank);
+    MPICheckError(ret_val);
+
+    /* Get the number of global elements (which is equal to the number of global bits in the BitMaps) */
+    const uint64_t num_global_bits = t8_forest_get_global_num_leaf_elements (coarsened_mesh);
+
+    /* Get the process-local global element offset in the coarsened mesh */
+    const uint64_t global_coarsened_bit_offset = static_cast<uint64_t>(t8_forest_get_first_local_leaf_element_id (coarsened_mesh)); 
+    const uint64_t num_local_bits = encoded_level_data_.size();
+
+    /* Declare an ouput vector, only the root rank will hold the full global mesh, the other process obtain empty vectors */
+    std::vector<uint8_t> global_encoded_mesh; 
+
+    if (rank != kRootRank)
+    {
+        /* Declare a send buffer */
+        std::vector<uint8_t> send_data;
+
+        /* Allocate the send data buffer (potentially, we do need an additional byte to account for the padding that will be potentially introduced) */
+        send_data.reserve(2 * sizeof(uint64_t) + encoded_level_data_.size_bytes() + sizeof(uint8_t));
+
+        /* We offset the bit stream according to the offset in the coarsened mesh */
+        const int uint64_t local_mesh_encoding_offset = global_coarsened_bit_offset % bit_map::kCharBit;
+
+        /* Push the information to the byte stream */
+        PushBackValueToByteStream<uint64_t>(global_coarsened_bit_offset);
+        const uint64_t num_bytes_offseted_mesh_encoding = (num_local_bits + local_mesh_encoding_offset) / bit_map::kCharBit + ((num_local_bits + local_mesh_encoding_offset) % bit_map::kCharBit != 0 ? 1 : 0);
+        PushBackValueToByteStream<uint64_t>(num_bytes_offseted_mesh_encoding);
+
+        if (local_mesh_encoding_offset != 0)
+        {
+            /* Construct the newly offseted bitmap */
+            bit_map::BitMap offset_bit_map;
+            offset_bit_map.Reserve(num_local_bits + bit_map::kCharBit);
+
+            /* Add the offset, such that the BitMap matches with the global partitioning */
+            offset_bit_map.PadZeroBits(static_cast<int>(local_mesh_encoding_offset));
+
+            /* Append the current encoding */
+            offset_bit_map.AppendBits(encoded_level_data_);
+
+            cmc_assert(num_bytes_offseted_mesh_encoding == offset_bit_map.size_bytes());
+
+            /* Copy the offseted data to the send buffer */
+            std::copy_n(offset_bit_map.begin_bytes(), offset_bit_map.size_bytes(), std::back_inserter(send_data));
+        } else
+        {
+            /* Copy the encoding of the mesh */
+            std::copy_n(encoded_level_data_.begin_bytes(), encoded_level_data_.size_bytes(), std::back_inserter(send_data));
+        }
+
+        /* Next, we send the data to the root rank */
+        const int rv_send_to_root = MPI_Send(send_data.data(), send_data.size(), MPI_UINT8_T, kRootRank, kSendMeshEncoding, comm);
+        MPICheckError(rv_send_to_root);
+    } else
+    {
+        /* On the root rank, we receive the offseted data from all ranks and store it */
+        int num_msgs_received{0};
+        const int num_msgs_expected{comm_size - 1};
+
+        /* Allocate a buffer on the root rank */
+        global_encoded_mesh = std::vector<uint8_t>(num_global_bits / bit_map::kCharBit + (num_global_bits % bit_map::kCharBit != 0 ? 1 : 0), 0);
+
+        /* Compute the maximumu message length */
+        const int max_msg_length = 2 * sizeof(uint64_t) + num_global_bits / bit_map::kCharBit + (num_global_bits % bit_map::kCharBit != 0 ? 1 : 0);
+
+        /* Loosely allocate a receive buffer */
+        std::vector<uint8_t> receive_buffer(max_msg_length, 0);
+
+        /* We start by copying over the local encoding of the mesh */
+        std::memcpy(global_encoded_mesh.data(), encoded_level_data_.data(), encoded_level_data_.size_bytes());
+
+        MPI_Status status;
+
+        /* Recieve all messages */
+        for (int msg_iter{0}; msg_iter < num_msgs_expected; ++msg_iter)
+        {
+            /* Receive the mesh encoding message from any rank (any message will be shorter than the number of global bits plus th additional info bytes) */
+            const int rv_recv = MPI_Recv(receive_buffer.data(), max_msg_length, MPI_UINT8_T, MPI_ANY_SOURCE, kSendMeshEncoding, comm, &status);
+            MPICheckError(rv_recv);
+
+            /* Get the number of sent bytes */
+            int send_count{0};
+            const int rv_get_count = MPI_Get_count(&status, MPI_UINT8_T, &send_count);
+            MPICheckError(rv_get_count);
+
+            /* Read the global offset */
+            const uint64_t recv_global_offset = GetValueFromByteStream<uint64_t>(receive_buffer.data());
+
+            /* Read the number of bytes of the mesh encoding */
+            const uint64_t recv_num_bytes = GetValueFromByteStream<uint64_t>(receive_buffer.data() + sizeof(uint64_t));
+
+            if (recv_num_bytes == 0)
+            {
+                /* If there are no mesh encoding bytes coming from this process, we continue with the next message */
+                continue;
+            }
+
+            cmc_assert(recv_num_bytes == static_cast<uint64_t>(send_count - 2 * sizeof(uint64_t)));
+
+            /* Start pointer to mesh encoding */
+            const uint8_t* recv_data = receive_buffer.data() + 2 * sizeof(uint64_t);
+
+            /* Determine the correct start position in the global mesh encoding stream */
+            const uint64_t start_byte_pos = recv_global_offset / bit_map::kCharBit;
+
+            /* We need to bitwise-OR the first and the last byte in order to not alter the boundary bits from the neighboring processes */
+            global_encoded_mesh[start_byte_pos] |= (*recv_data);
+
+            /* Copy all unique bytes to the global encoding */
+            const uint64_t remaining_bytes = recv_num_bytes - 1;
+            if (remaining_bytes >= 2)
+            {
+                const uint64_t num_full_copy_bytes = remaining_bytes - 1;
+                std::copy_n(recv_data + 1, num_full_copy_bytes, global_encoded_mesh.data() + start_byte_pos + 1);
+            }
+
+            /* Bitwise-OR the last byte (if more than one bytes has been received iniially) */
+            if (recv_num_bytes >= 2)
+            {
+                const uint64_t end_byte = start_byte_pos + recv_num_bytes - 1;
+                global_encoded_mesh[end_byte] |= (*(recv_data + recv_num_bytes - 1));
+            }
+        }
+    }
+
+    return global_encoded_mesh;
+}
+
 #endif
 
 }
