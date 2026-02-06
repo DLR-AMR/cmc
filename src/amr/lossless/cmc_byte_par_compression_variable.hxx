@@ -198,6 +198,9 @@ public:
     virtual std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_values) const = 0;
     virtual std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const = 0;
 
+    virtual std::vector<uint8_t> StorePartitionTableOnTheRootRank(const t8_forest_t coarsened_forest) const = 0;
+    virtual std::vector<uint8_t> StoreRootLevelPartitionTableOnTheRootRank(const t8_forest_t coarsened_forest) const = 0;
+
     virtual ~ICompressionAdaptData(){};
 
     bool IsValidForCompression() const;
@@ -413,19 +416,19 @@ AbstractByteCompressionVariable<T>::Compress()
         std::vector<uint8_t> encoded_data = adapt_data->EncodeLevelData(data_);
         buffered_encoded_data_.push_back(std::move(encoded_data));
 
-        /* Store the partitioning of this level (only on the root rank) */
-        std::vector<uint8_t> levelwise_partition = adapt_data->StorePartitionTable(adapted_forest);
-        buffered_partition_table_.push_back(std::move(levelwise_partition));
-
         /* Once the data is buffered, we can overwrite it with the adapted data */
         this->SwitchToExtractedData();
 
+        /* Store the partitioning of this level (only on the root rank) after the lengths and offsets of this level's encoding have been computed (->EncodeLevelData())*/
+        std::vector<uint8_t> levelwise_partition = adapt_data->StorePartitionTableOnTheRootRank();
+        buffered_partition_table_.push_back(std::move(levelwise_partition));
+
+        /* Store the global mesh encoding of this level */
+        std::vector<uint8_t> encoded_mesh_data = mesh_encoder_->GatherMeshEncodingOnTheRootRank(adapted_forest, comm_);
+        buffered_encoded_mesh_.push_back(std::move(encoded_mesh_data));
+
         /* Repartition the mesh */
         t8_forest_t partitioned_forest = RepartitionMesh(adapted_forest);
-
-        /* Get the encoded the mesh adapatations */ //TODO:: CHECK THIS
-        std::vector<uint8_t> encoded_mesh_data = mesh_encoder_->GetPartitionedEncodedLevelData(adapted_forest, partitioned_forest, this->GetMPIComm());
-        buffered_encoded_mesh_.push_back(std::move(encoded_mesh_data));
 
         /* Repartition the data */
         this->RepartitionData(adapted_forest, partitioned_forest);
@@ -443,13 +446,17 @@ AbstractByteCompressionVariable<T>::Compress()
         cmc_debug_msg("The coarsening iteration is finished.");
     }
 
+    /* At last, we need to encode the partition table on the root level */
+    std::vector<uint8_t> encoded_root_partition_table = adapt_data->StoreRootLevelPartitionTableOnTheRootRank(adapted_forest);
+    buffered_partition_table_.push_back(encoded_root_partition_table);
+
+    /* At last, we need to encode the root level of the mesh */
+    std::vector<uint8_t> encoded_root_mesh = mesh_encoder_->GatherRootLevelMeshEncodingOnTheRootRank(mesh_.GetMesh(), this->GetMPIComm());
+    buffered_encoded_mesh_.push_back(std::move(encoded_root_mesh));
+
     /* At last, we need to encode the root level data */
     std::vector<uint8_t> encoded_root_data = adapt_data->EncodeRootLevelData(data_);
     buffered_encoded_data_.push_back(std::move(encoded_root_data));
-
-    /* At last, we need to encode the root level of the mesh */
-    std::vector<uint8_t> encoded_root_mesh = mesh_encoder_->EncodeRootLevelMeshPar(mesh_.GetMesh(), this->GetMPIComm());
-    buffered_encoded_mesh_.push_back(std::move(encoded_root_mesh));
 
     /* Free the adapt data structure */
     this->adaptation_destructor_(adapt_data);

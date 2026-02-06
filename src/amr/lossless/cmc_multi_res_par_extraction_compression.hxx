@@ -44,6 +44,9 @@ public:
     std::vector<uint8_t> EncodeLevelData(const std::vector<CompressionValue<T>>& level_byte_values) const override;
     std::vector<uint8_t> EncodeRootLevelData(const std::vector<CompressionValue<T>>& root_level_values) const override;
 
+    std::vector<uint8_t> StorePartitionTableOnTheRootRank(const t8_forest_t coarsened_forest) const override;
+    std::vector<uint8_t> StoreRootLevelPartitionTableOnTheRootRank(const t8_forest_t coarsened_forest) const override;
+
 protected:
     ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) override;
     UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) override;
@@ -424,16 +427,16 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
  */
 template <typename T>
 std::vector<uint8_t>
-MultiResAdaptData<T>::StorePartitionTable(const t8_forest_t coarsened_forest) const
+MultiResAdaptData<T>::StorePartitionTableOnTheRootRank(const t8_forest_t coarsened_forest) const
 {
     /* Get the rank and size of the mpi process within the communicator */
     const MPI_Comm comm = this->GetMPIComm();
     int rank{0};
     int rv_rank = MPI_Comm_rank(comm, &rank);
     MPICheckError(rv_rank);
-    //int size{1};
-    //int rv_size = MPI_Comm_size(comm, &size);
-    //MPICheckError(rv_size);
+    int size{1};
+    int rv_size = MPI_Comm_size(comm, &size);
+    MPICheckError(rv_size);
 
     /* Get the global offset of the processes */
     std::array<uint32_t, 3> offset_values;
@@ -464,8 +467,6 @@ MultiResAdaptData<T>::StorePartitionTable(const t8_forest_t coarsened_forest) co
     if (rank == kRootRank)
     {
         serialized_partition_table.reserve(3 * size * sizeof(uint32_t));
-        /* First, we store the number of processes */ //Maybe do this once innthe header
-        //PushBackValueToByteStream<uint32_t>(serialized_partition_table, static_cast<uint32_t>(size));
 
         /* We need to exclusively scan the data to indicate the serialized positions */
         uint32_t num_elems{0};
@@ -489,6 +490,60 @@ MultiResAdaptData<T>::StorePartitionTable(const t8_forest_t coarsened_forest) co
             PushBackValueToByteStream<uint32_t>(serialized_partition_table, num_elems);
             PushBackValueToByteStream<uint32_t>(serialized_partition_table, num_entropy_codes);
             PushBackValueToByteStream<uint32_t>(serialized_partition_table, num_encoded_bytes);
+        }
+    }
+
+    return serialized_partition_table;
+}
+
+template <typename T>
+std::vector<uint8_t>
+MultiResAdaptData<T>::StoreRootLevelPartitionTableOnTheRootRank(const t8_forest_t coarsened_forest) const
+{
+/* Get the rank and size of the mpi process within the communicator */
+    const MPI_Comm comm = this->GetMPIComm();
+    int rank{0};
+    int rv_rank = MPI_Comm_rank(comm, &rank);
+    MPICheckError(rv_rank);
+    int size{1};
+    int rv_size = MPI_Comm_size(comm, &size);
+    MPICheckError(rv_size);
+
+    /* Store the number of local elements */
+    const uint32_t local_elem_count = static_cast<uint32_t>(t8_forest_get_local_num_leaf_elements(coarsened_forest));
+
+    /* Declare an output vector for the gathering */
+    std::vector<uint32_t> gathered_values;
+
+    /* Allocate the vector on the root rank */
+    if (rank == kRootRank)
+    {
+        gathered_values = std::vector<uint32_t>(size);
+    }
+
+    /* Gather all the process local data */
+    const int rv_gather = MPI_Gather(&local_elem_count, 1, MPI_UINT32_T, gathered_values.data(), 1, MPI_UINT32_T, kRootRank, comm);
+    MPICheckError(rv_gather);
+
+    std::vector<uint8_t> serialized_partition_table;
+    if (rank == kRootRank)
+    {
+        serialized_partition_table.reserve(3 * size * sizeof(uint32_t));
+
+        /* We need to exclusively scan the data to indicate the serialized positions */
+        uint32_t num_elems{0};
+
+        /* Store the default start offset */
+        PushBackValueToByteStream<uint32_t>(serialized_partition_table, num_elems);
+
+        /* Sum up the offsets for the next processes */
+        for (int rank_id{0}; rank_id < size - 1; ++rank_id)
+        {
+            /* Compute the next offsets */
+            num_elems += gathered_values[rank_id];
+
+            /* Store the offsets */
+            PushBackValueToByteStream<uint32_t>(serialized_partition_table, num_elems);
         }
     }
 
