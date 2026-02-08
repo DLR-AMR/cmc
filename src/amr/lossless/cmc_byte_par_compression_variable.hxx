@@ -298,7 +298,7 @@ ICompressionAdaptData<T>::LeaveElementUnchanged(const int which_tree, const int 
 {
     cmc_assert(which_tree >= 0 && lelement_id >= 0);
 
-     /* We indicate to that the element stays unchanged */
+    /* We indicate that the element stays unchanged */
     base_variable_->IndicateElementStaysUnchanged();
 
     /* Get the corresponding value */
@@ -383,6 +383,9 @@ AbstractByteCompressionVariable<T>::Compress()
         this->DetermineInitialMaximumRefinementLevel();
         cmc_assert(this->GetInitialMaximumRefinementLevel() > 0);
     }
+
+    /* Check if the forest is partitioned for coarsening and if not, do so */
+    //TODO...
 
     /* We create the adapt data based on the compression settings, the forest and the variables to consider during the adaptation/coarsening */
     ICompressionAdaptData<T>* adapt_data = this->CreateAdaptData();
@@ -661,26 +664,33 @@ AbstractByteCompressionVariable<T>::DetermineInitialMaximumRefinementLevel()
     const t8_scheme_c* scheme =  t8_forest_get_scheme(mesh);
 
     const t8_locidx_t num_local_trees = t8_forest_get_num_local_trees(mesh);
-    int val_idx = 0;
+
+    int max_elem_lvl{0};
 
     /* Iterate over all elements in all trees */
     for (t8_locidx_t tree_idx = 0; tree_idx < num_local_trees; ++tree_idx)
     {
         const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, tree_idx);
         const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, tree_idx);
-        for (t8_locidx_t elem_idx = 0; elem_idx < num_elements_in_tree; ++elem_idx, ++val_idx)
+        for (t8_locidx_t elem_idx = 0; elem_idx < num_elements_in_tree; ++elem_idx)
         {
             /* Get the current element */
             const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, tree_idx, elem_idx);
 
+            /* Get the level of the element */
             const int elem_level = scheme->element_get_level(tree_class, element);
 
-            if (max_initial_refinement_level_ < elem_level)
+            /* Check if the level is larger than the maximum previous level */
+            if (max_elem_lvl < elem_level) [[unlikely]]
             {
-                max_initial_refinement_level_ = elem_level;
+                max_elem_lvl = elem_level;
             }
         }
     }
+
+    /* Exchange the maximum present refinement level */
+    const int rv_allredc = MPI_Allreduce(&max_elem_lvl, &(this->max_initial_refinement_level_), 1, MPI_INT, MPI_MAX, this->comm_);
+    MPICheckError(rv_allredc);
 
     cmc_debug_msg("The maximum present element refinement level is ", max_initial_refinement_level_);
 }
