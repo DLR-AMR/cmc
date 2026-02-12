@@ -208,7 +208,7 @@ public:
     int GetInitialMaximumRefinementLevel() const {return base_variable_->GetInitialMaximumRefinementLevel();}
     int GetCurrentCompressionStep() const {return compression_step_;}
     MPI_Comm GetMPIComm() const {return base_variable_->GetMPIComm();};
-    const t8_forest GetMesh() const {return base_variable_->GetAmrMesh().GetMesh();}
+    t8_forest_t GetMesh() const {return base_variable_->GetAmrMesh().GetMesh();}
 protected:
     virtual ExtractionData<T> PerformExtraction(const int which_tree, const int lelement_id, const int num_elements, const VectorView<CompressionValue<T>> values) = 0;
     virtual UnchangedData<T> ElementStaysUnchanged(const int which_tree, const int lelement_id, const CompressionValue<T>& value) = 0;
@@ -450,7 +450,7 @@ AbstractByteCompressionVariable<T>::Compress()
     }
 
     /* At last, we need to encode the partition table on the root level */
-    std::vector<uint8_t> encoded_root_partition_table = adapt_data->StoreRootLevelPartitionTableOnTheRootRank(adapted_forest);
+    std::vector<uint8_t> encoded_root_partition_table = adapt_data->StoreRootLevelPartitionTableOnTheRootRank(mesh_.GetMesh());
     buffered_partition_table_.push_back(encoded_root_partition_table);
 
     /* At last, we need to encode the root level of the mesh */

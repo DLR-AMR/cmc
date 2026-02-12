@@ -10,7 +10,7 @@
 #include "utilities/cmc_byte_compression_arithmetic_encoding.hxx"
 #include "utilities/cmc_byte_compression_values.hxx"
 #include "utilities/cmc_compression_schema.hxx"
-#include "mesh_compression/cmc_iface_mesh_decoder.hxx"
+#include "mesh_compression/cmc_mesh_par_decoder.hxx"
 
 #include <t8.h>
 #include <t8_forest/t8_forest.h>
@@ -24,9 +24,11 @@
 #include <memory>
 #include <algorithm>
 #include <bit>
+#include <filesystem>
 
 namespace cmc::decompression::par
 {
+using SizeType = uint64_t;
 
 constexpr bool kWriteDecompressionStepToVTK = false;
 
@@ -75,7 +77,7 @@ struct OffsetHint
 
 struct ProcLevelByteStreamOffsets
 {
-    std::vector<OffsetHint>> offset_hints;
+    std::vector<OffsetHint> offset_hints;
 };
 
 /* Forward declarations */
@@ -124,7 +126,7 @@ protected:
     explicit AbstractByteParDecompressionVariable(std::vector<uint8_t>&& encoded_data_byte_stream, std::vector<uint8_t>&& encoded_mesh_byte_stream, const int max_num_decompression_iterations)
     : encoded_data_byte_stream_(std::move(encoded_data_byte_stream)), encoded_mesh_byte_stream_(std::move(encoded_mesh_byte_stream)), max_num_decompression_iterations_{max_num_decompression_iterations} {};
 
-    explicit AbstractByteParDecompressionVariable(const std::string& name, std::vector<uint8_t>&& global_level_num_elems, std::vector<uint8_t>&& encoded_mesh_stream, 
+    explicit AbstractByteParDecompressionVariable(const std::string& name, std::vector<cmc::compression_io::mpi::SizeType>&& global_level_num_elems, std::vector<uint8_t>&& encoded_mesh_stream, 
                                                   std::vector<uint8_t>&& global_level_data_bytes, const uint64_t file_byte_offset_encoded_data, 
                                                   std::vector<ProcLevelByteStreamOffsets>&& level_offset_hints, const std::string& file_name, const MPI_Comm comm)
     : name_(name), global_level_num_elems_(std::move(global_level_num_elems)), encoded_mesh_byte_stream_(std::move(encoded_mesh_stream)),
@@ -154,9 +156,6 @@ protected:
     void SetName(const std::string& name) {name_ = name;};
     void SetAmrMesh(const AmrMesh& mesh) {mesh_ = mesh;};
     void SetAmrMesh(AmrMesh&& mesh) {mesh_ = std::move(mesh);};
-    void SetData(const std::vector<T>& initial_data);
-    void SetData(const std::vector<SerializedCompressionValue<sizeof(T)>>& initial_data);
-    void SetData(std::vector<SerializedCompressionValue<sizeof(T)>>&& initial_data);
 
     const uint8_t* GetEncodedMeshStreamPtr() const {return encoded_mesh_byte_stream_.data();};
 
@@ -190,11 +189,11 @@ private:
     std::vector<CompressionValue<T>> data_; //!< The current data of the variable 
     std::vector<CompressionValue<T>> data_new_; //!< A helper variable for the adaptation
 
-    std::vector<SizeType> global_level_num_elems_; //!< Indicating the number of global elements per level
+    std::vector<cmc::compression_io::mpi::SizeType> global_level_num_elems_; //!< Indicating the number of global elements per level
     /* The mesh stream will be held completely in memory since it is rather small */
     const std::vector<uint8_t> encoded_mesh_byte_stream_; //!< The encoded byte stream of the mesh
     
-    std::vector<SizeType> global_level_bytes_;  //!< Indicating the number of encoded data bytes per level
+    std::vector<cmc::compression_io::mpi::SizeType> global_level_bytes_;  //!< Indicating the number of encoded data bytes per level
     const SizeType file_var_encoded_data_offset_; //!< The byte offset in the file to the start of the encoded level data of this variable 
 
     /* The byte stream indicating hints for the process-local offsets will be held in memory as well since it is rather small */
@@ -591,7 +590,7 @@ AbstractByteParDecompressionVariable<T>::DetermineEntropyOffsetsFromMeshOffset(b
     /* Move to the correct bit position within this level */
     mesh_lvl_encoding.MoveToStartBit(proc_elem_offset);
 
-    /* Therefore, we start to iterate locally throught all trees/elemenets and count them */
+    /* Therefore, we start to iterate locally through all trees/elements and count them */
     uint64_t num_local_entropy_codes{0};
 
     /* Get the scheme of the mesh */

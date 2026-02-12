@@ -224,7 +224,6 @@ SerializedVariableInfo<T>::GenerateVariableHeaders()
     }
 }
 
-const auto [mesh_var_id, mesh_lvl_byte_counts, mesh_lvls_encoding]
 inline
 std::tuple<VarDataInfoType, std::vector<SizeType>, std::vector<uint8_t>>
 DecodeMeshStream(const std::vector<uint8_t>& var_mesh_header_w_encoding)
@@ -319,15 +318,15 @@ public:
     ~DefaultFileHeader() = default;
 
     const std::vector<uint8_t>& GetSerializedFileHeader() const override;
-    static size_t GetFileHeaderSize(const size_t num_variables) const;
+    static size_t GetFileHeaderSize(const size_t num_variables);
 private:
     void GenerateFileHeader(const std::vector<SerializedVariableInfo<T>>& variables);
     std::vector<uint8_t> serialized_file_header_;
 };
 
 template <typename T>
-static size_t
-DefaultFileHeader<T>::GetFileHeaderSize(const size_t num_variables) const
+inline size_t
+DefaultFileHeader<T>::GetFileHeaderSize(const size_t num_variables)
 {
     /* The file header consists of the file singature, the num header bytes, the number of variables and for each variable of a id, name, num bytes mesh and num bytes data */
     static_assert(sizeof(uint8_t) == sizeof(char));

@@ -67,7 +67,7 @@ MultiResAdaptData<T>::InitializeExtractionIteration()
 {
     resdiual_order_indications_ = bit_map::BitMap();
     residual_presence_indications_ = bit_map::BitMap();
-    num_levelwise_entropy_codes_ = 0;
+    num_levelwise_entropy_codes_ = 1; //!< Each process will encode at least the symbol for the process boundary
     num_local_entropy_bytes_encoded_level_data_ = 0;
 }
 
@@ -367,9 +367,6 @@ MultiResAdaptData<T>::EncodeLevelData(const std::vector<CompressionValue<T>>& le
 
     /* Set up the BitVector holding the encoded data for further use */
     encoding.TrimToContent();
-
-    /* Count the additional process boundary symbol */
-    ++num_levelwise_entropy_codes_;
     /****** END of Encode the entropy codes interleaved with the encoded significant bits ******/
 
     /* Store the encoded data */

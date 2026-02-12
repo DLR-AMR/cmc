@@ -29,9 +29,9 @@ private:
     void WriteFileHeader();
     MPI_Offset GetDefaultFileHeaderOffset() const;
     MPI_Offset ComputeGlobalFileStorage(const MPI_Comm comm, const int rank) const;
-    std::pair<std::vector<MPI_Offset>, std::vector<MPI_Offset>> ComputeLocalChunkOffsets(const int comm_rank, const int comm_size, const SizeType num_file_header_bytes, const std::vector<SizeType>& global_information_lengths) const;
+    std::vector<MPI_Offset> ComputeLocalChunkOffsets(const int comm_rank, const int comm_size, const SizeType num_file_header_bytes, const std::vector<SizeType>& global_information_lengths) const;
     MPI_Offset ComputeGlobalFileSizeFromLocalStreamLengths(const SizeType num_file_header_bytes, const std::vector<SizeType>& global_information_lengths) const;
-    std::vector<SizeType> ExchangeLocalInformationStreamLenghts(const MPI_Comm comm, const int rank) const;
+    std::vector<MPI_Offset> ExchangeLocalInformationStreamLenghts(const MPI_Comm comm, const int rank, const int size);
 
     const std::string file_name_;
     const MPI_Comm comm_;

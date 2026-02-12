@@ -1,7 +1,7 @@
 #ifndef CMC_MESH_PAR_DECODER_HXX
 #define CMC_MESH_PAR_DECODER_HXX
 
-#include "mesh_compression/cmc_iface_mesh_par_decoder.hxx"
+#include "mesh_compression/cmc_iface_abstract_mesh_par_decoder.hxx"
 
 #include <cstdint>
 

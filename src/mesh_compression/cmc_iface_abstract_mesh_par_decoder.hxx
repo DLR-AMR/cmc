@@ -88,9 +88,9 @@ inline void
 IAbstractMeshParDecoder::IntializeDecompressionIteration(const t8_gloidx_t global_elem_offset)
 {
     /* Get the number of elements on this level which is equal to the number of refinement indications */
-    const uint64_t current_num_global_elements = GetValueFromByteStream<uint64_t>(global_encoded_mesh_lvl_);
+    const uint64_t current_num_global_elements = GetValueFromByteStream<uint64_t>(global_encoded_mesh_);
     
-    cmc_debug_msg("The number of refinement indications (which is equal to the number of elements) is ", current_num_global_elements_, " during this decompression iteration.");
+    cmc_debug_msg("The number of refinement indications (which is equal to the number of elements) is ", current_num_global_elements, " during this decompression iteration.");
 
     /* Set the view on the current level refinement bytes */
     level_refinement_indications_ = bit_map::BitMapView(global_encoded_mesh_ + offset_refinement_structure_encoding_ + sizeof(uint64_t), current_num_global_elements);

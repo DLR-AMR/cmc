@@ -31,8 +31,8 @@ public:
 
 #ifdef CMC_ENABLE_MPI
     std::vector<uint8_t> GetPartitionedEncodedLevelData(t8_forest_t adapted_mesh, t8_forest_t partitioned_mesh, MPI_Comm comm);
+    std::vector<uint8_t> GatherMeshEncodingOnTheRootRank(t8_forest_t coarsened_mesh, MPI_Comm comm);
 #endif
-
     virtual ~IAbstractMeshEncoder(){};
 
 protected:
@@ -364,12 +364,12 @@ IAbstractMeshEncoder::GatherMeshEncodingOnTheRootRank(t8_forest_t coarsened_mesh
         send_data.reserve(2 * sizeof(uint64_t) + encoded_level_data_.size_bytes() + sizeof(uint8_t));
 
         /* We offset the bit stream according to the offset in the coarsened mesh */
-        const int uint64_t local_mesh_encoding_offset = global_coarsened_bit_offset % bit_map::kCharBit;
+        const uint64_t local_mesh_encoding_offset = global_coarsened_bit_offset % bit_map::kCharBit;
 
         /* Push the information to the byte stream */
-        PushBackValueToByteStream<uint64_t>(global_coarsened_bit_offset);
+        PushBackValueToByteStream<uint64_t>(global_encoded_mesh, global_coarsened_bit_offset);
         const uint64_t num_bytes_offseted_mesh_encoding = (num_local_bits + local_mesh_encoding_offset) / bit_map::kCharBit + ((num_local_bits + local_mesh_encoding_offset) % bit_map::kCharBit != 0 ? 1 : 0);
-        PushBackValueToByteStream<uint64_t>(num_bytes_offseted_mesh_encoding);
+        PushBackValueToByteStream<uint64_t>(global_encoded_mesh, num_bytes_offseted_mesh_encoding);
 
         if (local_mesh_encoding_offset != 0)
         {
