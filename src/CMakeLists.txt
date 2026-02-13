@@ -1,7 +1,6 @@
 target_include_directories(cmc PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
 )
-
 target_sources(cmc PRIVATE 
     cmc.cxx 
     utilities/cmc_utilities.cxx 
@@ -18,6 +17,13 @@ install(FILES
     cmc.hxx 
     cmc_config.h 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(FILES
+    utilities/cmc_bits.hxx 
+    utilities/cmc_bits_vector.hxx
+    utilities/cmc_bits_vector_view.hxx
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 
 install(FILES
