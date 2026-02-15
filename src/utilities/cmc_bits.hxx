@@ -2,6 +2,7 @@
 #define CMC_BITS_HXX
 
 #include "cmc.hxx"
+#include "utilities/cmc_log_functions.hxx"
 
 #include <bit>
 #include <cstdint>
@@ -104,7 +105,7 @@ ConvertBigEndianBytePositionToNativeEndiannessBytePosition(const int bigendian_b
 {
     static_assert(std::endian::native == std::endian::big || std::endian::native == std::endian::little,
                   "Only little-endian and big-endian systems are suppoprted!");
-    if (sizeof(T) > bigendian_byte_idx) [[unlikely]]
+    if (sizeof(T) <= bigendian_byte_idx) [[unlikely]]
     {
         cmc_err_msg("The specified byte index is larger than the overall amount of bytes in type T!");
     }
