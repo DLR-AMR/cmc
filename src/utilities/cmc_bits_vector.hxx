@@ -17,6 +17,11 @@ class vector
 {
 public:
     template <UnsignedIntegerType T, IntegerType U> void AppendBits(const T value, const U start_pos, const U end_pos);
+    
+    void AppendBit(const bool bit);
+    void AppendSetBit();
+    void AppendUnsetBit();
+
     std::vector<uint8_t> GetSerializedByteStream() const;
     std::vector<uint8_t> GetSerializedByteStreamPadded() const;
 
@@ -101,6 +106,43 @@ vector::AppendBits(const T value, const U start_pos, const U end_pos)
     }
 }
 
+inline void
+vector::AppendBit(const bool bit)
+{
+    if (bit_position_ < 0) [[unlikely]]
+    {
+        vector_.emplace_back();
+        bit_position_ = kBitIndexStart;
+    }
+
+    vector_.back() |= (static_cast<uint64_t>(bit) << bit_position_);
+    --bit_position_;
+}
+
+inline void
+vector::AppendSetBit()
+{
+    if (bit_position_ < 0) [[unlikely]]
+    {
+        vector_.emplace_back();
+        bit_position_ = kBitIndexStart;
+    }
+
+    vector_.back() |= (uint64_t{1} << bit_position_);
+    --bit_position_;
+}
+
+inline void
+vector::AppendUnsetBit()
+{
+    if (bit_position_ < 0) [[unlikely]]
+    {
+        vector_.emplace_back();
+        bit_position_ = kBitIndexStart;
+    }
+
+    --bit_position_;
+}
 
 inline std::vector<uint8_t>
 vector::GetSerializedByteStream() const
