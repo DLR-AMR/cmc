@@ -48,10 +48,64 @@ int main(void)
 
     const uint64_t extracted_val7 = view.GetNextBitSequence<uint64_t>(48);
     cmc::ExpectTrue(extracted_val7 == 155350719137117);
-}
 
-/* Finalize cmc */
-cmc::CmcFinalize();
+    /* Define a second pointer to the serialized data */
+    const uint64_t* padded_data_ptr2 = reinterpret_cast<const uint64_t*>(serialized_byte_stream_padded.data());
 
-return cmc::CMC_TEST_SUCCESS;
+    /* Declare a new bits vector view */
+    cmc::bits::vector_view view2(padded_data_ptr2);
+
+    /* Move to a certain start bit */
+    view2.MoveToOffsetBitInStream(43);
+
+    const bool is_bit_at_pos_43_set = view2.IsCurrentBitSet();
+    cmc::ExpectTrue(is_bit_at_pos_43_set == true);
+
+    view2.MoveToNextBit();
+    const bool is_bit_at_pos_44_set = view2.IsCurrentBitSet();
+    cmc::ExpectTrue(is_bit_at_pos_44_set == false);
+
+    view2.MoveToNextByteStart();
+    view2.MoveToNextBit();
+    view2.MoveToNextByteStart();
+    view2.MoveToNextBit();
+    view2.MoveToNextByteStart();
+    view2.MoveToNextBit();
+    view2.MoveToNextByteStart();
+
+    const bool is_bit_at_pos_72_set = view2.GetNextBit();
+    cmc::ExpectTrue(is_bit_at_pos_72_set == false);
+
+    const bool is_bit_at_pos_73_set = view2.GetNextBit();
+    cmc::ExpectTrue(is_bit_at_pos_73_set == true);
+
+    const bool is_bit_at_pos_74_set = view2.GetNextBit();
+    cmc::ExpectTrue(is_bit_at_pos_74_set == false);
+
+    view2.SkipNumberOfBits(5);
+
+    const uint8_t byte10 = view2.GetNextBitSequence<uint8_t>(8);
+    cmc::ExpectTrue(byte10 == uint8_t{0b01101000});
+
+    view2.MoveToOffsetBitInStream(16);
+    const bool is_bit_at_pos_16_set = view2.GetNextBit();
+    cmc::ExpectTrue(is_bit_at_pos_16_set == true);
+
+    view2.SkipNumberOfBits(48);
+
+    const bool is_bit_at_pos_65_set = view2.GetNextBit();
+    cmc::ExpectTrue(is_bit_at_pos_65_set == false);
+
+    view2.SkipNumberOfBits(5);
+    const bool is_bit_at_pos_71_set = view2.GetNextBit();
+    cmc::ExpectTrue(is_bit_at_pos_71_set == true);
+
+    const uint16_t byte9_10 = view2.GetNextBitSequence<uint16_t>(16);
+    cmc::ExpectTrue(byte9_10 == uint16_t{19048});
+    }
+
+    /* Finalize cmc */
+    cmc::CmcFinalize();
+
+    return cmc::CMC_TEST_SUCCESS;
 }
