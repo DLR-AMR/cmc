@@ -30,6 +30,21 @@ endif()
 
 endif()
 
+# Add the test for the bits vector
+set(CMC_TEST_BITS_VECTOR cmc_test_bits_vector)
+add_executable(${CMC_TEST_BITS_VECTOR} ${CMAKE_CURRENT_LIST_DIR}/cmc_bits_vector.cxx)
+target_link_libraries(${CMC_TEST_BITS_VECTOR} PUBLIC cmc)
+target_include_directories(${CMC_TEST_BITS_VECTOR} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_BITS_VECTOR} COMMAND ${CMC_TEST_BITS_VECTOR})
+
+# Add the test for the bits vector view
+set(CMC_TEST_BITS_VECTOR_VIEW cmc_test_bits_vector_view)
+add_executable(${CMC_TEST_BITS_VECTOR_VIEW} ${CMAKE_CURRENT_LIST_DIR}/cmc_bits_vector_view.cxx)
+target_link_libraries(${CMC_TEST_BITS_VECTOR_VIEW} PUBLIC cmc)
+target_include_directories(${CMC_TEST_BITS_VECTOR_VIEW} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_BITS_VECTOR_VIEW} COMMAND ${CMC_TEST_BITS_VECTOR_VIEW})
+
+
 # Add the test for the byte compression values
 set(CMC_TEST_BYTE_COMPRESSION_VALUE cmc_test_byte_compression_value)
 add_executable(${CMC_TEST_BYTE_COMPRESSION_VALUE} ${CMAKE_CURRENT_LIST_DIR}/cmc_byte_compression_value.cxx)
