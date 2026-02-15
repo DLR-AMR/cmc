@@ -24,6 +24,7 @@ public:
 
     void MoveToOffsetBitInStream(const size_t global_bit_position_bigendian_stream);
     template<UnsignedIntegerType T> T GetNextBitSequence(const int num_bits);
+    bool GetNextBit();
 
 private:
     const uint64_t* data_;
@@ -36,12 +37,11 @@ private:
 inline void
 vector_view::MoveToOffsetBitInStream(const size_t global_bit_position_bigendian_stream)
 {
-    //The stream is condidered to be in big-endian, therefore, we eventually need to conver the index correctly
     /* Determine the value index in which the bit lies */
     pos_ = global_bit_position_bigendian_stream >> 6;
     const int be_bit_pos = global_bit_position_bigendian_stream - (pos_ << 6);
     current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
-    bit_position_ = ConvertBigEndianBytePositionToNativeEndiannessBytePosition<uint64_t>(be_bit_pos >> 3) * kCharBit + (7 - (be_bit_pos - (be_bit_pos >> 3) * kCharBit));
+    bit_position_ = kBitIndexStart - (global_bit_position_bigendian_stream - pos_ * sizeof(uint64_t) * kCharBit); 
 }
 
 inline bool
@@ -61,7 +61,8 @@ vector_view::MoveToNextBit()
         bit_position_ = kBitIndexStart;
     }
 }
-    
+   
+/* In case, the view already points to a start of a full byte, the pointer remains unchanged */
 inline void
 vector_view::MoveToNextByteStart()
 {
@@ -72,6 +73,20 @@ vector_view::MoveToNextByteStart()
         current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
         bit_position_ = kBitIndexStart;
     }
+}
+
+inline bool
+vector_view::GetNextBit()
+{
+    const bool bit = (current_value_ >> bit_position_) & uint64_t{1};
+    --bit_position_;
+    if (bit_position_ < 0) [[unlikely]]
+    {
+        ++pos_;
+        current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+        bit_position_ = kBitIndexStart;
+    }
+    return bit;
 }
 
 template<UnsignedIntegerType T>
