@@ -23,6 +23,7 @@ install(FILES
     utilities/cmc_bits.hxx 
     utilities/cmc_bits_vector.hxx
     utilities/cmc_bits_vector_view.hxx
+    utilities/cmc_bits_stream_decoder.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 
