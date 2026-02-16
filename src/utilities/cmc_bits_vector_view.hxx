@@ -13,7 +13,7 @@ namespace cmc::bits
 class vector_view
 {
 public:
-    vector_view() = delete;
+    vector_view() = default;
     vector_view(const uint64_t* data)
     : data_{data}, pos_{0}, current_value_{ConvertBigEndianToNativeEndianness(*data)}, bit_position_{kBitIndexStart} {};
 
@@ -25,14 +25,13 @@ public:
     void MoveToOffsetBitInStream(const size_t global_bit_position_bigendian_stream);
     template<UnsignedIntegerType T> T GetNextBitSequence(const int num_bits);
     bool GetNextBit();
-
+    void SetStart(const uint64_t* data);
 private:
-    const uint64_t* data_;
-    int64_t pos_;
-    uint64_t current_value_;
-    int64_t bit_position_;
+    const uint64_t* data_{nullptr};
+    int64_t pos_{0};
+    uint64_t current_value_{0};
+    int64_t bit_position_{kBitIndexStart};
 };
-
 
 inline void
 vector_view::MoveToOffsetBitInStream(const size_t global_bit_position_bigendian_stream)
@@ -172,6 +171,15 @@ vector_view::SkipNumberOfBits(const size_t num_bits)
         ++pos_;
         current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
     }
+}
+
+inline void
+vector_view::SetStart(const uint64_t* data)
+{
+    data_ = data;
+    pos_ = 0;
+    current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+    bit_position_ = kBitIndexStart;
 }
 
 }
