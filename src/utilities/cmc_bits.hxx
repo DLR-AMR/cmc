@@ -490,7 +490,6 @@ SerializeValueBE(const T value)
     return serialized;
 }
 
-
 template <ArithmeticType T, PointerType Iter>
 inline T
 DeserializeValueBE(Iter pos)
@@ -501,6 +500,19 @@ DeserializeValueBE(Iter pos)
     T value;
     /* Copy the bytes over to the type */
     std::memcpy(&value, pos_, sizeof(T));
+    /* Convert the value to the native endiannes */
+    const T native_value = ConvertBigEndianToNativeEndianness(value);
+    return native_value;
+}
+
+template <ArithmeticType T>
+inline T
+DeserializeValueBE(const uint8_t* pos)
+{
+    /* Declare an output value */
+    T value;
+    /* Copy the bytes over to the type */
+    std::memcpy(&value, pos, sizeof(T));
     /* Convert the value to the native endiannes */
     const T native_value = ConvertBigEndianToNativeEndianness(value);
     return native_value;
