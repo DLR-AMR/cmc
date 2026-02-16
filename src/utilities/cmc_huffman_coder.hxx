@@ -2,13 +2,12 @@
 #define CMC_HUFFMAN_CODER_HXX
 
 #include "cmc.hxx"
-#include "utilities/cmc_bit_vector.hxx"
-#include "utilities/cmc_byte_value.hxx"
-#include "utilities/cmc_serialization.hxx"
+#include "utilities/cmc_bits.hxx"
+#include "utilities/cmc_bits_vector.hxx"
 
 #include <vector>
 #include <cmath>
-#include <map>
+#include <unordered_map>
 #include <queue>
 #include <cstdint>
 #include <stdexcept>
@@ -21,19 +20,81 @@ namespace cmc::entropy_coding::huffman
 template <typename T>
 class HuffmanTree;
 
-using FrequencyType = uint32_t;
-using CodeLengthType = uint8_t;
-using SymbolInfoType = int32_t;
-using HuffmanCodeInfoType = uint32_t;
+using DefaultSymbolType = int32_t;
 
-using HuffmanCode = bit_vector::BitVector;
+using FrequencyType = uint32_t;
+using HuffmanCodeInfoType = int32_t;
+
+using HuffmanCodeWord = uint64_t;
+using HuffmanCodeLength = uint64_t;
+
+struct HuffmanCode
+{
+    HuffmanCodeWord code_word;
+    HuffmanCodeLength code_length;
+};
+
+//The codes are permitted to be of a maximum length of 56 bits, because one byte is needed for the code length during encoding
+inline void 
+AppendSetBit(HuffmanCode& huff_code)
+{
+    if (huff_code.code_length >= 56) [[unlikely]]
+    {
+        cmc_err_msg("The code word cannot be larger than 64 bit!");
+    }
+
+    huff_code.code_word <<= 1;
+    huff_code.code_word |= HuffmanCodeWord{1};
+    ++(huff_code.code_length);
+}
+
+//The codes are permitted to be of a maximum length of 56 bits, because one byte is needed for the code length during encoding
+inline void 
+AppendUnsetBit(HuffmanCode& huff_code)
+{
+    if (huff_code.code_length >= 56) [[unlikely]]
+    {
+        cmc_err_msg("The code word cannot be larger than 64 bit!");
+    }
+
+    huff_code.code_word <<= 1;
+    ++(huff_code.code_length);
+}
+
+inline uint64_t
+EncodeHuffmanCode(const HuffmanCode code)
+{
+    /* Shift the code word to the most significant bit */
+    uint64_t serialized = code.code_word << (64 - code.code_length);
+    /* Encode the codelength in the least significant byte */
+    serialized |= code.code_length;
+    return serialized;
+}
+
+inline uint64_t
+CreateStartEncodedHuffmanCode(const bool bit)
+{
+    return (uint64_t{bit} << cmc::bits::kBitIndexStart) + uint64_t{1};
+}
+
+inline void
+CreateNextEncodedHuffmanCode(uint64_t& code, const bool bit)
+{
+    /* Append the next bit */
+    code |= (uint64_t{bit} << (cmc::bits::kBitIndexStart - (code & uint64_t{0x00000000000000FF})));
+    /* Increment the code_length*/
+    ++code;
+}
+
 template <typename T>
-using HuffmanCodeMap = std::map<T, HuffmanCode>;
+using HuffmanCodeMap = std::unordered_map<T, HuffmanCode>;
+
+template <typename T>
+using HuffmanDecodeMap = std::unordered_map<HuffmanCodeWord, T>;
+
 
 constexpr bool kLeftBranch = false;
 constexpr bool kRightBranch = true;
-
-constexpr cmc::Endian kSerializationEndianness = Endian::Big;
 
 template <typename T>
 struct HuffmanSymbol
@@ -95,7 +156,7 @@ public:
 template <typename T>
 struct NodeCompare
 {
-    bool operator()(const INode<T>* lhs, const INode<T>* rhs) const { return lhs->frequency > rhs->frequency; }
+    bool operator()(const INode<T>* lhs, const INode<T>* rhs) const {return lhs->frequency > rhs->frequency;}
 };
 
 template<typename T>
@@ -106,34 +167,28 @@ public:
     HuffmanCoder(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies)
     : tree_(symbols_and_frequencies)
     {
-        if (symbols_and_frequencies.empty())
+        if (symbols_and_frequencies.empty()) [[unlikely]]
         {
             cmc_err_msg("The symbol frequency table for the HuffmanCoder is empty.");
         }
 
         /* Get the codes from the Huffman tree */
         codes_ = tree_.GetHuffmanCodes();
-
-        /* Serialize the Huffman Frequency Table */
-        serialized_sym_freq_table_ = this->SerializeSymbolFrequencyTable(symbols_and_frequencies);
     }
 
     ~HuffmanCoder() = default;
 
-    std::pair<std::vector<uint8_t>, size_t> EncodeSymbol(const T symbol) const;
-    std::vector<uint8_t> GetSerializedSymbolFrequencyTable() const {return serialized_sym_freq_table_;}
+    HuffmanCode EncodeSymbol(const T symbol) const;
+    std::vector<uint8_t> SerializeHuffmanCodes() const;
 
 private:
-    std::vector<uint8_t> SerializeSymbolFrequencyTable(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies) const;
-
     HuffmanTree<T> tree_;
     HuffmanCodeMap<T> codes_;
-    std::vector<uint8_t> serialized_sym_freq_table_;
 };
 
 template <typename T>
 inline 
-std::pair<std::vector<uint8_t>, size_t>
+HuffmanCode
 HuffmanCoder<T>::EncodeSymbol(const T symbol) const
 {
     /* Find the code for the given symbol in the generated Huffman codes */
@@ -141,53 +196,39 @@ HuffmanCoder<T>::EncodeSymbol(const T symbol) const
 
     cmc_assert(code != codes_.end());
 
-    if (code == codes_.end())
+    if (code == codes_.end()) [[unlikely]]
     {
         cmc_err_msg("The symbol ", symbol, " is not in the symbol-frequency-table of the HuffmanCoder.");
     }
 
     /* Return the bits as well as the length of the code */
-    return code->second.GetBits();
+    return code->second;
 }
 
 template <typename T>
-std::vector<uint8_t>
-HuffmanCoder<T>::SerializeSymbolFrequencyTable(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies) const
+inline std::vector<uint8_t>
+HuffmanCoder<T>::SerializeHuffmanCodes() const
 {
-    std::vector<uint8_t> serialized_symbol_frequency_table;
-    serialized_symbol_frequency_table.reserve(symbols_and_frequencies.size() * sizeof(T) + symbols_and_frequencies.size() * sizeof(FrequencyType) + sizeof(HuffmanCodeInfoType) + sizeof(SymbolInfoType));
+    std::vector<uint8_t> serialized_codes;
+    serialized_codes.reserve(codes_.size() * (sizeof(T) + sizeof(HuffmanCodeWord) + 2 * sizeof(HuffmanCodeInfoType)));
 
-    HuffmanCodeInfoType num_symbols = static_cast<HuffmanCodeInfoType>(symbols_and_frequencies.size());
+    /* Push back the number of symbols/codes */
+    cmc::bits::SerializeBEToByteStream(serialized_codes, static_cast<HuffmanCodeInfoType>(codes_.size()));
 
-    /* Count out zero frequencies */
-    for (const auto&[_, frequency] : symbols_and_frequencies)
-    {
-        if (frequency <= 0)
-        {
-            --num_symbols;
-        }
-    }
-
-    /* Push back the count of symbols */
-    PushBackValueToByteStream<HuffmanCodeInfoType>(serialized_symbol_frequency_table, num_symbols, kSerializationEndianness);
-    
     /* Push back the type of the symbol */
-    PushBackValueToByteStream<SymbolInfoType>(serialized_symbol_frequency_table, static_cast<SymbolInfoType>(ConvertToCmcType<T>()), kSerializationEndianness);
-    
-    /* Iterate over the symbol frequency table */
-    for (const auto&[symbol, frequency] : symbols_and_frequencies)
+    cmc::bits::SerializeBEToByteStream(serialized_codes, static_cast<HuffmanCodeInfoType>(ConvertToCmcType<T>()));
+
+    /* Iterate through the code book and serialize the values */
+    for (const auto&[symbol, huffcode] : codes_)
     {
-        if (frequency > 0)
-        {
-            /* Push back the symbol */
-            PushBackValueToByteStream<T>(serialized_symbol_frequency_table, static_cast<T>(symbol), kSerializationEndianness);
-            
-            /* Push back the frequency count */
-            PushBackValueToByteStream<FrequencyType>(serialized_symbol_frequency_table, static_cast<FrequencyType>(frequency), kSerializationEndianness);
-        }
+        /* Store the codeword first */
+        cmc::bits::SerializeBEToByteStream<HuffmanCodeWord>(serialized_codes, EncodeHuffmanCode(huffcode));
+
+        /* Store the symbol afetrwards */
+        cmc::bits::SerializeBEToByteStream<T>(serialized_codes, symbol);
     }
 
-    return serialized_symbol_frequency_table;
+    return serialized_codes;
 }
 
 template<typename T>
@@ -213,9 +254,6 @@ public:
     };
 
     HuffmanCodeMap<T> GetHuffmanCodes() const;
-
-    T GetNextSymbol(bit_vector::BitVectorView& view) const;
-
 private:
     void ConstructTree(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies);
     void GenerateCodes(const INode<FrequencyType>* node, const HuffmanCode& prefix, HuffmanCodeMap<T>& codes) const;
@@ -223,36 +261,6 @@ private:
     INode<FrequencyType>* root_{nullptr};
 };
 
-template<typename T>
-T
-HuffmanTree<T>::GetNextSymbol(bit_vector::BitVectorView& view) const
-{
-    /* Start at the root element */
-    INode<FrequencyType>* node = root_;
-
-    /* Iterate until we will find a leaf element */
-    while (const InternalNode<T>* current_node = dynamic_cast<const InternalNode<T>*>(node))
-    {
-        const bool flag = view.IsCurrentBitSet();
-        view.MoveToNextBit();
-
-        if (flag == kLeftBranch)
-        {
-            node = current_node->left;
-        } else
-        {
-            cmc_assert(flag == kRightBranch);
-            node = current_node->right;
-        }
-    }
-
-    /* If a leaf element is reached, we will get the symbol from it and return it */
-    const LeafNode<T>* leaf = dynamic_cast<const LeafNode<T>*>(node);
-
-    cmc_assert(leaf != nullptr);
-    
-    return leaf->symbol;
-}
 
 template<typename T>
 void HuffmanTree<T>::ConstructTree(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies)
@@ -290,7 +298,6 @@ void HuffmanTree<T>::ConstructTree(const std::vector<HuffmanSymbol<T>>& symbols_
     root_ = nodes.top();
 }
 
-
 template<typename T>
 void HuffmanTree<T>::GenerateCodes(const INode<FrequencyType>* node, const HuffmanCode& prefix, HuffmanCodeMap<T>& codes) const
 {
@@ -303,10 +310,11 @@ void HuffmanTree<T>::GenerateCodes(const INode<FrequencyType>* node, const Huffm
     {
         /* If it is an internal node, we append a bit to the prefix code and recurse into the left and right child */
         HuffmanCode left_prefix = prefix;
-        left_prefix.AppendBit(kLeftBranch);
+        AppendUnsetBit(left_prefix);
         GenerateCodes(internal_node->left, left_prefix, codes);
+
         HuffmanCode right_prefix = prefix;
-        right_prefix.AppendBit(kRightBranch);
+        AppendSetBit(right_prefix);
         GenerateCodes(internal_node->right, right_prefix, codes);
     }
 }
@@ -315,101 +323,15 @@ template<typename T>
 HuffmanCodeMap<T>
 HuffmanTree<T>::GetHuffmanCodes() const
 {
-    std::map<T, HuffmanCode> codes;
+    std::unordered_map<T, HuffmanCode> codes;
 
     if (root_ != nullptr)
     {
-        this->GenerateCodes(root_, bit_vector::BitVector(), codes);
+        this->GenerateCodes(root_, HuffmanCode{}, codes);
     }
 
     return codes;
 }
-
-template<typename T>
-class HuffmanDecoder 
-{
-public:
-    HuffmanDecoder() = delete;
-    HuffmanDecoder(const uint8_t* start_encoding_pos);
-
-    ~HuffmanDecoder()
-    {
-        if (tree_ != nullptr)
-        {
-            delete tree_;
-        }
-    };
-
-    void StartDecoding(const bit_vector::BitVectorView encoding);
-    T DecodeNextSymbol() {cmc_assert(tree_ != nullptr); return tree_->GetNextSymbol(encoded_stream_view_);}
-    void SkipNextNumberOfBits(const size_t num_bits_to_skip) {encoded_stream_view_.SkipNumberOfBits(num_bits_to_skip);}
-    std::vector<uint8_t> GetNextRawBitSequenceFromStream(const size_t num_bits) {return encoded_stream_view_.GetNextBitSequence(num_bits);}
-
-    size_t GetNumberOfProcessedBytesForSymbolFrequencyTable() const {return num_processed_bytes_sym_freq_table_;}
-
-private:
-    std::pair<std::vector<HuffmanSymbol<T>>, size_t> ReconstructHuffmanSymbolFrequencyTable(const uint8_t* start_encoding_pos);
-
-    HuffmanTree<T>* tree_{nullptr};
-    size_t num_processed_bytes_sym_freq_table_{0};
-    bit_vector::BitVectorView encoded_stream_view_;
-};
-
-template <typename T>
-HuffmanDecoder<T>::HuffmanDecoder(const uint8_t* start_encoding_pos)
-{
-    /* Reconstruct the symbol frequency table */
-    const auto [symbol_frequency_table, num_processed_bytes] = this->ReconstructHuffmanSymbolFrequencyTable(start_encoding_pos);
-    
-    /* Construct the tree */
-    tree_ = new HuffmanTree<T>(symbol_frequency_table);
-
-    /* Store the processed bytes for the decoding of the symbol frequency table */
-    num_processed_bytes_sym_freq_table_ = num_processed_bytes;
-}
-
-template <typename T>
-void
-HuffmanDecoder<T>::StartDecoding(const bit_vector::BitVectorView encoding)
-{
-    encoded_stream_view_ = encoding;
-}
-
-template <typename T>
-std::pair<std::vector<HuffmanSymbol<T>>, size_t>
-HuffmanDecoder<T>::ReconstructHuffmanSymbolFrequencyTable(const uint8_t* start_encoding_pos)
-{
-    size_t offset{0};
-
-    const HuffmanCodeInfoType num_symbols = GetValueFromByteStream<HuffmanCodeInfoType>(start_encoding_pos, kSerializationEndianness);
-    offset += sizeof(HuffmanCodeInfoType);
-
-    const SymbolInfoType data_type = GetValueFromByteStream<SymbolInfoType>(start_encoding_pos + offset, kSerializationEndianness);
-    offset += sizeof(SymbolInfoType);
-
-    if (static_cast<SymbolInfoType>(ConvertToCmcType<T>()) != data_type)
-    {
-        cmc_err_msg("The template parameter does not coincide with the symbol type of the Huffman symbol frequency table.");
-    }
-
-    std::vector<HuffmanSymbol<T>> symbol_frequency_table;
-    symbol_frequency_table.reserve(num_symbols);
-
-    /* Iterate until the symbol frequency table has been re-created */
-    for (HuffmanCodeInfoType iter{0}; iter < num_symbols; ++iter)
-    {
-        const T deserialized_symbol = GetValueFromByteStream<T>(start_encoding_pos + offset, kSerializationEndianness);
-        offset += sizeof(T);
-    
-        const FrequencyType deserialized_freq = GetValueFromByteStream<FrequencyType>(start_encoding_pos + offset, kSerializationEndianness);
-        offset += sizeof(FrequencyType);
-        
-        symbol_frequency_table.emplace_back(deserialized_symbol, deserialized_freq);
-    }
-
-    return std::make_pair(symbol_frequency_table, offset);
-}
-
 
 }
 
