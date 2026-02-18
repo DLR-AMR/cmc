@@ -28,10 +28,26 @@ using HuffmanCodeInfoType = int32_t;
 using HuffmanCodeWord = uint64_t;
 using HuffmanCodeLength = uint64_t;
 
+template <typename T>
+using HuffmanCodeMap = std::unordered_map<T, HuffmanCode>;
+
+template <typename T>
+using HuffmanDecodeMap = std::unordered_map<HuffmanCodeWord, T>;
+
 struct HuffmanCode
 {
     HuffmanCodeWord code_word;
     HuffmanCodeLength code_length;
+};
+
+template <typename T>
+struct EntropySymbol
+{
+    EntropySymbol(const T symbol_, const FrequencyType frequency_)
+    : symbol{symbol_}, frequency{frequency_} {}
+
+    T symbol;
+    FrequencyType frequency;
 };
 
 //The codes are permitted to be of a maximum length of 56 bits, because one byte is needed for the code length during encoding
@@ -85,26 +101,6 @@ CreateNextEncodedHuffmanCode(uint64_t& code, const bool bit)
     /* Increment the code_length*/
     ++code;
 }
-
-template <typename T>
-using HuffmanCodeMap = std::unordered_map<T, HuffmanCode>;
-
-template <typename T>
-using HuffmanDecodeMap = std::unordered_map<HuffmanCodeWord, T>;
-
-
-constexpr bool kLeftBranch = false;
-constexpr bool kRightBranch = true;
-
-template <typename T>
-struct HuffmanSymbol
-{
-    HuffmanSymbol(const T symbol_, const FrequencyType frequency_)
-    : symbol{symbol_}, frequency{frequency_} {}
-
-    T symbol;
-    FrequencyType frequency;
-};
 
 template <typename T>
 struct INode
@@ -164,7 +160,7 @@ class HuffmanCoder
 {
 public:
     HuffmanCoder() = delete;
-    HuffmanCoder(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies)
+    HuffmanCoder(const std::vector<EntropySymbol<T>>& symbols_and_frequencies)
     : tree_(symbols_and_frequencies)
     {
         if (symbols_and_frequencies.empty()) [[unlikely]]
@@ -236,7 +232,7 @@ class HuffmanTree
 {
 public:
     HuffmanTree() = delete;
-    HuffmanTree(const std::vector<HuffmanSymbol<T>> symbols_and_frequencies)
+    HuffmanTree(const std::vector<EntropySymbol<T>> symbols_and_frequencies)
     {
         if (symbols_and_frequencies.empty())
         {
@@ -255,7 +251,7 @@ public:
 
     HuffmanCodeMap<T> GetHuffmanCodes() const;
 private:
-    void ConstructTree(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies);
+    void ConstructTree(const std::vector<EntropySymbol<T>>& symbols_and_frequencies);
     void GenerateCodes(const INode<FrequencyType>* node, const HuffmanCode& prefix, HuffmanCodeMap<T>& codes) const;
 
     INode<FrequencyType>* root_{nullptr};
@@ -263,7 +259,7 @@ private:
 
 
 template<typename T>
-void HuffmanTree<T>::ConstructTree(const std::vector<HuffmanSymbol<T>>& symbols_and_frequencies)
+void HuffmanTree<T>::ConstructTree(const std::vector<EntropySymbol<T>>& symbols_and_frequencies)
 {
     cmc_assert(symbols_and_frequencies.size() > static_cast<size_t>(1));
 

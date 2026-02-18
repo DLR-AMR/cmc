@@ -16,7 +16,7 @@ main(void)
     
     /** EXAMPLE DATA GENERATION **/
     /* Create a symbol frequency table */
-    std::vector<cmc::entropy_coding::huffman::HuffmanSymbol<int32_t>> int_sym_freq_table;
+    std::vector<cmc::entropy_coding::huffman::EntropySymbol<int32_t>> int_sym_freq_table;
 
     std::vector<int32_t> int_symbols{0,2,0,0,3,5,6,3,2,4,5,6,1,1,0,0,0,0,0,0,5,4,5,3,2,1,3,4,5,6,6,3,2,3,6,0,0,0,0,3,2,2,1,5,4,3,1,1,1,4};
     int zero_freq{0}, one_freq{0}, two_freq{0}, three_freq{0}, four_freq{0}, five_freq{0}, six_freq{0}, seven_freq{0};
