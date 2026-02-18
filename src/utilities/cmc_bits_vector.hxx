@@ -9,6 +9,9 @@
 namespace cmc::bits
 {
 
+/* Forward declaration of the vector_view */
+class vector_view;
+
 /* Define some global constants for the BitsVector*/
 constexpr int64_t kBitIndexStart = 63;
 constexpr int64_t kNextByteMissing = -1;
@@ -28,6 +31,8 @@ public:
     void Reserve(const size_t num_bits);
     size_t size() const;
     size_t size_bytes() const;
+
+    friend class vector_view;
 private:
     std::vector<uint64_t> vector_;
     int64_t bit_position_{-1};

@@ -16,6 +16,9 @@ public:
     vector_view() = default;
     vector_view(const uint64_t* data)
     : data_{data}, pos_{0}, current_value_{ConvertBigEndianToNativeEndianness(*data)}, bit_position_{kBitIndexStart} {};
+    vector_view(const cmc::bits::vector& vector)
+    : data_{vector.vector_.data()}, pos_{0}, current_value_{ConvertBigEndianToNativeEndianness(vector.vector_.front())}, bit_position_{kBitIndexStart} {};
+
 
     void MoveToNextBit();
     void MoveToNextByteStart();
