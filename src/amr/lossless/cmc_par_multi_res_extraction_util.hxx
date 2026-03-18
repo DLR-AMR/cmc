@@ -11,6 +11,9 @@
 namespace cmc::par::lossless::multi_res
 {
 
+template<int DIM>
+concept Dimension = (DIM > 0 && DIM <= 4);
+
 /* Set the number of adjacent data points that will be coarsened given a certain dimensionality */
 template<Dimension DIM>
 constexpr int kPackSize;
@@ -48,9 +51,6 @@ using TwoByteResidualType = uint16_t;
 using FourByteResidualType = uint32_t;
 
 using EightByteResidualType = uint64_t;
-
-template<int DIM>
-concept Dimension = (DIM > 0 && DIM <= 4);
 
 template<OneByteArithmeticType T>
 constexpr inline
