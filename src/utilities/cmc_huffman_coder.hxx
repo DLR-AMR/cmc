@@ -28,17 +28,17 @@ using HuffmanCodeInfoType = int32_t;
 using HuffmanCodeWord = uint64_t;
 using HuffmanCodeLength = uint64_t;
 
-template <typename T>
-using HuffmanCodeMap = std::unordered_map<T, HuffmanCode>;
-
-template <typename T>
-using HuffmanDecodeMap = std::unordered_map<HuffmanCodeWord, T>;
-
 struct HuffmanCode
 {
     HuffmanCodeWord code_word;
     HuffmanCodeLength code_length;
 };
+
+template <typename T>
+using HuffmanCodeMap = std::unordered_map<T, HuffmanCode>;
+
+template <typename T>
+using HuffmanDecodeMap = std::unordered_map<HuffmanCodeWord, T>;
 
 template <typename T>
 struct EntropySymbol
