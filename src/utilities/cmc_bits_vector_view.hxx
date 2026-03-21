@@ -8,7 +8,7 @@ namespace cmc::bits
 {
 
 /**
- * A viewer class to extract bit sequences of a (padded) big-ednain stream serialized by cmc::bits::vector
+ * A viewer class to extract bit sequences of a (padded) big-endian stream serialized by cmc::bits::vector
  */
 class vector_view
 {
@@ -91,6 +91,11 @@ vector_view::GetNextBit()
     return bit;
 }
 
+/**
+ * Get the specified bit sequence supplied in the given type T,
+ * such that the sequence is aligned to the least significant bit position
+ * Example: Get 5-Bit sequence in 32-Bit type: 0b00000000000000000000000000000XXXXX
+ */
 template<UnsignedIntegerType T>
 T
 vector_view::GetNextBitSequence(const int num_bits)
@@ -127,14 +132,13 @@ vector_view::GetNextBitSequence(const int num_bits)
             current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
         }
 
-        /* The bit-sequence has been extracted in big endian, potentially, we need to swap the ordering*/
         return static_cast<T>(bit_sequence);
     } else
     {
         /* If the bit sequence does not lay entirely in the current value */
         //(bit_position_ + 1) bits are in the current value and (num_bits - (bit_position_ + 1)) are in the next value 
         /* Fill the sequence at the correct positions with the bits from the current value */
-        uint64_t bit_sequence = ((*(data_ + pos_)) << (num_bits - (bit_position_ + 1))) & (~uint64_t{0} >> (64 - num_bits));
+        uint64_t bit_sequence = (current_value_ << (num_bits - (bit_position_ + 1))) & (~uint64_t{0} >> (64 - num_bits));
         
         /* Move to next value */
         ++pos_;
@@ -149,9 +153,8 @@ vector_view::GetNextBitSequence(const int num_bits)
         //There is no need to check whether the bit_position_ becomes negative,
         //because due to the design (the bit_position always points to the start of the next bit-sequence,
         //and, therefore, at least one bit needs to reside in the preivous value, such that at max 63 bits
-        //can be extarcted in the succeeding value)
+        //can be extracted in the succeeding value)
         
-        /* The bit-sequence has been extracted in big endian, potentially, we need to swap the ordering*/
         return static_cast<T>(bit_sequence);
     }
 }
@@ -186,6 +189,5 @@ vector_view::SetStart(const uint64_t* data)
 }
 
 }
-
 
 #endif /* !CMC_BITS_SPAN_HXX */
