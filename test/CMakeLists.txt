@@ -44,6 +44,12 @@ target_link_libraries(${CMC_TEST_BITS_VECTOR_VIEW} PUBLIC cmc)
 target_include_directories(${CMC_TEST_BITS_VECTOR_VIEW} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
 add_test(NAME ${CMC_TEST_BITS_VECTOR_VIEW} COMMAND ${CMC_TEST_BITS_VECTOR_VIEW})
 
+# Add the test for the intra element lossless multi res compression
+set(CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING cmc_test_multi_res_lossless_intra_elem_coding)
+add_executable(${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_lossless_intra_elem_coding.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING})
 
 # Add the test for the byte compression values
 set(CMC_TEST_BYTE_COMPRESSION_VALUE cmc_test_byte_compression_value)
