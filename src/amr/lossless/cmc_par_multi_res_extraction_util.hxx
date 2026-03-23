@@ -30,6 +30,17 @@ constexpr int kPackSize<3> = 8;
 template<>
 constexpr int kPackSize<4> = 16;
 
+//TODO: Make t8code dependent
+/* Set the maximum number of children elements per dimension */
+template<int32_t DIM>
+constexpr int kNumMaxChildrenElements;
+template<>
+constexpr int kNumMaxChildrenElements<1> = 2;
+template<>
+constexpr int kNumMaxChildrenElements<2> = 4;
+template<>
+constexpr int kNumMaxChildrenElements<3> = 8;
+
 template<typename T>
 concept ArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T>);
 
@@ -92,8 +103,6 @@ using SymbolType = uint8_t;
 
 inline constexpr int32_t kMaxPresentElementLevelUnknown = -1;
 
-inline constexpr int32_t kNumMaxChildrenElements = 8;
-
 constexpr inline SymbolType kResidualSignumIndication = 0x80;
 
 template<ArithmeticType T>
@@ -153,43 +162,43 @@ AddProcessEndSymbol(std::array<uint64_t, GetNumEntropySymbols<T>()>& entropy_sym
     entropy_symbols_frequency[sizeof(T) * cmc::bits::kCharBit + kResidualSignumIndication] = num_local_proc_end_symbols;
 }
 
-template<typename T>
-struct LevelEncodingData;
+template<typename T, int32_t DIM>
+struct ElemEncodingData;
 
-template<typename T>
-requires OneByteArithmeticType<T>
-struct LevelEncodingData<T>
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && OneByteArithmeticType<T>
+struct ElemEncodingData<T, DIM>
 {
     uint8_t num_elements;
-    std::array<SymbolType, kNumMaxChildrenElements> entropy_symbols;
-    std::array<OneByteResidualType, kNumMaxChildrenElements> residuals;
+    std::array<SymbolType, kNumMaxChildrenElements<DIM>> entropy_symbols{};
+    std::array<OneByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
 };
 
-template<typename T>
-requires TwoByteArithmeticType<T>
-struct LevelEncodingData<T>
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && TwoByteArithmeticType<T>
+struct ElemEncodingData<T, DIM>
 {
     uint16_t num_elements;
-    std::array<SymbolType, kNumMaxChildrenElements> entropy_symbols;
-    std::array<TwoByteResidualType, kNumMaxChildrenElements> residuals;
+    std::array<SymbolType, kNumMaxChildrenElements<DIM>> entropy_symbols{};
+    std::array<TwoByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
 };
 
-template<typename T>
-requires FourByteArithmeticType<T>
-struct LevelEncodingData<T>
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && FourByteArithmeticType<T>
+struct ElemEncodingData<T, DIM>
 {
     uint32_t num_elements;
-    std::array<SymbolType, kNumMaxChildrenElements> entropy_symbols;
-    std::array<FourByteResidualType, kNumMaxChildrenElements> residuals;
+    std::array<SymbolType, kNumMaxChildrenElements<DIM>> entropy_symbols{};
+    std::array<FourByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
 };
 
-template<typename T>
-requires EightByteArithmeticType<T>
-struct LevelEncodingData<T>
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && EightByteArithmeticType<T>
+struct ElemEncodingData<T, DIM>
 {
     uint64_t num_elements;
-    std::array<SymbolType, kNumMaxChildrenElements> entropy_symbols;
-    std::array<EightByteResidualType, kNumMaxChildrenElements> residuals;
+    std::array<SymbolType, kNumMaxChildrenElements<DIM>> entropy_symbols{};
+    std::array<EightByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
 };
 
 template<ArithmeticType T, int32_t N>
@@ -223,6 +232,50 @@ ComputeMidRange(const std::array<T, N>& values)
     T max = std::numeric_limits<T>::lowest();
     /* Find the maximum */
     for (int idx{0}; idx < N; ++idx)
+    {
+        if (max < values[idx])
+        {
+            max = values[idx];
+        }
+    }
+
+    /* Compute the mid-range */
+    return ((max / 2) + (min / 2));
+}
+
+template<ArithmeticType T>
+inline T
+ComputeArithmeticMean(const std::span<T> values)
+{
+    cmc_assert(values.size() >= 2);
+
+    T sum = static_cast<T>(0);
+    for (int idx{0}; idx < values.size(); ++idx)
+    {
+        sum += values[idx];
+    }
+    return sum / static_cast<T>(values.size());
+}
+
+template<ArithmeticType T>
+inline T
+ComputeMidRange(const std::span<T> values)
+{
+    cmc_assert(values.size() >= 2);
+
+    T min{std::numeric_limits<T>::max()};
+    /* Find the minimum */
+    for (int idx{0}; idx < values.size(); ++idx)
+    {
+        if (min > values[idx])
+        {
+            min = values[idx];
+        }
+    }
+
+    T max{std::numeric_limits<T>::lowest()};
+    /* Find the maximum */
+    for (int idx{0}; idx < values.size(); ++idx)
     {
         if (max < values[idx])
         {

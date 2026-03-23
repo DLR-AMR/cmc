@@ -3,10 +3,11 @@
 
 #include "cmc.hxx"
 #include "amr/lossless/cmc_par_multi_res_extraction_util.hxx"
-#include "utilities/cmc_huffman_coder.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
+
+#include <t8_forest/t8_forest_partition.h>
 
 #include <string>
 #include <span>
@@ -15,15 +16,17 @@ namespace cmc::par::lossless::multi_res
 {
 
 /* Forward declaration of the general compression variable */
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 class CompressionVariableMultiData;
 
 /* Typedef for the general case with one data point per variable */
-template<ArithmeticType T, Dimension DIM>
-using CompressionVariable = CompressionVariableMultiData<T, DIM, int32_t{1}>
+template<ArithmeticType T, int32_t DIM>
+using CompressionVariable = CompressionVariableMultiData<T, DIM, int32_t{1}>;
 
 /* Actual class definition of the compression variable */
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 class CompressionVariableMultiData
 {
 public:
@@ -37,7 +40,9 @@ public:
 
 private:
     void DetermineMaxInitElementLevel();
-    void PerformIntraElementCompression();
+    std::vector<IntraElementCoding<T, DIM, N>> PerformIntraElementCompression();
+    void EncodeData();
+    std::vector<uint8_t> EncodeRootLevelData() const;
     bool IsCompressionProgressing() const;
     void Repartition(t8_forest_t& adapted_mesh, std::vector<T>& adapted_data);
     bool HasIntraElementCompression() const;
@@ -53,10 +58,10 @@ private:
 
     std::vector<T> data_;
     std::vector<cmc::bits::vector> coarsening_indications_;
-    std::vector<std::vector<LevelEncodingData<T>>> residual_encodings_;
+    std::vector<std::vector<ElemEncodingData<T, DIM>>> residual_encodings_;
 
     std::vector<uint8_t> serialized_intra_element_entropy_dictionary_;
-    std::vector<uint8_t>> intra_element_encoded_data_;
+    std::vector<uint8_t> intra_element_encoded_data_;
 
     /* Encoded data after the compression */
     std::vector<uint8_t> serialized_entropy_dictionary_;
@@ -64,50 +69,56 @@ private:
     bool is_initially_partitioned_for_coarsening_{false};
 };
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 inline void
 CompressionVariableMultiData<T, DIM, N>::SetMaximumInitialElementLevel(const int max_init_elem_level)
 {
     max_init_elem_level_ = max_init_elem_level;
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 inline void
 CompressionVariableMultiData<T, DIM, N>::SetIsMeshAlreadyPartitionedForCoarsening(const bool is_partitioned_for_coarsening)
 {
     is_initially_partitioned_for_coarsening_ = is_partitioned_for_coarsening;
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 inline bool
 CompressionVariableMultiData<T, DIM, N>::HasIntraElementCompression() const
 {
     return (N > 1);
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 inline bool
 CompressionVariableMultiData<T, DIM, N>::IsAlreadyPartitionedForCoarsening() const
 {
     return is_initially_partitioned_for_coarsening_;
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 inline bool
 CompressionVariableMultiData<T, DIM, N>::IsCompressionProgressing() const
 {
     return (mesh_.GetNumberGlobalElements() > mesh_.GetNumberGlobalTrees());
 }
 
-template<ArithmeticType T>
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
 struct CoarseningIterationData
 {
     CoarseningIterationData(const std::span<T> current_data, const int32_t init_max_level, const int32_t coarsening_step)
     : data(current_data), current_coarsening_level{init_max_level - coarsening_step}
     {
-        coarse_level_data.reserve(current_data_size / 4 + 1);
-        coarsening_indications.Reserve(current_data_size / 4 + 1);
-        residual_encodings.reserve(current_data_size / 4 + 1);
+        coarse_level_data.reserve(current_data.size() / 4 + 1);
+        coarsening_indications.Reserve(current_data.size() / 4 + 1);
+        residual_encodings.reserve(current_data.size() / 4 + 1);
     }
 
     void LeaveElementUnchanged(const int local_idx);
@@ -117,12 +128,13 @@ struct CoarseningIterationData
     const int64_t current_coarsening_level;
     std::vector<T> coarse_level_data;
     cmc::bits::vector coarsening_indications;
-    std::vector<LevelEncodingData<T>> residual_encodings;
+    std::vector<ElemEncodingData<T, DIM>> residual_encodings;
 };
 
-template<ArithmeticType T>
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
 inline void
-CoarseningIterationData<T>::LeaveElementUnchanged(const int local_idx)
+CoarseningIterationData<T, DIM>::LeaveElementUnchanged(const int local_idx)
 {
     /* Get the value from the current level */
     coarse_level_data.push_back(this->data[local_idx]);
@@ -132,78 +144,122 @@ CoarseningIterationData<T>::LeaveElementUnchanged(const int local_idx)
 }
 
 template<ArithmeticType T>
-inline void
-CoarseningIterationData<T>::PerformExtraction(const int local_idx, const int num_elements)
+inline std::vector<T>
+CreatePredictors(const std::span<T> values)
 {
+    /* Utilize each individual value as a predictor */
+    std::vector<T> predictors(values.size() + 2);
+    std::copy_n(values.begin(), values.size(), predictors.begin());
+
+    /* Append the arithmetic mean as a predictor */
+    predictors[values.size()] = ComputeArithmeticMean<T>(std::span<T>(predictors.data(), values.size()));
+
+    /* Append the mid-range as a predictor */
+    predictors[values.size() + 1] = ComputeMidRange<T>(std::span<T>(predictors.data(), values.size()));
+
+    return predictors;
+}
+
+template<typename T, int32_t DIM>
+requires Dimension<DIM>
+struct Residuals;
+
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && OneByteArithmeticType<T>
+struct Residuals<T, DIM>
+{
+    std::array<OneByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
+};
+
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && TwoByteArithmeticType<T>
+struct Residuals<T, DIM>
+{
+    std::array<TwoByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
+};
+
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && FourByteArithmeticType<T>
+struct Residuals<T, DIM>
+{
+    std::array<FourByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
+};
+
+template<typename T, int32_t DIM>
+requires Dimension<DIM> && EightByteArithmeticType<T>
+struct Residuals<T, DIM>
+{
+    std::array<EightByteResidualType, kNumMaxChildrenElements<DIM>> residuals{};
+};
+
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+inline void
+CoarseningIterationData<T, DIM>::PerformExtraction(const int local_idx, const int num_elements)
+{
+    cmc_assert(num_elements > 1 && num_elements <= kNumMaxChildrenElements<DIM>);
+    [[assume(num_elements > 1 && num_elements <= kNumMaxChildrenElements<DIM>)]];
+
     /* Indicate that corsening has been performed */
     this->coarsening_indications.AppendSetBit();
 
     /* Perform the multi-resolution extraction */
-    std::array<T, num_elements + 2> predictors;
-    std::copy_n(&(this->data[local_idx]), num_elements, predictors.begin())
-
-    /* Append the arithmetic mean as a predictor */
-    predictors[num_elements] = ComputeArithmeticMean<T>(predictors.data(), num_elements);
-
-    /* Append the mid-range as a predictor */
-    predictors[num_elements + 1] = ComputeMidRange<T>(predictors.data(), num_elements);
+    const std::vector<T> predictors = CreatePredictors<T>(std::span<T>(&(this->data[local_idx]), num_elements));
 
     int current_lzc{-1};
     T lzc_maximizing_predictor{};
 
+    ElemEncodingData<T, DIM> elem_coding;
+    elem_coding.num_elements = num_elements;
+
     /* For all predictors, we evaluate the one that gives us the overall maximum number of leading zeros */
     for (int pred_idx{0}; pred_idx < num_elements + 2; ++pred_idx)
     {
-        int cumulative_lzc{0};
+        std::array<SymbolType, kNumMaxChildrenElements<DIM>> current_entropy_codes{};
+        Residuals<T, DIM> current_residuals{};
+        
         /* Check the predictor for all element values */
         for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
         {
             /* Compute the residual */
-            const auto [_, residual] = ComputeIntegerResidual<T>(predictors[pred_idx], predictors[elem_idx]);
-            /* Add the LZC */
-            cumulative_lzc += cmc::bits::GetLZC(residual);
+            const auto [is_approx_greater, residual] = ComputeIntegerResidual<T>(predictors[pred_idx], predictors[elem_idx]);
+            
+            /* Store the entropy code */
+            current_entropy_codes[elem_idx] = CreateEntropySymbol(is_approx_greater, residual);
+            
+            /* Store the residual */
+            current_residuals.residuals[elem_idx] = residual;
         }
+
+        /* Compute the cumulative leading zero count */
+        const int cumulative_lzc = std::transform_reduce(std::execution::par_unseq, current_residuals.residuals.cbegin(), current_residuals.residuals.cend(), static_cast<int>(0),
+                                                         std::plus<>{}, [](auto res){return cmc::bits::GetLZC(res);});
 
         /* If the predictor maximizes the LZC, we store it */
         if (current_lzc < cumulative_lzc)
         {
             current_lzc = cumulative_lzc;
             lzc_maximizing_predictor = predictors[pred_idx];
+            std::copy_n(current_entropy_codes.cbegin(), kNumMaxChildrenElements<DIM>, elem_coding.entropy_symbols.begin());
+            std::copy_n(current_residuals.residuals.cbegin(), kNumMaxChildrenElements<DIM>, elem_coding.residuals.begin());
         }
     }
 
     /* We store the lzc_maximizing_predictor for the next coarse level */
     this->coarse_level_data.push_back(lzc_maximizing_predictor);
 
-    /* Allocate the coarsening data for the coarsening of this family of elements */
-    this->residual_encodings.emplace_back();
-    /* Define a reference for freshly allocated LevelEncdoingData struct for the ease of notation */
-    LevelEncodingData<T>& coarsening_data = this->residual_encodings.back();
-
-    /* Store the number of elements */
-    coarsening_data.num_elements = num_elements;
-
-    /* After we have found the "best" predictor, we compute the residuals and the entropy symbols */
-    for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
-    {
-        /* Compute residual */
-        const auto [is_pred_greater, residual] = ComputeIntegerResidual<T>(lzc_maximizing_predictor, predictors[elem_idx]);
-
-        /* Determine the entropy code */
-        coarsening_data.entropy_symbols[elem_idx] = CreateEntropySymbol(is_pred_greater, residual);
-
-        /* Store the residual */
-        coarsening_data.residuals[elem_idx] = residual;
-    }
+    /* Store this elements coarsening data */
+    this->residual_encodings.push_back(elem_coding);
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 inline void
 CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t& adapted_mesh, std::vector<T>& adapted_data)
 {
     /** Partition the mesh **/
     /* Keep the not-partitioned forest */
-    t8_forest_ref(adapted_forest);
+    t8_forest_ref(adapted_mesh);
 
     /* Allocate a forest */
     t8_forest_t partitioned_forest;
@@ -211,7 +267,7 @@ CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t& adapted_mesh, 
 
     /* Partition the forest */
     const int partition_for_coarsening = 0; //TODO: change to 'one' when partition for coarsening is in t8code
-    t8_forest_set_partition(partitioned_forest, adapted_forest, partition_for_coarsening);
+    t8_forest_set_partition(partitioned_forest, adapted_mesh, partition_for_coarsening);
     t8_forest_commit(partitioned_forest);
 
     /** Partition the adapted data **/
@@ -222,24 +278,25 @@ CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t& adapted_mesh, 
     std::vector<T> partitioned_data(t8_forest_get_local_num_leaf_elements(partitioned_forest));
 
     /* Create a wrapper for the freshly allocated partitioned data */
-    sc_array_t* out_data = sc_array_new_data (static_cast<void*>(partitioned_data.data()), sizeof(CompressionValue<T>), partitioned_data.size());
+    sc_array_t* out_data = sc_array_new_data (static_cast<void*>(partitioned_data.data()), sizeof(T), partitioned_data.size());
 
     /* Partition the variables data */
-    t8_forest_partition_data(adapted_forest, partitioned_forest, in_data, out_data);
+    t8_forest_partition_data(adapted_mesh, partitioned_forest, in_data, out_data);
 
     /* Destroy the array wrappers */
     sc_array_destroy(in_data);
     sc_array_destroy(out_data);
 
     /* Free the former forest and store the adapted/repartitioned mesh */
-    t8_forest_unref(&adapted_forest);
+    t8_forest_unref(&adapted_mesh);
     mesh_.SetMesh(partitioned_forest);
 
     /* Store the partitioned data */
     std::swap(this->data_, partitioned_data);
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::DetermineMaxInitElementLevel()
 {
@@ -282,9 +339,10 @@ CompressionVariableMultiData<T, DIM, N>::DetermineMaxInitElementLevel()
     }
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>>
-ExchangeIntraElementEntropySymbols(const std::vector<IntraElementCoding>& elem_coding, const MPI_Comm comm)
+ExchangeIntraElementEntropySymbols(const std::vector<IntraElementCoding<T, DIM, N>>& elem_coding, const MPI_Comm comm)
 {
     /* Get the number of all possible entropy symbols */
     constexpr int num_entropy_symbols = GetNumEntropySymbols<T>();
@@ -296,7 +354,7 @@ ExchangeIntraElementEntropySymbols(const std::vector<IntraElementCoding>& elem_c
     for (size_t elem_idx{0}; elem_idx < elem_coding.size(); ++elem_idx)
     {
         /* Iterate over all entropy codes from this coarsening data */
-        for (int entropy_sym_idx{0}; entropy_sym_idx < kNumPyramidalEntropyCodes<DIM, N>; ++entropy_sym_idx)
+        for (int entropy_sym_idx{0}; entropy_sym_idx < num_entropy_symbols; ++entropy_sym_idx)
         {
             /* Convert the symbol to the corresponding array index */
             const int array_idx = MapEntropySymbolToArrayIndex<T>(elem_coding[elem_idx].entropy_codes[entropy_sym_idx]);
@@ -306,7 +364,7 @@ ExchangeIntraElementEntropySymbols(const std::vector<IntraElementCoding>& elem_c
         }
     }
 
-    /* Contract the redundant full LZC symobls and add the process end symbol */
+    /* Add the process end symbol */
     AddProcessEndSymbol<T>(entropy_symbol_frequencies, 1);
 
     /* After all entropy symbol frequencies have been collected, we exchange them */
@@ -332,30 +390,9 @@ ExchangeIntraElementEntropySymbols(const std::vector<IntraElementCoding>& elem_c
     return global_symbol_frequencies;
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
-T 
-EncodeElementData(cmc::bits::vector& encoded_stream, const std::array<T, N>& init_data, const IntraElementCoding<T, DIM, N>& elem_coding)
-{
-    /* Compute the number of compression levels */
-    constexpr int num_compression_lvls_ = ComputeNumIntraCompressionLevels<DIM, N>();
-
-    int predictor_id{0};
-
-    /* Iterate over the compression levels, compute the residuals and the entropy codes */
-    for (int lvl_idx{0}; lvl_idx < num_compression_lvls_; ++lvl_idx)
-    {
-        const int num_lvl_data_per_dim = current_data_per_dim / 2 + (current_data_per_dim % 2 != 0 ? 1 : 0);
-
-        /* Iterate over the data on this element's level */
-        for (int data_idx{0}; data_idx < num_lvl_data_per_dim; ++data_idx)
-        {
-            
-        }
-    }
-}
-
-template<ArithmeticType T, Dimension DIM, int32_t N>
-const std::vector<IntraElementCoding<T, DIM, N>>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+inline std::vector<IntraElementCoding<T, DIM, N>>
 CompressionVariableMultiData<T, DIM, N>::PerformIntraElementCompression()
 {
     /* In case more than a single value is given on each element */
@@ -363,22 +400,24 @@ CompressionVariableMultiData<T, DIM, N>::PerformIntraElementCompression()
     {
         const size_t num_elements = init_data_.size() / N;
 
-        if (init_data_.size() % N != 0) [[unlikely]]
+        if (this->init_data_.size() % N != 0) [[unlikely]]
         {
-            cmc_err_msg("The data load per element is not evenly!");
+            cmc_err_msg("The data load per element is not evenly distributed!");
         }
 
         /* Allcoate memory for the intra element encodings */
         std::vector<IntraElementCoding<T, DIM, N>> intra_elem_encoding(num_elements);
 
+        //TODO: Make parallel OMP loop 
+        //#pragma omp parallel for
         /* Iterate over all elements and get the encodig data */
         for (size_t elem_idx{0}; elem_idx < num_elements; ++elem_idx)
         {
             /* Get a view onto this element's data */
-            const std::span<T> elem_data(init_data_.data() + elem_idx * N, N);
+            const std::span<T> elem_data(this->init_data_.data() + elem_idx * N, N);
 
             /* Store the intra element's encoding */
-            intra_elem_encoding[elem_idx] = CompressIntraElement<T, DIM, N>(elem_data);
+            intra_elem_encoding[elem_idx] = ComputeElementEncoding<T, DIM, N>(elem_data);
         }
 
         /* Exchange the local entropy codes */
@@ -387,33 +426,33 @@ CompressionVariableMultiData<T, DIM, N>::PerformIntraElementCompression()
         /* Build a Huffman coder */
         cmc::entropy_coding::huffman::HuffmanCoder<SymbolType> entropy_coder(entropy_symbols);
 
+        /* Store the serialized Huffman coder of the intra element compression */
+        this->serialized_intra_element_entropy_dictionary_ = entropy_coder.SerializeHuffmanCodes();
+
         /* Allocate a vector holding the encoded element data */
         cmc::bits::vector encoded_elem_data;
-        encoded_elem_data.reserve(static_cast<size_t>(0.75 * sizeof(T) * cmc::bits::kCharBit));
+        encoded_elem_data.Reserve(static_cast<size_t>(0.75 * sizeof(T) * cmc::bits::kCharBit));
 
-        /* Allocate an array for the element data */
-        std::array<T, N> element_data;
-
-        /* Iterate over all elements and encode them */
+        /* Iterate over all elements and encode them and append them to the encoded stream */
         for (size_t elem_idx{0}; elem_idx < num_elements; ++elem_idx)
         {
-            /* Copy the data from this element and encode it */
-            std::copy_n(init_data_.data() + elem_idx * N, N, element_data.data());
-        
-            EncodeElementData(encoded_elem_data, element_data, intra_elem_encoding[elem_idx]);
+            PerformElementEncoding(encoded_elem_data, entropy_coder, intra_elem_encoding[elem_idx]);
         }
-        
-        /* Allocate memory for the result of the intra element compression */
-        this->data_.reserve(num_elements);
 
-        /* Store the coarse value associated with this element */
-        data_.push_back(coarse_value);
+        /* Create the coarse level values */
+        data_ = std::vector<T>(num_elements);
+        for (size_t elem_idx{0}; elem_idx < num_elements; ++elem_idx)
+        {
+            this->data_[elem_idx] = intra_elem_encoding[elem_idx].GetCoarseValuePredictor();
+        }
 
+        /* Store the element encoding */
+        this->intra_element_encoded_data_ = encoded_elem_data.GetSerializedByteStream();
     } else
     {
         /* Just copy the data over and start the normal extraction process */
-        data_ = std::vector<T>(init_data_.size());
-        std::copy_n(init_data_.begin(), init_data_.size(), data_.begin()); 
+        this->data_ = std::vector<T>(this->init_data_.size());
+        std::copy_n(this->init_data_.begin(), this->init_data_.size(), this->data_.begin()); 
     }
 }
 
@@ -423,7 +462,8 @@ CheckIfElementIsEligibleForCoarsening(const int current_coarsening_level, const 
     return (current_coarsening_level == element_level);
 }
 
-template<typename T>
+template<typename T, int32_t DIM>
+requires Dimension<DIM>
 inline t8_locidx_t
 LosslessMultiResCompression (t8_forest_t forest,
                              t8_forest_t forest_from,
@@ -436,7 +476,7 @@ LosslessMultiResCompression (t8_forest_t forest,
                              [[maybe_unused]] t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
-    CoarseningIterationData<T>* adapt_data = static_cast<CoarseningIterationData<T>*>(t8_forest_get_user_data(forest));
+    CoarseningIterationData<T, DIM>* adapt_data = static_cast<CoarseningIterationData<T, DIM>*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
 
     /* Compute the start offset in the local contiguous array of the data*/
@@ -456,19 +496,12 @@ LosslessMultiResCompression (t8_forest_t forest,
     }
 }
 
-template<ArithmeticType T, Dimension DIM>
-void
-CompressionVariableMultiData<T, DIM, 1>::Compress()
-{
-    //Specialization for one data point per element 
-
-}
-
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::Compress()
 {
-    cmc_debug_msg("The lossless multi-resolution compression on variable ", this->name_, " is performed.");
+    cmc_debug_msg("The lossless multi-resolution compression of variable ", this->name_, " is performed.");
     /* Potentially, gather the maximum present element level */
     this->DetermineMaxInitElementLevel();
     
@@ -493,11 +526,11 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
         cmc_debug_msg("A coarsening iteration is initialized.");
 
         // 1) Allocate an extraction iteration 
-        CoarseningIterationData<T> adapt_data(std::span(this->data_), this->max_init_elem_level_, compression_step);
+        CoarseningIterationData<T, DIM> adapt_data(std::span(this->data_), this->max_init_elem_level_, compression_step);
 
         // 2)  Adapt
         /* Perform a coarsening iteration */
-        t8_forest_t adapted_forest = t8_forest_new_adapt(previous_forest, LosslessMultiResCompression<T>, 0, 0, static_cast<void*>(adapt_data));
+        t8_forest_t adapted_forest = t8_forest_new_adapt(mesh_.GetMesh(), LosslessMultiResCompression<T, DIM>, 0, 0, static_cast<void*>(adapt_data));
         cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements");
 
         // 3) Store data to be encoded later
@@ -518,9 +551,10 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     cmc_debug_msg("The lossless multi-resolution compression of variable ", this->name_, " has been completed.");
 }
 
-template<ArithmeticType T>
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
 std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>>
-ExchangeEntropySymbols(const std::vector<std::vector<LevelEncodingData<T>>>& levelwise_residuals, const MPI_Comm comm)
+ExchangeEntropySymbols(const std::vector<std::vector<ElemEncodingData<T, DIM>>>& levelwise_residuals, const MPI_Comm comm)
 {
     /* Get the number of all possible entropy symbols */
     constexpr int num_entropy_symbols = GetNumEntropySymbols<T>();
@@ -571,7 +605,29 @@ ExchangeEntropySymbols(const std::vector<std::vector<LevelEncodingData<T>>>& lev
     return global_symbol_frequencies;
 }
 
-template<ArithmeticType T, Dimension DIM, int32_t N>
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+std::vector<uint8_t>
+CompressionVariableMultiData<T, DIM, N>::EncodeRootLevelData() const
+{
+    std::vector<uint8_t> root_lvl_encoding;
+    root_lvl_encoding.reserve(this->data_->size() * sizeof(T));
+
+    /* Iterate over the coarse mesh and store the values on these elements */
+    for (size_t idx; idx < this->data_->size(); ++idx)
+    {
+        /* Serialize the value */
+        auto serialized = SerializeValueBE(this->data_[idx]);
+
+        /* Store the serialized value */
+        std::copy_n(serialized.begin(), serialized.size(), std::back_inserter(root_lvl_encoding));
+    }
+
+    return root_lvl_encoding;
+}
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::EncodeData()
 {
@@ -589,24 +645,23 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
     encoded_levelwise_data.reserve(num_encoding_steps);
 
     /* We need to encode the data resididng on the root level */
-    //TODO: Encode root level 
-    //...
+    levelwise_encoded_data_.push_back(this->EncodeRootLevelData());
 
     /* We encode the data from the root level to the leaf level */
-    lvl_iter = coarsening_indications_.rbegin();
-    res_iter = residual_encodings_.rbegin();
+    auto lvl_iter = coarsening_indications_.rbegin();
+    auto res_iter = residual_encodings_.rbegin();
 
     for (int step_idx{0}; step_idx < coarsening_indications_.size(); ++step_idx, ++lvl_iter, ++res_iter)
     {
         /* Allocate a bits::vector to store this level's encoded data */
         cmc::bits::vector lvl_data;
-        lvl_data.reserve(res_iter->size() * sizeof(LevelEncodingData<T>) * cmc::bits::kCharBit);
+        lvl_data.Reserve(res_iter->size() * sizeof(ElemEncodingData<T, DIM>) * cmc::bits::kCharBit);
 
         /* We define a view onto refinement indications */
         cmc::bits::vector_view lvl_view(*lvl_iter);
 
         /* Define a reference on the coarsening data for the ease of notation */
-        const std::vector<LevelEncodingData<T>>& lvl_coarsening_data = *res_iter;
+        const std::vector<ElemEncodingData<T, DIM>>& lvl_coarsening_data = *res_iter;
 
         /* Number of refinement indication bits on this level */
         const size_t num_elems = lvl_iter->size();
@@ -623,9 +678,9 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
                 lvl_data.AppendSetBit();
 
                 /* Define a refernce for the ease of notation */
-                const LevelEncodingData<T>& coarse_data = lvl_coarsening_data[coarsening_data_idx];
+                const ElemEncodingData<T, DIM>& coarse_data = lvl_coarsening_data[coarsening_data_idx];
 
-                /* Store the entropy codes for this family of elements */
+                /* Encode this elements entropy codes */
                 for (int child_elem_idx{0}; child_elem_idx < coarse_data.num_elements; ++child_elem_idx)
                 {
                     /* Encode the entropy symbol */
@@ -633,7 +688,11 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
 
                     /* Serialize the encoded entropy symbol */
                     lvl_data.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
+                }
 
+                /* Encode this elements residuals */
+                for (int child_elem_idx{0}; child_elem_idx < coarse_data.num_elements; ++child_elem_idx)
+                {
                     /* Retrieve the LZC from the entropy symbol */
                     const int lzc = GetLZCFromEntropySymbol(coarse_data.entropy_symbols[child_elem_idx]);
 
