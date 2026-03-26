@@ -201,7 +201,7 @@ vector::GetSerializedByteStreamPadded() const
 inline size_t
 vector::size() const
 {
-    return (vector_.size() >= 1 ? (vector_.size() - 1) * sizeof(uint64_t) * kCharBit : 0) + (bit_position_ > 0 ? (64 - (bit_position_ + 1)) : 0);
+    return (vector_.size() >= 1 ? (vector_.size() - 1) * sizeof(uint64_t) * kCharBit + (bit_position_ > 0 ? (64 - (bit_position_ + 1)) : 64) : 0);
 }
 
 inline size_t
