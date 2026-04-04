@@ -7,21 +7,26 @@
 namespace cmc::bits
 {
 
+using vector_view = vector_view_base<false>;
+using vector_view_in_memory = vector_view_base<true>;
+
 /**
  * A viewer class to extract bit sequences of a (padded) big-endian stream serialized by cmc::bits::vector
  */
-class vector_view
+template<bool InMemory = false>
+class vector_view_base
 {
 public:
-    vector_view() = default;
-    vector_view(const uint64_t* data)
+    vector_view_base() = default;
+    vector_view_base(const uint64_t* data)
     : data_{data}, pos_{0}, current_value_{ConvertBigEndianToNativeEndianness(*data)}, bit_position_{kBitIndexStart} {};
-    vector_view(const cmc::bits::vector& vector)
-    : data_{vector.vector_.data()}, pos_{0}, current_value_{ConvertBigEndianToNativeEndianness(vector.vector_.front())}, bit_position_{kBitIndexStart} {};
+    vector_view_base(const cmc::bits::vector& vector)
+    : data_{vector.vector_.data()}, pos_{0}, current_value_{vector.vector_.front()}, bit_position_{kBitIndexStart} {};
 
 
     void MoveToNextBit();
     void MoveToNextByteStart();
+    void MoveToNextVectorValueStart();
     bool IsCurrentBitSet() const;
     void SkipNumberOfBits(const size_t num_bits);
 
@@ -30,62 +35,93 @@ public:
     bool GetNextBit();
     void SetStart(const uint64_t* data);
 private:
+    void GetValueAtPos();
     const uint64_t* data_{nullptr};
     int64_t pos_{0};
     uint64_t current_value_{0};
     int64_t bit_position_{kBitIndexStart};
 };
 
+template<bool InMemory>
 inline void
-vector_view::MoveToOffsetBitInStream(const size_t global_bit_position_bigendian_stream)
+vector_view_base<InMemory>::GetValueAtPos()
+{
+    if constexpr (not InMemory)
+    {
+        current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+    } else
+    {
+        current_value_ = *(data_ + pos_);
+    }
+}
+
+template<bool InMemory>
+inline void
+vector_view_base<InMemory>::MoveToOffsetBitInStream(const size_t global_bit_position_bigendian_stream)
 {
     /* Determine the value index in which the bit lies */
     pos_ = global_bit_position_bigendian_stream >> 6;
     const int be_bit_pos = global_bit_position_bigendian_stream - (pos_ << 6);
-    current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+    this->GetValueAtPos();
     bit_position_ = kBitIndexStart - (global_bit_position_bigendian_stream - pos_ * sizeof(uint64_t) * kCharBit); 
 }
 
+template<bool InMemory>
 inline bool
-vector_view::IsCurrentBitSet() const
+vector_view_base<InMemory>::IsCurrentBitSet() const
 {
     return ((current_value_ >> bit_position_) & uint64_t{1});
 }
 
+template<bool InMemory>
 inline void
-vector_view::MoveToNextBit()
+vector_view_base<InMemory>::MoveToNextBit()
 {
     --bit_position_;
     if (bit_position_ < 0) [[unlikely]]
     {
         ++pos_;
-        current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+        this->GetValueAtPos();
         bit_position_ = kBitIndexStart;
     }
 }
    
 /* In case, the view already points to a start of a full byte, the pointer remains unchanged */
+template<bool InMemory>
 inline void
-vector_view::MoveToNextByteStart()
+vector_view_base<InMemory>::MoveToNextByteStart()
 {
     bit_position_ = ((bit_position_ + 1) / kCharBit) * kCharBit - 1;
     if (bit_position_ < 0) [[unlikely]]
     {
         ++pos_;
-        current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+        this->GetValueAtPos();
         bit_position_ = kBitIndexStart;
     }
 }
 
+/* In case, the view already points tot he start of a value, the pointer remains unchanged */
+template<bool InMemory>
+inline void
+vector_view_base<InMemory>::MoveToNextVectorValueStart()
+{
+    if (bit_position_ != kBitIndexStart)
+    {
+        bit_position_ = kBitIndexStart;
+        ++pos_;
+    }
+}
+
+template<bool InMemory>
 inline bool
-vector_view::GetNextBit()
+vector_view_base<InMemory>::GetNextBit()
 {
     const bool bit = (current_value_ >> bit_position_) & uint64_t{1};
     --bit_position_;
     if (bit_position_ < 0) [[unlikely]]
     {
         ++pos_;
-        current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+        this->GetValueAtPos();
         bit_position_ = kBitIndexStart;
     }
     return bit;
@@ -96,9 +132,10 @@ vector_view::GetNextBit()
  * such that the sequence is aligned to the least significant bit position
  * Example: Get 5-Bit sequence in 32-Bit type: 0b00000000000000000000000000000XXXXX
  */
+template<bool InMemory>
 template<UnsignedIntegerType T>
 T
-vector_view::GetNextBitSequence(const int num_bits)
+vector_view_base<InMemory>::GetNextBitSequence(const int num_bits)
 {
     /* Check if there are bits to extarct */
     if (num_bits <= 0) [[unlikely]] 
@@ -129,7 +166,7 @@ vector_view::GetNextBitSequence(const int num_bits)
         {
             ++pos_;
             bit_position_ = kBitIndexStart;
-            current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+            this->GetValueAtPos();
         }
 
         return static_cast<T>(bit_sequence);
@@ -142,7 +179,7 @@ vector_view::GetNextBitSequence(const int num_bits)
         
         /* Move to next value */
         ++pos_;
-        current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+        this->GetValueAtPos();
 
         /* Fill the sequence with the second part from the next value */
         bit_sequence |= (current_value_ >> (64 - (num_bits - (bit_position_ + 1))));
@@ -159,8 +196,9 @@ vector_view::GetNextBitSequence(const int num_bits)
     }
 }
 
+template<bool InMemory>
 inline void
-vector_view::SkipNumberOfBits(const size_t num_bits)
+vector_view_base<InMemory>::SkipNumberOfBits(const size_t num_bits)
 {
     cmc_assert(num_bits > 0);
     if (num_bits > 64) [[unlikely]]
@@ -175,16 +213,17 @@ vector_view::SkipNumberOfBits(const size_t num_bits)
         /* Rotate the bit position and load the next value from the stream */
         bit_position_ = 64 + bit_position_;
         ++pos_;
-        current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+        this->GetValueAtPos();
     }
 }
 
+template<bool InMemory>
 inline void
-vector_view::SetStart(const uint64_t* data)
+vector_view_base<InMemory>::SetStart(const uint64_t* data)
 {
     data_ = data;
     pos_ = 0;
-    current_value_ = ConvertBigEndianToNativeEndianness(*(data_ + pos_));
+    this->GetValueAtPos();
     bit_position_ = kBitIndexStart;
 }
 
