@@ -23,7 +23,7 @@ class HuffmanTree;
 using DefaultSymbolType = int32_t;
 
 using FrequencyType = uint32_t;
-using HuffmanCodeInfoType = int32_t;
+using HuffmanCodeInfoType = uint32_t;
 
 using HuffmanCodeWord = uint64_t;
 using HuffmanCodeLength = uint64_t;
@@ -176,6 +176,7 @@ public:
 
     HuffmanCode EncodeSymbol(const T symbol) const;
     std::vector<uint8_t> SerializeHuffmanCodes() const;
+    std::vector<uint64_t> SerializeHuffmanCodesBEPadded() const;
 
 private:
     HuffmanTree<T> tree_;
@@ -225,6 +226,35 @@ HuffmanCoder<T>::SerializeHuffmanCodes() const
     }
 
     return serialized_codes;
+}
+
+
+template <typename T>
+inline std::vector<uint64_t>
+HuffmanCoder<T>::SerializeHuffmanCodesBEPadded() const
+{
+    static_assert(2 * sizeof(HuffmanCodeInfoType) == sizeof(uint64_t));
+
+    cmc::bits::vector serialized_codes;
+    serialized_codes.Reserve(((codes_.size() + 1) * 2 * sizeof(HuffmanCodeInfoType) * cmc::bits::kCharBit));
+
+    /* Push back the number of symbols/codes */
+    serialized_codes.AppendBits(static_cast<HuffmanCodeInfoType>(codes_.size()), 0, 0);
+
+    /* Push back the type of the symbol */
+    serialized_codes.AppendBits(static_cast<HuffmanCodeInfoType>(ConvertToCmcType<T>()), 0, 0);
+
+    /* Iterate through the code book and serialize the values */
+    for (const auto&[symbol, huffcode] : codes_)
+    {
+        /* Store the codeword first */
+        serialized_codes.AppendBits(static_cast<HuffmanCodeWord>(EncodeHuffmanCode(huffcode)), 0, 0);
+
+        /* Store the symbol afetrwards */
+        serialized_codes.AppendBits(static_cast<T>(symbol), 0, 0);
+    }
+
+    return serialized_codes.GetSerializedByteStreamBE();
 }
 
 template<typename T>
