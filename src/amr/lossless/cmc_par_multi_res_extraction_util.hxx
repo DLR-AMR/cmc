@@ -5,6 +5,7 @@
 #include "utilities/cmc_bits_vector.hxx"
 #include "utilities/cmc_huffman_coder.hxx"
 #include "utilities/cmc_bits_stream_decoder.hxx"
+#include "mpi/cmc_mpi.hxx"
 
 #include <array>
 #include <limits>
@@ -40,6 +41,54 @@ template<>
 constexpr int kNumMaxChildrenElements<2> = 4;
 template<>
 constexpr int kNumMaxChildrenElements<3> = 8;
+
+using VarInfoType = uint32_t;
+using SizeType = uint64_t;
+constexpr SizeType kNumCharsVariableName = 256;
+inline const MPI_Datatype MPI_SIZE_TYPE = MPI_UINT64_T;
+
+constexpr int kRootRank = 0;
+constexpr int kTagMeshEncoding = 1000;
+
+struct PartitionInfo
+{
+    PartitionInfo() = default;
+    PartitionInfo(const uint64_t num_elems_, const uint64_t num_bytes_encoding_)
+    : num_elems{num_elems_}, num_bytes_encoding{num_bytes_encoding_} {}
+    PartitionInfo(const uint64_t num_elems_)
+    : num_elems{num_elems_} {}
+
+    uint64_t num_elems{0};
+    uint64_t num_bytes_encoding{0};
+};
+
+inline void
+CreatePartitionInfoMPIType(MPI_Datatype* partition_info_mpi_type)
+{
+    /* Define the properties of the custom 'LevelOffset' data type */
+    constexpr int num_fields = 2;
+    int array_of_blocklengths[] = {1,1};
+    MPI_Aint array_of_displacements[num_fields];
+    array_of_displacements[0] = offsetof(PartitionInfo, num_elems);
+    array_of_displacements[1] = offsetof(PartitionInfo, num_bytes_encoding);
+    MPI_Datatype array_of_types[] = {MPI_UINT64_T, MPI_UINT64_T};
+
+    const int ret_val_struct = MPI_Type_create_struct(num_fields, array_of_blocklengths, array_of_displacements,
+                                                      array_of_types, partition_info_mpi_type); 
+    MPICheckError(ret_val_struct);
+    const int ret_val_type_commit = MPI_Type_commit(partition_info_mpi_type);
+    MPICheckError(ret_val_type_commit); 
+}
+
+struct LevelPartition
+{
+    LevelPartition() = default;
+    LevelPartition(const SizeType elem_offset_, const SizeType coding_byte_offset)
+    : elem_offset{elem_offset_}, coding_byte_offset{coding_byte_offset} {}
+    
+    SizeType elem_offset{0};
+    SizeType coding_byte_offset{0};
+};
 
 template<typename T>
 concept ArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T>);
@@ -159,7 +208,7 @@ constexpr inline void
 AddProcessEndSymbol(std::array<uint64_t, GetNumEntropySymbols<T>()>& entropy_symbols_frequency, const uint64_t num_local_proc_end_symbols)
 {
     /* We store the process-end-symbol in the last array entry */
-    entropy_symbols_frequency[sizeof(T) * cmc::bits::kCharBit + kResidualSignumIndication] = num_local_proc_end_symbols;
+    entropy_symbols_frequency[GetNumEntropySymbols<T>() - 1] = num_local_proc_end_symbols;
 }
 
 template<typename T, int32_t DIM>
@@ -1208,6 +1257,15 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         {
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+
+            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
+            {
+                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
+                {
+                    stream_decoder.ApplyProcessEndSymbol64Bit();
+                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+                }
+            }
         }
 
         /* Determine the number of full packs */
