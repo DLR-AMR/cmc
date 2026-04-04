@@ -443,7 +443,7 @@ inline std::array<uint8_t, 1>
 SerializeValueBE(const T value)
 {
     /* Convert the value */
-    const T converted_value = ConvertToBigEndian(value);
+    const uint8_t converted_value = ConvertToBigEndian(std::bit_cast<uint8_t>(value));
     /* Create a byte pointer to the data */
     const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
     /* Copy the bytes into the array */
@@ -456,7 +456,7 @@ inline std::array<uint8_t, 2>
 SerializeValueBE(const T value)
 {
     /* Convert the value */
-    const T converted_value = ConvertToBigEndian(value);
+    const uint16_t converted_value = ConvertToBigEndian(std::bit_cast<uint16_t>(value));
     /* Create a byte pointer to the data */
     const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
     /* Copy the bytes into the array */
@@ -469,7 +469,7 @@ inline std::array<uint8_t, 4>
 SerializeValueBE(const T value)
 {
     /* Convert the value */
-    const T converted_value = ConvertToBigEndian(value);
+    const uint32_t converted_value = ConvertToBigEndian(std::bit_cast<uint32_t>(value));
     /* Create a byte pointer to the data */
     const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
     /* Copy the bytes into the array */
@@ -482,7 +482,7 @@ inline std::array<uint8_t, 8>
 SerializeValueBE(const T value)
 {
     /* Convert the value */
-    const T converted_value = ConvertToBigEndian(value);
+    const uint64_t converted_value = ConvertToBigEndian(std::bit_cast<uint64_t>(value));
     /* Create a byte pointer to the data */
     const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
     /* Copy the bytes into the array */
@@ -490,40 +490,160 @@ SerializeValueBE(const T value)
     return serialized;
 }
 
-template <ArithmeticType T, PointerType Iter>
+template <OneByteType T, PointerType Iter>
 inline T
 DeserializeValueBE(Iter pos)
 {
     /* Create a byte pointer from the iterator */
     const uint8_t* pos_ = reinterpret_cast<const uint8_t*>(&(*pos));
-    /* Declare an output value */
-    T value;
+    /* Declare input value */
+    uint8_t value;
     /* Copy the bytes over to the type */
     std::memcpy(&value, pos_, sizeof(T));
     /* Convert the value to the native endiannes */
-    const T native_value = ConvertBigEndianToNativeEndianness(value);
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
     return native_value;
 }
 
-template <ArithmeticType T>
+template <TwoByteType T, PointerType Iter>
+inline T
+DeserializeValueBE(Iter pos)
+{
+    /* Create a byte pointer from the iterator */
+    const uint8_t* pos_ = reinterpret_cast<const uint8_t*>(&(*pos));
+    /* Declare input value */
+    uint16_t value;
+    /* Copy the bytes over to the type */
+    std::memcpy(&value, pos_, sizeof(T));
+    /* Convert the value to the native endiannes */
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
+    return native_value;
+}
+
+template <FourByteType T, PointerType Iter>
+inline T
+DeserializeValueBE(Iter pos)
+{
+    /* Create a byte pointer from the iterator */
+    const uint8_t* pos_ = reinterpret_cast<const uint8_t*>(&(*pos));
+    /* Declare input value */
+    uint32_t value;
+    /* Copy the bytes over to the type */
+    std::memcpy(&value, pos_, sizeof(T));
+    /* Convert the value to the native endiannes */
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
+    return native_value;
+}
+
+template <EightByteType T, PointerType Iter>
+inline T
+DeserializeValueBE(Iter pos)
+{
+    /* Create a byte pointer from the iterator */
+    const uint8_t* pos_ = reinterpret_cast<const uint8_t*>(&(*pos));
+    /* Declare input value */
+    uint64_t value;
+    /* Copy the bytes over to the type */
+    std::memcpy(&value, pos_, sizeof(T));
+    /* Convert the value to the native endiannes */
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
+    return native_value;
+}
+
+template <OneByteType T>
 inline T
 DeserializeValueBE(const uint8_t* pos)
 {
-    /* Declare an output value */
-    T value;
+    /* Declare input value */
+    uint8_t value;
     /* Copy the bytes over to the type */
     std::memcpy(&value, pos, sizeof(T));
     /* Convert the value to the native endiannes */
-    const T native_value = ConvertBigEndianToNativeEndianness(value);
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
     return native_value;
 }
 
-template <ArithmeticType T>
+template <TwoByteType T>
+inline T
+DeserializeValueBE(const uint8_t* pos)
+{
+    /* Declare input value */
+    uint16_t value;
+    /* Copy the bytes over to the type */
+    std::memcpy(&value, pos, sizeof(T));
+    /* Convert the value to the native endiannes */
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
+    return native_value;
+}
+
+template <FourByteType T>
+inline T
+DeserializeValueBE(const uint8_t* pos)
+{
+    /* Declare input value */
+    uint32_t value;
+    /* Copy the bytes over to the type */
+    std::memcpy(&value, pos, sizeof(T));
+    /* Convert the value to the native endiannes */
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
+    return native_value;
+}
+
+template <EightByteType T>
+inline T
+DeserializeValueBE(const uint8_t* pos)
+{
+    /* Declare input value */
+    uint64_t value;
+    /* Copy the bytes over to the type */
+    std::memcpy(&value, pos, sizeof(T));
+    /* Convert the value to the native endiannes */
+    const T native_value = std::bit_cast<T>(ConvertBigEndianToNativeEndianness(value));
+    return native_value;
+}
+
+template <OneByteType T>
 inline void
 SerializeBEToByteStream(std::vector<uint8_t>& byte_stream, const T value)
 {
     /* Serialize the value correctly in big-endian */
-    const T converted_value = ConvertToBigEndian(value);
+    const uint8_t converted_value = ConvertToBigEndian(std::bit_cast<uint8_t>(value));
+    /* Create a byte pointer to the data */
+    const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
+    /* Copy the data to the byte stream */
+    std::copy_n(byte_ptr, sizeof(T), std::back_inserter(byte_stream));
+}
+
+template <TwoByteType T>
+inline void
+SerializeBEToByteStream(std::vector<uint8_t>& byte_stream, const T value)
+{
+    /* Serialize the value correctly in big-endian */
+    const uint16_t converted_value = ConvertToBigEndian(std::bit_cast<uint16_t>(value));
+    /* Create a byte pointer to the data */
+    const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
+    /* Copy the data to the byte stream */
+    std::copy_n(byte_ptr, sizeof(T), std::back_inserter(byte_stream));
+}
+
+template <FourByteType T>
+inline void
+SerializeBEToByteStream(std::vector<uint8_t>& byte_stream, const T value)
+{
+    /* Serialize the value correctly in big-endian */
+    const uint32_t converted_value = ConvertToBigEndian(std::bit_cast<uint32_t>(value));
+    /* Create a byte pointer to the data */
+    const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
+    /* Copy the data to the byte stream */
+    std::copy_n(byte_ptr, sizeof(T), std::back_inserter(byte_stream));
+}
+
+template <EightByteType T>
+inline void
+SerializeBEToByteStream(std::vector<uint8_t>& byte_stream, const T value)
+{
+    /* Serialize the value correctly in big-endian */
+    const uint64_t converted_value = ConvertToBigEndian(std::bit_cast<uint64_t>(value));
     /* Create a byte pointer to the data */
     const uint8_t* byte_ptr = reinterpret_cast<const uint8_t*>(&converted_value);
     /* Copy the data to the byte stream */
