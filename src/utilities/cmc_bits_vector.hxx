@@ -2,15 +2,18 @@
 #define CMC_BITS_VECTOR_HXX
 
 #include "cmc.hxx"
+#include "utilities/cmc_endian.hxx"
 #include "utilities/cmc_bits.hxx"
 
 #include <vector>
+#include <execution>
 
 namespace cmc::bits
 {
 
-/* Forward declaration of the vector_view */
-class vector_view;
+/* Forward declaration of the vector_view_base */
+template<bool InMemory>
+class vector_view_base;
 
 /* Define some global constants for the BitsVector*/
 constexpr int64_t kBitIndexStart = 63;
@@ -25,14 +28,15 @@ public:
     void AppendSetBit();
     void AppendUnsetBit();
 
-    std::vector<uint8_t> GetSerializedByteStream() const;
-    std::vector<uint8_t> GetSerializedByteStreamPadded() const;
+    std::vector<uint8_t> GetSerializedByteStreamBETrimmed() const;
+    std::vector<uint64_t> GetSerializedOffsetByteStreamBE(const int lsb_bit_offset) const;
+    std::vector<uint64_t> GetSerializedByteStreamBE() const;
 
     void Reserve(const size_t num_bits);
     size_t size() const;
     size_t size_bytes() const;
 
-    friend class vector_view;
+    template<bool InMemory> friend class vector_view_base;
 private:
     std::vector<uint64_t> vector_;
     int64_t bit_position_{-1};
@@ -150,8 +154,10 @@ vector::AppendUnsetBit()
 }
 
 inline std::vector<uint8_t>
-vector::GetSerializedByteStream() const
+vector::GetSerializedByteStreamBETrimmed() const
 {
+    static_assert(std::endian::native == std::endian::big || std::endian::native == std::endian::little,
+                  "Only little-endian and big-endian systems are suppoprted!");
     constexpr size_t type_size = sizeof(uint64_t);
 
     /* Allocate the serialized byte stream */
@@ -167,8 +173,8 @@ vector::GetSerializedByteStream() const
     }
 
     /* Potentially, pop back the bytes that are empty at the end */
-    const size_t num_bits_to_pop = std::abs(bit_position_ + 1) / kCharBit;
-    for (size_t idx{0}; idx < num_bits_to_pop; ++idx)
+    const size_t num_bytes_to_pop = std::abs(bit_position_ + 1) / kCharBit;
+    for (size_t idx{0}; idx < num_bytes_to_pop; ++idx)
     {
         serialized_encoding.pop_back();
     }
@@ -177,13 +183,133 @@ vector::GetSerializedByteStream() const
     return serialized_encoding;
 }
 
-inline std::vector<uint8_t>
-vector::GetSerializedByteStreamPadded() const
+inline std::vector<uint64_t>
+vector::GetSerializedOffsetByteStreamBE(const int lsb_bit_offset) const
 {
+    static_assert(std::endian::native == std::endian::big || std::endian::native == std::endian::little,
+                  "Only little-endian and big-endian systems are suppoprted!");
+
+    cmc_assert(lsb_bit_offset < sizeof(uint64_t) * cmc::bits::kCharBit && lsb_bit_offset >= 0);
+    
+    if (this->vector_.empty()) [[unlikely]]
+    {
+        return this->vector_;
+    }
+
+    if (lsb_bit_offset == 0) [[unlikely]]
+    {
+        return this->GetSerializedByteStreamBE();
+    }
+
+    /* Shift parameters */
+    const int shift_right = lsb_bit_offset;
+    const int shift_left = (cmc::bits::kCharBit * sizeof(uint64_t)) - lsb_bit_offset;
+
+    /* Check if the vector needs to be extended */
+    const bool has_vec_to_be_extended = not (bit_position_ + 1 - lsb_bit_offset >= 0);
+
+    /** In this case the offset fits into the current vector as well **/
+    /* Allocate the serialized byte stream */
+    std::vector<uint64_t> offset_stream(this->vector_.size() + (has_vec_to_be_extended ? 1 : 0));
+
+    for (size_t idx{0}; idx < vector_.size(); ++idx)
+    {
+        if (idx > 0)
+        {
+            /* Apply the left shift to the previous value */
+            offset_stream[idx - 1] |= ConvertToBigEndian<uint64_t>(this->vector_[idx - 1] << shift_left);
+        }
+    
+        /* Apply the right shfit to the current value */
+        offset_stream[idx] = ConvertToBigEndian<uint64_t>(this->vector_[idx] >> shift_right);
+    }
+
+    /* Potentially set the new value that has been introduced due to the offset */
+    if (has_vec_to_be_extended)
+    {
+        /* Apply the lkast left-shift to the newly added value*/
+        offset_stream.back() = ConvertToBigEndian<uint64_t>(this->vector_.back() << shift_left);
+    }
+
+    return offset_stream;
+
+    #if 0
     constexpr size_t type_size = sizeof(uint64_t);
 
     /* Allocate the serialized byte stream */
-    std::vector<uint8_t> serialized_encoding(vector_.size() * type_size);
+    std::vector<uint64_t> offset_stream((this->vector_.size() + 1) * type_size);
+
+    /* Shift parameters */
+    const int shift_right = lsb_bit_offset;
+    const int shift_left = (cmc::bits::kCharBit * sizeof(uint64_t)) - lsb_bit_offset;
+
+    const size_t num_vals = this->vector_.size();
+    
+    /** Offset the bit stream **/
+    for (size_t idx{0}; idx < num_vals; ++idx)
+    {
+        /* Add the front part */
+        offset_stream[idx] |= (this->vector_[idx] >> shift_right);
+
+        /* Add the back part */
+        offset_stream[idx + 1] |= (this->vector_[idx] << shift_left);
+    }
+
+    /* Compute the novel bit position with the offset */
+    const int offset_bit_idx = this->bit_position_ - lsb_bit_offset;
+    if (offset_bit_idx < 0)
+    {
+        /* In this case, the last value has not hed any data */
+        offset_stream.pop_back();
+    }
+
+    /** Copy the bytes in big endian **/
+    /* Allocate the serialized byte stream */
+    std::vector<uint8_t> serialized_encoding(offset_stream.size() * type_size);
+
+    /* Iterate through the encoded stream and append the bytes in the correct endianness (big endian) */
+    for (size_t idx{0}; idx < offset_stream.size(); ++idx)
+    {
+        /* Account for the endianness */
+        const auto serialized = SerializeValueBE(offset_stream[idx]);
+        /* Copy the bytes */
+        std::copy_n(serialized.data(), type_size, serialized_encoding.data() + idx * type_size);
+    }
+
+    /** Remove insignificant bytes **/
+    const size_t num_bytes_to_pop = (offset_bit_idx + 1 < 0 ? sizeof(uint64_t) - 1 : (offset_bit_idx + 1)/ kCharBit);
+    for (size_t idx{0}; idx < num_bytes_to_pop; ++idx)
+    {
+        serialized_encoding.pop_back();
+    }
+
+    /* Return the serialized value */
+    return serialized_encoding;
+    #endif
+}
+
+inline std::vector<uint64_t>
+vector::GetSerializedByteStreamBE() const
+{
+    static_assert(std::endian::native == std::endian::big || std::endian::native == std::endian::little,
+                  "Only little-endian and big-endian systems are suppoprted!");
+
+    if constexpr (std::endian::native == std::endian::big)
+    {
+        /* On a big endian system, we can juste return the encoded vector */
+        return vector_;
+    } else 
+    {
+        /* On a little endian machine, we need to swap the bytes */
+        std::vector<uint64_t> serialized_encoding(vector_.size());
+        std::transform(std::execution::par_unseq, vector_.cbegin(), vector_.cend(), serialized_encoding.begin(), std::byteswap<uint64_t>);
+        return serialized_encoding;
+    }
+
+    #if 0
+    constexpr size_t type_size = sizeof(uint64_t);
+    /* Allocate the serialized byte stream */
+    std::vector<uint64_t> serialized_encoding(vector_.size() * type_size);
 
     /* Iterate through the encoded stream and append the bytes in the correct endianness (big endian) */
     for (size_t idx{0}; idx < vector_.size(); ++idx)
@@ -196,6 +322,7 @@ vector::GetSerializedByteStreamPadded() const
 
     /* Return the serialized value */
     return serialized_encoding;
+    #endif
 }
 
 inline size_t
