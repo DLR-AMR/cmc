@@ -14,11 +14,15 @@ class StreamDecoder
 public:
     StreamDecoder() = default;
     void StartHuffmanCodesDecoding(const uint8_t* start_huffman_codes_serialization);
+    void StartHuffmanCodesDecoding(const uint64_t* start_huffman_codes_serialization);
     void StartDecoding(cmc::bits::vector_view encoding);
     T DecodeNextEntropySymbol();
     void SkipNextBits(const int num_bits_to_skip);
     template<UnsignedIntegerType U> U GetNextBitSequence(const int num_bits);
     bool GetNextBit();
+
+    void ApplyProcessEndSymbol8Bit();
+    void ApplyProcessEndSymbol64Bit();
 
     uint64_t GetNumberOfProcessedBytesForSymbolCodewordTable() const;
 
@@ -52,7 +56,8 @@ StreamDecoder<T>::StartHuffmanCodesDecoding(const uint8_t* start_huffman_codes_s
     {
         cmc_err_msg("The template parameter does not coincide with the symbol type of the Huffman symbol frequency table.");
     }
-
+    
+    codes_.clear();
     codes_.reserve(num_symbols);
 
     /* Iterate until the symbol frequency table has been re-created */
@@ -72,6 +77,64 @@ StreamDecoder<T>::StartHuffmanCodesDecoding(const uint8_t* start_huffman_codes_s
 
     /* Store the processed bytes */
     num_processed_bytes_symbol_codes_ = offset;
+}
+
+template <typename T>
+inline void
+StreamDecoder<T>::StartHuffmanCodesDecoding(const uint64_t* start_huffman_codes_serialization)
+{
+    cmc::bits::vector_view huff_decoder(start_huffman_codes_serialization);
+
+    const cmc::entropy_coding::huffman::HuffmanCodeInfoType num_symbols =
+            huff_decoder.GetNextBitSequence<cmc::entropy_coding::huffman::HuffmanCodeInfoType>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeInfoType) * cmc::bits::kCharBit);
+    cmc_global_msg("huff num_symbols: ", num_symbols, ", swapped: ", std::byteswap(num_symbols));
+    const cmc::entropy_coding::huffman::HuffmanCodeInfoType data_type =
+                huff_decoder.GetNextBitSequence<cmc::entropy_coding::huffman::HuffmanCodeInfoType>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeInfoType) * cmc::bits::kCharBit);
+    cmc_global_msg("huff data_type: ", data_type, ", swapped: ", std::byteswap(data_type));
+
+    if (static_cast<cmc::entropy_coding::huffman::HuffmanCodeInfoType>(ConvertToCmcType<T>()) != data_type) [[unlikely]]
+    {
+        cmc_err_msg("The template parameter does not coincide with the symbol type of the Huffman symbol frequency table.");
+    }
+    
+    int offset{2};
+
+    codes_.clear();
+    codes_.reserve(num_symbols);
+
+    /* Iterate until the symbol frequency table has been re-created */
+    for (cmc::entropy_coding::huffman::HuffmanCodeInfoType iter{0}; iter < num_symbols; ++iter)
+    {
+        /* De-Serialize the code word */
+        const cmc::entropy_coding::huffman::HuffmanCodeWord deserialized_code_word =
+                huff_decoder.GetNextBitSequence<cmc::entropy_coding::huffman::HuffmanCodeWord>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit);
+
+
+        /* De-Serialize the symbol */
+        const T deserialized_symbol = huff_decoder.GetNextBitSequence<T>(sizeof(T) * cmc::bits::kCharBit);
+
+        /* Store the deserialized symbol with the code word */
+        codes_[deserialized_code_word] = deserialized_symbol;
+
+        offset += 2;
+    }
+
+    /* Store the processed bytes */
+    num_processed_bytes_symbol_codes_ = offset * sizeof(uint64_t);
+}
+
+template <typename T>
+inline void
+StreamDecoder<T>::ApplyProcessEndSymbol8Bit()
+{
+    encoded_stream_view_.MoveToNextByteStart();
+}
+
+template <typename T>
+inline void
+StreamDecoder<T>::ApplyProcessEndSymbol64Bit()
+{
+    encoded_stream_view_.MoveToNextVectorValueStart();
 }
 
 template <typename T>
