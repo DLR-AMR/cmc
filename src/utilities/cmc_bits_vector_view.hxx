@@ -29,11 +29,13 @@ public:
     void MoveToNextVectorValueStart();
     bool IsCurrentBitSet() const;
     void SkipNumberOfBits(const size_t num_bits);
+    void SkipArbitraryNumberOfBits(const size_t num_bits);
 
     void MoveToOffsetBitInStream(const size_t global_bit_position_bigendian_stream);
     template<UnsignedIntegerType T> T GetNextBitSequence(const int num_bits);
     bool GetNextBit();
     void SetStart(const uint64_t* data);
+
 private:
     void GetValueAtPos();
     const uint64_t* data_{nullptr};
@@ -109,6 +111,7 @@ vector_view_base<InMemory>::MoveToNextVectorValueStart()
     {
         bit_position_ = kBitIndexStart;
         ++pos_;
+        this->GetValueAtPos();
     }
 }
 
@@ -215,6 +218,23 @@ vector_view_base<InMemory>::SkipNumberOfBits(const size_t num_bits)
         ++pos_;
         this->GetValueAtPos();
     }
+}
+
+template<bool InMemory>
+inline void
+vector_view_base<InMemory>::SkipArbitraryNumberOfBits(const size_t num_bits)
+{
+    cmc_assert(num_bits > 0);
+    int num_bits_to_skip = num_bits;
+
+    while (num_bits_to_skip > 64)
+    {
+        this->SkipNumberOfBits(64);
+        num_bits_to_skip -= 64;
+    }
+
+    /* Skip the remainder as well */
+    this->SkipNumberOfBits(num_bits_to_skip);
 }
 
 template<bool InMemory>

@@ -18,6 +18,7 @@ public:
     void StartDecoding(cmc::bits::vector_view encoding);
     T DecodeNextEntropySymbol();
     void SkipNextBits(const int num_bits_to_skip);
+    void SkipArbitraryNumberOfBits(const int num_bits_to_skip);
     template<UnsignedIntegerType U> U GetNextBitSequence(const int num_bits);
     bool GetNextBit();
 
@@ -142,6 +143,13 @@ inline void
 StreamDecoder<T>::SkipNextBits(const int num_bits_to_skip)
 {
     encoded_stream_view_.SkipNumberOfBits(num_bits_to_skip);
+}
+
+template <typename T>
+inline void
+StreamDecoder<T>::SkipArbitraryNumberOfBits(const int num_bits_to_skip)
+{
+    encoded_stream_view_.SkipArbitraryNumberOfBits(num_bits_to_skip);
 }
 
 template<typename T>
