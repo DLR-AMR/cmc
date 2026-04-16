@@ -227,65 +227,11 @@ vector::GetSerializedOffsetByteStreamBE(const int lsb_bit_offset) const
     /* Potentially set the new value that has been introduced due to the offset */
     if (has_vec_to_be_extended)
     {
-        /* Apply the lkast left-shift to the newly added value*/
+        /* Apply the last left-shift to the newly added value*/
         offset_stream.back() = ConvertToBigEndian<uint64_t>(this->vector_.back() << shift_left);
     }
 
     return offset_stream;
-
-    #if 0
-    constexpr size_t type_size = sizeof(uint64_t);
-
-    /* Allocate the serialized byte stream */
-    std::vector<uint64_t> offset_stream((this->vector_.size() + 1) * type_size);
-
-    /* Shift parameters */
-    const int shift_right = lsb_bit_offset;
-    const int shift_left = (cmc::bits::kCharBit * sizeof(uint64_t)) - lsb_bit_offset;
-
-    const size_t num_vals = this->vector_.size();
-    
-    /** Offset the bit stream **/
-    for (size_t idx{0}; idx < num_vals; ++idx)
-    {
-        /* Add the front part */
-        offset_stream[idx] |= (this->vector_[idx] >> shift_right);
-
-        /* Add the back part */
-        offset_stream[idx + 1] |= (this->vector_[idx] << shift_left);
-    }
-
-    /* Compute the novel bit position with the offset */
-    const int offset_bit_idx = this->bit_position_ - lsb_bit_offset;
-    if (offset_bit_idx < 0)
-    {
-        /* In this case, the last value has not hed any data */
-        offset_stream.pop_back();
-    }
-
-    /** Copy the bytes in big endian **/
-    /* Allocate the serialized byte stream */
-    std::vector<uint8_t> serialized_encoding(offset_stream.size() * type_size);
-
-    /* Iterate through the encoded stream and append the bytes in the correct endianness (big endian) */
-    for (size_t idx{0}; idx < offset_stream.size(); ++idx)
-    {
-        /* Account for the endianness */
-        const auto serialized = SerializeValueBE(offset_stream[idx]);
-        /* Copy the bytes */
-        std::copy_n(serialized.data(), type_size, serialized_encoding.data() + idx * type_size);
-    }
-
-    /** Remove insignificant bytes **/
-    const size_t num_bytes_to_pop = (offset_bit_idx + 1 < 0 ? sizeof(uint64_t) - 1 : (offset_bit_idx + 1)/ kCharBit);
-    for (size_t idx{0}; idx < num_bytes_to_pop; ++idx)
-    {
-        serialized_encoding.pop_back();
-    }
-
-    /* Return the serialized value */
-    return serialized_encoding;
-    #endif
 }
 
 inline std::vector<uint64_t>
@@ -305,24 +251,6 @@ vector::GetSerializedByteStreamBE() const
         std::transform(std::execution::par_unseq, vector_.cbegin(), vector_.cend(), serialized_encoding.begin(), std::byteswap<uint64_t>);
         return serialized_encoding;
     }
-
-    #if 0
-    constexpr size_t type_size = sizeof(uint64_t);
-    /* Allocate the serialized byte stream */
-    std::vector<uint64_t> serialized_encoding(vector_.size() * type_size);
-
-    /* Iterate through the encoded stream and append the bytes in the correct endianness (big endian) */
-    for (size_t idx{0}; idx < vector_.size(); ++idx)
-    {
-        /* Account for the endianness */
-        const auto serialized = SerializeValueBE(vector_[idx]);
-        /* Copy the bytes */
-        std::copy_n(serialized.data(), type_size, serialized_encoding.data() + idx * type_size);
-    }
-
-    /* Return the serialized value */
-    return serialized_encoding;
-    #endif
 }
 
 inline size_t
