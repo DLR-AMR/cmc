@@ -62,7 +62,7 @@ private:
     void DetermineMaxInitElementLevel();
     void PerformIntraElementCompression();
     void EncodeData();
-    std::vector<uint64_t>EncodeRootLevelData() const;
+    std::vector<uint64_t> EncodeRootLevelData() const;
     bool IsCompressionProgressing() const;
     void Repartition(t8_forest_t adapted_mesh, std::vector<T>& adapted_data);
     bool HasIntraElementCompression() const;
@@ -309,7 +309,7 @@ CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t adapted_mesh, s
     t8_forest_init(&partitioned_forest);
 
     /* Partition the forest */
-    const int partition_for_coarsening = 0; //TODO: change to 'one' when partition for coarsening is in t8code
+    const int partition_for_coarsening = 1; //TODO: change to 'one' when partition for coarsening is in t8code
     t8_forest_set_partition(partitioned_forest, adapted_mesh, partition_for_coarsening);
     t8_forest_commit(partitioned_forest);
 
@@ -455,7 +455,6 @@ CompressionVariableMultiData<T, DIM, N>::PerformIntraElementCompression()
 
         /* Allcoate memory for the intra element encodings */
         std::vector<IntraElementCoding<T, DIM, N>> intra_elem_encoding(num_elements);
-        cmc::cmc_global_msg("1");
 
         //TODO: Make parallel OMP loop 
         //#pragma omp parallel for
@@ -469,42 +468,47 @@ CompressionVariableMultiData<T, DIM, N>::PerformIntraElementCompression()
             intra_elem_encoding[elem_idx] = ComputeElementEncoding<T, DIM, N>(elem_data);
         }
 
-        cmc::cmc_global_msg("2");
         /* Exchange the local entropy codes */
         const std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> entropy_symbols = ExchangeIntraElementEntropySymbols<T, DIM, N>(intra_elem_encoding, this->comm_);
 
-        cmc::cmc_global_msg("3");
         /* Build a Huffman coder */
         cmc::entropy_coding::huffman::HuffmanCoder<SymbolType> entropy_coder(entropy_symbols);
 
-        cmc::cmc_global_msg("4");
         /* Store the serialized Huffman coder of the intra element compression */
         this->serialized_intra_element_entropy_dictionary_ = entropy_coder.SerializeHuffmanCodesBEPadded();
-        cmc::cmc_global_msg("5");
+
         /* Allocate a vector holding the encoded element data */
         cmc::bits::vector encoded_elem_data;
         encoded_elem_data.Reserve(static_cast<size_t>(0.75 * sizeof(T) * cmc::bits::kCharBit));
-        cmc::cmc_global_msg("6");
+
         /* Iterate over all elements and encode them and append them to the encoded stream */
         for (size_t elem_idx{0}; elem_idx < num_elements; ++elem_idx)
         {
             PerformElementEncoding(encoded_elem_data, entropy_coder, intra_elem_encoding[elem_idx]);
         }
-        cmc::cmc_global_msg("7");
+
+        /* Apply the process end symbol */
+        if (num_elements > 0)
+        {
+            /* At the end of the local encoding of the level, we append the process-end symbol */
+            const cmc::entropy_coding::huffman::HuffmanCode process_lvl_end_code = entropy_coder.EncodeSymbol(kProcessEndSymbol<T>);
+
+            /* Serialize the encoded process end symbol */
+            encoded_elem_data.AppendBits(process_lvl_end_code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - process_lvl_end_code.code_length), 0);
+        }
+        
         /* Create the coarse level values */
         data_ = std::vector<T>(num_elements);
         for (size_t elem_idx{0}; elem_idx < num_elements; ++elem_idx)
         {
             this->data_[elem_idx] = intra_elem_encoding[elem_idx].GetCoarseValuePredictor();
         }
-        cmc::cmc_global_msg("8");
+
         /* Store the element encoding */
         this->intra_element_encoded_data_ = encoded_elem_data.GetSerializedByteStreamBE();
 
         /* Store the encoding length */
         this->level_partitioning_info_.back().num_bytes_encoding = this->intra_element_encoded_data_.size() * sizeof(uint64_t);
-
-        cmc::cmc_global_msg("9");
 
         cmc::cmc_global_msg("The intra-element compression has been completed.");
     } else
@@ -555,6 +559,28 @@ LosslessMultiResCompression (t8_forest_t forest,
     }
 }
 
+static int step2{0};
+
+inline void
+WriteDataToVTKTest2(t8_forest_t mesh, const std::vector<float>& data)
+{
+    std::vector<double> double_data1;
+
+    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
+    {
+        double_data1.push_back(data[idx]);
+    }
+
+    t8_vtk_data_field_t vtk_data[1];
+    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
+    vtk_data[0].type = T8_VTK_SCALAR;
+    vtk_data[0].data = double_data1.data();
+
+    const std::string file_name = std::string("cmc_new_test_compr_coarse_data_vis_np1_step_") + std::to_string(step2);
+    ++step2;
+    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 1, 1, 1, 1, vtk_data);
+}
+
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 void
@@ -571,15 +597,13 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     /* Potentially, perform intra-element compression, such that we obtain one data point per element */
     this->PerformIntraElementCompression();
 
-    cmc::cmc_global_msg("A1");
-
     /* Potentially, perform partition for coarsening */
     if (not this->IsAlreadyPartitionedForCoarsening())
     {
         this->Repartition(mesh_.GetMesh(), this->data_);
     }
 
-    cmc::cmc_global_msg("A2");
+    //WriteDataToVTKTest2(mesh_.GetMesh(), this->data_);
 
     int32_t compression_step{0};
 
@@ -591,31 +615,37 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
         // 1) Allocate an extraction iteration 
         CoarseningIterationData<T, DIM> adapt_data(std::span(this->data_), this->max_init_elem_level_, compression_step);
 
-        cmc::cmc_global_msg("A3");
         // 2)  Adapt
         /* Perform a coarsening iteration */
         t8_forest_t adapted_forest = t8_forest_new_adapt(mesh_.GetMesh(), LosslessMultiResCompression<T, DIM>, 0, 0, static_cast<void*>(&adapt_data));
         cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements");
-        cmc::cmc_global_msg("A4");
+
         // 3) Store data to be encoded later
         this->coarsening_indications_.push_back(std::move(adapt_data.coarsening_indications));
         this->residual_encodings_.push_back(std::move(adapt_data.residual_encodings));
-        cmc::cmc_global_msg("A5");
+
         // We need to store the number of local elements after the adaptation for the partition info (before repartioning)
         this->level_partitioning_info_.emplace_back(static_cast<uint64_t>(t8_forest_get_local_num_leaf_elements(adapted_forest)));
 
         // 4) Repartition the mesh and the data for the next iteration
-        this->Repartition(adapted_forest, adapt_data.coarse_level_data);
-        cmc_debug_msg("The mesh and the data has been re-partitioned.");
-        cmc::cmc_global_msg("A6");
-        cmc_debug_msg("This coarsening iteration is finished.");
-
+        //if (t8_forest_get_global_num_leaf_elements(adapted_forest) == t8_forest_get_num_global_trees(adapted_forest))
+        //{
+        //    //Fix for PFC bug in t8code on the root level
+        //    this->data_ = adapt_data.coarse_level_data;
+        //    mesh_.SetMesh(adapted_forest);
+        //} else
+        //{
+            this->Repartition(adapted_forest, adapt_data.coarse_level_data);
+            cmc_debug_msg("This coarsening iteration is finished.");
+        //}
         ++compression_step;
+
+        //WriteDataToVTKTest2(mesh_.GetMesh(), this->data_);
     }
-    cmc::cmc_global_msg("A7");
+
     /* Encode the data that has been collected */
     this->EncodeData();
-    cmc::cmc_global_msg("A8");
+
     cmc_debug_msg("The lossless multi-resolution compression of variable ", this->name_, " has been completed.");
 }
 
@@ -732,14 +762,12 @@ PerformRootLevelEncoding(const std::vector<T>& data_)
     }
     return root_lvl_encoding.GetSerializedByteStreamBE();
 }
-
+//TODO: IF uneven num root elements per process, we have gaps in the encoding if the type is not 64-bit
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 std::vector<uint64_t>
 CompressionVariableMultiData<T, DIM, N>::EncodeRootLevelData() const
-{
-    cmc::cmc_global_msg("Num root elems: ", this->data_.size());
-    
+{    
     return PerformRootLevelEncoding<T>(this->data_);
 }
 
@@ -758,15 +786,13 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
     this->serialized_entropy_dictionary_ = entropy_coder.SerializeHuffmanCodesBEPadded();
 
     /* Number of overall encdoing steps */
-    //const int num_encoding_steps = coarsening_indications_.size() + 1 + (this->HasIntraElementCompression() ? 1 : 0);
     const int num_encoding_steps = this->coarsening_indications_.size() + 1;
-    cmc::cmc_global_msg("num num_encoding_steps: ", num_encoding_steps);
+
     /* Allocate an output vector for the levelwise encoding */
     this->levelwise_encoded_data_.reserve(num_encoding_steps);
 
     /* We need to encode the data resididng on the root level */
     this->levelwise_encoded_data_.push_back(this->EncodeRootLevelData());
-    cmc::cmc_global_msg("Size of root level enc: ", levelwise_encoded_data_.back().size());
 
     /* We store a partition table on the root level as well for completeness */
     this->level_partitioning_info_.emplace_back(this->data_.size(), this->levelwise_encoded_data_.back().size() * sizeof(uint64_t));
@@ -775,20 +801,9 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
     auto lvl_iter = this->coarsening_indications_.rbegin();
     auto res_iter = this->residual_encodings_.rbegin();
 
-    cmc::cmc_global_msg("coarsening_indications_.size(): ", coarsening_indications_.size());
-    
-    for (const auto& pinfo : this->level_partitioning_info_)
-    {
-        cmc::cmc_global_msg("num elems: ", pinfo.num_elems, ", num bytes: ", pinfo.num_bytes_encoding);
-    }
-
     /* Therefore, we also need to reverse the partition info in order to run from the root to the leaf level */
     std::reverse(this->level_partitioning_info_.begin(), this->level_partitioning_info_.end());
-    cmc::cmc_global_msg("REVERSED ORDER");
-    for (const auto& pinfo : this->level_partitioning_info_)
-    {
-        cmc::cmc_global_msg("num elems: ", pinfo.num_elems, ", num bytes: ", pinfo.num_bytes_encoding);
-    }
+
     /* Iterate over all compression levels (Without the root level and the intra element level) */
     for (int step_idx{1}; step_idx <= this->coarsening_indications_.size(); ++step_idx, ++lvl_iter, ++res_iter)
     {
@@ -804,7 +819,6 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
 
         /* Number of refinement indication bits on this level */
         const size_t num_elems = lvl_iter->size();
-        cmc::cmc_global_msg("Step idx: ", step_idx, ", num elems: ", num_elems);
         int coarsening_data_idx{0};
 
         /* Iterate over this level's refinement indications */
@@ -812,11 +826,6 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
         {
             if (lvl_view.GetNextBit() == true)
             {
-                if (step_idx == 1) {cmc_global_msg("Bit is set");}
-                /* In case a coarsening step has been performed */
-                /* Set the bit for refinement */
-                lvl_data.AppendSetBit();
-
                 /* Define a refernce for the ease of notation */
                 const ElemEncodingData<T, DIM>& coarse_data = lvl_coarsening_data[coarsening_data_idx];
 
@@ -870,47 +879,18 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
 
                 /* Update the coarsening data accessing index */
                 ++coarsening_data_idx;
-            } else
-            {
-                if (step_idx == 1) {cmc_global_msg("Bit is not set");}
-                /* In case the element remained unchanged */
-                /* Set the bit that the element remains unchanged */
-                lvl_data.AppendUnsetBit();
             }
         }
 
         /* At the end of the local encoding of the level, we append the process-end symbol */
         const cmc::entropy_coding::huffman::HuffmanCode process_lvl_end_code = entropy_coder.EncodeSymbol(kProcessEndSymbol<T>);
-        
-        if (step_idx == 1)
-        {
-            cmc_global_msg("Process End code: ", process_lvl_end_code.code_word, ", bitsset: ", std::bitset<64>(process_lvl_end_code.code_word), ", code length: ", process_lvl_end_code.code_length);
-        }
 
         /* Serialize the encoded process end symbol */
         lvl_data.AppendBits(process_lvl_end_code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - process_lvl_end_code.code_length), 0);
 
-        if (step_idx == 1)
-        {
-            cmc_global_msg("lvl_data size: ", lvl_data.size(), ", size_bytes(): ", lvl_data.size_bytes());
-        }
-
         /* We store this level's encoding in the variable's buffer */
         levelwise_encoded_data_.push_back(lvl_data.GetSerializedByteStreamBE());
 
-        if (step_idx == 1)
-        {
-            const std::vector<uint64_t> enc = lvl_data.GetSerializedByteStreamBE();
-
-            int idx{0};
-        for (const auto & val : enc)
-        {
-            const uint64_t rev_val = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(val);
-            cmc_global_msg("Bitset ", idx, ": ", std::bitset<64>(rev_val));
-            ++idx;
-        }
-
-        }
         /* We store the encoding length in the partition info */
         this->level_partitioning_info_[step_idx].num_bytes_encoding = levelwise_encoded_data_.back().size() * sizeof(uint64_t);
     }
@@ -987,15 +967,15 @@ CompressionVariableMultiData<T, DIM, N>::AppendVariableHeaderToStream(std::vecto
         cmc_warn_msg("The variable name '", this->name_, "' is too long; it gets trimmed to ", kNumCharsVariableName, " characters.");
     } 
     std::array<uint64_t, 32> var_name{}; //Filled with zeros, i.e. chars of '\0'
-    int name_char_count{0}, val_idx{0};
+    int name_char_count{7}, val_idx{0};
     for (size_t idx{0}; idx < this->name_.size() && idx < kNumCharsVariableName; ++idx)
     {
         var_name[val_idx] |= (static_cast<SizeType>(this->name_[idx]) << (cmc::bits::kCharBit * name_char_count));
-        ++name_char_count;
-        if (name_char_count >= 8)
+        --name_char_count;
+        if (name_char_count < 0)
         {
             ++val_idx;
-            name_char_count = 0;
+            name_char_count = 7;
         }
     }
     /* Copy the name to the stream */
@@ -1072,9 +1052,6 @@ AppendPartitionTableToStream(std::vector<uint64_t>& root_rank_start_stream_no_fr
         for (int rank_id{0}; rank_id < comm_size; ++rank_id)
         {
             /* We store the current offset for this rank */
-            //cmc::bits::SerializeBEToByteStream<SizeType>(root_rank_start_stream, intra_level_elem_count_offset);
-            //cmc::bits::SerializeBEToByteStream<SizeType>(root_rank_start_stream, intra_level_coding_byte_offset);
-            
             root_rank_start_stream_no_frac.push_back(cmc::bits::ConvertToBigEndian<SizeType>(intra_level_elem_count_offset));
             root_rank_start_stream_no_frac.push_back(cmc::bits::ConvertToBigEndian<SizeType>(intra_level_coding_byte_offset));
 
@@ -1103,7 +1080,7 @@ ComputeGlobalBytesPerLevel(const std::vector<PartitionInfo>& global_partition_in
             num_bytes += global_partition_info[access_idx].num_bytes_encoding;
         }
 
-        cmc::cmc_global_msg("lvl: ", lvl_idx, ", Global Bytes Per Level: ", num_bytes);
+        cmc::cmc_debug_msg("Compression level: ", lvl_idx, "; global bytes on this level: ", num_bytes);
 
         bytes_per_lvl.push_back(num_bytes);
     }
@@ -1122,17 +1099,15 @@ CompressionVariableMultiData<T, DIM, N>::AdjustLevelMeshEncodings(const std::vec
 
     std::vector<std::vector<uint64_t>> offseted_level_mesh_encodings;
     offseted_level_mesh_encodings.reserve(num_coarsening_encodings);
-    cmc_global_msg("partition_info.size(): ", partition_info.size() , ", num_global_mesh_encoding_steps: ", num_global_mesh_encoding_steps, ", this->coarsening_indications_.size(): ", this->coarsening_indications_.size());
 
     for (int lvl_idx{0}; lvl_idx < num_coarsening_encodings; ++lvl_idx)
     {
-        cmc_global_msg("this->coarsening_indications_[num_coarsening_encodings - 1 - lvl_idx].size(): ", this->coarsening_indications_[num_coarsening_encodings - 1 - lvl_idx].size());
-        cmc_global_msg("this->coarsening_indications_[num_coarsening_encodings - 1 - lvl_idx].size_bytes(): ", this->coarsening_indications_[num_coarsening_encodings - 1 - lvl_idx].size_bytes());
         SizeType lvl_elem_offset{0};
+
         /* Count this levels offset */
         for (int rank_idx{0}; rank_idx < this->comm_rank_; ++rank_idx)
         {
-            const int access_idx = rank_idx * num_global_encoding_steps + lvl_idx;
+            const int access_idx = rank_idx * num_global_encoding_steps + lvl_idx + 1;
             lvl_elem_offset += partition_info[access_idx].num_elems;
         }
 
@@ -1148,12 +1123,6 @@ CompressionVariableMultiData<T, DIM, N>::AdjustLevelMeshEncodings(const std::vec
 
         /* Get the offseted byte stream */
         offseted_level_mesh_encodings.emplace_back(this->coarsening_indications_[num_coarsening_encodings - 1 - lvl_idx].GetSerializedOffsetByteStreamBE(shift));
-
-        cmc_global_msg("Level: ", lvl_idx, " Offset Mesh encoding");
-        for (const auto& byte : offseted_level_mesh_encodings.back())
-        {
-            cmc_global_msg("Bitset OffEnc: ", std::bitset<64>(byte));
-        }
     }
 
     return offseted_level_mesh_encodings;
@@ -1167,7 +1136,9 @@ ComputeGlobalMeshEncodingLength(const std::vector<SizeType> global_elems_per_lev
     {
         num_bytes += (*lvl_iter) / (sizeof(uint64_t) * cmc::bits::kCharBit) + ((*lvl_iter) % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
     }
-    cmc_global_msg("Computed global meshe ncoding_ : ", num_bytes);
+
+    cmc::cmc_debug_msg("Number of bytes for global mesh encoding: ", num_bytes);
+    
     return num_bytes;
 }
 
@@ -1194,11 +1165,9 @@ CompressionVariableMultiData<T, DIM, N>::CollectMeshEncodingOnTheRootRank(const 
         {
             const int access_idx = rank_idx * num_global_encoding_steps + lvl_idx + 1;
             global_elems_level += global_partition_info[access_idx].num_elems;
-            cmc_global_msg("RankID: ", rank_idx, ", access_idx: ", access_idx, ", global elems: ", global_elems_level, ", global_partition_info[access_idx].num_elems: ", global_partition_info[access_idx].num_elems);
         }
 
         elems_per_level.push_back(global_elems_level);
-        cmc::cmc_global_msg("elements on level ", lvl_idx, " are ", global_elems_level);
     }
 
     if (this->comm_rank_ != kRootRank)
@@ -1283,14 +1252,14 @@ CompressionVariableMultiData<T, DIM, N>::CollectMeshEncodingOnTheRootRank(const 
             
             /* Update the offset by the root local elements */
             current_elem_offset += global_partition_info[lvl_idx + 1].num_elems;
-            cmc_global_msg("LVL IDX: ", lvl_idx, ", global_partition_info[lvl_idx].num_elems: ", global_partition_info[lvl_idx + 1].num_elems, ", current_elem_offset: ", current_elem_offset );
+
             /* Iterate over the root level from all other ranks and append their encodings */
             for (int rank_idx{1}; rank_idx < this->comm_size_; ++rank_idx)
             {
                 const int access_idx = rank_idx * num_global_encoding_steps + lvl_idx + 1;
 
                 const SizeType lvl_rank_num_elems = global_partition_info[access_idx].num_elems;
-                cmc_global_msg("lvl_rank_num_elems: ", lvl_rank_num_elems);
+
                 if (lvl_rank_num_elems > 0) [[likely]]
                 {
                     const SizeType lvl_rank_bits = lvl_rank_num_elems + (current_elem_offset % (sizeof(uint64_t) * cmc::bits::kCharBit));
@@ -1321,11 +1290,6 @@ CompressionVariableMultiData<T, DIM, N>::CollectMeshEncodingOnTheRootRank(const 
             }
         }
 
-        cmc_global_msg("Global Compressed Mesh Encoding:");
-        for (const auto& byte  : global_mesh_encoding)
-        {
-            cmc_global_msg("Bitset: ", std::bitset<8>(byte));
-        }
         /* Store the global mesh encoding on the root rank */
         this->global_mesh_encoding_ = std::move(global_mesh_encoding);
     }
@@ -1344,12 +1308,10 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
 
     /* Number of mesh encoding steps */
     const int num_global_mesh_encoding_steps = this->levelwise_encoded_data_.size();
-    cmc::cmc_global_msg("num_global_mesh_encoding_steps: ", num_global_mesh_encoding_steps);
 
     /* Number of overall encdoing steps */
     const int num_global_encoding_steps = this->levelwise_encoded_data_.size() + (this->HasIntraElementCompression() ? 1 : 0);
-    cmc::cmc_global_msg("num_global_encoding_steps: ", num_global_encoding_steps);
-    cmc::cmc_global_msg("this->level_partitioning_info_.size(): ", this->level_partitioning_info_.size());
+
     /* On the root level encoding, we do not have a partition table */
     cmc_assert(static_cast<size_t>(num_global_encoding_steps) == this->level_partitioning_info_.size());
     const int num_partition_infos = this->level_partitioning_info_.size();
@@ -1358,14 +1320,9 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
     MPI_Datatype PartitionInfoMPIType;
     CreatePartitionInfoMPIType(&PartitionInfoMPIType);
 
-    for (const auto& pinfo : this->level_partitioning_info_)
-    {
-        cmc::cmc_global_msg("num elems: ", pinfo.num_elems, ", num bytes: ", pinfo.num_bytes_encoding);
-    }
-
     /* Allocate memory for the offsets and the encoding lengths */
     std::vector<PartitionInfo> global_partition_info(this->comm_size_ * num_partition_infos);
-    cmc::cmc_global_msg("comm_size * num_partition_infos: ", this->comm_size_ * num_partition_infos);
+
     /* Allgather the local offsets and encoding lengths */
     const int rv_allgather = MPI_Allgather(this->level_partitioning_info_.data(), num_partition_infos, PartitionInfoMPIType,
                                            global_partition_info.data(), num_partition_infos, PartitionInfoMPIType, this->comm_);
@@ -1375,22 +1332,12 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
     const int rv_type_free = MPI_Type_free(&PartitionInfoMPIType);
     MPICheckError(rv_type_free);
 
-    for (const auto& pinfo : global_partition_info)
-    {
-        cmc::cmc_global_msg("num elems: ", pinfo.num_elems, ", num bytes: ", pinfo.num_bytes_encoding);
-    }
-
     /* Exchange the mesh level encodings */
     std::vector<std::vector<uint64_t>> offseted_level_mesh_encodings = this->AdjustLevelMeshEncodings(global_partition_info, num_global_mesh_encoding_steps, num_global_encoding_steps);
-    cmc::cmc_global_msg("Offset bytes streams generated");
-    for (const auto& ovec : offseted_level_mesh_encodings)
-    {
-        cmc::cmc_global_msg("Offset byte stream length: ", ovec.size());
-    }
+
     /* Collect the global level-wise mesh encoding on the root rank */
     this->CollectMeshEncodingOnTheRootRank(global_partition_info, num_global_encoding_steps, num_global_mesh_encoding_steps, offseted_level_mesh_encodings);
-    cmc::cmc_global_msg("Mesh encoding generated");
-    cmc::cmc_global_msg("Mesh encoding generated, length: ", this->global_mesh_encoding_.size());
+
     /* Allocate a vector for the data output */
     this->output_streams_.reserve(num_global_encoding_steps);
 
@@ -1400,7 +1347,6 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
                                             + this->serialized_entropy_dictionary_.size() * sizeof(uint64_t)
                                             + this->serialized_intra_element_entropy_dictionary_.size() * sizeof(uint64_t)
                                             + ComputeGlobalMeshEncodingLength(this->num_elements_per_level_) * sizeof(uint64_t);
-    cmc::cmc_global_msg("start_encoding_offset_: ", start_encoding_offset_);
     uint64_t current_byte_offset{start_encoding_offset_};
 
     /* Define an iterator to the local encoded data */
@@ -1415,18 +1361,15 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
             /* Check if it is this processes turn to write data */
             if (rank_id == this->comm_rank_)
             {
-                cmc::cmc_global_msg("rank_id: ", rank_id);
-                cmc::cmc_global_msg("current_byte_offset: ", current_byte_offset);
                 /* If we match the turn of the serialized ouput, we store the current offset */
                 output_streams_.emplace_back(static_cast<MPI_Offset>(current_byte_offset), std::move(*lvl_iter));
-                cmc::cmc_global_msg("output_streams_.back().data_stream.size(): ", output_streams_.back().data_stream.size());
-                cmc::cmc_global_msg("global_partition_info[comm_rank * num_global_encoding_steps + mesh_lvl_idx].num_bytes_encoding: ", global_partition_info[this->comm_rank_ * num_global_encoding_steps + mesh_lvl_idx].num_bytes_encoding);
+                
                 /* Check if the local length coincides with the length that has been dsitributed to the other ranks */
                 cmc_assert(output_streams_.back().data_stream.size() * sizeof(uint64_t) == global_partition_info[this->comm_rank_ * num_global_encoding_steps + mesh_lvl_idx].num_bytes_encoding);
 
                 /* Add the offset for the current data stream */
                 current_byte_offset += output_streams_.back().data_stream.size() * sizeof(uint64_t);
-                cmc::cmc_global_msg("output_streams_.back().data_stream.size()* sizeof(uint64_t): ", output_streams_.back().data_stream.size()* sizeof(uint64_t));
+
                 /* Overwrite the vector from which the data has been moved */
                 *lvl_iter = std::vector<uint64_t>();
 
@@ -1451,8 +1394,6 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
             /* Check if it is this processes turn to write data */
             if (rank_id == this->comm_rank_)
             {
-                cmc::cmc_global_msg("rank_id: ", rank_id);
-                cmc::cmc_global_msg("current_byte_offset: ", current_byte_offset);
                 /* If we match the turn of the serialized ouput, we store the current offset */
                 this->output_streams_.emplace_back(static_cast<MPI_Offset>(current_byte_offset), std::move(this->intra_element_encoded_data_));
                 
@@ -1480,7 +1421,7 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
     /* Now after storing the offsets of each rank on each level, we are left with the overall byte count of this compressed variable */
     const SizeType global_byte_count = current_byte_offset;
     this->global_compressed_byte_count_ = global_byte_count;
-    cmc::cmc_global_msg("global_byte_count: ", global_byte_count);
+
     /* In case of the root rank, we need to exchange the root level encoding and offset,
      * with an updated stream consisting of the variable header, partition table, huffman codes and level offsets, etc. */
     if (this->comm_rank_ == kRootRank)
@@ -1491,40 +1432,31 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
         /* Allocate a new vector which collects the start stream for the root rank */
         std::vector<uint64_t> root_rank_start_stream;
         root_rank_start_stream.reserve(start_encoding_offset_ + this->output_streams_[0].data_stream.size());
-        cmc_global_msg("0 root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
 
         /* Append the variable header */
         this->AppendVariableHeaderToStream(root_rank_start_stream, global_byte_count, start_encoding_offset_, num_global_mesh_encoding_steps, global_bytes_per_level);
-        cmc_global_msg("1 root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
+
         /* Append the partition table */
         AppendPartitionTableToStream(root_rank_start_stream, global_partition_info, num_global_encoding_steps, this->comm_size_);
-        cmc_global_msg("2 root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
+
         /* Append the Huffman codes from the mesh encoding steps */
         std::copy_n(this->serialized_entropy_dictionary_.begin(), this->serialized_entropy_dictionary_.size(), std::back_inserter(root_rank_start_stream));
-        cmc_global_msg("3 root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
+
         /* Append the Huffman Codes from the mesh encoding steps */
         std::copy_n(this->serialized_intra_element_entropy_dictionary_.begin(), this->serialized_intra_element_entropy_dictionary_.size(), std::back_inserter(root_rank_start_stream));
-        cmc_global_msg("4 root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
+
         /* Append the mesh encoding */
         std::copy_n(this->global_mesh_encoding_.begin(), this->global_mesh_encoding_.size(), std::back_inserter(root_rank_start_stream));
-        cmc_global_msg("5 root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
+
         /* Check the anticpiated offset for correctness */
-        cmc_global_msg("start_encoding_offset_: ", start_encoding_offset_, ", root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
         cmc_assert(start_encoding_offset_ == root_rank_start_stream.size() * sizeof(uint64_t));
 
         /* Append the root level encoding of the root rank */
         std::copy_n(this->output_streams_[0].data_stream.begin(), this->output_streams_[0].data_stream.size(), std::back_inserter(root_rank_start_stream));
-        cmc_global_msg("6 root_rank_start_stream.size() * sizeof(uint64_t): ", root_rank_start_stream.size() * sizeof(uint64_t));
+
         /* Store the adjusted offset and the new data stream for the root rank */
         this->output_streams_[0].offset = 0;
         this->output_streams_[0].data_stream = std::move(root_rank_start_stream);
-
-        int a = 0;
-        for (const auto& val : this->output_streams_[0].data_stream)
-        {
-            cmc_global_msg("Out: ", a, ", Value: ", val, "; NE: ", cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(val), ", Bitset: ", std::bitset<64>(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(val)));
-            ++a;
-        }
     }
 
     /* Now, all offsets and encoding streams have been added, and the ouput data is fully prepared for writing */
@@ -1538,7 +1470,7 @@ CheckMPIWriteCorrectness(const MPI_Status* status, const MPI_Datatype datatype, 
     MPICheckError(rv_check_write);
     if (elem_count_ != expected_num_elems)
     {
-        cmc_global_msg("The expeceted number of bytes could not be written to the file.");
+        cmc_debug_msg("The expeceted number of bytes could not be written to the file.");
         MPICheckError(MPI_ERR_COUNT);
     }
 }
@@ -1555,12 +1487,14 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
 
     /* Check if the output file exists, if so, we delete it, since the preallcoation fails if the file already exists */
     const std::filesystem::path output_file_path(file_name);
-    if (std::filesystem::exists(output_file_path))
+    if (this->comm_rank_ == kRootRank && std::filesystem::exists(output_file_path))
     {
         const int rv_delete = MPI_File_delete(file_name.c_str(), MPI_INFO_NULL);
-        cmc::cmc_global_msg("rv value delete: ", rv_delete);
         MPICheckError(rv_delete);
     }
+
+    const int rv_barrier_delete = MPI_Barrier(this->comm_);
+    MPICheckError(rv_barrier_delete);
 
     /* Allocate a MPI file handle */
     MPI_File fhandle;
@@ -1584,14 +1518,6 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
     /* Itearte over all data streams and place them in the file */
     for (const auto& stream : this->output_streams_)
     {
-        cmc_global_msg("\n\nwe write in the file at offset: ", stream.offset, ", a length of uint64_ts of ",stream.data_stream.size());
-        int idx{0};
-        for (const auto & val : stream.data_stream)
-        {
-            const uint64_t rev_val = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(val);
-            cmc_global_msg("Bitset ", idx, ": ", std::bitset<64>(rev_val));
-            ++idx;
-        }
         /* Move the file handle to the correct position within the file */
         const int rv_pos_fhandle = MPI_File_seek(fhandle, stream.offset, MPI_SEEK_SET);
         MPICheckError(rv_pos_fhandle);

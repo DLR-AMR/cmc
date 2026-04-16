@@ -19,7 +19,16 @@
 namespace cmc::par::lossless::multi_res
 {
 
-    static bool mesh_enc_once = true;
+/* Forward declaration of the general compression variable */
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+class DecompressionVariableMultiData;
+
+/* Typedef for the general case with one data point per variable */
+template<ArithmeticType T, int32_t DIM>
+using DecompressionVariable = DecompressionVariableMultiData<T, DIM, int32_t{1}>;
+
+static bool mesh_enc_once = true;
 
 struct CompressionInfoStruct
 {
@@ -34,16 +43,7 @@ struct CompressionInfoStruct
         {
             offset += global_num_elem_indications_step[step_idx] / (sizeof(uint64_t) * cmc::bits::kCharBit) + (global_num_elem_indications_step[step_idx] % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
         }
-        cmc_global_msg("Offset for Elem Indications step ", step, ": ", offset);
-        if (mesh_enc_once)
-        {
-        cmc_global_msg("Complete Global Mesh Encoding:");
-        for (int idx{0}; idx < this->num_bytes_global_mesh_encoding  /sizeof(uint64_t); ++idx)
-        {
-            cmc_global_msg("Bitset: ", std::bitset<64>(*(shared_data_init_ptr + offset + idx)));
-        }
-        mesh_enc_once = false;
-        }
+
         return cmc::bits::vector_view(shared_data_init_ptr + offset);
     }
 
@@ -56,12 +56,11 @@ struct CompressionInfoStruct
         cmc_assert((this->GetOffsetPartitionTable() + level * this->compression_comm_size * 2 * sizeof(SizeType)) % sizeof(uint64_t) == 0);
 
         const int offset = (this->GetOffsetPartitionTable() + level * this->compression_comm_size * 2 * sizeof(SizeType)) / sizeof(uint64_t);
-        cmc_global_msg("LevelPartition Level ", level, " offset: ", offset);
+
         for(int rank_idx{0}; rank_idx < this->compression_comm_size; ++rank_idx)
         {
             level_partition.emplace_back(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(this->shared_data_init_ptr + offset + 2 * rank_idx)),
                                          cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(this->shared_data_init_ptr + offset + 2 * rank_idx + 1)));
-            cmc_global_msg("rank_idx: ", rank_idx, ", level_partition.elem_offset: ", level_partition.back().elem_offset, ", level_partition.coding_byte_offset: ", level_partition.back().coding_byte_offset);
         }
         return level_partition;
     }
@@ -71,7 +70,6 @@ struct CompressionInfoStruct
     {
         cmc_assert((this->GetOffsetPartitionTable() + this->partition_table_size) % sizeof(uint64_t) == 0);
         const int offset = (this->GetOffsetPartitionTable() + this->partition_table_size) / sizeof(uint64_t);
-        cmc_global_msg("Offset mesh huffman codes: ", offset);
         return shared_data_init_ptr + offset;
     }
 
@@ -80,7 +78,6 @@ struct CompressionInfoStruct
     {
         cmc_assert((this->GetOffsetPartitionTable() + this->partition_table_size + this->mesh_compression_huffman_codes) % sizeof(uint64_t) == 0);
         const int offset = (this->GetOffsetPartitionTable() + this->partition_table_size + this->mesh_compression_huffman_codes) / sizeof(uint64_t);
-        cmc_global_msg("Offset intra elem huffman codes: ", offset);
         return shared_data_init_ptr + offset;
     }
 
@@ -122,7 +119,6 @@ CheckMPIReadCorrectness(const MPI_Status* status, const MPI_Datatype datatype, c
     }
 }
 
-//TODO: Update to uint64_t pointer
 inline CompressionInfoStruct
 ConstructCompressionInfoStruct(const std::vector<uint64_t>& encoded_preamble)
 {
@@ -136,47 +132,36 @@ ConstructCompressionInfoStruct(const std::vector<uint64_t>& encoded_preamble)
 
     info.global_byte_count = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.global_byte_count: ", info.global_byte_count);
 
     info.offset_start_encoding = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.offset_start_encoding: ", info.offset_start_encoding);
 
     std::copy_n(reinterpret_cast<const char*>(start_ptr + offset), kNumCharsVariableName, info.name.data());
     offset += 32;
-    cmc_global_msg("Received info.name: ", std::string(reinterpret_cast<const char*>(start_ptr + offset - 32)));
 
     info.data_type = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.data_type: ", info.data_type);
 
     info.dimensionality = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.dimensionality: ", info.dimensionality);
 
     info.data_per_elem = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.data_per_elem: ", info.data_per_elem);
 
     info.compression_comm_size = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.compression_comm_size: ", info.compression_comm_size);
 
     info.compression_scheme = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.compression_scheme: ", info.compression_scheme);
 
     info.mesh_compression_levels = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.mesh_compression_levels: ", info.mesh_compression_levels);
 
     info.intra_elem_compression_levels = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.intra_elem_compression_levels: ", info.intra_elem_compression_levels);
 
     info.pack_size = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.pack_size: ", info.pack_size);
 
     const int num_levels = info.mesh_compression_levels + (info.intra_elem_compression_levels > 0 ? 1 : 0);
     info.global_level_bytes.reserve(num_levels);
@@ -184,33 +169,25 @@ ConstructCompressionInfoStruct(const std::vector<uint64_t>& encoded_preamble)
     {
         info.global_level_bytes.push_back(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset)));
         ++offset;
-        cmc_global_msg("Received info.global_level_bytes.back(): ", info.global_level_bytes.back());
     }
 
-    cmc_global_msg("Received info.mesh_compression_levels: ", info.mesh_compression_levels);
     info.global_num_elem_indications_step.reserve(info.mesh_compression_levels - 1);
     for (int lvl_idx{0}; lvl_idx < info.mesh_compression_levels - 1; ++lvl_idx)
     {
         info.global_num_elem_indications_step.push_back(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset)));
         ++offset;
-        cmc_global_msg("Received info.global_num_elem_indications_step.back(): ", info.global_num_elem_indications_step.back());
     }
 
     info.partition_table_size = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.partition_table_size: ", info.partition_table_size);
 
     info.mesh_compression_huffman_codes = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.mesh_compression_huffman_codes: ", info.mesh_compression_huffman_codes);
 
     info.intra_elem_compression_huffman_codes = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
-    cmc_global_msg("Received info.intra_elem_compression_huffman_codes: ", info.intra_elem_compression_huffman_codes);
 
     info.num_bytes_global_mesh_encoding = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
-    //++offset;
-    cmc_global_msg("Received info.num_bytes_global_mesh_encoding: ", info.num_bytes_global_mesh_encoding);
 
     return info;
 }
@@ -285,7 +262,6 @@ DecodeCompressionInfoStruct(CompressionInfoStruct& encoded_info)
     ++offset;
 
     encoded_info.num_bytes_global_mesh_encoding = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
-    //++offset;
 }
 
 inline
@@ -365,7 +341,6 @@ ReadCompressionInfo(const std::string& file_name)
     ++offset;
 
     const SizeType num_preamble_values = num_preamble_bytes / sizeof(uint64_t);
-    cmc::cmc_global_msg("Num global bytes: ", num_global_bytes, ", Num preamble bytes: ",num_preamble_bytes, ", num_preamble_values: ", num_preamble_values);
 
     /* Move to the start of the file */
     const int rv_seek_start_again = MPI_File_seek(fhandle, 0, MPI_SEEK_SET);
@@ -377,12 +352,6 @@ ReadCompressionInfo(const std::string& file_name)
     MPICheckError(rv_preamble);
     CheckMPIReadCorrectness(&status, MPI_UINT64_T, num_preamble_values);
 
-    int a = 0;
-    for (const auto& val : preamble)
-    {
-        cmc_global_msg("Preamble: ", a, ", Value: ", val, "; NE: ", cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(val), ", Bitset: ", std::bitset<64>(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(val)));
-        ++a;
-    }
     PrintCompressionInfo(preamble, file_name);
 
     /* Close the file */
@@ -419,8 +388,9 @@ private:
     void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
     void DecodeRootLevelValues();
     void SetStartPositionForStreamDecoder(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const cmc::bits::vector_view level_encoding, const cmc::bits::vector_view lvl_mesh, const std::vector<LevelPartition>& level_partition_info, const SizeType mesh_offset, const SizeType num_local_elems);
-
     void DecodeMeshCompressionSteps();
+    void SetStartPositionForIntraElemStreamDecoder(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const cmc::bits::vector_view level_encoding, const std::vector<LevelPartition>& level_partition_info, const SizeType mesh_offset, const SizeType num_local_elems);
+    void DecodeIntraElementSteps();
 
     /* File containing the compressed data */
     const std::string file_name_;
@@ -525,7 +495,7 @@ DecompressionVariableMultiData<T, DIM, N>::InquireCompressionInfo()
     
     /* Read the second value from the file which gives the number of preamble bytes */
     const SizeType num_preamble_bytes = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(num_bytes[1]);
-    
+
     const MPI_Aint stream_length_in_bytes = (this->shm_rank_ != kRootRank ? 0 : num_preamble_bytes);
     cmc_assert(stream_length_in_bytes % sizeof(uint64_t) == 0); //The stream length is a multiple of 64 bit
     const MPI_Aint stream_length = stream_length_in_bytes / sizeof(uint64_t);
@@ -556,7 +526,8 @@ DecompressionVariableMultiData<T, DIM, N>::InquireCompressionInfo()
     MPICheckError(rv_shm_barrier);
 
     /* Setup the decoding start for this level correctly */
-    this->compression_info_.shared_data_init_ptr -= (this->shm_rank_ != kRootRank ? num_preamble_bytes : 0);
+    const SizeType num_preamble_vals = num_preamble_bytes / sizeof(uint64_t);
+    this->compression_info_.shared_data_init_ptr -= (this->shm_rank_ != kRootRank ? num_preamble_vals : 0);
 
     /* Decode and store the compression info struct */
     DecodeCompressionInfoStruct(this->compression_info_);
@@ -578,8 +549,8 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     cmc_assert(proc_offset_val_stream <= next_proc_offset_val_stream);
     const int val_stream_length = static_cast<int>(next_proc_offset_val_stream - proc_offset_val_stream);
     const int byte_stream_length = val_stream_length * sizeof(uint64_t);
-    cmc_global_msg("SHM Rank ", this->shm_rank_," starts at value: ", proc_offset_val_stream, " and ends at value: ", next_proc_offset_val_stream, ", val length: ", val_stream_length, " byte stream length: ", byte_stream_length);
-    /* Store the offset to the start of the contiguous memeory of the global level data */
+
+    /* Store the offset to the start of the contiguous memory of the global level data */
     const MPI_Aint global_level_start_offset = 0 - proc_offset_val_stream;
 
     /* Allocate a window on the shared memory communicators */
@@ -591,7 +562,6 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     const MPI_Offset var_level_offset = std::accumulate(this->compression_info_.global_level_bytes.begin(), std::next(this->compression_info_.global_level_bytes.begin(), level), 0);
     const MPI_Offset file_offset = this->compression_info_.offset_start_encoding + var_level_offset + proc_offset_val_stream * sizeof(uint64_t);
     
-    cmc_global_msg("SHM Rank ", this->shm_rank_," var level offset: ", var_level_offset, ", file_offset: ", file_offset);
     const int rv_seek_start = MPI_File_seek(this->fhandle_, file_offset, MPI_SEEK_SET);
     MPICheckError(rv_seek_start);
 
@@ -610,13 +580,11 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     MPICheckError(rv_shm_barrier);
 
     /* Setup the decoding start for this level correctly */
-    const uint64_t* global_var_start = shm_mem - global_level_start_offset;
-
-    cmc_global_msg("First eight encoding levels:");
-        for (int idx{0}; idx < val_stream_length; ++idx)
-        {
-            cmc_global_msg("Bitset: ", std::bitset<64>(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(global_var_start + idx))), ", value: ", cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(global_var_start + idx)));
-        }
+    //uint64_t* global_var_start{nullptr};
+    //MPI_Aint root_size{0};
+    //int root_disp_unit{0};
+    //const int rv_root_query = MPI_Win_shared_query(this->lvl_window_, kRootRank, &root_size, &root_disp_unit, &global_var_start);
+    const uint64_t* global_var_start = shm_mem - proc_offset_val_stream;
 
     return global_var_start;
 }
@@ -683,21 +651,58 @@ DecompressionVariableMultiData<T, DIM, N>::RepartitionData(t8_forest_t adapted_f
 
 template<OneByteArithmeticType T>
 inline std::vector<T>
-GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems)
+GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems, const std::vector<LevelPartition>& level_partition)
 {
-    /* Move to the start position (the root data is not encoded and therfore directly addressable) */
-    lvl_data_start_view.MoveToOffsetBitInStream(mesh_offset * sizeof(T) * cmc::bits::kCharBit);
+    cmc_assert(level_partition.size() >= 1);
+    constexpr int type_size = sizeof(T);
+
+    /* Find the first relevant parition that is larger than the mesh offset */
+    auto start_partition_iter = level_partition.begin();
+    for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
+    {
+        if (partition_iter->elem_offset > mesh_offset)
+        {
+           break;
+        } else
+        {
+            start_partition_iter = partition_iter;
+        }
+    }
+
+    /* Set the level view accordingly to the offset */
+    lvl_data_start_view.MoveToOffsetBitInStream(start_partition_iter->coding_byte_offset * cmc::bits::kCharBit);
 
     std::vector<T> data;
     data.reserve(num_local_elems);
 
-    /* Decode the root values */
-    for (t8_locidx_t elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
+    int num_reamining_elements{num_local_elems};
+
+    int last_element_offset = start_partition_iter->elem_offset;
+    for (auto partition_iter = std::next(start_partition_iter); partition_iter != level_partition.end(); ++partition_iter)
     {
-        /* De-Serialize this root value and store it in the current data vector */
+        /* Compute the next contigupus value sequence and extract it */
+        const int max_elems_to_extract = std::min<int>(static_cast<int>(partition_iter->elem_offset - last_element_offset), num_reamining_elements);
+
+        for (int elem_idx{0}; elem_idx < max_elems_to_extract; ++elem_idx)
+        {
+            const OneByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<OneByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+            data.push_back(std::bit_cast<T>(uvalue));
+        }
+
+        last_element_offset = partition_iter->elem_offset;
+        num_reamining_elements -= max_elems_to_extract;
+
+        if (num_reamining_elements <= 0) {break;}
+
+        /* Move to the next value sequence start */
+        lvl_data_start_view.MoveToNextVectorValueStart();
+    }
+
+    /* If there are still elements missing, they lay contiguoulsy in memory at that point and can be extarcted */
+    for (int elem_idx{0}; elem_idx < num_reamining_elements; ++elem_idx)
+    {
         const OneByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<OneByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
         data.push_back(std::bit_cast<T>(uvalue));
-        cmc_global_msg("Root value ", elem_idx," is: ", data.back());
     }
 
     return data;
@@ -705,21 +710,58 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
 
 template<TwoByteArithmeticType T>
 inline std::vector<T>
-GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems)
+GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems, const std::vector<LevelPartition>& level_partition)
 {
-    /* Move to the start position (the root data is not encoded and therfore directly addressable) */
-    lvl_data_start_view.MoveToOffsetBitInStream(mesh_offset * sizeof(T) * cmc::bits::kCharBit);
+    cmc_assert(level_partition.size() >= 1);
+    constexpr int type_size = sizeof(T);
+
+    /* Find the first relevant parition that is larger than the mesh offset */
+    auto start_partition_iter = level_partition.begin();
+    for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
+    {
+        if (partition_iter->elem_offset > mesh_offset)
+        {
+           break;
+        } else
+        {
+            start_partition_iter = partition_iter;
+        }
+    }
+
+    /* Set the level view accordingly to the offset */
+    lvl_data_start_view.MoveToOffsetBitInStream(start_partition_iter->coding_byte_offset * cmc::bits::kCharBit);
 
     std::vector<T> data;
     data.reserve(num_local_elems);
 
-    /* Decode the root values */
-    for (t8_locidx_t elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
+    int num_reamining_elements{num_local_elems};
+
+    int last_element_offset = start_partition_iter->elem_offset;
+    for (auto partition_iter = std::next(start_partition_iter); partition_iter != level_partition.end(); ++partition_iter)
     {
-        /* De-Serialize this root value and store it in the current data vector */
+        /* Compute the next contigupus value sequence and extract it */
+        const int max_elems_to_extract = std::min<int>(static_cast<int>(partition_iter->elem_offset - last_element_offset), num_reamining_elements);
+
+        for (int elem_idx{0}; elem_idx < max_elems_to_extract; ++elem_idx)
+        {
+            const TwoByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<TwoByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+            data.push_back(std::bit_cast<T>(uvalue));
+        }
+
+        last_element_offset = partition_iter->elem_offset;
+        num_reamining_elements -= max_elems_to_extract;
+
+        if (num_reamining_elements <= 0) {break;}
+
+        /* Move to the next value sequence start */
+        lvl_data_start_view.MoveToNextVectorValueStart();
+    }
+
+    /* If there are still elements missing, they lay contiguoulsy in memory at that point and can be extarcted */
+    for (int elem_idx{0}; elem_idx < num_reamining_elements; ++elem_idx)
+    {
         const TwoByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<TwoByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
         data.push_back(std::bit_cast<T>(uvalue));
-        cmc_global_msg("Root value ", elem_idx," is: ", data.back());
     }
 
     return data;
@@ -727,21 +769,58 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
 
 template<FourByteArithmeticType T>
 inline std::vector<T>
-GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems)
+GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems, const std::vector<LevelPartition>& level_partition)
 {
-    /* Move to the start position (the root data is not encoded and therfore directly addressable) */
-    lvl_data_start_view.MoveToOffsetBitInStream(mesh_offset * sizeof(T) * cmc::bits::kCharBit);
+    cmc_assert(level_partition.size() >= 1);
+    constexpr int type_size = sizeof(T);
+
+    /* Find the first relevant parition that is larger than the mesh offset */
+    auto start_partition_iter = level_partition.begin();
+    for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
+    {
+        if (partition_iter->elem_offset > mesh_offset)
+        {
+           break;
+        } else
+        {
+            start_partition_iter = partition_iter;
+        }
+    }
+
+    /* Set the level view accordingly to the offset */
+    lvl_data_start_view.MoveToOffsetBitInStream(start_partition_iter->coding_byte_offset * cmc::bits::kCharBit);
 
     std::vector<T> data;
     data.reserve(num_local_elems);
 
-    /* Decode the root values */
-    for (t8_locidx_t elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
+    int num_reamining_elements{num_local_elems};
+
+    int last_element_offset = start_partition_iter->elem_offset;
+    for (auto partition_iter = std::next(start_partition_iter); partition_iter != level_partition.end(); ++partition_iter)
     {
-        /* De-Serialize this root value and store it in the current data vector */
+        /* Compute the next contigupus value sequence and extract it */
+        const int max_elems_to_extract = std::min<int>(static_cast<int>(partition_iter->elem_offset - last_element_offset), num_reamining_elements);
+
+        for (int elem_idx{0}; elem_idx < max_elems_to_extract; ++elem_idx)
+        {
+            const FourByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<FourByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+            data.push_back(std::bit_cast<T>(uvalue));
+        }
+
+        last_element_offset = partition_iter->elem_offset;
+        num_reamining_elements -= max_elems_to_extract;
+
+        if (num_reamining_elements <= 0) {break;}
+
+        /* Move to the next value sequence start */
+        lvl_data_start_view.MoveToNextVectorValueStart();
+    }
+
+    /* If there are still elements missing, they lay contiguoulsy in memory at that point and can be extarcted */
+    for (int elem_idx{0}; elem_idx < num_reamining_elements; ++elem_idx)
+    {
         const FourByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<FourByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
         data.push_back(std::bit_cast<T>(uvalue));
-        cmc_global_msg("Root value ", elem_idx," is: ", data.back());
     }
 
     return data;
@@ -749,25 +828,86 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
 
 template<EightByteArithmeticType T>
 inline std::vector<T>
-GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems)
+GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems, const std::vector<LevelPartition>& level_partition)
 {
-    /* Move to the start position (the root data is not encoded and therfore directly addressable) */
-    lvl_data_start_view.MoveToOffsetBitInStream(mesh_offset * sizeof(T) * cmc::bits::kCharBit);
+    cmc_assert(level_partition.size() >= 1);
+    constexpr int type_size = sizeof(T);
+
+    /* Find the first relevant parition that is larger than the mesh offset */
+    auto start_partition_iter = level_partition.begin();
+    for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
+    {
+        if (partition_iter->elem_offset > mesh_offset)
+        {
+           break;
+        } else
+        {
+            start_partition_iter = partition_iter;
+        }
+    }
+
+    /* Set the level view accordingly to the offset */
+    lvl_data_start_view.MoveToOffsetBitInStream(start_partition_iter->coding_byte_offset * cmc::bits::kCharBit);
 
     std::vector<T> data;
     data.reserve(num_local_elems);
 
-    /* Decode the root values */
-    for (t8_locidx_t elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
+    int num_reamining_elements{num_local_elems};
+
+    int last_element_offset = start_partition_iter->elem_offset;
+    for (auto partition_iter = std::next(start_partition_iter); partition_iter != level_partition.end(); ++partition_iter)
     {
-        /* De-Serialize this root value and store it in the current data vector */
+        /* Compute the next contigupus value sequence and extract it */
+        const int max_elems_to_extract = std::min<int>(static_cast<int>(partition_iter->elem_offset - last_element_offset), num_reamining_elements);
+
+        for (int elem_idx{0}; elem_idx < max_elems_to_extract; ++elem_idx)
+        {
+            const EightByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<EightByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+            data.push_back(std::bit_cast<T>(uvalue));
+        }
+
+        last_element_offset = partition_iter->elem_offset;
+        num_reamining_elements -= max_elems_to_extract;
+
+        if (num_reamining_elements <= 0) {break;}
+
+        /* Move to the next value sequence start */
+        lvl_data_start_view.MoveToNextVectorValueStart();
+    }
+
+    /* If there are still elements missing, they lay contiguoulsy in memory at that point and can be extarcted */
+    for (int elem_idx{0}; elem_idx < num_reamining_elements; ++elem_idx)
+    {
         const EightByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<EightByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
         data.push_back(std::bit_cast<T>(uvalue));
-        cmc_global_msg("Root value ", elem_idx," is: ", data.back());
     }
 
     return data;
 }
+
+
+static int step = 0;
+
+inline void
+WriteDataToVTKTest(t8_forest_t mesh, const std::vector<float>& data)
+{
+    std::vector<double> double_data1;
+
+    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
+    {
+        double_data1.push_back(data[idx]);
+    }
+
+    t8_vtk_data_field_t vtk_data[1];
+    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
+    vtk_data[0].type = T8_VTK_SCALAR;
+    vtk_data[0].data = double_data1.data();
+
+    const std::string file_name = std::string("cmc_new_test_decompr_data_vis_np1_step_") + std::to_string(step);
+    ++step;
+    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 1, 1, 1, 1, vtk_data);
+}
+
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -793,8 +933,13 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeRootLevelValues()
     /* Get the number of local elements */
     const t8_locidx_t num_local_elems = t8_forest_get_local_num_leaf_elements(mesh_.GetMesh());
 
+    /* Get the partition table for the root level */
+    const std::vector<LevelPartition> root_level_partition = this->compression_info_.GetLevelPartition(root_level);
+
     /* De-Serialize the values */
-    this->data_ = GetRootLevelValuesFromView<T>(data_view, mesh_offset, num_local_elems);
+    this->data_ = GetRootLevelValuesFromView<T>(data_view, mesh_offset, num_local_elems, root_level_partition);
+
+    WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
 
     /* Close the shared level window after all values have been extarcted */
     this->CloseSharedLevelDataWindow();
@@ -802,7 +947,6 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeRootLevelValues()
     /* Update the decompression count */
     ++(this->decompression_step_idx_);
 }
-
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -814,9 +958,7 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
      * Additionally, we know which elements will be refined wihtin this compression step.
     */
     const SizeType next_rank_starting_pos = mesh_offset + num_local_elems;
-    //const auto lower_bound_iter = std::lower_bound(level_partition_info.begin(), level_partition_info.end(), next_rank_starting_pos, [](const LevelPartition& part1, const LevelPartition& part2){return part1.elem_offset < part2.elem_offset;}); 
-    cmc_global_msg("Mesh offset: ", mesh_offset, " num local elems:  ", num_local_elems, ", next rank start pos: ", next_rank_starting_pos);
-    cmc_global_msg("level_partition_info.size() : ", level_partition_info.size());
+
     /* Iterate until we find the largest partition bound before the partiton start of the next rank */
     int part_idx{0};
     for (size_t idx{0}; idx < level_partition_info.size(); ++idx)
@@ -824,7 +966,6 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
         if (level_partition_info[idx].elem_offset < next_rank_starting_pos)
         {
             part_idx = idx;
-            cmc_global_msg("part_idx: ", part_idx);
         } else
         {
             break;
@@ -834,17 +975,15 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
     /* Copy the view to determine the correct parallel offsets */
     cmc::bits::vector_view lvl_mesh = lvl_mesh_encoding;
 
-    cmc_global_msg("part_idx: ", part_idx, ", (level_partition_info[part_idx].elem_offset : ", level_partition_info[part_idx].elem_offset);
     /* Set the mesh encoding correctly to the start of the offset */
-    lvl_mesh.MoveToOffsetBitInStream(mesh_offset + (level_partition_info[part_idx].elem_offset <= mesh_offset ? 0 : level_partition_info[part_idx].elem_offset - mesh_offset));
+    const SizeType mesh_start_offset = (level_partition_info[part_idx].elem_offset <= mesh_offset ? mesh_offset : level_partition_info[part_idx].elem_offset);
+    lvl_mesh.MoveToOffsetBitInStream(mesh_start_offset);
 
     SizeType num_entropy_codes_correction{0};
-    SizeType num_elements_correction{0};
-
     bool once_potential_incomplete_tree{true};
 
     /* The last rank does not need a correction */
-    if (part_idx < level_partition_info.size())
+    if (this->shm_rank_ < this->shm_size_ - 1)
     {
         /* Get the offset from the Partition Info */
         const SizeType partition_bound = level_partition_info[part_idx].elem_offset;
@@ -856,25 +995,25 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
         /* Iterate over the local trees */
         for (t8_locidx_t tree_idx{0}, num_elems_skipped{0}; tree_idx < num_local_trees; ++tree_idx)
         {
-            /* Get the corresponding tree class */
-            const t8_eclass_t tree_class = t8_forest_get_tree_class (this->mesh_.GetMesh(), tree_idx);
-            
             /* Get the local number of elements in the tree */
             const t8_locidx_t num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (this->mesh_.GetMesh(), tree_idx);
-            
+
             /* Check if we need to iterate through this tree or whether we can skip it completely */
-            if (mesh_offset + num_elems_skipped + num_elements_in_tree < partition_bound)
+            if (mesh_offset + num_elems_skipped + num_elements_in_tree <= partition_bound)
             {
                 /* Skip the whole tree */
                 num_elems_skipped += num_elements_in_tree;
                 continue;
             }
 
+            /* Get the corresponding tree class */
+            const t8_eclass_t tree_class = t8_forest_get_tree_class (this->mesh_.GetMesh(), tree_idx);
+            
             /* Get the scheme from the mesh */
             const t8_scheme_c* scheme = t8_forest_get_scheme (this->mesh_.GetMesh());
 
             t8_locidx_t tree_local_start_idx{0};
-            if (once_potential_incomplete_tree)
+            if (once_potential_incomplete_tree && mesh_offset <= partition_bound)
             {
                 /* Compute the tree_local start idx for the potential for an potential incomplete tree offset */
                 tree_local_start_idx = partition_bound - mesh_offset - num_elems_skipped;
@@ -922,24 +1061,18 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
                     }
                 }
             }
-
-            /* Update the number of elements that needs to be corrected */
-            num_elements_correction += num_elements_in_tree - tree_local_start_idx;
         }
     }
 
     /* Now, we need to exchange the corrections */
-    std::array<SizeType, 3> exchange_data{mesh_offset, num_entropy_codes_correction, num_elements_correction};
+    std::array<SizeType, 2> exchange_data{mesh_offset, num_entropy_codes_correction};
 
     /* Allocate an ouput vector locally */
-    std::vector<SizeType> offset_array(3 * (this->comm_size_));
+    std::vector<SizeType> offset_array(2 * (this->comm_size_));
 
-    cmc_global_msg("Before Allgather");
     /* Exchange the data */
-    const int rv_all_gather_offset = MPI_Allgather(exchange_data.data(), 3, MPI_SIZE_TYPE, offset_array.data(), 3, MPI_SIZE_TYPE, this->comm_);
+    const int rv_all_gather_offset = MPI_Allgather(exchange_data.data(), 2, MPI_SIZE_TYPE, offset_array.data(), 2, MPI_SIZE_TYPE, this->comm_);
     MPICheckError(rv_all_gather_offset);
-
-    cmc_global_msg("After Allgather");
 
     /* Find first (non-local) partition bound */
     int first_part_idx{0};
@@ -959,13 +1092,9 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
 
     int rank_offset{0};
     /* Now, we need to find the first relevant rank for the entropy count correction */
-    //while(offset_array[3 * rank_offset] <= first_partition_bound_offset && rank_offset <= this->comm_rank_)
-    //{
-    //    ++rank_offset;
-    //}
     for (int rank_idx{0}; rank_idx <= this->comm_rank_; ++rank_idx)
     {
-        if (offset_array[3 * rank_offset] > first_partition_bound_offset)
+        if (offset_array[2 * rank_idx] > first_partition_bound_offset)
         {
             break;
         } else
@@ -973,25 +1102,20 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
             rank_offset = rank_idx;
         }
     }
+
     /* Count the number of entropy codes we need to correct the compression partition bound */
     int num_entropy_codes_to_correct{0};
-    int num_elements_to_correct{0};
     for (int rank_idx{rank_offset}; rank_idx < this->comm_rank_; ++rank_idx)
     {
-        num_entropy_codes_to_correct += offset_array[3 * rank_idx + 1];
-        num_elements_to_correct += offset_array[3 * rank_idx + 2];
+        num_entropy_codes_to_correct += offset_array[2 * rank_idx + 1];
     }
 
-    cmc::cmc_debug_msg(this->comm_, "rank: ", this->comm_rank_, ", Mesh elem off: ", mesh_offset, ", Offset last part bound: ", level_partition_info[part_idx].elem_offset, ", num_entropy_codes to proc end: ", num_entropy_codes_correction);
-    cmc::cmc_debug_msg(this->comm_, "rank: ", this->comm_rank_, ", Mesh elem off: ", mesh_offset, ", First rel part bound: ", first_partition_bound_offset, ", num_entropy_codes to correct: ", num_entropy_codes_to_correct, ", Num elems to correct: ", num_elements_to_correct);
-    cmc::cmc_global_msg("level_partition_info[first_part_idx].coding_byte_offset : ", level_partition_info[first_part_idx].coding_byte_offset);
     /* Set the start to the first relevant partition bound */
     const SizeType level_entropy_offset = level_partition_info[first_part_idx].coding_byte_offset;
 
     /* Set the level stream decoder correctly */
-    cmc::bits::vector_view adjusted_level_data = level_encoding;//lvl_mesh_encoding;
+    cmc::bits::vector_view adjusted_level_data = level_encoding;
 
-    cmc_global_msg("Bit Offset in mesh straem: ", level_entropy_offset * cmc::bits::kCharBit);
     adjusted_level_data.MoveToOffsetBitInStream(level_entropy_offset * cmc::bits::kCharBit);
 
     /* Set the adjusted in the stream decoder */
@@ -999,48 +1123,42 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
 
     /* And now, we need to skip the number of entropy codes to correct in order to move to the process-local start position */
     SizeType entropy_codes_skipped{0};
-    SizeType elements_skipped{0};
-    while (elements_skipped < num_elements_to_correct || entropy_codes_skipped < num_entropy_codes_to_correct)
+
+    for (int entropy_skip_idx{0}; entropy_skip_idx < num_entropy_codes_to_correct; ++entropy_skip_idx)
     {
-        cmc_global_msg("Adapt start position in stream decoder");
         /* We are reading the next bit, if it is a refinement we discard the entropy codes and move on;
          * in case the element remains unchanged, we just move on with the next bit */
-        if (stream_decoder.GetNextBit())
-        {
-            /* If there will be a refinement, we are skipping entropy codes */
-            /* Get the next symbol */
-            const SymbolType symbol = std::invoke([&stream_decoder](){
-                SymbolType next_symbol = stream_decoder.DecodeNextEntropySymbol();
-                if (next_symbol == kProcessEndSymbol<T>) [[unlikely]]
-                {
-                    while (next_symbol == kProcessEndSymbol<T>)
-                    {
-                        stream_decoder.ApplyProcessEndSymbol64Bit();
-                        next_symbol = stream_decoder.DecodeNextEntropySymbol();
-                    }
-                }
-                return next_symbol;
-            });
 
-            /* Get the LZC */
-            const int lzc = GetLZCFromEntropySymbol(symbol);
-
-            /* Check if there are significant residual bits */
-            if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+        /* If there will be a refinement, we are skipping entropy codes */
+        /* Get the next symbol */
+        const SymbolType symbol = std::invoke([&stream_decoder](){
+            SymbolType next_symbol = stream_decoder.DecodeNextEntropySymbol();
+            if (next_symbol == kProcessEndSymbol<T>) [[unlikely]]
             {
-                /* Compute the residual length */
-                const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
-
-                /* Skip those bits */
-                stream_decoder.SkipNextBits(residual_length);
+                while (next_symbol == kProcessEndSymbol<T>)
+                {
+                    stream_decoder.ApplyProcessEndSymbol64Bit();
+                    next_symbol = stream_decoder.DecodeNextEntropySymbol();
+                }
             }
+            return next_symbol;
+        });
 
-            /* Update the discarded entropy codes */
-            ++entropy_codes_skipped;
+        /* Get the LZC */
+        const int lzc = GetLZCFromEntropySymbol(symbol);
+
+        /* Check if there are significant residual bits */
+        if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+        {
+            /* Compute the residual length */
+            const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
+
+            /* Skip those bits */
+            stream_decoder.SkipNextBits(residual_length);
         }
 
-        /* Update the discarded elements */
-        ++elements_skipped;
+        /* Update the discarded entropy codes */
+        ++entropy_codes_skipped;
     }
 }
 
@@ -1049,19 +1167,19 @@ template<FourByteArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 struct RefinementIterationData
 {
-    RefinementIterationData(const std::span<T> current_data, cmc::bits::StreamDecoder<SymbolType>& stream_decoder_)
-    : data(current_data), stream_decoder{stream_decoder_}
+    RefinementIterationData(const std::span<T> current_data, cmc::bits::StreamDecoder<SymbolType>& stream_decoder_, cmc::bits::vector_view process_local_level_mesh_encoding_)
+    : data(current_data), stream_decoder{stream_decoder_}, process_local_level_mesh_encoding{process_local_level_mesh_encoding_}
     {
-        fine_level_data.reserve(current_data.size() * 2 *DIM + 1);
+        fine_level_data.reserve(current_data.size() * 2 * DIM + 1);
     }
 
     void LeaveElementUnchanged(const int local_idx);
-    //void PerformRefinement(const int local_idx, const int num_elements);
     void PerformRefinement(const int coarse_value_id, const int num_elements);
-    bool WillNextElementBeRefined() {return stream_decoder.GetNextBit();}
+    bool WillNextElementBeRefined() {return process_local_level_mesh_encoding.GetNextBit();}
 
     const std::span<T> data;
     cmc::bits::StreamDecoder<SymbolType>& stream_decoder;
+    cmc::bits::vector_view process_local_level_mesh_encoding;
     std::vector<T> fine_level_data;
 };
 
@@ -1076,21 +1194,6 @@ RefinementIterationData<T, DIM>::PerformRefinement(const int local_idx, const in
     /* Iterate over all finer elements that will be constructed */
     for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
     {
-        #if 0
-        /* Get the next entropy symbol */
-        SymbolType symbol = stream_decoder.DecodeNextEntropySymbol();
-
-        /* Check that we do not get an process end symbol */
-        if (symbol == kProcessEndSymbol<T>) [[unlikely]]
-        {
-            while (symbol == kProcessEndSymbol<T>)
-            {
-                stream_decoder_.ApplyProcessEndSymbol64Bit();
-                symbol = stream_decoder.DecodeNextEntropySymbol();
-            }
-        }
-        #endif
-
         /* Get the next symbol */
         const SymbolType symbol = std::invoke([this](){
             SymbolType next_symbol = stream_decoder.DecodeNextEntropySymbol();
@@ -1134,8 +1237,15 @@ RefinementIterationData<T, DIM>::PerformRefinement(const int local_idx, const in
             }
         } else
         {
+            if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+            {
+                /* Store the predictor */
+                this->fine_level_data.push_back(std::bit_cast<T>(predictor));
+                continue;
+            }
+
             /* Compute the residual in case we do not need to extract a bit-sequence */
-            const FourByteResidualType residual = (FourByteResidualType{0x70000000} >> lzc);
+            constexpr FourByteResidualType residual{0x00000001};
 
             /* We create the residual applied value */
             if (IsApproximationGreater(symbol))
@@ -1185,26 +1295,26 @@ LosslessMultiResDecompression (t8_forest_t forest,
     /* Check whether we perform a refinement or not */
     if (adapt_data->WillNextElementBeRefined())
     {
-        cmc_global_msg("elem ", lelement_id, " will be refined");
         /* If the element will be refined */
         /* Get the local start index */
         const int local_idx = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
+
         /* Get the number of children elements into which this element will be refined */
         const int num_children = ts->element_get_num_children(tree_class, elements[0]);
+
         /* Perform the refinement */
         adapt_data->PerformRefinement(local_idx, num_children);
         return cmc::t8::kRefineElement;
     } else
     {
-        cmc_global_msg("elem ", lelement_id, " remians unchanged");
         /* If the element stays unchanged */
         const int local_idx = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
+
         /* Perform the unchangendness */
         adapt_data->LeaveElementUnchanged(local_idx);
         return cmc::t8::kLeaveElementUnchanged;
     }
 }
-
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -1237,41 +1347,171 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         /* Move the stream decoder to the correct starting position */
         this->SetStartPositionForStreamDecoder(this->stream_decoder_, level_data_encoding, level_mesh_encoding, level_partition, mesh_offset, num_local_elems);
 
-        cmc_debug_msg("Size of data before adaptation: ", this->data_.size());
+        /* Set the process local mesh encoding start */
+        cmc::bits::vector_view process_local_level_mesh_encoding = level_mesh_encoding;
+        process_local_level_mesh_encoding.MoveToOffsetBitInStream(mesh_offset);
     
         /****** Perform the local refinement onto the next finer level as dictated by the mesh encoding ******/
         /* Crerate the adaptation data */
-        RefinementIterationData<T, DIM> adapt_data(std::span<T>(this->data_), this->stream_decoder_);
+        RefinementIterationData<T, DIM> adapt_data(std::span<T>(this->data_), this->stream_decoder_, process_local_level_mesh_encoding);
 
         /* Perform a decompression iteration */
         t8_forest_t adapted_forest = t8_forest_new_adapt(mesh_.GetMesh(), LosslessMultiResDecompression<T, DIM>, 0, 0, static_cast<void*>(&adapt_data));
         cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements");
 
-        cmc_debug_msg("Size of data after adaptation: ", this->data_.size());
         /****** Partition the mesh and the data ******/
-
         /* Store the refined data */
         this->data_ = std::move(adapt_data.fine_level_data);
 
         /* Repartition the mesh */
         t8_forest_t partitioned_forest = this->RepartitionMesh(adapted_forest);
-        cmc_debug_msg("Num lcoal elems after partition: ", this->data_.size());
-        /* repartition thefien data to coincide with the mesh */
+
+        /* Repartition the fine data to coincide with the mesh */
         this->RepartitionData(adapted_forest, partitioned_forest);
-        cmc_debug_msg("Size of data after partition: ", t8_forest_get_global_num_leaf_elements(partitioned_forest));
+
         /* Store the partitioned mesh */
         mesh_.SetMesh(partitioned_forest);
+
+        //WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
 
         /****** Clean-Up of the decompression iteration ******/
         /* Free the former/coarser forest */
         t8_forest_unref(&adapted_forest);
+
+        /* Close this levels data window */
+        this->CloseSharedLevelDataWindow();
+
+        /* Update the decompression count */
+        ++(this->decompression_step_idx_);
+        cmc_debug_msg("The mesh decompression step ", mesh_lvl," has been completed.");
+    }
+}
+
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+void
+DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForIntraElemStreamDecoder(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const cmc::bits::vector_view level_encoding, const std::vector<LevelPartition>& level_partition_info, const SizeType mesh_offset, [[maybe_unused]] const SizeType num_local_elems)
+{   
+    /* Find first (potential non-local) partition bound */
+    int first_part_idx{0};
+    for (size_t idx{0}; idx < level_partition_info.size(); ++idx)
+    {
+        if (level_partition_info[idx].elem_offset > mesh_offset)
+        {
+           break;
+        } else
+        {
+            first_part_idx = idx;
+        }
+    }
+    
+    /* Get the relevant partition bound offset */
+    const SizeType first_partition_bound_offset = level_partition_info[first_part_idx].elem_offset;
+
+    /* Set the start to the first relevant partition bound */
+    const SizeType level_entropy_offset = level_partition_info[first_part_idx].coding_byte_offset;
+
+    /* Set the level stream decoder correctly */
+    cmc::bits::vector_view adjusted_level_data = level_encoding;
+
+    adjusted_level_data.MoveToOffsetBitInStream(level_entropy_offset * cmc::bits::kCharBit);
+
+    /* Set the adjusted in the stream decoder */
+    stream_decoder.StartDecoding(adjusted_level_data);
+
+    /* And now, we need to skip the number of entropy codes for a fixed amount of elements */
+    const int num_elems_to_skip = mesh_offset - first_partition_bound_offset;
+
+    for (int elem_idx{0}; elem_idx < num_elems_to_skip; ++elem_idx)
+    {
+        /* Skip this elements significant bits in the encoded stream */
+        SkipToNextCompressedElement<T, DIM, N>(stream_decoder);
+    }
+}
+
+template<FourByteArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+struct RefinementIntraElementData
+{
+    RefinementIntraElementData(const std::span<T> current_data, cmc::bits::StreamDecoder<SymbolType>& stream_decoder_)
+    : data(current_data), stream_decoder{stream_decoder_}
+    {
+        static_assert(N >= 1);
+
+        fine_elem_data.reserve(current_data.size() * N);
+    }
+
+    void PerformRefinement(const int coarse_value_id);
+
+    const std::span<T> data;
+    cmc::bits::StreamDecoder<SymbolType>& stream_decoder;
+    std::vector<T> fine_elem_data;
+};
+
+template<FourByteArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+inline void
+RefinementIntraElementData<T, DIM, N>::PerformRefinement(const int coarse_value_id)
+{
+    /* Perform the element decoding */
+    const std::array<T, N> elem_data = PerformElementDecoding<float, DIM, N>(this->stream_decoder, data[coarse_value_id]);
+
+    /* Copy the data to the fine value output */
+    std::copy_n(elem_data.begin(), N, std::back_inserter(fine_elem_data));
+}
+
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+void
+DecompressionVariableMultiData<T, DIM, N>::DecodeIntraElementSteps()
+{
+    cmc_assert(this->compression_info_.intra_elem_compression_levels == 1);
+
+    /* Set up the Huffman decoder within the stream decoder */
+    this->stream_decoder_.StartHuffmanCodesDecoding(this->compression_info_.GetIntraElementCompressionHuffmanCodes());
+
+    const int num_mesh_compression_levels = this->compression_info_.mesh_compression_levels;
+    const int num_intra_elem_compression_levels = this->compression_info_.intra_elem_compression_levels > 0 ? 1 : 0;
+
+    for (int intra_lvl{0}; intra_lvl < num_intra_elem_compression_levels; ++intra_lvl)
+    {
+        cmc_debug_msg("The intra element decompression step ", num_mesh_compression_levels + intra_lvl," starts...");
+        /****** Get the correct view on this level for each process ******/
+        /* Get the Level partition information */
+        const std::vector<LevelPartition> intra_level_data_partition = this->compression_info_.GetLevelPartition(num_mesh_compression_levels + intra_lvl);
+
+        /* Get the global offset of the first element */
+        const SizeType mesh_offset = (SizeType) t8_forest_get_first_local_leaf_element_id(mesh_.GetMesh());
+        const SizeType num_local_elems = (SizeType) t8_forest_get_local_num_leaf_elements(mesh_.GetMesh());
+
+        /* Open shared data window on this levels encoding */
+        const uint64_t* shared_intra_lvl_start_ptr = this->OpenSharedLevelDataWindow(num_mesh_compression_levels + intra_lvl);
+        /* Create an encoded level data view */
+        cmc::bits::vector_view intra_level_data_encoding(shared_intra_lvl_start_ptr);
+
+        /* Setup intra element decompression view */
+        this->SetStartPositionForIntraElemStreamDecoder(this->stream_decoder_, intra_level_data_encoding, intra_level_data_partition, mesh_offset, num_local_elems);
+        
+        /* Setup the decompressor */
+        RefinementIntraElementData<T, DIM, N> intra_level_decompressor(std::span<T>(this->data_), this->stream_decoder_);
+
+        /* Iterate over all local elements and decompress them */
+        for (int elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
+        {
+            intra_level_decompressor.PerformRefinement(elem_idx);
+        }
+
+        /* Store the output data */
+        this->data_ = std::move(intra_level_decompressor.fine_elem_data);
 
         /* CLose this levels data window */
         this->CloseSharedLevelDataWindow();
 
         /* Update the decompression count */
         ++(this->decompression_step_idx_);
-        cmc_debug_msg("The mesh decompression step ", mesh_lvl," has been completed.");
+        cmc_debug_msg("The intra element decompression step ", num_mesh_compression_levels + intra_lvl, " has been completed.");
     }
 }
 
@@ -1285,8 +1525,6 @@ DecompressionVariableMultiData<T, DIM, N>::Decompress()
         cmc_err_msg("The variable has already been decompressed!");
     }
 
-    cmc_debug_msg("Decompression of variable ", reinterpret_cast<const char*>(this->compression_info_.name.data()), " starts...");
-
     /* Inquire the basic information about the compression */
     this->InquireCompressionInfo();
 
@@ -1296,11 +1534,11 @@ DecompressionVariableMultiData<T, DIM, N>::Decompress()
     /* Perform the level-wise iterative decompression */
     this->DecodeMeshCompressionSteps();
 
-    #if 0
-
     /* Perform the intra-element decompression */
-    this->DecodeIntraElementSteps();
-    #endif
+    if constexpr (N > 1)
+    {
+        this->DecodeIntraElementSteps();
+    }
 
     /* Close shared window on compression infos */
     /* Impose a barrier to finish all outstanding reads */
@@ -1328,12 +1566,11 @@ std::pair<t8_forest_t, std::vector<T>>
 DecompressionVariableMultiData<T, DIM, N>::GetDecompressedData()
 {
     t8_forest_t mesh = mesh_.GetMesh();
-    mesh_.SetMesh(nullptr);
+    mesh_.SetNullMesh();
     std::vector<T> decompressed_data{};
     std::swap(decompressed_data, this->data_);
     return std::make_pair(mesh, std::move(decompressed_data));
 }
-
 
 }
 #endif /* !CMC_PAR_MULTI_RES_DECOMPRESSION_HXX */

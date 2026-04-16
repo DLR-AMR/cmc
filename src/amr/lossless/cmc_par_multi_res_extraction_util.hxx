@@ -11,8 +11,6 @@
 #include <limits>
 #include <execution>
 
-#include <bitset>
-
 namespace cmc::par::lossless::multi_res
 {
 
@@ -503,7 +501,7 @@ ComputeNumPyramidalCodes()
     return num_entropy_codes_per_elem;
 }
 
-#else
+#endif
 
 template<int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -596,8 +594,6 @@ ComputeNumPyramidalCodes()
 
     return num_entropy_codes_per_elem;
 }
-
-#endif
 
 template<int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -1212,6 +1208,60 @@ PerformElementEncoding(cmc::bits::vector& encoding, const cmc::entropy_coding::h
     });
 }
 
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+void
+SkipToNextCompressedElement(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
+{
+    /* We always coarsen kPackSize values at a time */
+	constexpr int num_compression_lvls = ComputeNumIntraCompressionLevels<DIM, N>();
+
+    /* Get the number of values per intra compression level */
+    constexpr std::array<int32_t, num_compression_lvls> num_elems_per_level = ComputeNumCodesPerLevel<DIM, N>();
+
+    /* Get the overall number of entropy codes/residuals */
+    constexpr int32_t num_all_codes = ComputeNumPyramidalCodes<DIM, N>();
+    static_assert(num_all_codes >= 1);
+
+    /* Iterate over all compression levels */
+    for_constexpr<0, num_compression_lvls, 1>([&](auto LVL_IDX)
+    {
+        /* The elements per level are stored in reverse */
+        constexpr int32_t lvl_idx = num_compression_lvls - 1 - LVL_IDX;
+
+        /* Get the number of elements on this level */
+        constexpr int32_t num_elems_on_level = num_elems_per_level[lvl_idx];
+
+        /* Allocate all entropy codes on this level */
+        std::array<SymbolType, num_elems_on_level> lvl_entropy_codes;
+
+        /* Gather all entropy codes for this level */
+        for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
+        {
+            /* Decode the next entropy symbol */
+            lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+
+            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
+            {
+                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
+                {
+                    stream_decoder.ApplyProcessEndSymbol64Bit();
+                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+                }
+            }
+        }
+
+        /* Compute the bits to skip from the decoded entropy symbols */
+        const int num_bits_to_skip = std::transform_reduce(std::execution::par_unseq, lvl_entropy_codes.cbegin(), lvl_entropy_codes.cend(), static_cast<int>(0),
+                                                            std::plus<>{}, [](auto entropy_symbol){
+                                                            const int lzc = GetLZCFromEntropySymbol(entropy_symbol);
+                                                            return (lzc < sizeof(T) * cmc::bits::kCharBit - 1 ? sizeof(T) * cmc::bits::kCharBit - 1 - lzc : 0);
+                                                           });
+        /* Skip the bits */
+        stream_decoder.SkipArbitraryNumberOfBits(num_bits_to_skip);
+    });
+}
+
 template<FourByteArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 std::array<T, N>
@@ -1315,7 +1365,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const FourByteResidualType residual = (FourByteResidualType{0x70000000} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr FourByteResidualType residual{0x00000001};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
@@ -1384,7 +1443,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const FourByteResidualType residual = (FourByteResidualType{0x70000000} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr FourByteResidualType residual{0x00000001};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
@@ -1516,7 +1584,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const EightByteResidualType residual = (EightByteResidualType{0x7000000000000000} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr EightByteResidualType residual{0x0000000000000001};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
@@ -1584,7 +1661,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const EightByteResidualType residual = (EightByteResidualType{0x7000000000000000} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr EightByteResidualType residual{0x0000000000000001};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
@@ -1716,7 +1802,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const TwoByteResidualType residual = (TwoByteResidualType{0x7000} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr TwoByteResidualType residual{0x0001};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
@@ -1784,7 +1879,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const TwoByteResidualType residual = (TwoByteResidualType{0x7000} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr TwoByteResidualType residual{0x0001};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
@@ -1916,7 +2020,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const OneByteResidualType residual = (OneByteResidualType{0x70} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr OneByteResidualType residual{0x01};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
@@ -1984,7 +2097,16 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 } else
                 {
                     /* Compute the residual in case we do not need to extract a bit-sequence */
-                    const OneByteResidualType residual = (OneByteResidualType{0x70} >> lzc);
+                    if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    {
+                        /* Store the predictor */
+                        predictors[pred_idx] = predictor;
+                        ++pred_idx;
+                        continue;
+                    }
+
+                    /* Compute the residual in case we do not need to extract a bit-sequence */
+                    constexpr OneByteResidualType residual{0x01};
 
                     /* We create the residual applied value */
                     if (IsApproximationGreater(lvl_entropy_codes[entropy_idx_offset + idx]))
