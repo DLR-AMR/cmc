@@ -16,8 +16,8 @@
 #include <t8_forest/t8_forest_general.h>
 #include <t8_schemes/t8_scheme.hxx> 
 #include <t8_forest/t8_forest_iterate.h>
-#include <t8_eclass.h>
-#include <t8_element.h>
+#include <t8_eclass/t8_eclass.h>
+#include <t8_element/t8_element.h>
 #endif
 
 namespace cmc
@@ -55,7 +55,7 @@ public:
     t8_gloidx_t GetNumberGlobalTrees() const; 
     t8_forest_t GetMesh() const;
     void SetMesh(t8_forest_t mesh);
-
+    void SetNullMesh();
 private:
     t8_forest_t mesh_{nullptr};
     int initial_refinement_level_{kInitialRefinementLevelIsUnknown};

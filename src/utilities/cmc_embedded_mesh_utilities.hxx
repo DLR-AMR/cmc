@@ -7,7 +7,7 @@
 #include "utilities/cmc_log_functions.hxx"
 
 #ifdef CMC_WITH_T8CODE
-#include <t8_cmesh.h>
+#include <t8_cmesh/t8_cmesh.h>
 #include <t8_cmesh/t8_cmesh_examples.h>
 #include <t8_schemes/t8_scheme.hxx> 
 #include <t8_schemes/t8_default/t8_default.hxx>

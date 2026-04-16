@@ -68,8 +68,8 @@ GetElementAnchorOfElement(t8_forest_t mesh, const t8_element_t* element, const t
 
     std::array<int, 3> element_anchor;
     /* Receive the integer anchor coordinates of the element */
-    ts->element_get_anchor (tree_class, element, element_anchor.data());
-
+    //ts->element_get_anchor (tree_class, element, element_anchor.data());
+    cmc::cmc_err_msg("Above functionality is currently not implemented");
     return element_anchor;
 }
 

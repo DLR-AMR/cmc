@@ -71,6 +71,12 @@ AmrMesh::SetMesh(t8_forest_t mesh)
     mesh_ = mesh;    
 }
 
+void
+AmrMesh::SetNullMesh()
+{
+    mesh_ = nullptr; 
+}
+
 int
 AmrMesh::GetDimensionality() const
 {
@@ -142,8 +148,8 @@ GetElementAnchorOfElement(const t8_eclass_t tree_class, const t8_element_t* elem
     //int* array_ptr = element_anchor.data();
 
     /* Receive the integer anchor coordinates of the element */
-    scheme->element_get_anchor (tree_class, element, element_anchor.data());
-
+    //scheme->element_get_anchor (tree_class, element, element_anchor.data());
+    cmc::cmc_err_msg("Above functionality is currently not implemented");
     return element_anchor;
 }
 
@@ -331,7 +337,8 @@ GetMortonIndexOnLevel(const t8_eclass_t tree_class, const t8_element_t* elem, co
     int element_anchor[3];
 
     /* Receive the integer anchor coordinates of the element */
-    ts->element_get_anchor (tree_class, elem, element_anchor);
+    //ts->element_get_anchor (tree_class, elem, element_anchor);
+    cmc::cmc_err_msg("Above functionality is currently not implemented");
 
     std::vector<DomainIndex> coords;
 

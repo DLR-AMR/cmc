@@ -671,7 +671,8 @@ AbstractEmbeddedByteDecompressionVariable<T>::DeMortonizeData() const
             /* Get the current element */
             const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, tree_id, elem_id);
             /* Get the element anchor */
-            scheme->element_get_anchor(tree_class, element, element_anchor.data());
+            //scheme->element_get_anchor(tree_class, element, element_anchor.data());
+            cmc::cmc_err_msg("Above functionality is currently not implemented");
 
             std::vector<DomainIndex> coords;
             /* Transform coordinates into the range of the initial-refinement-level coordinate values */

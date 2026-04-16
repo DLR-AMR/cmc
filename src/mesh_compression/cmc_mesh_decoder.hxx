@@ -10,7 +10,7 @@
 #ifdef CMC_WITH_T8CODE
 #include <t8_cmesh/t8_cmesh_examples.h>
 #include <t8_schemes/t8_default/t8_default.hxx>
-#include <t8_cmesh_readmshfile.h>
+#include <t8_cmesh/t8_cmesh_io/t8_cmesh_readmshfile.h>
 #endif
 
 namespace cmc::mesh_compression
