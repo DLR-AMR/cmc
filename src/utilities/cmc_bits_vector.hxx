@@ -2,7 +2,6 @@
 #define CMC_BITS_VECTOR_HXX
 
 #include "cmc.hxx"
-#include "utilities/cmc_endian.hxx"
 #include "utilities/cmc_bits.hxx"
 
 #include <vector>
