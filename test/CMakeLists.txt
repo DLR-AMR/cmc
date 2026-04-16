@@ -51,6 +51,13 @@ target_link_libraries(${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} PUBLIC cm
 target_include_directories(${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
 add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING})
 
+# Add the test for the intra element lossless multi res compression with multiple data
+set(CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION cmc_test_multi_res_lossless_multi_data_compression)
+add_executable(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_lossless_compression_multi_data.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION})
+
 # Add the test for the byte compression values
 set(CMC_TEST_BYTE_COMPRESSION_VALUE cmc_test_byte_compression_value)
 add_executable(${CMC_TEST_BYTE_COMPRESSION_VALUE} ${CMAKE_CURRENT_LIST_DIR}/cmc_byte_compression_value.cxx)
