@@ -247,7 +247,8 @@ install(FILES
     amr/lossless/cmc_prefix_extraction_decompression_plain_suffixes.hxx 
     amr/lossless/cmc_byte_decompression_variable.hxx 
     amr/lossless/cmc_par_multi_res_extraction_util.hxx 
-    # amr/lossless/cmc_par_multi_res_extraction.hxx 
+    amr/lossless/cmc_par_multi_res_extraction.hxx 
+    amr/lossless/cmc_par_multi_res_decomrpession.hxx 
     # amr/lossless/cmc_byte_par_compression_variable.hxx 
     # amr/lossless/cmc_multi_res_par_extraction_compression.hxx 
     # amr/lossless/cmc_multi_res_par_extraction_util.hxx 
