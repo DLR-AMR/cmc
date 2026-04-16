@@ -61,7 +61,7 @@ int main(void)
                                               0b00000000, 0b00001110, 0b10001101, 0b01001010, 0b01101000, 0b01101110,
                                               0b00000101, 0b01011101};
                                             
-    const std::vector<uint8_t> serialized_byte_stream = bits_vec.GetSerializedByteStream();
+    const std::vector<uint8_t> serialized_byte_stream = bits_vec.GetSerializedByteStreamBETrimmed();
 
     cmc::ExpectTrue(serialized_byte_stream.size() == expected_bytes.size());
     cmc::ExpectTrue(bits_vec.size_bytes() == expected_bytes.size());
@@ -73,9 +73,9 @@ int main(void)
         cmc::ExpectTrue(expected_bytes[i] == serialized_byte_stream[i]);
     }
     
-    /* Get the serialized stream padded to contain full uint64_t's */
-    const std::vector<uint8_t> serialized_byte_stream_padded = bits_vec.GetSerializedByteStreamPadded();
-    cmc::ExpectTrue(serialized_byte_stream_padded.size() == 16);
+    /* Get the serialized stream consisitng of two uint64_t's  */
+    const std::vector<uint64_t> serialized_byte_stream_padded = bits_vec.GetSerializedByteStreamBE();
+    cmc::ExpectTrue(serialized_byte_stream_padded.size() == 2);
 
     /* Declare a new bits vector */
     cmc::bits::vector bits_vec2;
@@ -96,18 +96,22 @@ int main(void)
     cmc::ExpectTrue(bits_vec2.size() == 18);
     cmc::ExpectTrue(bits_vec2.size_bytes() == 3);
 
+    /* Get the serialized bit stream in big endian */
+    const std::vector<uint64_t> serialized_byte_stream2 = bits_vec2.GetSerializedByteStreamBE();
+
+    cmc::ExpectTrue(serialized_byte_stream2.size() == 1);
+    //Expected BE Value: uint64_t{0b1011100000001000110000000000000000000000000000000000000000000000}
+    cmc::ExpectTrue(serialized_byte_stream2.front() == cmc::bits::ConvertToBigEndian<uint64_t>(uint64_t{13261060209024958464ULL}));
+
     /* Define the bytes that are expected */
     std::vector<uint8_t> expected_bytes2{0b10111000, 0b00001000, 0b11000000};
 
-    /* Get the serialized bit stream in big endian */
-    const std::vector<uint8_t> serialized_byte_stream2 = bits_vec2.GetSerializedByteStream();
-
-    cmc::ExpectTrue(serialized_byte_stream2.size() == 3);
+    const uint8_t* serialized_byte_stream_ptr = reinterpret_cast<const uint8_t*>(serialized_byte_stream2.data());
 
     /* Check the expected bytes for equality with the serialization */
     for (size_t i{0}; i < expected_bytes2.size(); ++i)
     {
-        cmc::ExpectTrue(expected_bytes2[i] == serialized_byte_stream2[i]);
+        cmc::ExpectTrue(expected_bytes2[i] == serialized_byte_stream_ptr[i]);
     }
 }
 

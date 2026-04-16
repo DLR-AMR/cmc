@@ -76,7 +76,7 @@ main(void)
     const std::vector<uint8_t> serialized_huffman_codes = int_coder.SerializeHuffmanCodes();
 
     /* Serialize the stream encoded symbols */
-    const std::vector<uint8_t> encoded_stream = encoded_symbols.GetSerializedByteStreamPadded();
+    const std::vector<uint64_t> encoded_stream = encoded_symbols.GetSerializedByteStreamBE();
 
 
     /** DECODING **/
@@ -89,7 +89,7 @@ main(void)
                                                        + 7 * (sizeof(int32_t) + sizeof(uint64_t)));
 
     /* Define a view on the encoding of the symbols */
-    cmc::bits::vector_view encoded_stream_view(reinterpret_cast<const uint64_t*>(encoded_stream.data()));
+    cmc::bits::vector_view encoded_stream_view(encoded_stream.data());
 
     /* Set the view as the start of the decoder */
     stream_decoder.StartDecoding(encoded_stream_view);

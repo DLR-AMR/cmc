@@ -68,7 +68,7 @@ Test2DFloatData()
     cmc::par::lossless::multi_res::PerformElementEncoding<float, DIM, N>(elem_encoding, huffman_coder, elem_coding);
 
     /* Serialize the stream of the encoded element data */
-    const std::vector<uint8_t> encoded_elem_stream = elem_encoding.GetSerializedByteStreamPadded();
+    const std::vector<uint64_t> encoded_elem_stream = elem_encoding.GetSerializedByteStreamBE();
 
     /* We setup a stream decoder for the data */
     /* Construct a stream decoder for the given serialized Huffman codes */
@@ -76,7 +76,7 @@ Test2DFloatData()
     stream_decoder.StartHuffmanCodesDecoding(serialized_huffman_codes.data());
 
     /* Set the start of the decoder to the encoded stream */
-    cmc::bits::vector_view encoded_stream_view(reinterpret_cast<const uint64_t*>(encoded_elem_stream.data()));
+    cmc::bits::vector_view encoded_stream_view(encoded_elem_stream.data());
     stream_decoder.StartDecoding(encoded_stream_view);
 
     /* We decompress the encoded data */
@@ -147,7 +147,7 @@ Test3DDoubleData()
     cmc::par::lossless::multi_res::PerformElementEncoding<double, DIM, N>(elem_encoding, huffman_coder, elem_coding);
 
     /* Serialize the stream of the encoded element data */
-    const std::vector<uint8_t> encoded_elem_stream = elem_encoding.GetSerializedByteStreamPadded();
+    const std::vector<uint64_t> encoded_elem_stream = elem_encoding.GetSerializedByteStreamBE();
 
     /* We setup a stream decoder for the data */
     /* Construct a stream decoder for the given serialized Huffman codes */
@@ -155,7 +155,7 @@ Test3DDoubleData()
     stream_decoder.StartHuffmanCodesDecoding(serialized_huffman_codes.data());
 
     /* Set the start of the decoder to the encoded stream */
-    cmc::bits::vector_view encoded_stream_view(reinterpret_cast<const uint64_t*>(encoded_elem_stream.data()));
+    cmc::bits::vector_view encoded_stream_view(encoded_elem_stream.data());
     stream_decoder.StartDecoding(encoded_stream_view);
 
     /* We decompress the encoded data */
