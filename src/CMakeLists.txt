@@ -85,6 +85,7 @@ install(FILES
     input/cmc_forward_decl_input_variable.hxx 
     input/cmc_binary_reader.hxx 
     input/cmc_binary_reader_forward.hxx 
+    input/cmc_binary_file_reader.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
 )
 
@@ -108,6 +109,9 @@ install(FILES
     patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx 
     patch/lossless/cmc_patch_multi_res_extraction_compression.hxx 
     patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx 
+    patch/lossless/cmc_multi_res_extraction.hxx
+    patch/lossless/cmc_multi_res_extraction_util.hxx 
+    patch/lossless/cmc_multi_res_decompression.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
