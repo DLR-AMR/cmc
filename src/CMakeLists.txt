@@ -13,13 +13,6 @@ target_sources(cmc PRIVATE
 )
 
 install(FILES
-    patch/lossless/cmc_multi_res_extraction.hxx 
-    patch/lossless/cmc_patch_multi_res_extraction_util.hxx 
-    patch/lossless/cmc_multi_res_decompression.hxx
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
-)
-
-install(FILES
     input/cmc_binary_file_reader.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/input
 )
