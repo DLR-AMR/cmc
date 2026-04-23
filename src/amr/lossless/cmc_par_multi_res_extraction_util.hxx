@@ -185,7 +185,7 @@ template<ArithmeticType T>
 constexpr inline SymbolType
 MapArrayIndexToEntropySymbol(int array_idx)
 {
-    return static_cast<SymbolType>(array_idx + (array_idx > sizeof(T) * cmc::bits::kCharBit ? kResidualSignumIndication - sizeof(T) * cmc::bits::kCharBit - 1 : 0));
+    return static_cast<SymbolType>(array_idx + (array_idx > static_cast<int>(sizeof(T) * cmc::bits::kCharBit) ? kResidualSignumIndication - sizeof(T) * cmc::bits::kCharBit - 1 : 0));
 }
 
 template<ArithmeticType T>
@@ -297,7 +297,7 @@ ComputeArithmeticMean(const std::span<T> values)
     cmc_assert(values.size() >= 2);
 
     T sum = static_cast<T>(0);
-    for (int idx{0}; idx < values.size(); ++idx)
+    for (unsigned idx{0}; idx < values.size(); ++idx)
     {
         sum += values[idx];
     }
@@ -312,7 +312,7 @@ ComputeMidRange(const std::span<T> values)
 
     T min{std::numeric_limits<T>::max()};
     /* Find the minimum */
-    for (int idx{0}; idx < values.size(); ++idx)
+    for (unsigned idx{0}; idx < values.size(); ++idx)
     {
         if (min > values[idx])
         {
@@ -322,7 +322,7 @@ ComputeMidRange(const std::span<T> values)
 
     T max{std::numeric_limits<T>::lowest()};
     /* Find the maximum */
-    for (int idx{0}; idx < values.size(); ++idx)
+    for (unsigned idx{0}; idx < values.size(); ++idx)
     {
         if (max < values[idx])
         {
@@ -1200,7 +1200,7 @@ PerformElementEncoding(cmc::bits::vector& encoding, const cmc::entropy_coding::h
             /* Store all significant bits of the residuals, we do not need to store the implicit one bit that succeeds the leading zeros */
             const int lzc = GetLZCFromEntropySymbol(entropy_codes[idx]);
 
-            if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+            if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
             {
                 encoding.AppendBits(elem_coding.residuals[offset + idx], lzc + 1, 0);
             }
@@ -1255,7 +1255,7 @@ SkipToNextCompressedElement(cmc::bits::StreamDecoder<SymbolType>& stream_decoder
         const int num_bits_to_skip = std::transform_reduce(std::execution::par_unseq, lvl_entropy_codes.cbegin(), lvl_entropy_codes.cend(), static_cast<int>(0),
                                                             std::plus<>{}, [](auto entropy_symbol){
                                                             const int lzc = GetLZCFromEntropySymbol(entropy_symbol);
-                                                            return (lzc < sizeof(T) * cmc::bits::kCharBit - 1 ? sizeof(T) * cmc::bits::kCharBit - 1 - lzc : 0);
+                                                            return (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1 ? sizeof(T) * cmc::bits::kCharBit - 1 - lzc : 0);
                                                            });
         /* Skip the bits */
         stream_decoder.SkipArbitraryNumberOfBits(num_bits_to_skip);
@@ -1336,7 +1336,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -1414,7 +1414,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -1555,7 +1555,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -1632,7 +1632,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -1773,7 +1773,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -1850,7 +1850,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -1991,7 +1991,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -2068,7 +2068,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
                 /* Determine the leading zero count */
                 const int lzc = GetLZCFromEntropySymbol(lvl_entropy_codes[entropy_idx_offset + idx]);
 
-                if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+                if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
                 {
                     /* Compute the length of the significant residual bits */
                     const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;

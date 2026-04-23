@@ -80,7 +80,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, const int kLevLength,  [[maybe_unused]] const int kTimeLength)
 {
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
     return data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
 }
 
@@ -88,7 +88,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T value, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  const int kLevLength, [[maybe_unused]] const int kTimeLength)
 {
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
     data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
 }
 
@@ -96,7 +96,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, [[maybe_unused]] const int kLevLength)
 {
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
     return data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
 }
 
@@ -104,7 +104,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T value, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  [[maybe_unused]] const int kLevLength)
 {
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
     data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
 }
 
@@ -112,7 +112,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
 {
-    cmc_assert(lat * kLonLength + lon < data.size());
+    cmc_assert(lat * kLonLength + lon < static_cast<int>(data.size()));
     return data[lat * kLonLength + lon];
 }
 
@@ -120,7 +120,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T value, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
 {
-    cmc_assert(lat * kLonLength + lon < data.size());
+    cmc_assert(lat * kLonLength + lon < static_cast<int>(data.size()));
     data[lat * kLonLength + lon] = value;
 }
 
@@ -458,7 +458,7 @@ requires Dimension<DIM>
 void
 CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTag4D)
 {
-    constexpr int kDim = 4;
+    [[maybe_unused]] constexpr int kDim = 4;
     constexpr int kTimeID = 0;
     constexpr int kLevID = 1;
     constexpr int kLatID = 2;
@@ -607,7 +607,7 @@ CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTa
             lvl_encoding.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
             
             /* We do not need to encode the implicit given one-bit following the LZC */
-            if (lzc + 1 < sizeof(T) * cmc::bits::kCharBit) [[likely]]
+            if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
             {
                 /* Append the significant reisdual bits */
                 AppendResidualBits<T>(lvl_encoding, residuals[elem_idx], lzc + 1, 0);
@@ -629,7 +629,7 @@ requires Dimension<DIM>
 void
 CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTag3D)
 {
-    constexpr int kDim = 3;
+    [[maybe_unused]] constexpr int kDim = 3;
     constexpr int kLevID = 0;
     constexpr int kLatID = 1;
     constexpr int kLonID = 2;
@@ -767,7 +767,7 @@ CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTa
             lvl_encoding.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
             
             /* We do not need to encode the implicit given one-bit following the LZC */
-            if (lzc + 1 < sizeof(T) * cmc::bits::kCharBit) [[likely]]
+            if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
             {
                 /* Append the significant reisdual bits */
                 AppendResidualBits<T>(lvl_encoding, residuals[elem_idx], lzc + 1, 0);
@@ -788,7 +788,7 @@ requires Dimension<DIM>
 void
 CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTag2D)
 {
-    constexpr int kDim = 2;
+    [[maybe_unused]] constexpr int kDim = 2;
     constexpr int kLatID = 0;
     constexpr int kLonID = 1;
 
@@ -915,7 +915,7 @@ CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTa
             lvl_encoding.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
             
             /* We do not need to encode the implicit given one-bit following the LZC */
-            if (lzc + 1 < sizeof(T) * cmc::bits::kCharBit) [[likely]]
+            if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
             {
                 /* Append the significant reisdual bits */
                 AppendResidualBits<T>(lvl_encoding, residuals[elem_idx], lzc + 1, 0);

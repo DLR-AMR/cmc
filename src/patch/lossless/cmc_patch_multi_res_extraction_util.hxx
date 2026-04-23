@@ -199,7 +199,7 @@ template<ArithmeticType T>
 constexpr inline SymbolType
 MapArrayIndexToEntropySymbol(int array_idx)
 {
-    return static_cast<SymbolType>(array_idx + (array_idx > sizeof(T) * cmc::bits::kCharBit ? kResidualSignumIndication - sizeof(T) * cmc::bits::kCharBit - 1 : 0));
+    return static_cast<SymbolType>(array_idx + (array_idx > static_cast<int>(sizeof(T) * cmc::bits::kCharBit) ? kResidualSignumIndication - sizeof(T) * cmc::bits::kCharBit - 1 : 0));
 }
 
 template<ArithmeticType T>
@@ -265,7 +265,7 @@ ComputeArithmeticMean(const std::span<T> values)
     cmc_assert(values.size() >= 2);
 
     T sum = static_cast<T>(0);
-    for (int idx{0}; idx < values.size(); ++idx)
+    for (size_t idx{0}; idx < values.size(); ++idx)
     {
         sum += values[idx];
     }
@@ -280,7 +280,7 @@ ComputeMidRange(const std::span<T> values)
 
     T min{std::numeric_limits<T>::max()};
     /* Find the minimum */
-    for (int idx{0}; idx < values.size(); ++idx)
+    for (size_t idx{0}; idx < values.size(); ++idx)
     {
         if (min > values[idx])
         {
@@ -290,7 +290,7 @@ ComputeMidRange(const std::span<T> values)
 
     T max{std::numeric_limits<T>::lowest()};
     /* Find the maximum */
-    for (int idx{0}; idx < values.size(); ++idx)
+    for (size_t idx{0}; idx < values.size(); ++idx)
     {
         if (max < values[idx])
         {

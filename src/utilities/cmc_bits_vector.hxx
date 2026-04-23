@@ -46,7 +46,7 @@ template<typename T, IntegerType U>
 inline int
 GetNumSignificantBits(const U start_pos, const U end_pos)
 {
-    cmc_assert(start_pos + end_pos <= sizeof(T) * kCharBit);
+    cmc_assert(start_pos + end_pos <= static_cast<U>(sizeof(T) * kCharBit));
     return sizeof(T) * kCharBit - start_pos - end_pos;
 }
 
@@ -65,7 +65,7 @@ vector::AppendBits(const T value, const U start_pos, const U end_pos)
     cmc_assert(start_pos <= 64 && end_pos <= 64 && start_pos + end_pos <= 64);
 
     /* If the value is empty, we do not need to add anything */
-    if (start_pos + end_pos >= sizeof(T) * kCharBit) [[unlikely]]
+    if (start_pos + end_pos >= static_cast<U>(sizeof(T) * kCharBit)) [[unlikely]]
     {
         return;
     }
@@ -189,7 +189,7 @@ vector::GetSerializedOffsetByteStreamBE(const int lsb_bit_offset) const
     static_assert(std::endian::native == std::endian::big || std::endian::native == std::endian::little,
                   "Only little-endian and big-endian systems are suppoprted!");
 
-    cmc_assert(lsb_bit_offset < sizeof(uint64_t) * cmc::bits::kCharBit && lsb_bit_offset >= 0);
+    cmc_assert(lsb_bit_offset < static_cast<int>(sizeof(uint64_t) * cmc::bits::kCharBit) && lsb_bit_offset >= 0);
     
     if (this->vector_.empty()) [[unlikely]]
     {
