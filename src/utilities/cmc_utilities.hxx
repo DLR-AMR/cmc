@@ -18,7 +18,8 @@
 #define CMC_MACRO_EXPANSION2(x) CMC_MACRO_EXPANSION(x)
 #define CMC_FILE_LOCATION __FILE__ ": " CMC_MACRO_EXPANSION2(__LINE__)
 
-namespace cmc {
+namespace cmc
+{
 
 #ifdef CMC_ENABLE_DEBUG
 #define cmc_assert(condition) assert(condition)
@@ -32,30 +33,10 @@ namespace cmc {
 
 [[noreturn]] void cmc_abort(const char* _err_msg, const char* _location);
 
-enum Dimension {DimensionUndefined = -1, Lon = 0, Lat = 1, Lev = 2, Time = 3, NumCoordinates};
-
 enum CmcType {TypeUndefined = -1, Int8_t, Char, Int16_t, Int32_t, Float, Double, Uint8_t, Uint16_t, Uint32_t, Int64_t, Uint64_t, NumTypes};
-
-//TODO: Maybe make a nicer design of the layout, such that there is a pattern between layouts 
-//Extend 2D and 3D with Time dimension 
-enum DataLayout {LayoutUndefined, Lon_, Lat_, Lev_, Time_, _InternEnd1DLayouts, Lat_Lon, Lon_Lat, Lat_Lev, Lev_Lat, Lon_Lev, Lev_Lon, _InternEnd2DLayouts,
-                 Lat_Lon_Lev, Lat_Lev_Lon, Lev_Lat_Lon, Lev_Lon_Lat, Lon_Lev_Lat, Lon_Lat_Lev, _InternEnd3DLayouts,
-                 Time_Lev_Lat_Lon, Time_Lev_Lon_Lat, Time_Lat_Lev_Lon, Time_Lat_Lon_Lev, Time_Lon_Lev_Lat, Time_Lon_Lat_Lev,
-                 Lev_Time_Lat_Lon, Lev_Time_Lon_Lat, Lev_Lat_Time_Lon, Lev_Lat_Lon_Time, Lev_Lon_Time_Lat, Lev_Lon_Lat_Time,
-                 Lat_Time_Lev_Lon, Lat_Time_Lon_Lev, Lat_Lev_Time_Lon, Lat_Lev_Lon_Time, Lat_Lon_Time_Lev, Lat_Lon_Lev_Time,
-                 Lon_Time_Lev_Lat, Lon_Time_Lat_Lev, Lon_Lev_Time_Lat, Lon_Lev_Lat_Time, Lon_Lat_Time_Lev, Lon_Lat_Lev_Time,
-                _InternEnd4DLayouts};
-
-enum DataRepresentation {RepresentationUndefined, SpaceFillingCurve, CartesianCoordinates, HyperslabCoordinates};
 
 /* A type for holding 'arbitrary' data, in particular any possible CmcType */
 using CmcUniversalType = std::variant<int8_t, char, int16_t, int32_t, float, double, uint8_t, uint16_t, uint32_t, int64_t, uint64_t>;
-
-typedef int64_t MortonIndex;
-typedef int64_t LinearIndex;
-typedef int64_t DomainIndex;
-
-enum DataFormat {FormatUndefined, LinearFormat, CartesianFormat, HyperslabFormat};
 
 /* Helper function for the variant */
 template<class...>
@@ -114,18 +95,6 @@ auto GetUniversalDataAs(const CmcUniversalType& universal_data)
     }, universal_data);
 }
 
-DataLayout
-GetDataLayoutAfterRemoval(const DataLayout initial_layout, const Dimension removed_dimension);
-
-std::vector<Dimension>
-GetDimensionVectorFromLayout(const DataLayout layout);
-
-int
-GetDimensionalityOfDataLayout(const DataLayout layout);
-
-std::string
-GetDimensionName(const Dimension dimension);
-
 template<typename T>
 constexpr CmcType
 ConvertToCmcType()
@@ -171,26 +140,19 @@ ConvertToCmcType()
     }
 }
 
-template <typename T, typename U>
-auto
-ReinterpretValuesAs(const std::vector<T>& values)
- -> std::enable_if_t<sizeof(T) == sizeof(U), std::vector<U>>
+[[noreturn]] inline void
+cmc_exit(const char* _err_msg, const char* _location)
 {
-    std::vector<U> reinterpreted_values;
-    reinterpreted_values.reserve(values.size());
-
-    for (auto idx = 0; idx < values.size(); ++values)
-    {
-        U reintpr_value;
-        std::memcpy(&reintpr_value, &values[idx], sizeof(T));
-        reinterpreted_values.push_back(reintpr_value);
-    }
-
-    return reinterpreted_values;
+    std::cout << "CMC_EXIT is invoked..." << std::endl << _err_msg << std::endl << "Error Occurence:"  << _location << std::endl;
+    std::exit(EXIT_FAILURE);
 }
 
-DataLayout
-GetDefaultDataLayout(const int dimensionality);
+[[noreturn]] inline void
+cmc_abort(const char* _err_msg, const char* _location)
+{
+    std::cout << "CMC_ABORT is invoked..." << std::endl << _err_msg << std::endl << "Error Occurence:"  << _location << std::endl;
+    std::abort();
+}
 
 }
 

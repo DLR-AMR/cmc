@@ -2,19 +2,11 @@
 #define CMC_T8_ADAPTATION_CALLBACKS_HXX
 
 #include "utilities/cmc_utilities.hxx"
-#include "utilities/cmc_geo_domain.hxx"
-#include "utilities/cmc_vector_view.hxx"
 
 #ifdef CMC_WITH_T8CODE
 #include <t8.h>
-//#include <t8_cmesh/t8_cmesh.h>
-//include <t8_cmesh/t8_cmesh_examples.h>
+
 #include <t8_forest/t8_forest_general.h>
-//#include <t8_schemes/t8_scheme.hxx> 
-//#include <t8_schemes/t8_default/t8_default.hxx>
-//#include <t8_forest/t8_forest_iterate.h>
-//#include <p4est.h>
-//#include <p8est.h>
 #endif
 
 #include <vector>

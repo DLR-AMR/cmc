@@ -1,19 +1,9 @@
 #include "cmc.hxx"
-#include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_compression.hxx"
-#include "patch/lossless/cmc_patch_prefix_extraction_plain_suffixes_decompression.hxx"
-#include "patch/lossless/cmc_patch_multi_res_extraction_compression.hxx"
-#include "patch/lossless/cmc_patch_multi_res_extraction_decompression.hxx"
-    
-#include "input/cmc_binary_reader.hxx"
+#include "patch/lossless/cmc_multi_res_extraction.hxx"
+#include "patch/lossless/cmc_multi_res_decompression.hxx"
 
-#include "utilities/cmc_hyperslab.hxx"
+#include "input/cmc_binary_file_reader.hxx"
 
-#include "compression_io/cmc_compression_serial_output.hxx"
-#include "compression_io/cmc_decompression_serial_input.hxx"
-
-#include <numeric>
-#include <algorithm>
-#include <memory>
 #include <vector>
 
 int
@@ -22,7 +12,74 @@ main(void)
     /* Initialize cmc */
     cmc::CmcInitialize();
     {
+    
+    #if 0
+    constexpr int32_t DIM  = 2;
 
+    std::vector<float> init_data{2.34,2.79,3.10,2.56,
+                                 3.21,3.07,2.99,2.76,
+                                 3.01,2.88,2.34,2.19,
+                                 2.27,2.45,2.76,2.56};
+    std::array<int, DIM> init_dims{4,4};
+    
+    cmc::serial::patch::lossless::multi_res::CompressionVariable<float, DIM> compression_variable(std::move(init_data), init_dims);
+ 
+    compression_variable.Compress();
+    compression_variable.WriteData("cmc_patch_example_data.cmc");
+
+    cmc::serial::patch::lossless::multi_res::CompressionInfo cr = cmc::serial::patch::lossless::multi_res::ReadCompressionData("cmc_patch_example_data.cmc");
+    cmc::cmc_global_msg("\n\n\n");
+    cmc::serial::patch::lossless::multi_res::DecompressionVariable<float, DIM> decompression_variable("cmc_patch_example_data.cmc");
+  
+    decompression_variable.Decompress();
+
+    const std::vector<float> decompressed_data = decompression_variable.GetDecompressedData();
+    cmc::cmc_global_msg("Decompressed data size: ", decompressed_data.size());
+    for(const auto& val : decompressed_data)
+    {
+        //cmc::cmc_global_msg("Decompressed Value: ", val);
+    }
+
+
+    #endif
+
+    cmc::cmc_global_msg("\n\n\nNext Test\n");
+
+    const std::string file_name("/home/niklas/software/data/100x500x500/CLOUDf48.bin.f32");
+    constexpr int DataFileDimension = 3;
+    const std::array<int, DataFileDimension> dim_lengths{100, 500, 500};
+    const std::endian file_endianness = std::endian::little;
+
+    cmc::input::binary_file::Reader<float, DataFileDimension> bin_reader(file_name, dim_lengths, file_endianness);
+    const std::vector<float> init_file_data = bin_reader.ReadData();
+    std::vector<float> copy_init_data = init_file_data;
+
+    cmc::serial::patch::lossless::multi_res::CompressionVariable<float, DataFileDimension> compression_variable2(std::move(copy_init_data), dim_lengths);
+ 
+    compression_variable2.Compress();
+    compression_variable2.WriteData("cmc_big_patch_example_data.cmc");
+
+    cmc::serial::patch::lossless::multi_res::DecompressionVariable<float, DataFileDimension> decompression_variable2("cmc_big_patch_example_data.cmc");
+  
+    decompression_variable2.Decompress();
+
+    const std::vector<float> decompressed_data2 = decompression_variable2.GetDecompressedData();
+
+    cmc::cmc_debug_msg("Size init data: ", init_file_data.size(), ", Size decompressed: ", decompressed_data2.size());
+
+    for (size_t idx{0}; idx < init_file_data.size(); ++idx)
+    {
+        if (init_file_data[idx] != decompressed_data2[idx])
+        {
+            cmc::cmc_err_msg("Unequal at pos ", idx);
+        }
+    }
+
+#if 0
+
+    0000000000000000000000000000000000000000000000000000001111111000
+
+    0000000000000000000000000000000000000000000000000000001100011000
     /* Read in data */
     #if 1
     const std::string file = "../data/100x500x500/TCf48.bin.f32";
@@ -128,6 +185,12 @@ main(void)
     #endif
 
 #endif
+
+
+
+#endif
+
+
 
     }
     /* Finalize cmc */

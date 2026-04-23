@@ -5,8 +5,6 @@
  */
 
 #include "utilities/cmc_utilities.hxx"
-#include "utilities/cmc_geo_domain.hxx"
-#include "utilities/cmc_hyperslab.hxx"
 
 #include <climits>
 
@@ -18,6 +16,7 @@
 #include <t8_forest/t8_forest_iterate.h>
 #include <t8_eclass/t8_eclass.h>
 #include <t8_element/t8_element.h>
+#include <t8_schemes/t8_default/t8_default.hxx>
 #endif
 
 namespace cmc
@@ -62,26 +61,129 @@ private:
     int dimensionality_{kDimensionalityIsUnknown};
 };
 
-struct CoarseningSample
+inline
+AmrMesh::~AmrMesh()
 {
-    CoarseningSample(const int variable_id)
-    : corresponding_variable_id{variable_id}{};
-    const int corresponding_variable_id{kMeshCorrespondsToNoneVariables};
-};
+    if (mesh_ != nullptr)
+    {
+        /* Deallocate the mesh (if there is one) */
+        t8_forest_unref(&mesh_);
+    }
+}
 
-t8_eclass_t
-DimensionToElementClass(const int dimensionality);
+inline
+AmrMesh::AmrMesh(const AmrMesh& other)
+: mesh_{other.mesh_},
+  initial_refinement_level_{other.initial_refinement_level_},
+  dimensionality_{other.dimensionality_}
+{
+    if (other.mesh_ != nullptr)
+    {
+        t8_forest_ref(other.mesh_);
+    }
+}
 
-bool
-IsMeshElementWithinGlobalDomain(const t8_eclass_t tree_class, const t8_element_t* element, const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
+inline AmrMesh&
+AmrMesh::operator=(const AmrMesh& other)
+{
+    if (mesh_ != nullptr)
+    {
+        t8_forest_unref(&mesh_);
+    }
+    std::cout << std::endl;
+    return *this = AmrMesh(other);
+}
 
-bool
-IsMeshElementWithinGlobalDomain(const std::vector<DomainIndex>& element_anchor, const GeoDomain& global_domain, const DataLayout initial_layout);
+inline
+AmrMesh::AmrMesh(AmrMesh&& other)
+: mesh_{std::move(other.mesh_)}, initial_refinement_level_{other.initial_refinement_level_},
+  dimensionality_{other.dimensionality_}
+{
+    other.mesh_ = nullptr;
+}
 
-bool
-IsAnyElementWithinGlobalDomain(const t8_eclass_t tree_class, const int num_elements, const t8_element_t* elements[], const t8_scheme_c* ts, const GeoDomain& global_domain, const int initial_refinement_level, const DataLayout initial_layout);
+inline AmrMesh&
+AmrMesh::operator=(AmrMesh&& other)
+{
+    this->mesh_ = std::move(other.mesh_);
+    other.mesh_ = nullptr;
+    this->initial_refinement_level_ = other.initial_refinement_level_;
+    this->dimensionality_ = other.dimensionality_;
+    return *this;
+}
+    
+inline t8_forest_t
+AmrMesh::GetMesh() const
+{
+    cmc_assert(mesh_ != nullptr);
+    return mesh_;    
+}
 
-MortonIndex GetMortonIndexOnLevel(const t8_eclass_t tree_class, const t8_element_t* elem, const t8_scheme_c* ts, const int dimensioanlity, const int level);
+inline void
+AmrMesh::SetMesh(t8_forest_t mesh)
+{
+    cmc_assert(mesh != nullptr);
+    mesh_ = mesh;    
+}
+
+inline void
+AmrMesh::SetNullMesh()
+{
+    mesh_ = nullptr; 
+}
+
+inline int
+AmrMesh::GetDimensionality() const
+{
+    return dimensionality_;
+}
+
+inline void
+AmrMesh::SetDimensionality(const int dimensionality)
+{
+    cmc_assert(dimensionality >= 2 && dimensionality <= 3);
+    dimensionality_ = dimensionality;
+}
+
+inline bool
+AmrMesh::IsValid() const
+{
+    return (mesh_ != nullptr ? true : false);
+}
+
+inline t8_gloidx_t
+AmrMesh::GetNumberGlobalTrees() const
+{
+    cmc_assert(mesh_ != nullptr);
+    return t8_forest_get_num_global_trees(mesh_);
+} 
+
+inline t8_gloidx_t
+AmrMesh::GetNumberGlobalElements() const
+{
+    cmc_assert(mesh_ != nullptr);
+    return t8_forest_get_global_num_leaf_elements(mesh_);
+}
+
+inline t8_locidx_t
+AmrMesh::GetNumberLocalElements() const
+{
+    cmc_assert(mesh_ != nullptr);
+    return t8_forest_get_local_num_leaf_elements(mesh_);
+}
+
+inline int
+AmrMesh::GetInitialRefinementLevel() const
+{
+    return initial_refinement_level_;
+}
+
+inline void
+AmrMesh::SetInitialRefinementLevel(const int initial_refinement_level)
+{
+    initial_refinement_level_ = initial_refinement_level;
+}
+
 
 }
 
