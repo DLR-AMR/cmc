@@ -28,14 +28,12 @@ class DecompressionVariableMultiData;
 template<ArithmeticType T, int32_t DIM>
 using DecompressionVariable = DecompressionVariableMultiData<T, DIM, int32_t{1}>;
 
-static bool mesh_enc_once = true;
-
 struct CompressionInfoStruct
 {
     cmc::bits::vector_view
     GetGlobalElementIndicationsStep(const int step)
     {
-        cmc_assert(step >= 0 && step < this->mesh_compression_levels - 1);
+        cmc_assert(step >= 0 && step < static_cast<int>(this->mesh_compression_levels) - 1);
         cmc_assert((this->GetOffsetPartitionTable() + this->partition_table_size + this->mesh_compression_huffman_codes + this->intra_elem_compression_huffman_codes) % sizeof(uint64_t) == 0);
 
         int offset = (this->GetOffsetPartitionTable() + this->partition_table_size + this->mesh_compression_huffman_codes + this->intra_elem_compression_huffman_codes) / sizeof(uint64_t);
@@ -57,7 +55,7 @@ struct CompressionInfoStruct
 
         const int offset = (this->GetOffsetPartitionTable() + level * this->compression_comm_size * 2 * sizeof(SizeType)) / sizeof(uint64_t);
 
-        for(int rank_idx{0}; rank_idx < this->compression_comm_size; ++rank_idx)
+        for(int rank_idx{0}; rank_idx < static_cast<int>(this->compression_comm_size); ++rank_idx)
         {
             level_partition.emplace_back(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(this->shared_data_init_ptr + offset + 2 * rank_idx)),
                                          cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(this->shared_data_init_ptr + offset + 2 * rank_idx + 1)));
@@ -172,7 +170,7 @@ ConstructCompressionInfoStruct(const std::vector<uint64_t>& encoded_preamble)
     }
 
     info.global_num_elem_indications_step.reserve(info.mesh_compression_levels - 1);
-    for (int lvl_idx{0}; lvl_idx < info.mesh_compression_levels - 1; ++lvl_idx)
+    for (int lvl_idx{0}; lvl_idx < static_cast<int>(info.mesh_compression_levels) - 1; ++lvl_idx)
     {
         info.global_num_elem_indications_step.push_back(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset)));
         ++offset;
@@ -246,7 +244,7 @@ DecodeCompressionInfoStruct(CompressionInfoStruct& encoded_info)
     }
 
     encoded_info.global_num_elem_indications_step.reserve(encoded_info.mesh_compression_levels - 1);
-    for (int lvl_idx{0}; lvl_idx < encoded_info.mesh_compression_levels - 1; ++lvl_idx)
+    for (int lvl_idx{0}; lvl_idx < static_cast<int>(encoded_info.mesh_compression_levels) - 1; ++lvl_idx)
     {
         encoded_info.global_num_elem_indications_step.push_back(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset)));
         ++offset;
@@ -286,7 +284,7 @@ PrintCompressionInfo(const std::vector<uint64_t>& encoded_preamble, const std::s
     cmc_global_msg("\t Intra Elem Compaction Stencil: ", info.pack_size);
 
     cmc_global_msg("\t Mesh Compression Level Byte Count:");
-    for (int lvl_idx{0}; lvl_idx < info.mesh_compression_levels; ++lvl_idx)
+    for (SizeType lvl_idx{0}; lvl_idx < info.mesh_compression_levels; ++lvl_idx)
     {
         cmc_global_msg("\t\t Level ", lvl_idx, ": ", info.global_level_bytes[lvl_idx], " bytes");
     }
@@ -297,7 +295,7 @@ PrintCompressionInfo(const std::vector<uint64_t>& encoded_preamble, const std::s
     }
 
     cmc_global_msg("\t Mesh Compression Global Element Count (size: ", info.global_num_elem_indications_step.size(), "): ");
-    for (int lvl_idx{0}; lvl_idx < info.mesh_compression_levels - 1; ++lvl_idx)
+    for (SizeType lvl_idx{0}; lvl_idx < info.mesh_compression_levels - 1; ++lvl_idx)
     {
         cmc_global_msg("\t\t Level ", lvl_idx, ": ", info.global_num_elem_indications_step[lvl_idx], " bytes");
     }
@@ -335,7 +333,7 @@ ReadCompressionInfo(const std::string& file_name)
     MPICheckError(rv_start_bytes);
     CheckMPIReadCorrectness(&status, MPI_UINT64_T, 2);
 
-    const SizeType num_global_bytes = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(num_bytes[0]);
+    [[maybe_unused]] const SizeType num_global_bytes = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(num_bytes[0]);
     ++offset;
     const SizeType num_preamble_bytes = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(num_bytes[1]);
     ++offset;
@@ -541,7 +539,6 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     cmc_assert(this->compression_info_.global_level_bytes.size() > static_cast<size_t>(level) && level >= 0);
 
     /* Compute equal distributions for the whole data level */
-    const SizeType num_global_lvl_bytes = this->compression_info_.global_level_bytes[level];
     const SizeType num_global_lvl_vals = this->compression_info_.global_level_bytes[level] / sizeof(uint64_t);
 
     const SizeType proc_offset_val_stream = static_cast<SizeType>(((static_cast<double>(this->shm_rank_) * static_cast<long double>(num_global_lvl_vals)) / static_cast<double>(this->shm_size_)));
@@ -549,9 +546,6 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     cmc_assert(proc_offset_val_stream <= next_proc_offset_val_stream);
     const int val_stream_length = static_cast<int>(next_proc_offset_val_stream - proc_offset_val_stream);
     const int byte_stream_length = val_stream_length * sizeof(uint64_t);
-
-    /* Store the offset to the start of the contiguous memory of the global level data */
-    const MPI_Aint global_level_start_offset = 0 - proc_offset_val_stream;
 
     /* Allocate a window on the shared memory communicators */
     uint64_t* shm_mem{nullptr};
@@ -660,7 +654,7 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     auto start_partition_iter = level_partition.begin();
     for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
     {
-        if (partition_iter->elem_offset > mesh_offset)
+        if (partition_iter->elem_offset > static_cast<SizeType>(mesh_offset))
         {
            break;
         } else
@@ -719,7 +713,7 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     auto start_partition_iter = level_partition.begin();
     for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
     {
-        if (partition_iter->elem_offset > mesh_offset)
+        if (partition_iter->elem_offset > static_cast<SizeType>(mesh_offset))
         {
            break;
         } else
@@ -772,13 +766,12 @@ inline std::vector<T>
 GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_gloidx_t mesh_offset, const t8_locidx_t num_local_elems, const std::vector<LevelPartition>& level_partition)
 {
     cmc_assert(level_partition.size() >= 1);
-    constexpr int type_size = sizeof(T);
 
     /* Find the first relevant parition that is larger than the mesh offset */
     auto start_partition_iter = level_partition.begin();
     for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
     {
-        if (partition_iter->elem_offset > mesh_offset)
+        if (partition_iter->elem_offset > static_cast<SizeType>(mesh_offset))
         {
            break;
         } else
@@ -837,7 +830,7 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     auto start_partition_iter = level_partition.begin();
     for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
     {
-        if (partition_iter->elem_offset > mesh_offset)
+        if (partition_iter->elem_offset > static_cast<SizeType>(mesh_offset))
         {
            break;
         } else
@@ -1148,7 +1141,7 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
         const int lzc = GetLZCFromEntropySymbol(symbol);
 
         /* Check if there are significant residual bits */
-        if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+        if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
         {
             /* Compute the residual length */
             const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -1211,7 +1204,7 @@ RefinementIterationData<T, DIM>::PerformRefinement(const int local_idx, const in
         /* Get the LZC from the symbol */
         const int lzc = GetLZCFromEntropySymbol(symbol);
 
-        if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+        if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
         {
             /* Compute the length of the significant residual bits */
             const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;

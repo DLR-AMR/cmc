@@ -63,7 +63,6 @@ vector_view_base<InMemory>::MoveToOffsetBitInStream(const size_t global_bit_posi
 {
     /* Determine the value index in which the bit lies */
     pos_ = global_bit_position_bigendian_stream >> 6;
-    const int be_bit_pos = global_bit_position_bigendian_stream - (pos_ << 6);
     this->GetValueAtPos();
     bit_position_ = kBitIndexStart - (global_bit_position_bigendian_stream - pos_ * sizeof(uint64_t) * kCharBit); 
 }
@@ -147,7 +146,7 @@ vector_view_base<InMemory>::GetNextBitSequence(const int num_bits)
     }
 
     /* Check if the type is capable of holding the bit-sequence */
-    if (sizeof(T) * kCharBit < num_bits) [[unlikely]]
+    if (static_cast<int>(sizeof(T) * kCharBit) < num_bits) [[unlikely]]
     {
         cmc_err_msg("The specified number of bits (", num_bits, ") does not fit in the requested type (maximum number of bits: ", sizeof(T) * kCharBit, ")!");
     }

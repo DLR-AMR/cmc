@@ -667,7 +667,7 @@ ExchangeEntropySymbols(const std::vector<std::vector<ElemEncodingData<T, DIM>>>&
         for (size_t coarsening_idx{0}; coarsening_idx < levelwise_residuals[lvl_idx].size(); ++coarsening_idx)
         {
             /* Iterate over all entropy codes from this coarsening data */
-            for (int entropy_sym_idx{0}; entropy_sym_idx < levelwise_residuals[lvl_idx][coarsening_idx].num_elements; ++entropy_sym_idx)
+            for (unsigned entropy_sym_idx{0}; entropy_sym_idx < levelwise_residuals[lvl_idx][coarsening_idx].num_elements; ++entropy_sym_idx)
             {
                 /* Convert the symbol to the corresponding array index */
                 const int array_idx = MapEntropySymbolToArrayIndex<T>(levelwise_residuals[lvl_idx][coarsening_idx].entropy_symbols[entropy_sym_idx]);
@@ -805,7 +805,7 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
     std::reverse(this->level_partitioning_info_.begin(), this->level_partitioning_info_.end());
 
     /* Iterate over all compression levels (Without the root level and the intra element level) */
-    for (int step_idx{1}; step_idx <= this->coarsening_indications_.size(); ++step_idx, ++lvl_iter, ++res_iter)
+    for (size_t step_idx{1}; step_idx <= this->coarsening_indications_.size(); ++step_idx, ++lvl_iter, ++res_iter)
     {
         /* Allocate a bits::vector to store this level's encoded data */
         cmc::bits::vector lvl_data;
@@ -857,7 +857,7 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
                 }
                 #else
                 //Interleaved Encoding, always pair of entropy code and corresponding reisdual
-                for (int child_elem_idx{0}; child_elem_idx < coarse_data.num_elements; ++child_elem_idx)
+                for (int child_elem_idx{0}; child_elem_idx < static_cast<int>(coarse_data.num_elements); ++child_elem_idx)
                 {
                     /* Encode the entropy symbol */
                     const cmc::entropy_coding::huffman::HuffmanCode code = entropy_coder.EncodeSymbol(coarse_data.entropy_symbols[child_elem_idx]);
@@ -869,7 +869,7 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
                     lvl_data.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
                 
                     /* We do not need to encode the implicit given one-bit following the LZC */
-                    if (lzc + 1 < sizeof(T) * cmc::bits::kCharBit) [[likely]]
+                    if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
                     {
                         /* Append the significant reisdual bits */
                         lvl_data.AppendBits(coarse_data.residuals[child_elem_idx], lzc + 1, 0);
@@ -949,7 +949,7 @@ CompressionVariableMultiData<T, DIM, N>::AppendVariableHeaderToStream(std::vecto
     const int num_global_mesh_encoding_steps = this->levelwise_encoded_data_.size();
 
     /* Compute the number of bytes needed for the variable header */
-    const SizeType num_bytes_var_header = GetVarHeaderSize(num_global_mesh_encoding_steps, this->HasIntraElementCompression());
+    [[maybe_unused]] const SizeType num_bytes_var_header = GetVarHeaderSize(num_global_mesh_encoding_steps, this->HasIntraElementCompression());
 
     /** Fill the header **/
     /* Global Bytes compressed variable */
@@ -1009,14 +1009,14 @@ CompressionVariableMultiData<T, DIM, N>::AppendVariableHeaderToStream(std::vecto
     stream.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(kPackSize<DIM>)));
 
     /* Append the global level bytes */
-    cmc_assert(global_bytes_per_level.size() == mesh_compression_levels + (this->HasIntraElementCompression() ? 1 : 0));
+    cmc_assert(static_cast<int>(global_bytes_per_level.size()) == mesh_compression_levels + (this->HasIntraElementCompression() ? 1 : 0));
     for (auto lvl_iter = global_bytes_per_level.begin(); lvl_iter != global_bytes_per_level.end(); ++lvl_iter)
     {
         stream.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(*lvl_iter)));
     }
 
     /* Apped the global num elements per level */
-    cmc_assert(this->num_elements_per_level_.size() == num_global_mesh_encoding_steps - 1);
+    cmc_assert(static_cast<int>(this->num_elements_per_level_.size()) == num_global_mesh_encoding_steps - 1);
     for (auto lvl_elem_iter = this->num_elements_per_level_.begin(); lvl_elem_iter != this->num_elements_per_level_.end(); ++lvl_elem_iter)
     {
         stream.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(*lvl_elem_iter)));
@@ -1040,10 +1040,10 @@ CompressionVariableMultiData<T, DIM, N>::AppendVariableHeaderToStream(std::vecto
 inline void
 AppendPartitionTableToStream(std::vector<uint64_t>& root_rank_start_stream_no_frac, const std::vector<PartitionInfo>& global_partition_info, const int num_global_encoding_steps, const int comm_size)
 {
-    cmc_assert(num_global_encoding_steps * comm_size == global_partition_info.size());
+    cmc_assert(num_global_encoding_steps * comm_size == static_cast<int>(global_partition_info.size()));
 
     /* We iterate over all levels and store the computed offset originating from the partitioning */
-    for (size_t lvl_idx{0}; lvl_idx < num_global_encoding_steps; ++lvl_idx)
+    for (int lvl_idx{0}; lvl_idx < num_global_encoding_steps; ++lvl_idx)
     {
         SizeType intra_level_elem_count_offset{0};
         SizeType intra_level_coding_byte_offset{0};
@@ -1071,7 +1071,7 @@ ComputeGlobalBytesPerLevel(const std::vector<PartitionInfo>& global_partition_in
     std::vector<SizeType> bytes_per_lvl;
     bytes_per_lvl.reserve(global_partition_info.size());
 
-    for (size_t lvl_idx{0}; lvl_idx < num_global_encoding_steps; ++lvl_idx)
+    for (int lvl_idx{0}; lvl_idx < num_global_encoding_steps; ++lvl_idx)
     {
         SizeType num_bytes{0};
         for (int rank_id{0}; rank_id < comm_size; ++rank_id)
@@ -1095,7 +1095,7 @@ CompressionVariableMultiData<T, DIM, N>::AdjustLevelMeshEncodings(const std::vec
 {
     cmc_assert(num_global_mesh_encoding_steps >= 1);
     const int num_coarsening_encodings = num_global_mesh_encoding_steps - 1;
-    cmc_assert(num_coarsening_encodings == this->coarsening_indications_.size());
+    cmc_assert(num_coarsening_encodings == static_cast<int>(this->coarsening_indications_.size()));
 
     std::vector<std::vector<uint64_t>> offseted_level_mesh_encodings;
     offseted_level_mesh_encodings.reserve(num_coarsening_encodings);
@@ -1149,7 +1149,7 @@ CompressionVariableMultiData<T, DIM, N>::CollectMeshEncodingOnTheRootRank(const 
 {
     /* Compute the number of mesh encoding levels */
     const int num_levels = this->coarsening_indications_.size();
-    cmc_assert(num_levels == num_global_mesh_encoding_steps - 1);
+    cmc_assert(num_levels == static_cast<int>(num_global_mesh_encoding_steps) - 1);
 
     /* Allocate an output vector */
     std::vector<SizeType> elems_per_level;
@@ -1225,7 +1225,6 @@ CompressionVariableMultiData<T, DIM, N>::CollectMeshEncodingOnTheRootRank(const 
         }
         
         /* After all expeceted messages have been received, we process them and create the global level-wise mesh encoding */
-        const int num_coarsening_encodings = num_global_mesh_encoding_steps - 1;
 
         /* Compute the number of bytes for the global level-wise mesh encoding */
         SizeType mesh_encoding_vals{0};

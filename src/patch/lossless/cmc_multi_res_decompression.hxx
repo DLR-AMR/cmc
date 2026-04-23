@@ -90,14 +90,14 @@ ReadCompressionData(const std::string& file_name)
     const int num_encdoing_levels = compression_info.num_compression_levels + 1;
 
     compression_info.global_level_byte_count.reserve(compression_info.num_compression_levels);
-    for (int idx{0}; idx < compression_info.num_compression_levels; ++idx)
+    for (SizeType idx{0}; idx < compression_info.num_compression_levels; ++idx)
     {
         compression_info.global_level_byte_count.push_back(cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(preamble[offset]));
         ++offset;
     }
 
     compression_info.level_dim_lengths.reserve(num_encdoing_levels);
-    for (int idx{0}; idx < compression_info.num_compression_levels; ++idx)
+    for (SizeType idx{0}; idx < compression_info.num_compression_levels; ++idx)
     {
         compression_info.level_dim_lengths.emplace_back(compression_info.dimensionality, 0);
         for (SizeType dim_idx{0}; dim_idx < compression_info.dimensionality; ++dim_idx)
@@ -125,7 +125,10 @@ ReadCompressionData(const std::string& file_name)
     /* Read the compressed data from */
     std::vector<SizeType> encoded_data(encoded_level_values);
     const std::size_t encoded_vals_read = std::fread(encoded_data.data(), sizeof(uint64_t), encoded_level_values, file_in);
-
+    if (static_cast<SizeType>(encoded_vals_read) != encoded_level_values)
+    {
+        cmc_err_msg("The encoded data has not been read correctly from the file!");
+    }
     compression_info.variable_encoding = std::move(encoded_data);
 
     /* Close the file */
@@ -194,7 +197,7 @@ RefineValue(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const T coarse
     /* Determine the leading zero count */
     const int lzc = GetLZCFromEntropySymbol(entropy_symbol);
 
-    if (lzc < sizeof(T) * cmc::bits::kCharBit - 1) [[likely]]
+    if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
     {
         /* Compute the length of the significant residual bits */
         const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
@@ -324,7 +327,7 @@ DecompressionVariable<T, DIM>::PerformDecompression(DecompressionVariable<T, DIM
 {
     cmc_debug_msg("Decompression of the variable starts...");
 
-    constexpr int kDim = 2;
+    [[maybe_unused]] constexpr int kDim = 2;
     constexpr int kLatID = 0;
     constexpr int kLonID = 1;
 
@@ -404,10 +407,10 @@ GetCoarseValue(const std::vector<T>& coarse_data, const std::vector<int>& coarse
     const int coarse_lvl_lat = next_lvl_lat / kDimReductionFactor;
     const int coarse_lvl_lon = next_lvl_lon / kDimReductionFactor;
 
-    cmc_assert(coarse_lvl_lev < coarse_lvl_dims[kLevID]);
-    cmc_assert(coarse_lvl_lat < coarse_lvl_dims[kLatID]);
-    cmc_assert(coarse_lvl_lon < coarse_lvl_dims[kLonID]);
-    cmc_assert(coarse_lvl_lev * coarse_lvl_dims[kLatID] * coarse_lvl_dims[kLonID] + coarse_lvl_lat * coarse_lvl_dims[kLonID] + coarse_lvl_lon < coarse_data.size());
+    cmc_assert(coarse_lvl_lev < static_cast<int>(coarse_lvl_dims[kLevID]));
+    cmc_assert(coarse_lvl_lat < static_cast<int>(coarse_lvl_dims[kLatID]));
+    cmc_assert(coarse_lvl_lon < static_cast<int>(coarse_lvl_dims[kLonID]));
+    cmc_assert(coarse_lvl_lev * coarse_lvl_dims[kLatID] * coarse_lvl_dims[kLonID] + coarse_lvl_lat * coarse_lvl_dims[kLonID] + coarse_lvl_lon < static_cast<int>(coarse_data.size()));
 
     return coarse_data[coarse_lvl_lev * coarse_lvl_dims[kLatID] * coarse_lvl_dims[kLonID] + coarse_lvl_lat * coarse_lvl_dims[kLonID] + coarse_lvl_lon];
 }
@@ -419,7 +422,7 @@ DecompressionVariable<T, DIM>::PerformDecompression(DecompressionVariable<T, DIM
 {
     cmc_debug_msg("Decompression of the variable starts...");
 
-    constexpr int kDim = 3;
+    [[maybe_unused]] constexpr int kDim = 3;
     constexpr int kLevID = 0;
     constexpr int kLatID = 1;
     constexpr int kLonID = 2;
@@ -520,7 +523,7 @@ DecompressionVariable<T, DIM>::PerformDecompression(DecompressionVariable<T, DIM
 {
     cmc_debug_msg("Decompression of the variable starts...");
 
-    constexpr int kDim = 4;
+    [[maybe_unused]] constexpr int kDim = 4;
     constexpr int kTimeID = 0;
     constexpr int kLevID = 1;
     constexpr int kLatID = 2;
