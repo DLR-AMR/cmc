@@ -103,7 +103,7 @@ template <typename T>
 std::pair<bool, CompressionValue<T>>
 MultiResEmbeddedAdaptData<T>::GetFaceValue(t8_forest_t forest, const int tree_id, const t8_scheme_c *scheme, const t8_element_t* elem, const int face_idx) const 
 {
-    t8_element_t** neighbor_leaves;
+    const t8_element_t** neighbor_leaves;
     int* dual_faces;
     int num_neighbors{0};
     t8_locidx_t* neighbor_element_indices;
@@ -111,7 +111,7 @@ MultiResEmbeddedAdaptData<T>::GetFaceValue(t8_forest_t forest, const int tree_id
 
     /* Gathe the face neighbor via this face */
     t8_forest_leaf_face_neighbors (forest, tree_id, elem, &neighbor_leaves, face_idx, &dual_faces, &num_neighbors,
-                                   &neighbor_element_indices, &neighbor_tree_class, 1);
+                                   &neighbor_element_indices, &neighbor_tree_class);
 
     /* Check if there is a neighboring element at the face */
     if (num_neighbors > 0)
@@ -123,7 +123,6 @@ MultiResEmbeddedAdaptData<T>::GetFaceValue(t8_forest_t forest, const int tree_id
         CompressionValue<T> coarse_face_value = this->GetAdaptedDataValueAtIndex(neighbor_element_indices[0]);
 
         /* Deallocate the memory for the face neighbor construction */
-        scheme->element_destroy (neighbor_tree_class, num_neighbors, neighbor_leaves);
         T8_FREE (neighbor_leaves);
         T8_FREE (neighbor_element_indices);
         T8_FREE (dual_faces);

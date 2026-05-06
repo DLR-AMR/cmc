@@ -538,7 +538,7 @@ IEmbeddedCompressionAdaptData<T>::GatherCoarseFaceRemainingPermittedErrors(t8_fo
 
     for (int face_idx = 0; face_idx < num_faces; ++face_idx)
     {
-        t8_element_t** neighbor_leaves;
+        const t8_element_t** neighbor_leaves;
         int* dual_faces;
         int num_neighbors{0};
         t8_locidx_t* neighbor_element_indices;
@@ -546,7 +546,7 @@ IEmbeddedCompressionAdaptData<T>::GatherCoarseFaceRemainingPermittedErrors(t8_fo
 
         /* Gather the face neighbor via this face */
         t8_forest_leaf_face_neighbors (forest, tree_id, elem, &neighbor_leaves, face_idx, &dual_faces, &num_neighbors,
-                                       &neighbor_element_indices, &neighbor_tree_class, 1);
+                                       &neighbor_element_indices, &neighbor_tree_class);
 
         /* Check if there is a neighboring element at the face */
         if (num_neighbors > 0)
@@ -562,7 +562,6 @@ IEmbeddedCompressionAdaptData<T>::GatherCoarseFaceRemainingPermittedErrors(t8_fo
             remaining_errors[face_idx] = coarse_face_remaining_permitted_error;
 
             /* Deallocate the memory for the face neighbor construction */
-            scheme->element_destroy (neighbor_tree_class, num_neighbors, neighbor_leaves);
             T8_FREE (neighbor_leaves);
             T8_FREE (neighbor_element_indices);
             T8_FREE (dual_faces);
