@@ -986,7 +986,8 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
         const t8_locidx_t num_local_trees = t8_forest_get_num_local_trees(this->mesh_.GetMesh());
         
         /* Iterate over the local trees */
-        for (t8_locidx_t tree_idx{0}, num_elems_skipped{0}; tree_idx < num_local_trees; ++tree_idx)
+        int num_elems_skipped{0};
+        for (t8_locidx_t tree_idx{0}; tree_idx < num_local_trees; ++tree_idx)
         {
             /* Get the local number of elements in the tree */
             const t8_locidx_t num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (this->mesh_.GetMesh(), tree_idx);
@@ -1054,6 +1055,9 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
                     }
                 }
             }
+            
+            /* Update the processed elements */
+            num_elems_skipped += num_elements_in_tree;
         }
     }
 
