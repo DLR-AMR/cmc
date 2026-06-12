@@ -612,10 +612,6 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     MPICheckError(rv_shm_barrier);
 
     /* Setup the decoding start for this level correctly */
-    //uint64_t* global_var_start{nullptr};
-    //MPI_Aint root_size{0};
-    //int root_disp_unit{0};
-    //const int rv_root_query = MPI_Win_shared_query(this->lvl_window_, kRootRank, &root_size, &root_disp_unit, &global_var_start);
     const uint64_t* global_var_start = shm_mem - proc_offset_val_stream;
 
     return global_var_start;
@@ -815,8 +811,6 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
         }
     }
 
-    cmc_debug_msg("Move to offset bit for root lvl vals: ", start_partition_iter->coding_byte_offset * cmc::bits::kCharBit);
-
     /* Set the level view accordingly to the offset */
     lvl_data_start_view.MoveToOffsetBitInStream(start_partition_iter->coding_byte_offset * cmc::bits::kCharBit);
 
@@ -835,8 +829,6 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
         {
             const FourByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<FourByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
             data.push_back(std::bit_cast<T>(uvalue));
-
-            cmc_debug_msg("Root Elem_Idx: ", elem_idx, ", value: ", data.back());
         }
 
         last_element_offset = partition_iter->elem_offset;
@@ -853,8 +845,6 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     {
         const FourByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<FourByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
         data.push_back(std::bit_cast<T>(uvalue));
-
-        cmc_debug_msg("Reamining Root Elem_Idx: ", elem_idx, ", value: ", data.back());
     }
 
     return data;
@@ -1002,7 +992,6 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
             break;
         }
     }
-    cmc_debug_msg("mesh_offset: ", mesh_offset, ", part_idx: ", part_idx, ", next_rank_starting_pos: ", next_rank_starting_pos);
 
     /* Copy the view to determine the correct parallel offsets */
     cmc::bits::vector_view lvl_mesh = lvl_mesh_encoding;
@@ -1010,8 +999,6 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
     /* Set the mesh encoding correctly to the start of the offset */
     const SizeType mesh_start_offset = (level_partition_info[part_idx].elem_offset <= mesh_offset ? mesh_offset : level_partition_info[part_idx].elem_offset);
     lvl_mesh.MoveToOffsetBitInStream(mesh_start_offset);
-
-    cmc_debug_msg("moveOffsetInStreamDecoder parittion bound: ", mesh_start_offset);
 
     SizeType num_entropy_codes_correction{0};
     bool once_potential_incomplete_tree{true};
@@ -1021,29 +1008,26 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
     {
         /* Get the offset from the Partition Info */
         const SizeType partition_bound = level_partition_info[part_idx].elem_offset;
-        //cmc_debug_msg("Corection start:  level_partition_info[part_idx].elem_offset: ",  level_partition_info[part_idx].elem_offset);
+
         /** Iterate the local elements until we arrive at the elem_offset and count from thereon the number of entropy codes up to the process end **/
         /* Get the number of local trees */
         const t8_locidx_t num_local_trees = t8_forest_get_num_local_trees(this->mesh_.GetMesh());
         
-        //cmc_debug_msg("num_local_trees: ", num_local_trees);
         /* Iterate over the local trees */
         int num_elems_skipped{0};
         for (t8_locidx_t tree_idx{0}; tree_idx < num_local_trees; ++tree_idx)
         {
             /* Get the local number of elements in the tree */
             const t8_locidx_t num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (this->mesh_.GetMesh(), tree_idx);
-            //cmc_debug_msg(" tree idx: ", tree_idx, ", num_elements_in_tree: ", num_elements_in_tree);
 
             /* Check if we need to iterate through this tree or whether we can skip it completely */
             if (mesh_offset + num_elems_skipped + num_elements_in_tree <= partition_bound)
             {
-                //cmc_debug_msg("Skip whole tree");
                 /* Skip the whole tree */
                 num_elems_skipped += num_elements_in_tree;
                 continue;
             }
-            //cmc_debug_msg("num_elems_skipped: ", num_elems_skipped);
+
             /* Get the corresponding tree class */
             const t8_eclass_t tree_class = t8_forest_get_tree_class (this->mesh_.GetMesh(), tree_idx);
             
@@ -1056,14 +1040,11 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
                 /* Compute the tree_local start idx for the potential for an potential incomplete tree offset */
                 tree_local_start_idx = partition_bound - mesh_offset - num_elems_skipped;
                 once_potential_incomplete_tree = false;
-
-                //cmc_debug_msg("Incomplete Tree: set start: ", tree_local_start_idx);
             }
 
             /* Check whether the tree refines regularly */
             const bool refines_regular = not scheme->refines_irregular(tree_class);
 
-            //cmc_debug_msg("tree_local_start_idx: ", tree_local_start_idx);
             if (refines_regular)
             {
                 if (num_elements_in_tree < 1) {continue;}
@@ -1075,11 +1056,9 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
 
                 for (t8_locidx_t elem_idx{tree_local_start_idx}; elem_idx < num_elements_in_tree; ++elem_idx)
                 {
-                    //cmc_debug_msg("Evaluate elem idx");
                     /* Check whether this element will be refined during this iteration */
                     if (lvl_mesh.GetNextBit())
                     {
-                        //cmc_debug_msg("Elem will be refined");
                         /* Add this amount of entropy codes to the counter */
                         num_entropy_codes_correction += num_children;
                     }
@@ -1112,7 +1091,7 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
 
     /* Now, we need to exchange the corrections */
     std::array<SizeType, 2> exchange_data{mesh_offset, num_entropy_codes_correction};
-    cmc_debug_msg("Exchange data: mesh offset: ", mesh_offset, ", num_entropy_codes_correction: ", num_entropy_codes_correction);
+
     /* Allocate an ouput vector locally */
     std::vector<SizeType> offset_array(2 * (this->comm_size_));
 
@@ -1159,8 +1138,6 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
     /* Set the start to the first relevant partition bound */
     const SizeType level_entropy_offset = level_partition_info[first_part_idx].coding_byte_offset;
 
-    cmc_debug_msg("Relevant partition bound: ", level_entropy_offset);
-
     /* Set the level stream decoder correctly */
     cmc::bits::vector_view adjusted_level_data = level_encoding;
 
@@ -1171,8 +1148,6 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
 
     /* And now, we need to skip the number of entropy codes to correct in order to move to the process-local start position */
     SizeType entropy_codes_skipped{0};
-
-    cmc_debug_msg("Num entropy codes to skip for the stream decoder: ", num_entropy_codes_to_correct);
 
     for (int entropy_skip_idx{0}; entropy_skip_idx < num_entropy_codes_to_correct; ++entropy_skip_idx)
     {
@@ -1353,7 +1328,6 @@ RefinementIterationData<T, DIM>::PerformQuadPrediction(const std::vector<T>& con
                 {
                     stream_decoder.ApplyProcessEndSymbol64Bit();
                     next_symbol = stream_decoder.DecodeNextEntropySymbol();
-                    //cmc_debug_msg("Process End symbol: next symbol is: ", next_symbol);
                 }
             }
             return next_symbol;
@@ -1365,8 +1339,6 @@ RefinementIterationData<T, DIM>::PerformQuadPrediction(const std::vector<T>& con
             /* Get the unpredicted value from the stream */
             const T unpredicted_value = GetUnpredictableValue<T>(this->stream_decoder);
 
-            //cmc_debug_msg(" Unpredictable: Value was: ", unpredicted_value);
-
             /* We replace the predicted value with the actual one */
             fam_predictions[elem_idx] = unpredicted_value;
         } else
@@ -1376,8 +1348,6 @@ RefinementIterationData<T, DIM>::PerformQuadPrediction(const std::vector<T>& con
 
             /* Apply the de-quantization */
             fam_predictions[elem_idx] += ((was_prediction_greater ? -2.0 : +2.0) * permitted_abs_error[elem_idx] * quant_bin);
-
-            //cmc_debug_msg("Predictable: Value: ", fam_predictions[elem_idx], " quant bin was: ", quant_bin, " pred_was_greater: ", was_prediction_greater);
         }
     }
 
@@ -1417,7 +1387,6 @@ LossyMultiResDecompression (t8_forest_t forest,
     if (adapt_data->WillNextElementBeRefined())
     {
         /** The element will be refined and the children elements need to be predicted **/
-        //cmc_debug_msg("Next elem will be refined");
 
         /* Convert the local to a global tree id */
         const int global_tree_idx = t8_forest_global_tree_id (forest_from, which_tree);
@@ -1431,7 +1400,7 @@ LossyMultiResDecompression (t8_forest_t forest,
 
         /* Get this families control value */
         const T fam_control_value = adapt_data->GetData(local_start_index);
-        //cmc_debug_msg("Fam control value: ", fam_control_value);
+
         /* Create a vector for all face_values (and fill it with the default value (this families control value)) */
         std::vector<T> control_points(num_faces + 1, fam_control_value);
 
@@ -1503,7 +1472,6 @@ LossyMultiResDecompression (t8_forest_t forest,
         for (int child_idx{0}; child_idx < num_children; ++child_idx)
         {
             permitted_abs_errors.emplace_back(adapt_data->GetPermittedAbsError(ts, global_tree_idx, tree_class, child_elements[child_idx]));
-            //cmc_debug_msg("Child id: ", child_idx, ", abs error: ", permitted_abs_errors.back());
         }
 
         /* Destroy the constructed elements */
@@ -1578,11 +1546,6 @@ DecompressionVariableMultiData<T, DIM, N>::RepartitionForRefinementIteration(t8_
     const t8_locidx_t current_local_elems = t8_forest_get_local_num_leaf_elements(mesh);
     const t8_locidx_t current_ghost_elems = t8_forest_get_num_ghosts (mesh);
 
-    #if 1
-    const t8_gloidx_t first_elem_id1 = t8_forest_get_first_local_leaf_element_id(mesh);
-    cmc_debug_msg("In Repartition, in offset: ", first_elem_id1, ", lcoal elems: ", current_local_elems, ", num ghosts: ", current_ghost_elems);
-    #endif
-
     cmc_assert(current_local_elems + current_ghost_elems == static_cast<t8_locidx_t>(data.size()));
 
     /* Keep the not-partitioned forest */
@@ -1656,11 +1619,6 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         /* Get the Level partition information */
         const std::vector<LevelPartition> level_partition = this->compression_info_.GetLevelPartition(mesh_lvl);
 
-        for (auto level_part : level_partition)
-        {
-            cmc_debug_msg("LevelPartition: elem_offset: ", level_part.elem_offset, ", coding byte offset: ", level_part.coding_byte_offset);
-        }
-
         /* Get the view on the mesh encoding */
         cmc::bits::vector_view level_mesh_encoding = this->compression_info_.GetGlobalElementIndicationsStep(mesh_lvl - 1);
         /* Open shared data window on this levels encoding */
@@ -1679,8 +1637,6 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         cmc::bits::vector_view process_local_level_mesh_encoding = level_mesh_encoding;
         process_local_level_mesh_encoding.MoveToOffsetBitInStream(mesh_offset);
     
-        cmc_debug_msg("MeshEncodingOffset: ", mesh_offset);
-
         /****** Perform the local refinement onto the next finer level as dictated by the mesh encoding ******/
         /* Crerate the adaptation data */
         RefinementIterationData<T, DIM> adapt_data(std::span<T>(this->data_), this->stream_decoder_, process_local_level_mesh_encoding, this->error_mesh_);
@@ -1698,12 +1654,9 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         this->mesh_.SetMesh(partitioned_mesh);
         this->data_ = std::move(partitioned_data);
         
-        cmc_debug_msg("local num elems: ", t8_forest_get_local_num_leaf_elements(this->mesh_.GetMesh()), ", length lcoal data: ", this->data_.size());
         WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
 
         /****** Clean-Up of the decompression iteration ******/
-        /* Free the former/coarser forest */
-        //t8_forest_unref(&adapted_forest);
 
         /* Close this levels data window */
         this->CloseSharedLevelDataWindow();
@@ -1711,9 +1664,6 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         /* Update the decompression count */
         ++(this->decompression_step_idx_);
         cmc_debug_msg("The mesh decompression step ", mesh_lvl," has been completed.");
-
-        //if (mesh_lvl == 1)
-        //cmc_err_msg("Stop here");
     }
 }
 
