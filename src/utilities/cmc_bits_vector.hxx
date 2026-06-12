@@ -210,18 +210,18 @@ vector::GetSerializedOffsetByteStreamBE(const int lsb_bit_offset) const
 
     /** In this case the offset fits into the current vector as well **/
     /* Allocate the serialized byte stream */
-    std::vector<uint64_t> offset_stream(this->vector_.size() + (has_vec_to_be_extended ? 1 : 0));
+    std::vector<uint64_t> offset_stream(this->vector_.size() + (has_vec_to_be_extended ? 1 : 0), 0);
 
     for (size_t idx{0}; idx < vector_.size(); ++idx)
     {
         if (idx > 0)
         {
             /* Apply the left shift to the previous value */
-            offset_stream[idx - 1] |= ConvertToBigEndian<uint64_t>(this->vector_[idx - 1] << shift_left);
+            offset_stream[idx] = ConvertToBigEndian<uint64_t>(this->vector_[idx - 1] << shift_left);
         }
     
         /* Apply the right shfit to the current value */
-        offset_stream[idx] = ConvertToBigEndian<uint64_t>(this->vector_[idx] >> shift_right);
+        offset_stream[idx] |= ConvertToBigEndian<uint64_t>(this->vector_[idx] >> shift_right);
     }
 
     /* Potentially set the new value that has been introduced due to the offset */
@@ -240,6 +240,11 @@ vector::GetSerializedByteStreamBE() const
     static_assert(std::endian::native == std::endian::big || std::endian::native == std::endian::little,
                   "Only little-endian and big-endian systems are suppoprted!");
 
+    if (vector_.empty()) [[unlikely]]
+    {
+        return std::vector<uint64_t>();
+    }
+    
     if constexpr (std::endian::native == std::endian::big)
     {
         /* On a big endian system, we can juste return the encoded vector */
