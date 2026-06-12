@@ -15,11 +15,11 @@ enum CompressionCriterion {CriterionUndefined, RelativeErrorThreshold, AbsoluteE
 struct PermittedError
 {
     PermittedError() = delete;
-    PermittedError(const CompressionCriterion etype, const double permitted_error)
+    PermittedError(const CompressionCriterion etype, const float permitted_error)
     : criterion{etype}, error{permitted_error}{};
 
     const CompressionCriterion criterion{CompressionCriterion::CriterionUndefined};
-    const double error{0.0};
+    const float error{0.0};
 };
 
 class ErrorDomain
@@ -39,7 +39,7 @@ public:
     
     inline bool
     IsAnyElementWithinDomain(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
-                             const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
+                             const t8_scheme_c* ts, const int num_elements, t8_element_t* elements[]) const
     {
         for (int idx = 0; idx < num_elements; ++idx)
         {
@@ -73,7 +73,7 @@ public:
     
     inline CompressionCriterion GetCompressionCriterion() const {return error_criterion_.criterion;};
 
-    inline double GetErrorThreshold() const {return error_criterion_.error;};
+    inline float GetErrorThreshold() const {return error_criterion_.error;};
 
 private:
     const PermittedError error_criterion_;

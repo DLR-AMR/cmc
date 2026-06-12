@@ -14,7 +14,7 @@ namespace cmc {
 class CompressionSettings
 {
 public:
-    void SetGeneralErrorCriterion(const CompressionCriterion criterion, const double permitted_error)
+    void SetGeneralErrorCriterion(const CompressionCriterion criterion, const float permitted_error)
     {
         error_domains_.emplace_back(PermittedError{criterion, permitted_error}, error_domain_fn::GeneralErrorCriterion);
     }
@@ -34,6 +34,7 @@ std::vector<PermittedError>
 CompressionSettings::FindRestrictingErrors(t8_forest_t forest, t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
                                            const t8_scheme_c* ts, const int num_elements, const t8_element_t* elements[]) const
 {
+    #if 0
     bool is_absolute_error_found = false;
     double min_absolute_error = std::numeric_limits<double>::max();
     bool is_relative_error_found = false;
@@ -84,6 +85,9 @@ CompressionSettings::FindRestrictingErrors(t8_forest_t forest, t8_locidx_t which
     }
 
     return permitted_errors;
+    #endif
+    cmc_err_msg("Implementation needs to be updated.");
+    return std::vector<PermittedError>();
 }
 
 }
