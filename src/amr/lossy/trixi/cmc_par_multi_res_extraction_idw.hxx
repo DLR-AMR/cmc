@@ -88,6 +88,7 @@ private:
     std::vector<uint64_t> EncodeRootLevelData() const;
     bool IsMeshCompressionProgressing() const;
     std::pair<t8_forest_t, std::vector<T>> Repartition(t8_forest_t adapted_mesh, std::vector<T>& adapted_data);
+    std::pair<t8_forest_t, std::vector<T>> Repartition(t8_forest_t adapted_mesh, std::vector<T>& adapted_data, const SizeType partition_bound);
     bool HasIntraElementCompression() const;
     bool IsAlreadyPartitionedForCoarsening() const;
     void GenerateOuputStreams();
@@ -324,6 +325,51 @@ CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t adapted_mesh, s
     return std::make_pair(partitioned_forest, partitioned_data);
 }
 
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+inline std::pair<t8_forest_t, std::vector<T>>
+CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t adapted_mesh, std::vector<T>& adapted_data, const SizeType partition_bound)
+{
+    /** Partition the mesh **/
+    /* Keep the not-partitioned forest */
+    t8_forest_ref(adapted_mesh);
+
+    /* Allocate a forest */
+    t8_forest_t partitioned_forest;
+    t8_forest_init(&partitioned_forest);
+
+    /* Partition the forest */
+    t8_forest_set_partition(partitioned_forest, adapted_mesh, 0);
+
+    /* Set the partition bound explicitly */
+    t8_forest_set_partition_offset (partitioned_forest, static_cast<t8_gloidx_t>(partition_bound));
+
+    t8_forest_commit(partitioned_forest);
+
+    /** Partition the adapted data **/
+    /* Create an sc_array_t wrapper of the variable's data */
+    sc_array_t* in_data = sc_array_new_data (static_cast<void*>(adapted_data.data()), sizeof(T), adapted_data.size());
+
+    /* Allocate an output vector for the partitioned data */
+    std::vector<T> partitioned_data(t8_forest_get_local_num_leaf_elements(partitioned_forest));
+
+    /* Create a wrapper for the freshly allocated partitioned data */
+    sc_array_t* out_data = sc_array_new_data (static_cast<void*>(partitioned_data.data()), sizeof(T), partitioned_data.size());
+
+    /* Partition the variables data */
+    t8_forest_partition_data(adapted_mesh, partitioned_forest, in_data, out_data);
+
+    /* Destroy the array wrappers */
+    sc_array_destroy(in_data);
+    sc_array_destroy(out_data);
+
+    /* Free the former forest and store the adapted/repartitioned mesh */
+    t8_forest_unref(&adapted_mesh);
+
+    return std::make_pair(partitioned_forest, partitioned_data);
+}
+
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 void
@@ -332,7 +378,7 @@ CompressionVariableMultiData<T, DIM, N>::CollectCoarseLevelPredictionPyramid()
 
     /* Allocate for the expected levelwise data-streams */
     this->coarsening_indications_.reserve(this->max_init_elem_level_ + 1);
-    this->level_partition_offset_.reserve(this->max_init_elem_level_ + 1);
+    this->level_partition_offset_.reserve(this->max_init_elem_level_ + 1 + (this->HasIntraElementCompression() ? 1 : 0));
 
     // Coarsen until the root level predictors have been reached
     while(this->IsCoarsePredictorExtractionProgressing())
@@ -887,6 +933,13 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     /* Perfom Intra Element Compression */
     if constexpr (N > 1)
     {
+        /* Repartition the data to the manual bound in order to perform the process-local compression correctly */
+        auto [partitioned_mesh, partitioned_data] = this->Repartition(this->mesh_.GetMesh(), this->data_, *level_partition_iter);
+
+        /* Set the partitioned data and mesh */
+        this->data_ = std::move(partitioned_data);
+        this->mesh_.SetMesh(partitioned_mesh);
+
         // We need to store the number of local elements before the intra-element prediction for the partition info 
         this->level_partitioning_info_.emplace_back(static_cast<uint64_t>(t8_forest_get_local_num_leaf_elements(this->mesh_.GetMesh())));
 
@@ -1127,7 +1180,7 @@ CompressionVariableMultiData<T, DIM, N>::PerformIntraElementCompression(const st
         }
     }
 
-    /* Deallocate the contructed mesh */
+    /* Store the final mesh after compression */
     this->mesh_.SetMesh(init_mesh);
 }
 
