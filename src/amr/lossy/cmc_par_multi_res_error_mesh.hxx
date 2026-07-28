@@ -14,9 +14,12 @@
 #include <vector>
 #include <cstdint>
 #include <limits>
+#include <span>
 
 namespace cmc::par::lossy::multi_res
 {
+
+constexpr bool kWriteErrorMeshToVTK = true;
 
 using bfloat16_t = uint16_t;
 
@@ -45,6 +48,7 @@ class ErrorMesh
 {
 public:
     template <typename T> ErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::vector<T>& init_data); //Compression Constructor 
+    template <typename T> ErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem); //Compression Constructor for multiple data per element
     ErrorMesh(t8_forest_t root_level_mesh, const uint64_t* encoded_error_mesh, const MPI_Comm shm_comm, const int shm_rank, const int shm_size); //Decompression Constructor
 
     float GetPermittedAbsError(const t8_scheme_c* scheme, const int global_tree_id, const t8_eclass_t tree_class, const t8_element_t* element) const;
@@ -61,8 +65,8 @@ public:
     constexpr static int kNumObligatoryCoarseningIterations = 3;
 
 private:
-    template <typename T> void CreateErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::vector<T>& init_data);
-    template <typename T> std::pair<t8_forest_t, std::vector<bfloat16_t>> GetCoarseErrors(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::vector<T>& init_data);
+    template <typename T> void CreateErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem);
+    template <typename T> std::pair<t8_forest_t, std::vector<bfloat16_t>> GetCoarseErrors(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem);
     void GatherTreeElementsOffsetAndErrors(t8_forest_t mesh, const uint64_t* permitted_abs_error_ptr);
     void ReconstructErrorMesh(t8_forest_t root_level_mesh, const uint64_t* encoded_error_mesh_start_ptr);
     t8_forest_t ReconstructCoarseMesh(t8_forest_t root_level_mesh, const std::vector<uint64_t>& global_elems_per_level, cmc::bits::vector_view encoded_mesh_view);
@@ -91,8 +95,19 @@ private:
 template <typename T> 
 ErrorMesh::ErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::vector<T>& init_data)
 {
+    cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(init_mesh)) == init_data.size());
+    /* Create a span onto the initial data */
+    const std::span<const T> initial_data(init_data);
     /* Construct the error mesh and serialize it */
-    this->CreateErrorMesh(init_mesh, error_domains, init_data);
+    this->CreateErrorMesh(init_mesh, error_domains, initial_data, int{1});
+}
+
+template <typename T>
+ErrorMesh::ErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem)
+{
+    cmc_assert(t8_forest_get_local_num_leaf_elements(init_mesh) * num_data_per_elem == init_data.size());
+    /* Construct the error mesh from multiple data per element and serialize it */
+    this->CreateErrorMesh(init_mesh, error_domains, init_data, num_data_per_elem);
 }
 
 ErrorMesh::ErrorMesh(t8_forest_t root_level_mesh, const uint64_t* encoded_error_mesh, const MPI_Comm shm_comm, const int shm_rank, const int shm_size)
@@ -144,14 +159,14 @@ struct CoarseningErrors
 template<typename T>
 inline t8_locidx_t
 CollectCoarseErrors (t8_forest_t forest,
-                         t8_forest_t forest_from,
-                         t8_locidx_t which_tree,
-                         const t8_eclass_t tree_class,
-                         t8_locidx_t lelement_id,
-                         const t8_scheme_c * ts,
-                         const int is_family,
-                         [[maybe_unused]] const int num_elements,
-                         t8_element_t * elements[])
+                     t8_forest_t forest_from,
+                     t8_locidx_t which_tree,
+                     [[maybe_unused]] const t8_eclass_t tree_class,
+                     t8_locidx_t lelement_id,
+                     [[maybe_unused]] const t8_scheme_c * ts,
+                     const int is_family,
+                     [[maybe_unused]] const int num_elements,
+                     [[maybe_unused]] t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
     CoarseningErrors* adapt_data = static_cast<CoarseningErrors*>(t8_forest_get_user_data(forest));
@@ -181,7 +196,7 @@ CollectCoarseErrors (t8_forest_t forest,
             /* Check if the other element values are also zero */
             for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
             {
-                if (IsFloatZero(adapt_data->current_permitted_errors[local_start_index + elem_idx]))
+                if (not IsFloatZero(adapt_data->current_permitted_errors[local_start_index + elem_idx]))
                 {
                     goto LeaveThisElementUnchanged;
                 }
@@ -365,105 +380,6 @@ AppendCoarsePermittedAbsErrors(std::vector<uint64_t>& error_mesh_serialization, 
     }
 }
 
-template <typename T>
-struct FirstErrorCoarseningData
-{
-    FirstErrorCoarseningData(const int num_local_elems, const std::vector<ErrorDomain>& error_domains_, const std::vector<T>& initial_data)
-    : error_domains{error_domains_}, init_data{initial_data}
-    {
-        permitted_abs_errors.reserve(num_local_elems);
-    }
-
-    std::vector<bfloat16_t> permitted_abs_errors;
-    const std::vector<ErrorDomain>& error_domains;
-    const std::vector<T>& init_data;
-};
-
-template<typename T>
-inline t8_locidx_t
-CoarsenAndEvaluatePermimttedErrors (t8_forest_t forest,
-                                    t8_forest_t forest_from,
-                                    t8_locidx_t which_tree,
-                                    const t8_eclass_t tree_class,
-                                    t8_locidx_t lelement_id,
-                                    const t8_scheme_c * ts,
-                                    const int is_family,
-                                    const int num_elements,
-                                    t8_element_t * elements[])
-{
-    /* Retrieve the adapt_data */
-    FirstErrorCoarseningData<T>* adapt_data = static_cast<FirstErrorCoarseningData<T>*>(t8_forest_get_user_data(forest));
-    cmc_assert(adapt_data != nullptr);
-
-    float min_abs_err{std::numeric_limits<float>::max()};
-
-    /* Check all error domains */
-    for (auto err_iter = adapt_data->error_domains.begin(); err_iter != adapt_data->error_domains.end(); ++err_iter)
-    {
-        /* Check if any of the considered elements are within the error domain */
-        if (err_iter->IsAnyElementWithinDomain(forest_from, which_tree, tree_class, lelement_id, ts, num_elements, elements))
-        {
-            /* Get the permitted error */
-            const PermittedError error_criterion = err_iter->GetPermittedError();
-
-            /* Check if it is an absolute or relative error criterion */
-            if (error_criterion.criterion == CompressionCriterion::AbsoluteErrorThreshold)
-            {
-                /* In case of an absolute error criterion, we can just compare the prescribed error with the current minumum */
-                if (min_abs_err > error_criterion.error)
-                {
-                    min_abs_err = error_criterion.error;
-                }
-            } else
-            {
-                cmc_assert(error_criterion.criterion == CompressionCriterion::RelativeErrorThreshold);
-
-                /* Get the local offset */
-                const int local_start_index = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
-
-                /* In case of a relative error, we need to compute all resulting absolute deviations */
-                for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
-                {
-                    if constexpr (std::is_signed_v<T>)
-                    {
-                        /* In case the data type is signed */
-                        const float abs_err = std::fabs(static_cast<float>(adapt_data->init_data[local_start_index + elem_idx]) * error_criterion.error);
-                        
-                        /* Check if the deviation is smaller than the currently permitted abs error */
-                        if (min_abs_err > abs_err)
-                        {
-                            min_abs_err = abs_err;
-                        }
-                    } else
-                    {
-                        /* In case the data type is unsigned */
-                        const float abs_err = static_cast<float>(adapt_data->init_data[local_start_index + elem_idx]) * std::fabs(error_criterion.error);
-                        
-                        /* Check if the deviation is smaller than the currently permitted abs error */
-                        if (min_abs_err > abs_err)
-                        {
-                            min_abs_err = abs_err;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /* Store the computed absolute minimum for this element/family */
-    adapt_data->permitted_abs_errors.push_back(GetBfloat16(min_abs_err));
-
-    /* If it is a family, it will be coarsened, otherwise the element stays unchanged */
-    if (is_family)
-    {
-        return cmc::t8::kCoarsenElements;
-    } else
-    {
-        return cmc::t8::kLeaveElementUnchanged;
-    }
-}
-
-
 template<typename T>
 inline std::pair<t8_forest_t, std::vector<T>>
 RepartitionErrorData(t8_forest_t adapted_mesh, std::vector<T>& adapted_data)
@@ -550,32 +466,151 @@ CoarsenPermimttedErrors (t8_forest_t forest,
     } else
     {
         /* In case it is not a family, we leave the element unchanged */
-        adapt_data->coarse_errors.push_back(adapt_data->current_errors[local_start_index ]);
+        adapt_data->coarse_errors.push_back(adapt_data->current_errors[local_start_index]);
         return cmc::t8::kLeaveElementUnchanged;
     }
 }
 
 template <typename T>
-std::pair<t8_forest_t, std::vector<bfloat16_t>>
-ErrorMesh::GetCoarseErrors(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::vector<T>& init_data)
+std::vector<bfloat16_t>
+EvaluateInitialErrors(t8_forest_t base_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem)
 {
+    /* Get the initial number of local elements */
+    const int init_num_local_elems = t8_forest_get_local_num_leaf_elements(base_mesh);
+
+    /* We start to evaluate the permitted errrors per element */
+    std::vector<bfloat16_t> init_permitted_abs_errors;
+    init_permitted_abs_errors.reserve(init_num_local_elems);
+
+    /* Get the scheme of the mesh */
+    const t8_scheme *scheme = t8_forest_get_scheme (base_mesh);
+
+    /* We iterate through the mesh and evaluate the permitted abs error per element */
+    const int num_local_trees = t8_forest_get_num_local_trees(base_mesh);
+    for (int tree_idx{0}; tree_idx < num_local_trees; ++tree_idx)
+    {
+        /* Get the number of elements in the tree */
+        const int num_elems = t8_forest_get_tree_num_leaf_elements(base_mesh, tree_idx);
+
+        /* Get the tree class */
+        const t8_eclass_t tree_class = t8_forest_get_eclass(base_mesh, tree_idx);
+
+        /* Get the tree offset count */
+        const int tree_elem_offset = t8_forest_get_tree_element_offset (base_mesh, tree_idx);
+
+        /* Iterate over all elements and evaluate the errors */
+        for (int elem_idx{0}; elem_idx < num_elems; ++elem_idx)
+        {
+            /* Get the element from the tree */
+            const t8_element_t* elem = t8_forest_get_leaf_element_in_tree (base_mesh, tree_idx, elem_idx);
+
+            float min_abs_err{std::numeric_limits<float>::max()};
+
+            /* Check all error domains */
+            for (auto err_iter = error_domains.begin(); err_iter != error_domains.end(); ++err_iter)
+            {
+                /* Check if any of the considered elements are within the error domain */
+                if (err_iter->IsAnyElementWithinDomain(base_mesh, tree_idx, tree_class, elem_idx, scheme, 1, &elem))
+                {
+                    /* Get the permitted error */
+                    const PermittedError error_criterion = err_iter->GetPermittedError();
+                
+                    /* Check if it is an absolute or relative error criterion */
+                    if (error_criterion.criterion == CompressionCriterion::AbsoluteErrorThreshold)
+                    {
+                        /* In case of an absolute error criterion, we can just compare the prescribed error with the current minumum */
+                        if (min_abs_err > error_criterion.error)
+                        {
+                            min_abs_err = error_criterion.error;
+                        }
+                    } else
+                    {
+                        cmc_assert(error_criterion.criterion == CompressionCriterion::RelativeErrorThreshold);
+                    
+                        /* Get the local offset in the init data */
+                        const int local_start_index = (tree_elem_offset + elem_idx) * num_data_per_elem;
+                    
+                        /* In case of a relative error, we need to compute all resulting absolute deviations */
+                        for (int data_idx{0}; data_idx < num_data_per_elem; ++data_idx)
+                        {
+                            if constexpr (std::is_signed_v<T>)
+                            {
+                                /* In case the data type is signed */
+                                const float abs_err = std::fabs(static_cast<float>(init_data[local_start_index + data_idx]) * error_criterion.error);
+                            
+                                /* Check if the deviation is smaller than the currently permitted abs error */
+                                if (min_abs_err > abs_err)
+                                {
+                                    min_abs_err = abs_err;
+                                }
+                            } else
+                            {
+                                /* In case the data type is unsigned */
+                                const float abs_err = static_cast<float>(init_data[local_start_index + data_idx]) * std::fabs(error_criterion.error);
+                            
+                                /* Check if the deviation is smaller than the currently permitted abs error */
+                                if (min_abs_err > abs_err)
+                                {
+                                    min_abs_err = abs_err;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        
+            /* Store the computed absolute minimum permitted error for this element */
+            init_permitted_abs_errors.push_back(GetBfloat16(min_abs_err));
+        }
+    }
+
+    return init_permitted_abs_errors;
+}
+
+template <typename T>
+std::pair<t8_forest_t, std::vector<bfloat16_t>>
+ErrorMesh::GetCoarseErrors(t8_forest_t base_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem)
+{
+    cmc_assert(init_data.size() == static_cast<size_t>(t8_forest_get_local_num_leaf_elements(base_mesh) * num_data_per_elem));
+
+    /* We start to evaluate the permitted errrors per element */
+    std::vector<bfloat16_t> init_permitted_abs_errors = EvaluateInitialErrors<T>(base_mesh, error_domains, init_data, num_data_per_elem);
+
     /* Reference the init mesh, since we do not own it */
-    t8_forest_ref(init_mesh);
+    t8_forest_ref(base_mesh);
 
-    /* Create the adapt data for the initial error coarsening */
-    FirstErrorCoarseningData init_adapt_data(t8_forest_get_local_num_leaf_elements(init_mesh), error_domains, init_data);
+    /* Perform partition for coarsening */
+    /* Allocate a new forest */
+    t8_forest_t init_mesh;
+    t8_forest_init(&init_mesh);
 
-    /* Perform the first coarsening iteration while evaluating the permitted errors */
-    t8_forest_t coarsened_mesh = t8_forest_new_adapt(init_mesh, CoarsenAndEvaluatePermimttedErrors<T>, 0, 0, &init_adapt_data);
+    /* Partition the mesh for caorsening */
+    constexpr int partition_for_coarsening = 1;
+    t8_forest_set_partition(init_mesh, base_mesh, partition_for_coarsening);
+    t8_forest_commit(init_mesh);
 
-    /* Repartition the mesh and the data */
-    auto [partitioned_mesh, partitoned_data] = RepartitionErrorData<bfloat16_t>(coarsened_mesh, init_adapt_data.permitted_abs_errors);
+    /* Partition the data (single datum per element now) */
+    /* Create an sc_array_t wrapper of the variable's data */
+    sc_array_t* in_data = sc_array_new_data (init_permitted_abs_errors.data(), sizeof(bfloat16_t), init_permitted_abs_errors.size());
+
+    /* Allocate an output vector for the partitioned data */
+    std::vector<bfloat16_t> partitioned_data(t8_forest_get_local_num_leaf_elements(init_mesh));
+
+    /* Create a wrapper for the freshly allocated partitioned data */
+    sc_array_t* out_data = sc_array_new_data (partitioned_data.data(), sizeof(bfloat16_t), partitioned_data.size());
+
+    /* Partition the variables data */
+    t8_forest_partition_data(base_mesh, init_mesh, in_data, out_data);
+
+    /* Destroy the array wrappers */
+    sc_array_destroy(in_data);
+    sc_array_destroy(out_data);
 
     /* Next, we perform some more obligatory coarsening iterations */
-    constexpr int num_coarsening_iterations = ErrorMesh::kNumObligatoryCoarseningIterations - 1;
+    constexpr int num_coarsening_iterations = ErrorMesh::kNumObligatoryCoarseningIterations;
 
-    t8_forest_t mesh = partitioned_mesh;
-    std::vector<bfloat16_t> permitted_abs_errors = std::move(partitoned_data);
+    t8_forest_t mesh = init_mesh;
+    std::vector<bfloat16_t> permitted_abs_errors = std::move(partitioned_data);
 
     /* Perform the obligatory coarsening steps */
     for (int coarsening_step{0}; coarsening_step < num_coarsening_iterations; ++coarsening_step)
@@ -599,10 +634,10 @@ ErrorMesh::GetCoarseErrors(t8_forest_t init_mesh, const std::vector<ErrorDomain>
     int64_t previous_num_elements = std::numeric_limits<int64_t>::max();
 
     t8_gloidx_t num_global_elems_coarse_error_mesh = t8_forest_get_global_num_leaf_elements(mesh);
-    t8_gloidx_t num_global_trees_coarse_error_mesh = t8_forest_get_num_global_trees(mesh);
+    const t8_gloidx_t num_global_trees_coarse_error_mesh = t8_forest_get_num_global_trees(mesh);
 
     /* Get the coarsest possible error mesh without restraining the permitted abs error too much */
-    while(IsCoarseningErrorsProgressing(previous_num_elements, num_global_elems_coarse_error_mesh, num_global_trees_coarse_error_mesh))
+    while (IsCoarseningErrorsProgressing(previous_num_elements, num_global_elems_coarse_error_mesh, num_global_trees_coarse_error_mesh))
     {
         previous_num_elements = num_global_elems_coarse_error_mesh;
 
@@ -626,21 +661,22 @@ ErrorMesh::GetCoarseErrors(t8_forest_t init_mesh, const std::vector<ErrorDomain>
         cmc_debug_msg("Additional coarsening iteration is finished");
     }
 
-    #if 1
-    /* Write out the error mesh */
-    std::vector<double> abs_errors_double;
-    abs_errors_double.reserve(permitted_abs_errors.size());
-    for(auto iter=permitted_abs_errors.begin(); iter != permitted_abs_errors.end(); ++iter)
+    if constexpr (kWriteErrorMeshToVTK)
     {
-        abs_errors_double.push_back(static_cast<double>(GetFloat(*iter)));
-    }
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "PermittedAbsError");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = abs_errors_double.data();
+        /* Write out the error mesh */
+        std::vector<double> abs_errors_double;
+        abs_errors_double.reserve(permitted_abs_errors.size());
+        for(auto iter=permitted_abs_errors.begin(); iter != permitted_abs_errors.end(); ++iter)
+        {
+            abs_errors_double.push_back(static_cast<double>(GetFloat(*iter)));
+        }
+        t8_vtk_data_field_t vtk_data[1];
+        snprintf (vtk_data[0].description, BUFSIZ, "PermittedAbsError");
+        vtk_data[0].type = T8_VTK_SCALAR;
+        vtk_data[0].data = abs_errors_double.data();
 
-    t8_forest_write_vtk_ext (mesh, "cmc_test_error_mesh", 1, 1, 1, 1, 0, 0, 0, 1, vtk_data);
-    #endif
+        t8_forest_write_vtk_ext (mesh, "cmc_lossy_multi_res_error_mesh", 1, 1, 1, 1, 0, 0, 0, 1, vtk_data);
+    }
 
     /* Finally, we received the coarse error mesh alognside the permitted absolute errors */
     return std::make_pair(mesh, std::move(permitted_abs_errors));
@@ -1055,7 +1091,7 @@ ErrorMesh::GatherTreeElementsOffsetAndErrors(t8_forest_t mesh, const uint64_t* p
 
     /* Next, we need to perform an exclusive scan, in order to obtain the global offsets */
     uint64_t acc_tree_offset{0};
-    for (uint64_t celem_idx{0}; celem_idx < this->num_global_trees_; ++celem_idx)
+    for (int celem_idx{0}; celem_idx < this->num_global_trees_; ++celem_idx)
     {
         const uint64_t num_uniform_elems_in_tree = exchanged_global_tree_offsets[celem_idx];
         exchanged_global_tree_offsets[celem_idx] = acc_tree_offset;
@@ -1068,7 +1104,7 @@ ErrorMesh::GatherTreeElementsOffsetAndErrors(t8_forest_t mesh, const uint64_t* p
     const int rv_allgather_lengths = MPI_Allgather(&num_local_elems, 1, MPI_INT, num_proc_local_elems.data(), 1, MPI_INT, this->comm_);
     MPICheckError(rv_allgather_lengths);
 
-    cmc_assert(std::reduce(num_proc_local_elems.begin(), num_proc_local_elems.end()) == num_global_coarse_mesh_elems);
+    cmc_assert(static_cast<uint64_t>(std::reduce(num_proc_local_elems.begin(), num_proc_local_elems.end())) == num_global_coarse_mesh_elems);
 
     /* Exchange the amount of copies globally */
     std::vector<uint32_t> num_global_elem_copies(num_global_coarse_mesh_elems, 0);
@@ -1100,7 +1136,6 @@ ErrorMesh::GatherTreeElementsOffsetAndErrors(t8_forest_t mesh, const uint64_t* p
     const uint64_t num_abs_error_vals = num_global_coarse_mesh_elems / 4;
     const uint64_t val_start_offset = static_cast<uint64_t>(((static_cast<double>(this->shm_rank_) * static_cast<long double>(num_abs_error_vals)) / static_cast<double>(this->shm_size_)));
     const uint64_t val_end_offset = static_cast<uint64_t>(((static_cast<double>(this->shm_rank_ + 1) * static_cast<long double>(num_abs_error_vals)) / static_cast<double>(this->shm_size_)));
-    const uint64_t num_vals_errors = val_end_offset - val_start_offset;
 
     uint64_t elem_idx = val_start_offset * 4;
 
@@ -1201,7 +1236,7 @@ ErrorMesh::ReconstructErrorMesh(t8_forest_t root_level_mesh, const uint64_t* enc
     this->num_global_trees_ = num_global_trees;
 
     /* Get the global number of elements in the coarse error mesh */
-    const uint64_t num_coarse_error_mesh_global_elems = cmc::bits::ConvertBigEndianToNativeEndianness<uint64_t>(*(encoded_error_mesh_start_ptr + offset));
+    [[maybe_unused]] const uint64_t num_coarse_error_mesh_global_elems = cmc::bits::ConvertBigEndianToNativeEndianness<uint64_t>(*(encoded_error_mesh_start_ptr + offset));
     ++offset;
 
     /* Get the global number of uniform elements */
@@ -1311,7 +1346,7 @@ ErrorMesh::ReconstructErrorMesh(t8_forest_t root_level_mesh, const uint64_t* enc
 
     std::vector<uint64_t> global_elems_per_level;
     global_elems_per_level.reserve(num_adaptation_levels);
-    for (int lvl_idx{0}; lvl_idx < num_adaptation_levels; ++lvl_idx)
+    for (uint64_t lvl_idx{0}; lvl_idx < num_adaptation_levels; ++lvl_idx)
     {
         const uint64_t lvl_elems = cmc::bits::ConvertBigEndianToNativeEndianness<uint64_t>(*(encoded_error_mesh_start_ptr + mesh_encoding_offset + 1 + lvl_idx));
         global_elems_per_level.push_back(lvl_elems);
@@ -1337,7 +1372,7 @@ ErrorMesh::ReconstructErrorMesh(t8_forest_t root_level_mesh, const uint64_t* enc
 
 template <typename T>
 void
-ErrorMesh::CreateErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::vector<T>& init_data)
+ErrorMesh::CreateErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem)
 {
     constexpr int kRootRank = 0;
 
@@ -1392,7 +1427,7 @@ ErrorMesh::CreateErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>
     }
 
     /* Get the coarsest possible mesh alongside the errors */
-    auto [mesh, local_permitted_abs_errors] = this->GetCoarseErrors(init_mesh, error_domains, init_data);
+    auto [mesh, local_permitted_abs_errors] = this->GetCoarseErrors(init_mesh, error_domains, init_data, num_data_per_elem);
     cmc_assert(static_cast<size_t>(t8_forest_get_local_num_leaf_elements(mesh)) == local_permitted_abs_errors.size());
 
     /* Get the number of global elements in the coarse error mesh */
@@ -1826,7 +1861,7 @@ ErrorMesh::CreateErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>
         error_mesh_serialization.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(num_mesh_encoding_bytes));
         //cmc_err_msg("Stop here");
         /* Store the uniform refinement level per tree */
-        cmc_assert(num_global_trees == max_present_refinement_level_per_tree.size());
+        cmc_assert(static_cast<size_t>(num_global_trees) == max_present_refinement_level_per_tree.size());
 
         /* Append the uniform tree levels to the serialization */
         AppendUniformRefinementLevelsPerTree(error_mesh_serialization, max_present_refinement_level_per_tree);
@@ -1864,7 +1899,6 @@ ErrorMesh::CreateErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>
         MPICheckError(rv_free_root_shm_comm);
     }
 }
-
 
 inline void
 ErrorMesh::DestructErrorMeshCollectively()
