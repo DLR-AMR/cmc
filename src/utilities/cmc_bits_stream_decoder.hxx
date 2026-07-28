@@ -88,10 +88,9 @@ StreamDecoder<T>::StartHuffmanCodesDecoding(const uint64_t* start_huffman_codes_
 
     const cmc::entropy_coding::huffman::HuffmanCodeInfoType num_symbols =
             huff_decoder.GetNextBitSequence<cmc::entropy_coding::huffman::HuffmanCodeInfoType>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeInfoType) * cmc::bits::kCharBit);
-    cmc_global_msg("huff num_symbols: ", num_symbols, ", swapped: ", std::byteswap(num_symbols));
+
     const cmc::entropy_coding::huffman::HuffmanCodeInfoType data_type =
-                huff_decoder.GetNextBitSequence<cmc::entropy_coding::huffman::HuffmanCodeInfoType>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeInfoType) * cmc::bits::kCharBit);
-    cmc_global_msg("huff data_type: ", data_type, ", swapped: ", std::byteswap(data_type));
+            huff_decoder.GetNextBitSequence<cmc::entropy_coding::huffman::HuffmanCodeInfoType>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeInfoType) * cmc::bits::kCharBit);
 
     if (static_cast<cmc::entropy_coding::huffman::HuffmanCodeInfoType>(ConvertToCmcType<T>()) != data_type) [[unlikely]]
     {
