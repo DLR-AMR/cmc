@@ -229,6 +229,16 @@ install(FILES
     amr/lossy/cmc_simul_adaptive_coarsening.hxx 
     amr/lossy/cmc_byte_compression_variable.hxx 
     amr/lossy/cmc_multi_res_trimmed_residuals.hxx 
+    amr/lossy/cmc_par_multi_res_extraction_util.hxx 
+    amr/lossy/cmc_par_multi_res_extraction.hxx 
+    amr/lossy/cmc_par_multi_res_decompression.hxx 
+    amr/lossy/cmc_par_multi_res_error_mesh.hxx 
+    amr/lossy/cmc_par_multi_res_idw_interpolation_util.hxx 
+    amr/lossy/cmc_par_multi_res_extraction_idw.hxx 
+    amr/lossy/cmc_par_multi_res_decompression_idw.hxx
+    amr/lossy/trixi/cmc_par_multi_res_extraction_idw.hxx 
+    amr/lossy/trixi/cmc_par_multi_res_decompression_idw.hxx 
+    amr/lossy/trixi/cmc_par_multi_res_util.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy
 )
 
@@ -252,7 +262,10 @@ install(FILES
     amr/lossless/cmc_byte_decompression_variable.hxx 
     amr/lossless/cmc_par_multi_res_extraction_util.hxx 
     amr/lossless/cmc_par_multi_res_extraction.hxx 
-    amr/lossless/cmc_par_multi_res_decomrpession.hxx 
+    amr/lossless/cmc_par_multi_res_decompression.hxx 
+    amr/lossless/cmc_par_fast_multi_res_extraction_util.hxx 
+    amr/lossless/cmc_par_fast_multi_res_extraction.hxx 
+    amr/lossless/cmc_par_fast_multi_res_decompression.hxx 
     # amr/lossless/cmc_byte_par_compression_variable.hxx 
     # amr/lossless/cmc_multi_res_par_extraction_compression.hxx 
     # amr/lossless/cmc_multi_res_par_extraction_util.hxx 
