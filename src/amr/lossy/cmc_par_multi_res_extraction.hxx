@@ -19,6 +19,9 @@
 namespace cmc::par::lossy::multi_res
 {
 
+/* A switch to write out intermediate data during the compression */
+constexpr bool kWriteVTKCompressionStep = true;
+
 /* Forward declaration of the general compression variable */
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -50,6 +53,14 @@ public:
         MPICheckError(rv_rank);
         /* Increment the reference count, since we do not have ownership of the forest mesh */
         t8_forest_ref(forest);
+        /* Get the cmesh */
+        t8_cmesh_t cmesh = t8_forest_get_cmesh (this->mesh_.GetMesh());
+        /* Check whether the dimensionality matches */
+        const int mesh_dimension = t8_cmesh_get_dimension (cmesh);
+        if (mesh_dimension != DIM)
+        {
+            cmc_err_msg("The suppplied dimension (", DIM, ") does not match the dimension of the mesh (", mesh_dimension, ")!");
+        }
     }
 
     void Compress();
@@ -94,14 +105,12 @@ private:
     /* The current data during the extraction */
     std::vector<T> data_;
 
-
     const std::vector<ErrorDomain> error_domains_;
 
     std::vector<std::vector<T>> data_pyramid_;
     int mesh_coarsening_steps_{0};
     int prediction_step_{0};
     std::vector<SizeType> level_partition_offset_;
-    //ErrorMesh error_indicator_;
     std::unique_ptr<ErrorMesh> error_mesh_;
 
     int compression_step_{0};
@@ -295,28 +304,6 @@ CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t adapted_mesh, s
     return std::make_pair(partitioned_forest, partitioned_data);
 }
 
-static int step3{0};
-
-inline void
-WriteDataToVTKTest3(t8_forest_t mesh, const std::vector<float>& data)
-{
-    std::vector<double> double_data1;
-
-    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
-    {
-        double_data1.push_back(data[idx]);
-    }
-
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = double_data1.data();
-
-    const std::string file_name = std::string("cmc_lossy_mr_control_vals_") + std::to_string(step3);
-    ++step3;
-    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 0, 0, 0, 1, vtk_data);
-}
-
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 void
@@ -356,13 +343,16 @@ CompressionVariableMultiData<T, DIM, N>::CollectCoarseLevelPredictionPyramid()
         /* Store the extracted coarse level predictors */
         this->data_pyramid_.push_back(std::move(partitioned_data));
 
+        if constexpr (kWriteVTKCompressionStep)
+        {
+            const std::string file_prefix = std::string("cmc_compression_coarse_predictor_") + this->name_ + std::string("_") + std::to_string(this->mesh_coarsening_steps_);
+            WriteDataToVTK<T>(this->mesh_.GetMesh(), this->data_pyramid_.back(), this->name_, file_prefix);
+        }
+
         /* Increment the step counter */
         ++(this->mesh_coarsening_steps_);
-
-        WriteDataToVTKTest3(this->mesh_.GetMesh(), this->data_pyramid_.back());
     }
 }
-
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -838,35 +828,13 @@ CompressionVariableMultiData<T, DIM, N>::RepartitionForCompressionIteration(t8_f
     return std::make_pair(partitioned_ghost_mesh, std::move(partitioned_ghost_data));
 }
 
-static int step2{0};
-
-inline void
-WriteDataToVTKTest2(t8_forest_t mesh, const std::vector<float>& data)
-{
-    std::vector<double> double_data1;
-
-    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
-    {
-        double_data1.push_back(data[idx]);
-    }
-
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = double_data1.data();
-
-    const std::string file_name = std::string("cmc_test_lossy_mr_") + std::to_string(step2);
-    ++step2;
-    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 0, 0, 0, 1, vtk_data);
-}
-
-
-
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::Compress()
 {
+    static_assert(N == 1, "Intra-Element Compression is currently not supported for the lossy compression.");
+    
     cmc_debug_msg("The lossy multi-resolution compression of variable ", this->name_, " is performed.");
     /* Potentially, gather the maximum present element level */
     this->DetermineMaxInitElementLevel();
@@ -891,6 +859,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     this->error_mesh_ = std::make_unique<ErrorMesh>(this->mesh_.GetMesh(), this->error_domains_, this->data_pyramid_.back());
 
     //Perfom Intra Element Coarse-Predictor Extraction?
+    
 
     /* Collect the coarse level predictors from the mesh coarsening steps */
     this->CollectCoarseLevelPredictionPyramid();
@@ -939,14 +908,17 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
         // Set the adapted forest for the next iteration 
         this->mesh_.SetMesh(adapted_forest);
 
+        if constexpr (kWriteVTKCompressionStep)
+        {
+            const std::string file_prefix = std::string("cmc_compression_predicted_data_") + this->name_ + std::string("_") + std::to_string(this->compression_step_);
+            WriteDataToVTK<T>(this->mesh_.GetMesh(), this->data_, this->name_, file_prefix);
+        }
+        
         /* Update the counter and iterators */
         ++(this->compression_step_);
         ++(coarse_data_iter);
         ++(level_partition_iter);
         ++(refinement_indicator_iter);
-
-        //if (this->compression_step_ > 0) {return;}
-        WriteDataToVTKTest2(mesh_.GetMesh(), this->data_);
     }
 
     //Perfom Intra Element Compression
