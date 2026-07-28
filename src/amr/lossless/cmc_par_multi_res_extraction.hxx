@@ -48,6 +48,14 @@ public:
         MPICheckError(rv_rank);
         /* Increment the reference count, since we do not have ownership of the forest mesh */
         t8_forest_ref(forest);
+        /* Get the cmesh */
+        t8_cmesh_t cmesh = t8_forest_get_cmesh (this->mesh_.GetMesh());
+        /* Check whether the dimensionality matches */
+        const int mesh_dimension = t8_cmesh_get_dimension (cmesh);
+        if (mesh_dimension != DIM)
+        {
+            cmc_err_msg("The suppplied dimension (", DIM, ") does not match the dimension of the mesh (", mesh_dimension, ")!");
+        }
     }
 
     void Compress();
@@ -1505,6 +1513,10 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
 
     cmc_debug_msg(this->comm_, "The file ", file_name, " has been opened.");
 
+    /* Set the native data representation */
+    const int rv_file_view = MPI_File_set_view(fhandle, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
+    MPICheckError(rv_file_view);
+    
     /* Pre-Allocate global file storage */
     const uint64_t preallocation_size = this->global_compressed_byte_count_ + (sizeof(uint64_t) - (this->global_compressed_byte_count_ % sizeof(uint64_t)));
     const int rv_file_prealloc = MPI_File_preallocate(fhandle, preallocation_size);

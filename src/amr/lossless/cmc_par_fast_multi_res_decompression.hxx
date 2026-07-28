@@ -317,6 +317,10 @@ ReadCompressionInfo(const std::string& file_name)
 
     cmc_debug_msg("The file ", file_name, " has been opened.");
 
+    /* Set the native data representation */
+    const int rv_file_view = MPI_File_set_view(fhandle, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
+    MPICheckError(rv_file_view);
+
     /* Read the first two values */
     std::array<uint64_t, 2> num_bytes;
 
@@ -466,6 +470,10 @@ DecompressionVariableMultiData<T, DIM, N>::DecompressionVariableMultiData(const 
     /* Open the file on the shared memory communicator */
     const int rv_open = MPI_File_open(this->shm_comm_, this->file_name_.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &(this->fhandle_));
     MPICheckError(rv_open);
+
+    /* Set the native data representation */
+    const int rv_file_view = MPI_File_set_view(this->fhandle_, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
+    MPICheckError(rv_file_view);
 
     /* Create a forest mesh from the given parameters */
     mesh_.SetMesh(t8_forest_new_uniform (cmesh, scheme, 0, 0, this->comm_));
