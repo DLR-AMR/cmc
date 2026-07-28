@@ -7,11 +7,13 @@
 #include "utilities/cmc_bits_stream_decoder.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "utilities/cmc_error_domain.hxx"
+#include "t8code/cmc_t8_mesh.hxx"
 
 #include <array>
 #include <limits>
 #include <execution>
 #include <cfloat>
+#include <string>
 
 namespace cmc::par::lossy::multi_res
 {
@@ -232,6 +234,27 @@ GetAbsResidual(const T& value1, const T& value2)
     {
         return (value1 > value2 ? value1 - value2 : value2 - value1);
     }
+}
+
+template <ArithmeticType T>
+inline void
+WriteDataToVTK(t8_forest_t mesh, const std::vector<T>& data, const std::string variable_name, const std::string file_prefix)
+{
+    cmc_assert(data.size() >= static_cast<size_t>(t8_forest_get_local_num_leaf_elements(mesh)));
+    std::vector<double> double_data;
+    double_data.reserve(data.size());
+
+    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
+    {
+        double_data.push_back(static_cast<double>(data[idx]));
+    }
+
+    t8_vtk_data_field_t vtk_data[1];
+    snprintf (vtk_data[0].description, BUFSIZ, "%s", variable_name.c_str());
+    vtk_data[0].type = T8_VTK_SCALAR;
+    vtk_data[0].data = double_data.data();
+
+    t8_forest_write_vtk_ext (mesh, file_prefix.c_str(), 1, 1, 1, 1, 0, 0, 0, 1, vtk_data);
 }
 
 /***** Specialized implementations for certain setups *****/
