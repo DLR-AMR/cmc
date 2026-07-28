@@ -1,5 +1,5 @@
-#ifndef CMC_PAR_MULTI_RES_EXTRACTION_UTIL_HXX
-#define CMC_PAR_MULTI_RES_EXTRACTION_UTIL_HXX
+#ifndef CMC_PAR_FAST_MULTI_RES_EXTRACTION_UTIL_HXX
+#define CMC_PAR_FAST_MULTI_RES_EXTRACTION_UTIL_HXX
 
 #include "utilities/cmc_bits.hxx"
 #include "utilities/cmc_bits_vector.hxx"
@@ -11,7 +11,7 @@
 #include <limits>
 #include <execution>
 
-namespace cmc::par::lossless::multi_res
+namespace cmc::par::lossless::multi_res::fast
 {
 
 template<int32_t DIM>
@@ -334,6 +334,26 @@ ComputeMidRange(const std::span<T> values)
     return ((max / 2) + (min / 2));
 }
 
+template<ArithmeticType T>
+inline T
+DecodeImplicitValueFromMean(const T mean_value, const std::span<T> decoded_values, const int num_elements)
+{
+    cmc_assert(decoded_values.size() >= 1ULL);
+    cmc_assert(decoded_values.size() == static_cast<size_t>(num_elements - 1));
+
+    T sum = static_cast<T>(0);
+    for (unsigned idx{0}; idx < decoded_values.size(); ++idx)
+    {
+        sum += decoded_values[idx];
+    }
+
+    /* Compute the implicitly given value */
+    const T implicit_value = static_cast<T>(num_elements) * (mean_value - (sum / static_cast<T>(num_elements)));
+    
+    return implicit_value;
+}
+
+
 /**
  * Compute the DIM-th root of N which resembles the amount of data points per single direction.
  * In case, there is no integral DIM-th root of N, the function returns zero, since we cannot work 
@@ -362,146 +382,6 @@ ComputeNumDataPerDim()
 
     return 0;
 }
-
-#if 0
-
-/** 
- * Compute the number of compression levels for the amount of data points N given in a single direction.
- * This gives the amount of levels on which residuals and entropy codes exist, e.g. 3x3x3 data points in 3D
- * gives two levels; 3x3x3 -> 2x2x2 (-> afterwards the coarse value has been reached 1x1x1) */
-template<int32_t N>
-constexpr int
-ComputeNumIntraCompressionLevels()
-{
-    if constexpr (N == 1)
-    {
-        return 0;
-    }
-
-    int exp = 1;
-    for (int i{1}; i < N; ++i)
-    {
-        exp *= 2;
-        if (exp >= N)
-        {
-            return i;
-        }
-    }
-
-    return 0;
-}
-
-/** Compute the number of compression levels for the amount of overall data points N given on the element with the corersponding diemnsionality.
- * This gives the amount of levels on which residuals and entropy codes exist, e.g. 8x8x8 data points in 3D
- * gives three levels; 8x8x8 -> 4x4x4 -> 2x2x2 (-> afterwards the coarse value has been reached 1x1x1) */
-template<int32_t DIM, int32_t N>
-constexpr int
-ComputeNumIntraCompressionLevels()
-{
-    /* Compute the data per dimension */
-    constexpr int32_t num_data_per_dim = ComputeNumDataPerDim<DIM, N>();
-
-    /* Compute the number of compression levels */
-    return ComputeNumIntraCompressionLevels<num_data_per_dim>();
-}
-
-template<int32_t DIM, int32_t N>
-constexpr int
-ComputeNumIntraPredictors()
-{
-    if constexpr (N == 1)
-    {
-        return 0;
-    }
-
-    /* Compute the data per dimension */
-    constexpr int32_t num_data_per_dim = ComputeNumDataPerDim<DIM, N>();
-    
-    int num_intra_predictors{0};
-    int current_data_per_dim = num_data_per_dim;
-
-    if constexpr (num_data_per_dim > 0)
-    {
-        /* In case we are able to work with the certain amount of data */
-        constexpr int num_compression_lvls_ = ComputeNumIntraCompressionLevels<DIM, N>();
-
-        for (int clvl{0}; clvl < num_compression_lvls_; ++clvl)
-        {
-            /* Compute the coarse number of elements per dimension on this level */
-            const int num_lvl_data_per_dim = current_data_per_dim / 2 + (current_data_per_dim % 2 != 0 ? 1 : 0);
-
-            int num_level_entropy_codes{1};
-            /* Determine the number of entropy codes on this level per element */
-            for (int i{0}; i < DIM; ++i)
-            {
-                num_level_entropy_codes *= num_lvl_data_per_dim;
-            }
-
-            /* Update the overall count by this level */
-            num_intra_predictors += num_level_entropy_codes;
-
-            /* Update the number of data per dimension */
-            current_data_per_dim = num_lvl_data_per_dim;
-        }
-
-        /* And add the last coarse elem value as predictor as well */
-        ++num_intra_predictors;
-    } else
-    {
-        static_assert(false, "Currently, the amount of data points N needs to be an integral DIM-th root; e.g. in 3D: N=1,8,27,64,...");
-    }
-
-    return num_intra_predictors;
-}
-
-/**
- * Compute the overall number of entropy codes/residuals per elemnent based on the dimensionality DIM
- * and the number of data points N per element.
- */
-//TODO: Incorrect computation since we only have one incomplete pack per level since we iterate linearily through the data
-//and make use of an SFC ordering at this position
-template<int32_t DIM, int32_t N>
-constexpr inline int32_t
-ComputeNumPyramidalCodes()
-{
-    /* Compute the data per dimension */
-    constexpr int32_t num_data_per_dim = ComputeDataPerDim<DIM, N>();
-    
-    int num_entropy_codes_per_elem{N};
-    int current_data_per_dim = num_data_per_dim;
-
-    if constexpr (num_data_per_dim > 0)
-    {
-        /* In case of we are able to work with the certain amount of data */
-        constexpr int num_compression_lvls_ = ComputeNumIntraCompressionLevels<DIM, N>();
-
-        for (int clvl{0}; clvl < num_compression_lvls_; ++clvl)
-        {
-            /* Compute the coarse number of elements per dimension on this level */
-            const int num_lvl_data_per_dim = current_data_per_dim / 2 + (current_data_per_dim % 2 != 0 ? 1 : 0);
-
-            int num_level_entropy_codes{1};
-            /* Determine the number of entropy codes on this level per element */
-            for (int i{0}; i < DIM; ++i)
-            {
-                num_level_entropy_codes *= num_lvl_data_per_dim;
-            }
-
-            /* Update the overall count by this level */
-            num_entropy_codes_per_elem += num_level_entropy_codes;
-
-            /* Update the number of data per dimension */
-            current_data_per_dim = num_lvl_data_per_dim;
-        }
-    } else
-    {
-        static_assert(false, "Currently, the amount of data points N needs to be an integral DIM-th root; e.g. in 3D: N=1,8,27,64,...");
-    }
-
-    return num_entropy_codes_per_elem;
-}
-
-#endif
 
 template<int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -1238,7 +1118,6 @@ SkipToNextCompressedElement(cmc::bits::StreamDecoder<SymbolType>& stream_decoder
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
-            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
 
@@ -1306,7 +1185,6 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
-            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
 
@@ -1532,21 +1410,11 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Allocate all entropy codes on this level */
         std::array<SymbolType, num_elems_on_level> lvl_entropy_codes;
         
-        //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
-
-            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
-            {
-                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
-                {
-                    stream_decoder.ApplyProcessEndSymbol64Bit();
-                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
-                }
-            }
         }
 
         /* Determine the number of full packs */
@@ -1763,18 +1631,8 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
-            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
-            
-            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
-            {
-                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
-                {
-                    stream_decoder.ApplyProcessEndSymbol64Bit();
-                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
-                }
-            }
         }
 
         /* Determine the number of full packs */
@@ -1991,18 +1849,8 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
-            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
-
-            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
-            {
-                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
-                {
-                    stream_decoder.ApplyProcessEndSymbol64Bit();
-                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
-                }
-            }
         }
 
         /* Determine the number of full packs */
@@ -2205,4 +2053,4 @@ PerformElementEncoding(cmc::bits::vector& encoding, const cmc::entropy_coding::h
 
 }
 
-#endif /* !CMC_PAR_MULTI_RES_EXTRACTION_UTIL_HXX */
+#endif /* !CMC_PAR_FAST_MULTI_RES_EXTRACTION_UTIL_HXX */

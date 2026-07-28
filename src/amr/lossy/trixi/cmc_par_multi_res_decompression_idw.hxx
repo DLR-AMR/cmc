@@ -1,13 +1,17 @@
-#ifndef CMC_PAR_MULTI_RES_DECOMPRESSION_HXX
-#define CMC_PAR_MULTI_RES_DECOMPRESSION_HXX
+#ifndef CMC_AMR_LOSSY_TRIXI_PAR_MULTI_RES_DECOMPRESSION_HXX
+#define CMC_AMR_LOSSY_TRIXI_PAR_MULTI_RES_DECOMPRESSION_HXX
 
 #include "cmc.hxx"
-#include "amr/lossless/cmc_par_multi_res_extraction_util.hxx"
+#include "amr/lossy/cmc_par_multi_res_extraction_util.hxx"
+#include "amr/lossy/cmc_par_multi_res_error_mesh.hxx"
+#include "amr/lossy/cmc_par_multi_res_idw_interpolation_util.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
 #include "utilities/cmc_compression_schema.hxx"
 #include "utilities/cmc_bits_stream_decoder.hxx"
+#include "amr/lossy/cmc_par_multi_res_idw_interpolation_util.hxx"
+#include "amr/lossy/trixi/cmc_par_multi_res_util.hxx"
 
 #include <t8_forest/t8_forest_partition.h>
 
@@ -15,9 +19,11 @@
 #include <span>
 #include <filesystem>
 
-
-namespace cmc::par::lossless::multi_res
+namespace cmc::par::lossy::multi_res::idw::trixi
 {
+
+/* Switch to write out intermediate data from the decompression steps */
+constexpr bool kWriteVTKDecompressionStepData = true;
 
 /* Forward declaration of the general compression variable */
 template<ArithmeticType T, int32_t DIM, int32_t N>
@@ -27,6 +33,37 @@ class DecompressionVariableMultiData;
 /* Typedef for the general case with one data point per variable */
 template<ArithmeticType T, int32_t DIM>
 using DecompressionVariable = DecompressionVariableMultiData<T, DIM, int32_t{1}>;
+
+inline int
+integral_pow(const int base, const int exponent)
+{
+    cmc_assert(exponent >= 0);
+
+    if (exponent == 0)
+    {
+        return 1;
+    }
+    if (exponent == 1)
+    {
+        return base;
+    }
+
+    const int temp = integral_pow(base, exponent / 2);
+
+    if (exponent % 2 == 0)
+    {
+        return temp * temp;
+    } else
+    {
+        return base * temp * temp;
+    }
+}
+
+inline int
+GetNumPointsPerElem(const int num_data_per_dim, const int dim)
+{
+    return integral_pow(num_data_per_dim, dim);
+}
 
 struct CompressionInfoStruct
 {
@@ -79,15 +116,18 @@ struct CompressionInfoStruct
         return shared_data_init_ptr + offset;
     }
 
-    SizeType GetOffsetPartitionTable() const {return sizeof(SizeType) * (14 + global_level_bytes.size() + global_num_elem_indications_step.size())
-                                                     + kNumCharsVariableName * sizeof(char);}
+    SizeType GetOffsetPartitionTable() const {return sizeof(SizeType) * (15 + global_level_bytes.size() + global_num_elem_indications_step.size())
+                                                     + kNumCharsVariableName * sizeof(char)
+                                                     + (this->data_per_dim > 1 ? sizeof(SizeType) * (((dimensionality * GetNumPointsPerElem(data_per_dim, dimensionality)) / 2) + ((dimensionality * GetNumPointsPerElem(data_per_dim, dimensionality)) % 2 != 0 ? 1 : 0)) : 0);}
+
+    const char* GetName() const {return name.data();}             
 
     SizeType global_byte_count{0};
     SizeType offset_start_encoding{0};
     std::array<char, kNumCharsVariableName> name;
     SizeType data_type{0};
     SizeType dimensionality{0};
-    SizeType data_per_elem{0};
+    SizeType data_per_dim{0};
     SizeType compression_comm_size{0};
     SizeType compression_scheme{0};
     SizeType mesh_compression_levels{0};
@@ -99,7 +139,8 @@ struct CompressionInfoStruct
     SizeType mesh_compression_huffman_codes{0};
     SizeType intra_elem_compression_huffman_codes{0};
     SizeType num_bytes_global_mesh_encoding{0};
-
+    SizeType num_bytes_global_error_mesh_encoding{0};
+    std::vector<float> reference_coordinates;
     uint64_t* shared_data_init_ptr{nullptr};
     MPI_Win shared_data;
 };
@@ -143,7 +184,7 @@ ConstructCompressionInfoStruct(const std::vector<uint64_t>& encoded_preamble)
     info.dimensionality = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
 
-    info.data_per_elem = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
+    info.data_per_dim = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
     ++offset;
 
     info.compression_comm_size = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
@@ -186,7 +227,43 @@ ConstructCompressionInfoStruct(const std::vector<uint64_t>& encoded_preamble)
     ++offset;
 
     info.num_bytes_global_mesh_encoding = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
+    ++offset;
 
+    info.num_bytes_global_error_mesh_encoding = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset));
+    ++offset;
+
+    /* Decode the reference coordinates */
+    if (info.data_per_dim > 1)
+    {
+        const int num_coords_per_elem = info.data_per_dim * GetNumPointsPerElem(static_cast<int>(info.data_per_dim), static_cast<int>(info.dimensionality));
+
+        static_assert(sizeof(uint32_t) == sizeof(float));
+        std::vector<float> extracted_coords;
+        extracted_coords.reserve(num_coords_per_elem);
+
+        int front_back_indicator{0};
+        int access_idx{0};
+        uint64_t current_encoding_val{0};
+
+        /* Extract all coordinates from all points per element */
+        for (int idx{0}; idx < num_coords_per_elem; ++idx)
+        {
+            if (front_back_indicator % 2 == 0)
+            {
+                current_encoding_val = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(start_ptr + offset + access_idx));
+                const uint32_t ucoord = static_cast<uint32_t>(current_encoding_val >> 32);
+                extracted_coords.push_back(std::bit_cast<float>(ucoord));
+            } else
+            {
+                const uint32_t ucoord = static_cast<uint32_t>(uint64_t{0x00000000FFFFFFFFULL} & current_encoding_val);
+                extracted_coords.push_back(std::bit_cast<float>(ucoord));
+                ++access_idx;
+            }
+            ++front_back_indicator;
+        }
+
+        info.reference_coordinates = std::move(extracted_coords);
+    }
     return info;
 }
 
@@ -217,7 +294,7 @@ DecodeCompressionInfoStruct(CompressionInfoStruct& encoded_info)
     encoded_info.dimensionality = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
     ++offset;
 
-    encoded_info.data_per_elem = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
+    encoded_info.data_per_dim = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
     ++offset;
 
     encoded_info.compression_comm_size = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
@@ -260,6 +337,43 @@ DecodeCompressionInfoStruct(CompressionInfoStruct& encoded_info)
     ++offset;
 
     encoded_info.num_bytes_global_mesh_encoding = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
+    ++offset;
+
+    encoded_info.num_bytes_global_error_mesh_encoding = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
+    ++offset;
+
+    /* Decode the reference coordinates */
+    if (encoded_info.data_per_dim > 1)
+    {
+        static_assert(sizeof(uint32_t) == sizeof(float));
+
+        const int num_coords_per_elem = encoded_info.dimensionality * GetNumPointsPerElem(static_cast<int>(encoded_info.data_per_dim), static_cast<int>(encoded_info.dimensionality));
+
+        std::vector<float> extracted_coords;
+        extracted_coords.reserve(num_coords_per_elem);
+
+        int front_back_indicator{0};
+        uint64_t current_encoding_val{0};
+
+        /* Extract all coordinates from all points per element */
+        for (int idx{0}; idx < num_coords_per_elem; ++idx)
+        {
+            if (front_back_indicator % 2 == 0)
+            {
+                current_encoding_val = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(*(encoded_info.shared_data_init_ptr + offset));
+                const uint32_t ucoord = static_cast<uint32_t>(current_encoding_val >> 32);
+                extracted_coords.push_back(std::bit_cast<float>(ucoord));
+            } else
+            {
+                const uint32_t ucoord = static_cast<uint32_t>(uint64_t{0x00000000FFFFFFFFULL} & current_encoding_val);
+                extracted_coords.push_back(std::bit_cast<float>(ucoord));
+                ++offset;
+            }
+            ++front_back_indicator;
+        }
+
+        encoded_info.reference_coordinates = std::move(extracted_coords);
+    }
 }
 
 inline
@@ -276,7 +390,7 @@ PrintCompressionInfo(const std::vector<uint64_t>& encoded_preamble, const std::s
     cmc_global_msg("\t Name: ", reinterpret_cast<const char*>(info.name.data()));
     cmc_global_msg("\t DataType: ", info.data_type);
     cmc_global_msg("\t Dimensionality: ", info.dimensionality, "D");
-    cmc_global_msg("\t Data Per Elem: ", info.data_per_elem);
+    cmc_global_msg("\t Data Per Dimension: ", info.data_per_dim);
     cmc_global_msg("\t Compression Communicator Size: ", info.compression_comm_size);
     cmc_global_msg("\t Compression Scheme: ", info.compression_scheme);
     cmc_global_msg("\t Mesh Compression LVLs: ", info.mesh_compression_levels);
@@ -297,12 +411,29 @@ PrintCompressionInfo(const std::vector<uint64_t>& encoded_preamble, const std::s
     cmc_global_msg("\t Mesh Compression Global Element Count (size: ", info.global_num_elem_indications_step.size(), "): ");
     for (SizeType lvl_idx{0}; lvl_idx < info.mesh_compression_levels - 1; ++lvl_idx)
     {
-        cmc_global_msg("\t\t Level ", lvl_idx, ": ", info.global_num_elem_indications_step[lvl_idx], " bytes");
+        cmc_global_msg("\t\t Level ", lvl_idx, ": ", info.global_num_elem_indications_step[lvl_idx], " elements");
     }
     cmc_global_msg("\t Partition Table Byte Count: ", info.partition_table_size, " bytes");
+
+    for (SizeType lvl_idx{0}; lvl_idx < info.mesh_compression_levels; ++lvl_idx)
+    {
+        const int offset = 15 + info.global_level_bytes.size() + info.global_num_elem_indications_step.size()
+                          + (kNumCharsVariableName * sizeof(char)) / sizeof(uint64_t)
+                          + (info.data_per_dim > 1 ? (((info.dimensionality * GetNumPointsPerElem(info.data_per_dim, info.dimensionality)) / 2) + ((info.dimensionality * GetNumPointsPerElem(info.data_per_dim, info.dimensionality)) % 2 != 0 ? 1 : 0)) : 0)
+                          + lvl_idx * info.compression_comm_size * 2;
+
+        for(int rank_idx{0}; rank_idx < static_cast<int>(info.compression_comm_size); ++rank_idx)
+        {
+            const SizeType elem_offset = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(encoded_preamble[offset + 2 * rank_idx]);
+            const SizeType byte_offset = cmc::bits::ConvertBigEndianToNativeEndianness<SizeType>(encoded_preamble[offset + 2 * rank_idx + 1]);
+            cmc_global_msg("\t\t Partition Level: ", lvl_idx, ", Rank: ", rank_idx, ", Elem_Offset: ", elem_offset, ", Coding_Byte_Offset: ", byte_offset);
+        }
+    }
+
     cmc_global_msg("\t Serialized Mesh Compression Huffman Codes: ", info.mesh_compression_huffman_codes, " bytes");
     cmc_global_msg("\t Serialized Intra Elem Compression Huffman Codes: ", info.intra_elem_compression_huffman_codes, " bytes");
     cmc_global_msg("\t Serialized Global Mesh Encoding: ", info.num_bytes_global_mesh_encoding, " bytes");
+    cmc_global_msg("\t Serialized Global Error-Mesh Encoding: ", info.num_bytes_global_error_mesh_encoding, " bytes");
 }
 
 inline
@@ -374,7 +505,7 @@ class DecompressionVariableMultiData
 {
 public:
     DecompressionVariableMultiData() = delete;
-    DecompressionVariableMultiData(const std::string& file_name, const MPI_Comm comm, const t8_cmesh_t cmesh, const t8_scheme *scheme);
+    DecompressionVariableMultiData(const std::string& file_name, const MPI_Comm comm, const t8_cmesh_t cmesh, const t8_scheme* scheme);
 
 
     //void Decompress(const int max_decompression_level = kMaxDecompressionLevelUndefined);
@@ -386,13 +517,16 @@ private:
     void InquireCompressionInfo();
     const uint64_t* OpenSharedLevelDataWindow(const int level);
     void CloseSharedLevelDataWindow();
-    t8_forest_t RepartitionMesh(t8_forest_t adapted_forest);
+    t8_forest_t RepartitionInitMesh(t8_forest_t adapted_forest);
     void RepartitionData(t8_forest_t adapted_forest, t8_forest_t partitioned_forest);
     void DecodeRootLevelValues();
     void SetStartPositionForStreamDecoder(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const cmc::bits::vector_view level_encoding, const cmc::bits::vector_view lvl_mesh, const std::vector<LevelPartition>& level_partition_info, const SizeType mesh_offset, const SizeType num_local_elems);
     void DecodeMeshCompressionSteps();
     void SetStartPositionForIntraElemStreamDecoder(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const cmc::bits::vector_view level_encoding, const std::vector<LevelPartition>& level_partition_info, const SizeType mesh_offset, const SizeType num_local_elems);
     void DecodeIntraElementSteps();
+    std::pair<t8_forest_t, std::vector<T>> RepartitionForRefinementIteration(t8_forest_t mesh, std::vector<T>& data);
+    void CreateGhostLayerOnMesh();
+    void ReconstructErrorMesh();
 
     /* File containing the compressed data */
     const std::string file_name_;
@@ -405,6 +539,9 @@ private:
 
     /* Infos extarcted from the preamble */
     CompressionInfoStruct compression_info_;
+
+    /* The reference coordinates of the DG coefficients per element */
+    std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> reference_coordinates_;
 
     /* The current AMR mesh */
     AmrMesh mesh_;
@@ -426,6 +563,9 @@ private:
 
     /* A decoder */
     cmc::bits::StreamDecoder<SymbolType> stream_decoder_;
+
+    /* The utilized error mesh */
+    std::unique_ptr<ErrorMesh> error_mesh_;
 
     /* A step counter for the compression */
     int decompression_step_idx_{0};
@@ -470,13 +610,19 @@ DecompressionVariableMultiData<T, DIM, N>::DecompressionVariableMultiData(const 
     /* Open the file on the shared memory communicator */
     const int rv_open = MPI_File_open(this->shm_comm_, this->file_name_.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &(this->fhandle_));
     MPICheckError(rv_open);
-
+    
     /* Set the native data representation */
     const int rv_file_view = MPI_File_set_view(this->fhandle_, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
     MPICheckError(rv_file_view);
-    
+
     /* Create a forest mesh from the given parameters */
-    mesh_.SetMesh(t8_forest_new_uniform (cmesh, scheme, 0, 0, this->comm_));
+    t8_forest_t init_mesh = t8_forest_new_uniform (cmesh, scheme, 0, 0, this->comm_);
+
+    /* Repartition the mesh */
+    t8_forest_t partitioned_forest = this->RepartitionInitMesh(init_mesh);
+
+    /* Store the initial partitioned forest */
+    mesh_.SetMesh(partitioned_forest);
 }
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
@@ -537,6 +683,32 @@ DecompressionVariableMultiData<T, DIM, N>::InquireCompressionInfo()
 
     /* Decode and store the compression info struct */
     DecodeCompressionInfoStruct(this->compression_info_);
+
+    /* Set up the reference coordinates properly */
+    if constexpr (N > 1)
+    {
+        cmc_assert(static_cast<size_t>(integral_pow<DIM>(N) * DIM) == this->compression_info_.reference_coordinates.size());
+        
+        constexpr int num_points_per_elem = integral_pow<DIM>(N);
+
+        /* Allocate the reference coordinates */
+        this->reference_coordinates_.reserve(num_points_per_elem);
+
+        /* Assing the coordinates correctly */
+        int access_idx{0};
+        for (int data_idx{0}; data_idx < num_points_per_elem; ++data_idx)
+        {
+            /* Cosntruct a new coordinate */
+            this->reference_coordinates_.emplace_back();
+
+            /* Fill the dimensional coordinates of this point */
+            for (int dim_idx{0}; dim_idx < DIM; ++dim_idx)
+            {
+                this->reference_coordinates_.back().coordinates[dim_idx] = this->compression_info_.reference_coordinates[access_idx];
+                ++access_idx;
+            }
+        }
+    }
 }
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
@@ -548,6 +720,8 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
 
     /* Compute equal distributions for the whole data level */
     const SizeType num_global_lvl_vals = this->compression_info_.global_level_bytes[level] / sizeof(uint64_t);
+
+    cmc_debug_msg("Num global uint64_ts on encoded level: ", num_global_lvl_vals);
 
     const SizeType proc_offset_val_stream = static_cast<SizeType>(((static_cast<double>(this->shm_rank_) * static_cast<long double>(num_global_lvl_vals)) / static_cast<double>(this->shm_size_)));
     const SizeType next_proc_offset_val_stream = static_cast<SizeType>(((static_cast<double>(this->shm_rank_ + 1) * static_cast<long double>(num_global_lvl_vals)) / static_cast<double>(this->shm_size_)));
@@ -564,6 +738,8 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     const MPI_Offset var_level_offset = std::accumulate(this->compression_info_.global_level_bytes.begin(), std::next(this->compression_info_.global_level_bytes.begin(), level), 0);
     const MPI_Offset file_offset = this->compression_info_.offset_start_encoding + var_level_offset + proc_offset_val_stream * sizeof(uint64_t);
     
+    cmc_debug_msg("File Offset: ", file_offset);
+
     const int rv_seek_start = MPI_File_seek(this->fhandle_, file_offset, MPI_SEEK_SET);
     MPICheckError(rv_seek_start);
 
@@ -582,10 +758,6 @@ DecompressionVariableMultiData<T, DIM, N>::OpenSharedLevelDataWindow(const int l
     MPICheckError(rv_shm_barrier);
 
     /* Setup the decoding start for this level correctly */
-    //uint64_t* global_var_start{nullptr};
-    //MPI_Aint root_size{0};
-    //int root_disp_unit{0};
-    //const int rv_root_query = MPI_Win_shared_query(this->lvl_window_, kRootRank, &root_size, &root_disp_unit, &global_var_start);
     const uint64_t* global_var_start = shm_mem - proc_offset_val_stream;
 
     return global_var_start;
@@ -608,17 +780,14 @@ DecompressionVariableMultiData<T, DIM, N>::CloseSharedLevelDataWindow()
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 t8_forest_t
-DecompressionVariableMultiData<T, DIM, N>::RepartitionMesh(t8_forest_t adapted_forest)
+DecompressionVariableMultiData<T, DIM, N>::RepartitionInitMesh(t8_forest_t adapted_forest)
 {
-    /* Keep the not-partitioned forest */
-    t8_forest_ref(adapted_forest);
-
     /* Allocate a forest */
     t8_forest_t partitioned_forest;
     t8_forest_init(&partitioned_forest);
 
     /* Partition the forest */
-    const int partition_for_coarsening = 0; //TODO: change to 'one' when partition for coarsening is in t8code
+    const int partition_for_coarsening = 0;
     t8_forest_set_partition(partitioned_forest, adapted_forest, partition_for_coarsening);
     t8_forest_commit(partitioned_forest);
 
@@ -775,7 +944,7 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
 {
     cmc_assert(level_partition.size() >= 1);
 
-    /* Find the first relevant parition that is larger than the mesh offset */
+    /* Find the first relevant partition that is larger than the mesh offset */
     auto start_partition_iter = level_partition.begin();
     for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
     {
@@ -799,7 +968,7 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     int last_element_offset = start_partition_iter->elem_offset;
     for (auto partition_iter = std::next(start_partition_iter); partition_iter != level_partition.end(); ++partition_iter)
     {
-        /* Compute the next contigupus value sequence and extract it */
+        /* Compute the next contiguous value sequence and extract it */
         const int max_elems_to_extract = std::min<int>(static_cast<int>(partition_iter->elem_offset - last_element_offset), num_reamining_elements);
 
         for (int elem_idx{0}; elem_idx < max_elems_to_extract; ++elem_idx)
@@ -834,7 +1003,7 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     cmc_assert(level_partition.size() >= 1);
     constexpr int type_size = sizeof(T);
 
-    /* Find the first relevant parition that is larger than the mesh offset */
+    /* Find the first relevant parition that is smaller than the mesh offset */
     auto start_partition_iter = level_partition.begin();
     for (auto partition_iter = level_partition.begin(); partition_iter != level_partition.end(); ++partition_iter)
     {
@@ -876,7 +1045,7 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
         lvl_data_start_view.MoveToNextVectorValueStart();
     }
 
-    /* If there are still elements missing, they lay contiguoulsy in memory at that point and can be extarcted */
+    /* If there are still elements missing, they lay contiguoulsy in memory at that point and can be extracted */
     for (int elem_idx{0}; elem_idx < num_reamining_elements; ++elem_idx)
     {
         const EightByteResidualType uvalue = lvl_data_start_view.GetNextBitSequence<EightByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
@@ -885,30 +1054,6 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
 
     return data;
 }
-
-
-static int step = 0;
-
-inline void
-WriteDataToVTKTest(t8_forest_t mesh, const std::vector<float>& data)
-{
-    std::vector<double> double_data1;
-
-    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
-    {
-        double_data1.push_back(data[idx]);
-    }
-
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = double_data1.data();
-
-    const std::string file_name = std::string("cmc_new_test_decompr_data_vis_np1_step_") + std::to_string(step);
-    ++step;
-    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 1, 1, 1, 1, vtk_data);
-}
-
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -922,11 +1067,7 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeRootLevelValues()
     /* Create a view on the data and extarct it, since there is no special encoding applied to root elvel values */
     cmc::bits::vector_view data_view(shared_lvl_start_ptr);
 
-    /* Partition the mesh */
-    t8_forest_t init_mesh = this->mesh_.GetMesh();
-    t8_forest_t partitioned_mesh = this->RepartitionMesh(init_mesh);
-    t8_forest_unref(&init_mesh);
-    this->mesh_.SetMesh(partitioned_mesh);
+    //TODO: Partition the mesh here? 
 
     /* Get the global offset of the first element */
     const t8_gloidx_t mesh_offset = t8_forest_get_first_local_leaf_element_id(mesh_.GetMesh());
@@ -939,8 +1080,13 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeRootLevelValues()
 
     /* De-Serialize the values */
     this->data_ = GetRootLevelValuesFromView<T>(data_view, mesh_offset, num_local_elems, root_level_partition);
+    cmc_assert(static_cast<t8_locidx_t>(this->data_.size()) == num_local_elems);
 
-    WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
+    if constexpr (kWriteVTKDecompressionStepData)
+    {
+        const std::string file_prefix = std::string("cmc_decompression_") + std::string(this->compression_info_.GetName()) + std::string("_0");
+        WriteDataToVTK<T>(this->mesh_.GetMesh(), this->data_, std::string(this->compression_info_.GetName()), file_prefix);
+    }
 
     /* Close the shared level window after all values have been extarcted */
     this->CloseSharedLevelDataWindow();
@@ -1063,7 +1209,7 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
                     }
                 }
             }
-            
+
             /* Update the processed elements */
             num_elems_skipped += num_elements_in_tree;
         }
@@ -1138,9 +1284,9 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
         /* Get the next symbol */
         const SymbolType symbol = std::invoke([&stream_decoder](){
             SymbolType next_symbol = stream_decoder.DecodeNextEntropySymbol();
-            if (next_symbol == kProcessEndSymbol<T>) [[unlikely]]
+            if (next_symbol == kProcessEndSymbol) [[unlikely]]
             {
-                while (next_symbol == kProcessEndSymbol<T>)
+                while (next_symbol == kProcessEndSymbol)
                 {
                     stream_decoder.ApplyProcessEndSymbol64Bit();
                     next_symbol = stream_decoder.DecodeNextEntropySymbol();
@@ -1149,17 +1295,11 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
             return next_symbol;
         });
 
-        /* Get the LZC */
-        const int lzc = GetLZCFromEntropySymbol(symbol);
-
-        /* Check if there are significant residual bits */
-        if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
+        /* Check whether the value was predictable during the compression */
+        if (symbol == kFlagUnpredictable)
         {
-            /* Compute the residual length */
-            const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
-
-            /* Skip those bits */
-            stream_decoder.SkipNextBits(residual_length);
+            /* In this case the entropy code is followed by the significant bits of the unpredicted value which we need to skip */
+            stream_decoder.SkipNextBits(sizeof(T) * cmc::bits::kCharBit);
         }
 
         /* Update the discarded entropy codes */
@@ -1167,44 +1307,97 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
     }
 }
 
-
-template<FourByteArithmeticType T, int32_t DIM>
+template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 struct RefinementIterationData
 {
-    RefinementIterationData(const std::span<T> current_data, cmc::bits::StreamDecoder<SymbolType>& stream_decoder_, cmc::bits::vector_view process_local_level_mesh_encoding_)
-    : data(current_data), stream_decoder{stream_decoder_}, process_local_level_mesh_encoding{process_local_level_mesh_encoding_}
+    RefinementIterationData(const std::span<T> current_data, cmc::bits::StreamDecoder<SymbolType>& stream_decoder_, cmc::bits::vector_view process_local_level_mesh_encoding_, const std::unique_ptr<ErrorMesh>& error_mesh_)
+    : data(current_data), stream_decoder{stream_decoder_}, process_local_level_mesh_encoding{process_local_level_mesh_encoding_}, error_mesh{error_mesh_}
     {
         fine_level_data.reserve(current_data.size() * 2 * DIM + 1);
     }
 
     void LeaveElementUnchanged(const int local_idx);
-    void PerformRefinement(const int coarse_value_id, const int num_elements);
+    void PerformRefinement(const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
     bool WillNextElementBeRefined() {return process_local_level_mesh_encoding.GetNextBit();}
+    T GetData(const int idx) const {return data[idx];}
+    inline float GetPermittedAbsError(const t8_scheme_c* scheme, const int global_tree_id, const t8_eclass_t tree_class, const t8_element_t* element) const
+    {
+        return error_mesh->GetPermittedAbsError(scheme, global_tree_id, tree_class, element);
+    }
+
+    void PerformPrediction(const std::vector<T>& control_values, const std::vector<float>& permitted_abs_error);
 
     const std::span<T> data;
     cmc::bits::StreamDecoder<SymbolType>& stream_decoder;
     cmc::bits::vector_view process_local_level_mesh_encoding;
+    const std::unique_ptr<ErrorMesh>& error_mesh;
     std::vector<T> fine_level_data;
 };
 
-template<FourByteArithmeticType T, int32_t DIM>
+
+template<OneByteArithmeticType T>
+inline T 
+GetUnpredictableValue(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
+{
+    const auto value = stream_decoder.GetNextBitSequence<OneByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+    return std::bit_cast<T>(value);
+}
+
+template<TwoByteArithmeticType T>
+inline T 
+GetUnpredictableValue(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
+{
+    const auto value = stream_decoder.GetNextBitSequence<TwoByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+    return std::bit_cast<T>(value);
+}
+
+template<FourByteArithmeticType T>
+inline T 
+GetUnpredictableValue(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
+{
+    const auto value = stream_decoder.GetNextBitSequence<FourByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+    return std::bit_cast<T>(value);
+}
+
+template<EightByteArithmeticType T>
+inline T 
+GetUnpredictableValue(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
+{
+    const auto value = stream_decoder.GetNextBitSequence<EightByteResidualType>(sizeof(T) * cmc::bits::kCharBit);
+    return std::bit_cast<T>(value);
+}
+
+
+template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 void
-RefinementIterationData<T, DIM>::PerformRefinement(const int local_idx, const int num_elements)
+RefinementIterationData<T, DIM>::PerformRefinement(const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
 {
-    /* Get the utilized predictor */
-    const FourByteResidualType predictor = std::bit_cast<FourByteResidualType>(this->data[local_idx]);
+    const int num_elems = static_cast<int>(eval_coords.size());
 
-    /* Iterate over all finer elements that will be constructed */
-    for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
+    /* Re-Create the predictions vector for this family of elements */
+    /** The first child element is always equal to the first control point **/
+    std::vector<T> fam_predictions;
+    fam_predictions.reserve(control_values.size());
+    fam_predictions.push_back(control_values[0].data);
+
+    /* The first child's prediction is equal to the family control value */
+    for (int child_idx{1}; child_idx < num_elems; ++child_idx)
+    {
+        /* Compute the prediction for the refined children elements */
+        fam_predictions.push_back(cmc::par::lossy::idw::util::ComputePrediction<T, DIM>(control_values, eval_coords[child_idx]));
+    }
+
+    /* Check all the entropy codes for this family of elements and potentially de-quantize them */
+    for (int elem_idx{0}; elem_idx < num_elems; ++elem_idx)
     {
         /* Get the next symbol */
         const SymbolType symbol = std::invoke([this](){
             SymbolType next_symbol = stream_decoder.DecodeNextEntropySymbol();
-            if (next_symbol == kProcessEndSymbol<T>) [[unlikely]]
+            if (next_symbol == kProcessEndSymbol) [[unlikely]]
             {
-                while (next_symbol == kProcessEndSymbol<T>)
+                while (next_symbol == kProcessEndSymbol)
                 {
                     stream_decoder.ApplyProcessEndSymbol64Bit();
                     next_symbol = stream_decoder.DecodeNextEntropySymbol();
@@ -1213,66 +1406,29 @@ RefinementIterationData<T, DIM>::PerformRefinement(const int local_idx, const in
             return next_symbol;
         });
 
-        /* Get the LZC from the symbol */
-        const int lzc = GetLZCFromEntropySymbol(symbol);
-
-        if (lzc < static_cast<int>(sizeof(T) * cmc::bits::kCharBit) - 1) [[likely]]
+        /* Check, if the value was un-predictable */
+        if (symbol == kFlagUnpredictable) [[unlikely]]
         {
-            /* Compute the length of the significant residual bits */
-            const int residual_length = sizeof(T) * cmc::bits::kCharBit - 1 - lzc;
+            /* Get the unpredicted value from the stream */
+            const T unpredicted_value = cmc::par::lossy::multi_res::idw::trixi::GetUnpredictableValue<T>(this->stream_decoder);
 
-            /* We obtain the residual and add the implicit one bit  */
-            const FourByteResidualType residual = this->stream_decoder.GetNextBitSequence<FourByteResidualType>(residual_length) | (FourByteResidualType{1} << residual_length);
-
-            /* We create the residual applied value */
-            if (IsApproximationGreater(symbol))
-            {
-                /* Subtract the residual from the prediction */
-                const FourByteResidualType value = cmc::bits::IntegerSubtraction(predictor, residual);
-
-                /* Store the residual applied value */
-                this->fine_level_data.push_back(std::bit_cast<T>(value));
-            } else
-            {
-                /* Add the residual to the prediction */
-                const FourByteResidualType value = cmc::bits::IntegerAddition(predictor, residual);
-
-                /* Store the residual applied value */
-                this->fine_level_data.push_back(std::bit_cast<T>(value));
-            }
+            /* We replace the predicted value with the actual one */
+            fam_predictions[elem_idx] = unpredicted_value;
         } else
         {
-            if (lzc == sizeof(T) * cmc::bits::kCharBit) [[likely]]
-            {
-                /* Store the predictor */
-                this->fine_level_data.push_back(std::bit_cast<T>(predictor));
-                continue;
-            }
+            /* Get the quantization bin from the entropy code */
+            const auto [was_prediction_greater, quant_bin] = GetQuantizationBinFromEntropySymbol(symbol);
 
-            /* Compute the residual in case we do not need to extract a bit-sequence */
-            constexpr FourByteResidualType residual{0x00000001};
-
-            /* We create the residual applied value */
-            if (IsApproximationGreater(symbol))
-            {
-                /* Subtract the residual from the prediction */
-                const FourByteResidualType value = cmc::bits::IntegerSubtraction(predictor, residual);
-
-                /* Store the residual applied value */
-                this->fine_level_data.push_back(std::bit_cast<T>(value));
-            } else
-            {
-                /* Add the residual to the prediction */
-                const FourByteResidualType value = cmc::bits::IntegerAddition(predictor, residual);
-
-                /* Store the residual applied value */
-                this->fine_level_data.push_back(std::bit_cast<T>(value));
-            }
+            /* Apply the de-quantization */
+            fam_predictions[elem_idx] += ((was_prediction_greater ? -2.0 : +2.0) * permitted_abs_error[elem_idx] * quant_bin);
         }
     }
+
+    /* We need to store the the de-quantized values for the next decompression iteration */
+    std::copy_n(fam_predictions.begin(), num_elems, std::back_inserter(this->fine_level_data)); 
 }
 
-template<FourByteArithmeticType T, int32_t DIM>
+template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 inline void
 RefinementIterationData<T, DIM>::LeaveElementUnchanged(const int local_idx)
@@ -1283,42 +1439,231 @@ RefinementIterationData<T, DIM>::LeaveElementUnchanged(const int local_idx)
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 inline t8_locidx_t
-LosslessMultiResDecompression (t8_forest_t forest,
-                               t8_forest_t forest_from,
-                               t8_locidx_t which_tree,
-                               const t8_eclass_t tree_class,
-                               t8_locidx_t lelement_id,
-                               const t8_scheme_c * ts,
-                               [[maybe_unused]] const int is_family,
-                               [[maybe_unused]] const int num_elements,
-                               t8_element_t * elements[])
+LossyMultiResDecompression (t8_forest_t forest,
+                            t8_forest_t forest_from,
+                            t8_locidx_t which_tree,
+                            const t8_eclass_t tree_class,
+                            t8_locidx_t lelement_id,
+                            const t8_scheme_c * ts,
+                            const int is_family,
+                            const int num_elements,
+                            t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
     RefinementIterationData<T, DIM>* adapt_data = static_cast<RefinementIterationData<T, DIM>*>(t8_forest_get_user_data(forest));
     cmc_assert(adapt_data != nullptr);
 
-    /* Check whether we perform a refinement or not */
+    /* Compute the start offset in the local contiguous array of the data*/
+    const int local_start_index = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
+
+    /* Check if the current element will be refined/performs a prediction */
     if (adapt_data->WillNextElementBeRefined())
     {
-        /* If the element will be refined */
-        /* Get the local start index */
-        const int local_idx = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
+        /** The element will be refined and the children elements need to be predicted **/
 
-        /* Get the number of children elements into which this element will be refined */
+        /* Convert the local to a global tree id */
+        const int global_tree_idx = t8_forest_global_tree_id (forest_from, which_tree);
+
+        /* Get the number of children elements that need to be predicted */
         const int num_children = ts->element_get_num_children(tree_class, elements[0]);
+        cmc_assert(num_children <= kNumMaxChildrenElements<DIM>);
 
-        /* Perform the refinement */
-        adapt_data->PerformRefinement(local_idx, num_children);
+        /* Allocate storage for the children elements */
+        std::vector<t8_element_t*> child_elements(num_children, nullptr);
+        t8_element_new (ts, tree_class, num_children, child_elements.data());
+
+        /* Create the children */
+        t8_element_get_children(ts, tree_class, elements[0], num_children, child_elements.data());
+
+        /* Compute the evaluation coords of the constructed children elements */
+        std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> eval_coords;
+        eval_coords.reserve(child_elements.size());
+
+        for (int child_idx{0}; child_idx < num_children; ++child_idx)
+        {
+            eval_coords.emplace_back(cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, which_tree, child_elements[child_idx]));
+        }
+
+        /* Get the number of faces of this element */
+        const int num_faces = ts->element_get_num_faces(tree_class, elements[0]);
+
+        /* Create a vector for all face_values (and fill it with the default value (this families control value)) */
+        std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> control_points;
+        control_points.reserve(1 + num_faces);
+
+        /* Create a point value for the family's control value */
+        control_points.emplace_back();
+        control_points.back().data = adapt_data->GetData(local_start_index);
+        control_points.back().coordinates = eval_coords[0];
+
+        /* Allocate some variables to be filled by the face neighbor calls */
+        const t8_element_t** neighbor_leaves;
+        int* dual_faces;
+        int num_neighbors{0};
+        t8_locidx_t* neighbor_element_indices;
+        t8_eclass_t neighbor_tree_class;
+        t8_gloidx_t gneigh_tree;
+        int orientation;
+
+        /* Iterate over all faces and fill the control points */
+        for (int face_idx{0}; face_idx < num_faces; ++face_idx)
+        {
+            /* Gather the face neighbor via this face */
+            t8_forest_leaf_face_neighbors_ext (forest_from, which_tree, elements[0], &neighbor_leaves, face_idx, &dual_faces, &num_neighbors,
+                                               &neighbor_element_indices, &neighbor_tree_class, &gneigh_tree, &orientation);
+
+            /* Get the coordinates from the control points */
+            for (int neigh_idx{0}; neigh_idx < num_neighbors; ++neigh_idx)
+            {
+                /* Convert to ghost local tree id (it is either a local or a ghost tree) */
+                const t8_locidx_t neigh_tree_idx = t8_forest_get_local_or_ghost_id(forest_from, gneigh_tree);
+                cmc_assert(neigh_tree_idx >= 0);
+
+                /* Add a new control value via this face */
+                control_points.emplace_back();
+                control_points.back().data = adapt_data->GetData(neighbor_element_indices[neigh_idx]);
+                control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, neigh_tree_idx, neighbor_leaves[neigh_idx]);
+            }
+
+            /* Deallocate the memory for the face neighbor construction */
+            if (num_neighbors > 0) {
+                T8_FREE (neighbor_leaves);
+                T8_FREE (neighbor_element_indices);
+                T8_FREE (dual_faces);
+            }
+        }
+
+        /* We need to get the permitted errors for the children elements that will be constructed */
+        std::vector<float> permitted_abs_errors;
+        permitted_abs_errors.reserve(num_children);
+        
+        /* Get the permitted errors for the child elements */
+        for (int child_idx{0}; child_idx < num_children; ++child_idx)
+        {
+            permitted_abs_errors.emplace_back(adapt_data->GetPermittedAbsError(ts, global_tree_idx, tree_class, child_elements[child_idx]));
+        }
+
+        /* Destroy the constructed elements */
+        t8_element_destroy(ts, tree_class, num_children, child_elements.data());
+
+        /* Perform the prediction and get the data for encoding */
+        adapt_data->PerformRefinement(control_points, eval_coords, permitted_abs_errors);
+
         return cmc::t8::kRefineElement;
     } else
     {
-        /* If the element stays unchanged */
-        const int local_idx = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
-
-        /* Perform the unchangendness */
-        adapt_data->LeaveElementUnchanged(local_idx);
+        /** The element remains unchanged, therefore no prediction needs to be made **/
+        adapt_data->LeaveElementUnchanged(local_start_index);
+        
         return cmc::t8::kLeaveElementUnchanged;
     }
+}
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+void
+DecompressionVariableMultiData<T, DIM, N>::CreateGhostLayerOnMesh()
+{
+    t8_forest_t mesh = this->mesh_.GetMesh();
+
+    const t8_locidx_t current_local_elems = t8_forest_get_local_num_leaf_elements(mesh);
+
+    /* Allocate a new forest */
+    t8_forest_t ghost_mesh;
+    t8_forest_init (&ghost_mesh);
+
+    /* Set the base forest mesh */
+    t8_forest_set_copy(ghost_mesh, mesh);
+
+    /* Set the forest for creating a face ghost layer */
+    t8_forest_set_ghost (ghost_mesh, 1, T8_GHOST_FACES);
+
+    /* Commit the forest, this step will perform the partitioning and ghost layer creation. */
+    t8_forest_commit (ghost_mesh);
+
+    /* Get the number of ghost elements of forest. */
+    const t8_locidx_t num_ghost_elements = t8_forest_get_num_ghosts (ghost_mesh);
+
+    /* Allocate a vector holding the local data and the ghost data */
+    std::vector<T> local_and_ghost_values(current_local_elems + num_ghost_elements);
+    std::copy_n(this->data_.begin(), current_local_elems, local_and_ghost_values.begin());
+
+    /* Create a wrapper for the ghost exchange */
+    sc_array_t* ghost_exchange_data = sc_array_new_data (local_and_ghost_values.data(), sizeof(T), current_local_elems + num_ghost_elements);
+
+    /* Exchange the ghost data for the newly partitioned data */
+    t8_forest_ghost_exchange_data (ghost_mesh, ghost_exchange_data);
+
+    /* Destroy the array wrapper */
+    sc_array_destroy(ghost_exchange_data);
+
+    /* Set the mesh and the data */
+    this->mesh_.SetMesh(ghost_mesh);
+    this->data_ = std::move(local_and_ghost_values);
+}
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+std::pair<t8_forest_t, std::vector<T>>
+DecompressionVariableMultiData<T, DIM, N>::RepartitionForRefinementIteration(t8_forest_t mesh, std::vector<T>& data)
+{
+    const t8_locidx_t current_local_elems = t8_forest_get_local_num_leaf_elements(mesh);
+    const t8_locidx_t current_ghost_elems = t8_forest_get_num_ghosts (mesh);
+
+    cmc_assert(current_local_elems + current_ghost_elems == static_cast<t8_locidx_t>(data.size()));
+
+    /* Keep the not-partitioned forest */
+    t8_forest_ref(mesh);
+
+    /** Partition the forest correctly and build a halo layer **/
+    t8_forest_t partitioned_ghost_mesh;
+    t8_forest_init (&partitioned_ghost_mesh);
+
+    /* Set the forest for partitioning */
+    t8_forest_set_partition (partitioned_ghost_mesh, mesh, 0);
+
+    /* Set the forest for creating a face ghost layer */
+    t8_forest_set_ghost (partitioned_ghost_mesh, 1, T8_GHOST_FACES);
+
+    /* Commit the forest, this step will perform the partitioning and ghost layer creation. */
+    t8_forest_commit (partitioned_ghost_mesh);
+
+    /** Exchange the data corectly to set up the halo layer **/
+    /* Get the number of local elements */
+    const t8_locidx_t num_local_elements = t8_forest_get_local_num_leaf_elements(partitioned_ghost_mesh);
+    
+    /* Get the number of ghost elements of forest. */
+    const t8_locidx_t num_ghost_elements = t8_forest_get_num_ghosts (partitioned_ghost_mesh);
+
+    /* Create an sc_array_t wrapper of the variable's local element data */
+    sc_array_t* in_data = sc_array_new_data (static_cast<void*>(data.data()), sizeof(T), current_local_elems);
+
+    /* Allocate an output vector for the partitioned data */
+    std::vector<T> partitioned_ghost_data(num_local_elements + num_ghost_elements);
+
+    /* Create a wrapper for the freshly allocated partitioned data */
+    sc_array_t* out_data = sc_array_new_data (static_cast<void*>(partitioned_ghost_data.data()), sizeof(T), num_local_elements);
+
+    /* Partition the variables local element data */
+    t8_forest_partition_data(mesh, partitioned_ghost_mesh, in_data, out_data);
+
+    /* Destroy the array wrappers */
+    sc_array_destroy(in_data);
+    sc_array_destroy(out_data);
+
+    /* Free the former forest */
+    t8_forest_unref(&mesh);
+
+    /* Create a wrapper for the ghost exchange */
+    sc_array_t* ghost_exchange_data = sc_array_new_data (partitioned_ghost_data.data(), sizeof(T), num_local_elements + num_ghost_elements);
+
+    /* Exchange the ghost data for the newly partitioned data */
+    t8_forest_ghost_exchange_data (partitioned_ghost_mesh, ghost_exchange_data);
+
+    /* Destroy the array wrapper */
+    sc_array_destroy(ghost_exchange_data);
+
+    return std::make_pair(partitioned_ghost_mesh, std::move(partitioned_ghost_data));
 }
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
@@ -1346,8 +1691,8 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         cmc::bits::vector_view level_data_encoding(shared_lvl_start_ptr);
 
         /* Get the global offset of the first element */
-        const SizeType mesh_offset = (SizeType) t8_forest_get_first_local_leaf_element_id(mesh_.GetMesh());
-        const SizeType num_local_elems = (SizeType) t8_forest_get_local_num_leaf_elements(mesh_.GetMesh());
+        const SizeType mesh_offset = (SizeType) t8_forest_get_first_local_leaf_element_id(this->mesh_.GetMesh());
+        const SizeType num_local_elems = (SizeType) t8_forest_get_local_num_leaf_elements(this->mesh_.GetMesh());
 
         /* Move the stream decoder to the correct starting position */
         this->SetStartPositionForStreamDecoder(this->stream_decoder_, level_data_encoding, level_mesh_encoding, level_partition, mesh_offset, num_local_elems);
@@ -1358,30 +1703,28 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
     
         /****** Perform the local refinement onto the next finer level as dictated by the mesh encoding ******/
         /* Crerate the adaptation data */
-        RefinementIterationData<T, DIM> adapt_data(std::span<T>(this->data_), this->stream_decoder_, process_local_level_mesh_encoding);
+        RefinementIterationData<T, DIM> adapt_data(std::span<T>(this->data_), this->stream_decoder_, process_local_level_mesh_encoding, this->error_mesh_);
 
         /* Perform a decompression iteration */
-        t8_forest_t adapted_forest = t8_forest_new_adapt(mesh_.GetMesh(), LosslessMultiResDecompression<T, DIM>, 0, 0, static_cast<void*>(&adapt_data));
+        t8_forest_t adapted_forest = t8_forest_new_adapt(mesh_.GetMesh(), LossyMultiResDecompression<T, DIM>, 0, 0, static_cast<void*>(&adapt_data));
         cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements");
 
         /****** Partition the mesh and the data ******/
-        /* Store the refined data */
-        this->data_ = std::move(adapt_data.fine_level_data);
 
-        /* Repartition the mesh */
-        t8_forest_t partitioned_forest = this->RepartitionMesh(adapted_forest);
+        /* Repartition the mesh and the data */
+        auto [partitioned_mesh, partitioned_data] = this->RepartitionForRefinementIteration(adapted_forest, adapt_data.fine_level_data);
 
-        /* Repartition the fine data to coincide with the mesh */
-        this->RepartitionData(adapted_forest, partitioned_forest);
+        /* Store the partitioned mesh and the data */
+        this->mesh_.SetMesh(partitioned_mesh);
+        this->data_ = std::move(partitioned_data);
 
-        /* Store the partitioned mesh */
-        mesh_.SetMesh(partitioned_forest);
-
-        //WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
+        if constexpr (kWriteVTKDecompressionStepData)
+        {
+            const std::string file_prefix = std::string("cmc_decompression_") + std::string(this->compression_info_.GetName()) + std::string("_") + std::to_string(mesh_lvl);
+            WriteDataToVTK<T>(this->mesh_.GetMesh(), this->data_, std::string(this->compression_info_.GetName()), file_prefix);
+        }
 
         /****** Clean-Up of the decompression iteration ******/
-        /* Free the former/coarser forest */
-        t8_forest_unref(&adapted_forest);
 
         /* Close this levels data window */
         this->CloseSharedLevelDataWindow();
@@ -1392,6 +1735,52 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
     }
 }
 
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+void
+SkipToNextCompressedElement(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
+{
+    /* We always need to skip the first level prediction control values and afterwards the second level predictions of the init data */
+    constexpr int kNumControlPoints = kNumIntraElemControlValues<DIM>;
+    constexpr int kNumInitPredictionPoints = kNumInitDataPredictions<DIM, N>;
+
+    /* Iterate over all control values */
+    for (int cidx{0}; cidx < kNumControlPoints; ++cidx)
+    {
+        /* Decode the next entropy symbol */
+        SymbolType symbol = stream_decoder.DecodeNextEntropySymbol();
+
+        if (cidx == 0 && symbol == kProcessEndSymbol) [[unlikely]]
+        {
+            while (symbol == kProcessEndSymbol)
+            {
+                stream_decoder.ApplyProcessEndSymbol64Bit();
+                symbol = stream_decoder.DecodeNextEntropySymbol();
+            }
+        }
+        
+        /* Check if it is an unpredictable value */
+        if (symbol == cmc::par::lossy::multi_res::kFlagUnpredictable) [[unlikely]]
+        {
+            /* In that case, we need to skip the the full unpredictable value */
+            stream_decoder.SkipNextBits(sizeof(T) * cmc::bits::kCharBit);
+        }
+    }
+
+    /* Iterate over all prediction data points */
+    for (int iidx{0}; iidx < kNumInitPredictionPoints; ++iidx)
+    {
+        /* Decode the next entropy symbol */
+        SymbolType symbol = stream_decoder.DecodeNextEntropySymbol();
+        
+        /* Check if it is an unpredictable value */
+        if (symbol == cmc::par::lossy::multi_res::kFlagUnpredictable) [[unlikely]]
+        {
+            /* In that case, we need to skip the the full unpredictable value */
+            stream_decoder.SkipNextBits(sizeof(T) * cmc::bits::kCharBit);
+        }
+    }
+}
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -1420,6 +1809,7 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForIntraElemStreamDec
     /* Set the level stream decoder correctly */
     cmc::bits::vector_view adjusted_level_data = level_encoding;
 
+    cmc_debug_msg("Computed stream offset: ", level_entropy_offset * cmc::bits::kCharBit);
     adjusted_level_data.MoveToOffsetBitInStream(level_entropy_offset * cmc::bits::kCharBit);
 
     /* Set the adjusted in the stream decoder */
@@ -1444,28 +1834,135 @@ struct RefinementIntraElementData
     {
         static_assert(N >= 1);
 
-        fine_elem_data.reserve(current_data.size() * N);
+        fine_elem_data.reserve(current_data.size() * kGetNumPointsPerElement<DIM, N>());
     }
 
-    void PerformRefinement(const int coarse_value_id);
+    void PerformRefinement(const int coarse_value_id, const float permitted_abs_error, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates);
 
     const std::span<T> data;
     cmc::bits::StreamDecoder<SymbolType>& stream_decoder;
     std::vector<T> fine_elem_data;
 };
 
+static int celem_id{0};
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+std::array<T, kGetNumPointsPerElement<DIM, N>()>
+PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const T coarse_predictor, const float permitted_abs_error, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates)
+{
+    constexpr int kNumControlPoints = kNumIntraElemControlValues<DIM>;
+    constexpr int kNumInitPredictionPoints = kNumInitDataPredictions<DIM, N>;
+
+    /* Allocate the predicted data on the element */
+    std::array<T, kGetNumPointsPerElement<DIM, N>()> predictions;
+
+    cmc_assert(reference_coordinates.size() == static_cast<size_t>(kGetNumPointsPerElement<DIM, N>()));
+
+    /* Create the prediction control values */
+    std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> prediction_control_values(kNumControlPoints);
+
+    {
+    /* Get the indices of the control values */
+    constexpr std::array<int, kNumControlPoints> control_val_indices = GetControlValueIndices<DIM, N>();
+
+    /* Assign the correct reference coordinates to the control values */
+    for (int cidx{0}; cidx < kNumIntraElemControlValues<DIM>; ++cidx)
+    {
+        prediction_control_values[cidx].coordinates = reference_coordinates[control_val_indices[cidx]];
+    }
+    
+    /* Recreate the control values */
+    for (int cidx{0}; cidx < kNumControlPoints; ++cidx)
+    {
+        /* Get the entropy symbol */
+        SymbolType symbol = stream_decoder.DecodeNextEntropySymbol();
+
+        /* Check first entropy symbol for "ProcessEnd", elements are coded contiguously and there cannot be a partition bound wihtin an element */
+        if (cidx == 0 && symbol == kProcessEndSymbol) [[unlikely]]
+        {
+            while (symbol == kProcessEndSymbol)
+            {
+                stream_decoder.ApplyProcessEndSymbol64Bit();
+                symbol = stream_decoder.DecodeNextEntropySymbol();
+            }
+        }
+
+        /* Check, if the value was un-predictable */
+        if (symbol == kFlagUnpredictable) [[unlikely]]
+        {
+            /* Get the unpredicted value from the stream */
+            const T unpredicted_value = cmc::par::lossy::multi_res::idw::trixi::GetUnpredictableValue<T>(stream_decoder);
+
+            /* We store the unpredicted value */
+            predictions[control_val_indices[cidx]] = unpredicted_value;
+
+        } else
+        {
+            /* Get the quantization bin from the entropy code */
+            const auto [was_prediction_greater, quant_bin] = GetQuantizationBinFromEntropySymbol(symbol);
+
+            /* Apply the de-quantization */
+            predictions[control_val_indices[cidx]] = coarse_predictor + ((was_prediction_greater ? -2.0 : +2.0) * permitted_abs_error * quant_bin);
+        }
+
+        /* Store the predicted values as a control value */
+        prediction_control_values[cidx].data = predictions[control_val_indices[cidx]];
+
+        //cmc_debug_msg("celem_id: ", celem_id);
+        //++celem_id;
+    }
+
+    }
+
+    /* Get the prediction indices */
+    constexpr std::array<int, kNumInitPredictionPoints> prediciton_indices = GetPredictionReferenceCoordinates<DIM, N>();
+
+    /* For the second prediciton step, we do perform an IDW prediction on the reference coordinates */
+    for (int iidx{0}; iidx < kNumInitPredictionPoints; ++iidx)
+    {
+        /* Decode the next entropy symbol, since the whole element is encoded contiguously, there cannot be a "ProcessEnd"-Symbol in between */
+        SymbolType symbol = stream_decoder.DecodeNextEntropySymbol();
+        
+        /* Check if it is an unpredictable value */
+        if (symbol == cmc::par::lossy::multi_res::kFlagUnpredictable) [[unlikely]]
+        {
+            /* Get the unpredicted value from the stream */
+            const T unpredicted_value = cmc::par::lossy::multi_res::idw::trixi::GetUnpredictableValue<T>(stream_decoder);
+
+            /* We store the unpredicted value */
+            predictions[prediciton_indices[iidx]] = unpredicted_value;
+
+        } else
+        {
+            /* Get the quantization bin */
+            const auto [was_prediction_greater, quant_bin] = GetQuantizationBinFromEntropySymbol(symbol);
+
+            /* Perform the IDW prediction */
+            const T prediction = ComputePrediction<T, DIM>(prediction_control_values, reference_coordinates[prediciton_indices[iidx]]);
+
+            /* Perform the de-quantization */
+            predictions[prediciton_indices[iidx]] = prediction + ((was_prediction_greater ? -2.0 : +2.0) * permitted_abs_error * quant_bin);
+        }
+
+        //cmc_debug_msg("celem_id: ", celem_id);
+        //++celem_id;
+    }
+
+    return predictions;
+}
+
 template<FourByteArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 inline void
-RefinementIntraElementData<T, DIM, N>::PerformRefinement(const int coarse_value_id)
+RefinementIntraElementData<T, DIM, N>::PerformRefinement(const int coarse_value_id, const float permitted_abs_error, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates)
 {
     /* Perform the element decoding */
-    const std::array<T, N> elem_data = PerformElementDecoding<float, DIM, N>(this->stream_decoder, data[coarse_value_id]);
+    const std::array<T, kGetNumPointsPerElement<DIM, N>()> elem_data = PerformElementDecoding<T, DIM, N>(this->stream_decoder, this->data[coarse_value_id], permitted_abs_error, reference_coordinates);
 
     /* Copy the data to the fine value output */
-    std::copy_n(elem_data.begin(), N, std::back_inserter(fine_elem_data));
+    std::copy_n(elem_data.begin(), kGetNumPointsPerElement<DIM, N>(), std::back_inserter(this->fine_elem_data));
 }
-
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -1478,46 +1975,138 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeIntraElementSteps()
     this->stream_decoder_.StartHuffmanCodesDecoding(this->compression_info_.GetIntraElementCompressionHuffmanCodes());
 
     const int num_mesh_compression_levels = this->compression_info_.mesh_compression_levels;
-    const int num_intra_elem_compression_levels = this->compression_info_.intra_elem_compression_levels > 0 ? 1 : 0;
+    /* Currently, there is only one intra-element compression iteration */
+    cmc_assert(this->compression_info_.intra_elem_compression_levels == 1);
+    const int intra_lvl = 0;
+    
+    cmc_debug_msg("The intra element decompression step ", num_mesh_compression_levels + intra_lvl," starts...");
+    /****** Get the correct view on this level for each process ******/
+    /* Get the Level partition information */
+    const std::vector<LevelPartition> intra_level_data_partition = this->compression_info_.GetLevelPartition(num_mesh_compression_levels + intra_lvl);
 
-    for (int intra_lvl{0}; intra_lvl < num_intra_elem_compression_levels; ++intra_lvl)
+    cmc_global_msg("First intra elem data partiition, elem_off: ", intra_level_data_partition.front().elem_offset , ", coding_byte_offset: ", intra_level_data_partition.front().coding_byte_offset);
+    cmc_global_msg("Second intra elem data partiition, elem_off: ", intra_level_data_partition[1].elem_offset , ", coding_byte_offset: ", intra_level_data_partition[1].coding_byte_offset);
+
+    /* Get the global offset of the first element */
+    const SizeType mesh_offset = (SizeType) t8_forest_get_first_local_leaf_element_id(mesh_.GetMesh());
+    const SizeType num_local_elems = (SizeType) t8_forest_get_local_num_leaf_elements(mesh_.GetMesh());
+
+    /* Open shared data window on this levels encoding */
+    const uint64_t* shared_intra_lvl_start_ptr = this->OpenSharedLevelDataWindow(num_mesh_compression_levels + intra_lvl);
+
+    /* Create an encoded level data view */
+    cmc::bits::vector_view intra_level_data_encoding(shared_intra_lvl_start_ptr);
+
+    /* Setup intra element decompression view */
+    this->SetStartPositionForIntraElemStreamDecoder(this->stream_decoder_, intra_level_data_encoding, intra_level_data_partition, mesh_offset, num_local_elems);
+    
+    /* Setup the decompressor */
+    RefinementIntraElementData<T, DIM, N> intra_level_decompressor(std::span<T>(this->data_), this->stream_decoder_);
+
+    /* Get the forest's scheme */
+    const t8_scheme_c* scheme = t8_forest_get_scheme(this->mesh_.GetMesh());
+
+    /* Get the number of local trees in the mesh */
+    const t8_locidx_t num_local_trees = t8_forest_get_num_local_trees(this->mesh_.GetMesh());
+
+    int elem_offset{0};
+
+    /* Iterate over all elements in all trees */
+    for (int tree_idx{0}; tree_idx < num_local_trees; ++tree_idx)
     {
-        cmc_debug_msg("The intra element decompression step ", num_mesh_compression_levels + intra_lvl," starts...");
-        /****** Get the correct view on this level for each process ******/
-        /* Get the Level partition information */
-        const std::vector<LevelPartition> intra_level_data_partition = this->compression_info_.GetLevelPartition(num_mesh_compression_levels + intra_lvl);
+        /* Get the class of the tree */
+        const t8_eclass_t tree_class = t8_forest_get_tree_class (this->mesh_.GetMesh(), tree_idx);
 
-        /* Get the global offset of the first element */
-        const SizeType mesh_offset = (SizeType) t8_forest_get_first_local_leaf_element_id(mesh_.GetMesh());
-        const SizeType num_local_elems = (SizeType) t8_forest_get_local_num_leaf_elements(mesh_.GetMesh());
+        /* Get the number of elements in the tree */
+        const t8_locidx_t  num_elements_in_tree = t8_forest_get_tree_num_leaf_elements (this->mesh_.GetMesh(), tree_idx);
 
-        /* Open shared data window on this levels encoding */
-        const uint64_t* shared_intra_lvl_start_ptr = this->OpenSharedLevelDataWindow(num_mesh_compression_levels + intra_lvl);
-        /* Create an encoded level data view */
-        cmc::bits::vector_view intra_level_data_encoding(shared_intra_lvl_start_ptr);
+        /* Get the global tree id */
+        const int global_tree_id = t8_forest_global_tree_id (this->mesh_.GetMesh(), tree_idx);
 
-        /* Setup intra element decompression view */
-        this->SetStartPositionForIntraElemStreamDecoder(this->stream_decoder_, intra_level_data_encoding, intra_level_data_partition, mesh_offset, num_local_elems);
-        
-        /* Setup the decompressor */
-        RefinementIntraElementData<T, DIM, N> intra_level_decompressor(std::span<T>(this->data_), this->stream_decoder_);
-
-        /* Iterate over all local elements and decompress them */
-        for (int elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
+        /* Iterate over all tree-local elements and encode them */
+        for (int elem_idx = 0; elem_idx < num_elements_in_tree; ++elem_idx)
         {
-            intra_level_decompressor.PerformRefinement(elem_idx);
+            /* Get the current element */
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree (this->mesh_.GetMesh(), tree_idx, elem_idx);
+
+            /* Get the permmitted absolute error for this element */
+            const float permitted_abs_error = this->error_mesh_->GetPermittedAbsError(scheme, global_tree_id, tree_class, element);
+
+            /* Perform the element-wise intra decompression */
+            intra_level_decompressor.PerformRefinement(elem_offset, permitted_abs_error, this->reference_coordinates_);
+
+            /* Update the offsets */
+            ++elem_offset;
         }
-
-        /* Store the output data */
-        this->data_ = std::move(intra_level_decompressor.fine_elem_data);
-
-        /* CLose this levels data window */
-        this->CloseSharedLevelDataWindow();
-
-        /* Update the decompression count */
-        ++(this->decompression_step_idx_);
-        cmc_debug_msg("The intra element decompression step ", num_mesh_compression_levels + intra_lvl, " has been completed.");
     }
+    
+    /* Store the output data */
+    this->data_ = std::move(intra_level_decompressor.fine_elem_data);
+
+    /* CLose this levels data window */
+    this->CloseSharedLevelDataWindow();
+
+    /* Update the decompression count */
+    ++(this->decompression_step_idx_);
+    cmc_debug_msg("The intra element decompression step ", num_mesh_compression_levels + intra_lvl, " has been completed.");
+}
+
+template<ArithmeticType T, int32_t DIM, int32_t N>
+requires Dimension<DIM>
+void
+DecompressionVariableMultiData<T, DIM, N>::ReconstructErrorMesh()
+{
+    /* The error mesh is stored directly before the encoding start, therfore, we can just move the given bytes back */
+    const MPI_Aint file_error_mesh_offset = this->compression_info_.offset_start_encoding - this->compression_info_.num_bytes_global_error_mesh_encoding;
+    cmc_assert(file_error_mesh_offset % sizeof(uint64_t) == 0);
+
+    /* Create a shared memory window */
+    MPI_Win error_mesh_window;
+
+    /* Compute equal distributions for the encoded error mesh */
+    const SizeType num_global_vals = this->compression_info_.num_bytes_global_error_mesh_encoding / sizeof(uint64_t);
+    cmc_assert(this->compression_info_.num_bytes_global_error_mesh_encoding % sizeof(uint64_t) == 0);
+
+    const SizeType proc_offset_val_stream = static_cast<SizeType>(((static_cast<double>(this->shm_rank_) * static_cast<long double>(num_global_vals)) / static_cast<double>(this->shm_size_)));
+    const SizeType next_proc_offset_val_stream = static_cast<SizeType>(((static_cast<double>(this->shm_rank_ + 1) * static_cast<long double>(num_global_vals)) / static_cast<double>(this->shm_size_)));
+    cmc_assert(proc_offset_val_stream <= next_proc_offset_val_stream);
+    const int val_stream_length = static_cast<int>(next_proc_offset_val_stream - proc_offset_val_stream);
+    const int byte_stream_length = val_stream_length * sizeof(uint64_t);
+
+    /* Allocate a window on the shared memory communicators */
+    uint64_t* shm_mem{nullptr};
+    const int rv_win_alloc = MPI_Win_allocate_shared(static_cast<MPI_Aint>(byte_stream_length), sizeof(uint64_t), MPI_INFO_NULL, this->shm_comm_, &shm_mem, &error_mesh_window);
+    MPICheckError(rv_win_alloc);
+
+    /* Move to the correct position in the file for the current level on the current process */
+    const MPI_Offset file_offset = file_error_mesh_offset + proc_offset_val_stream * sizeof(uint64_t);
+    
+    const int rv_seek_start = MPI_File_seek(this->fhandle_, file_offset, MPI_SEEK_SET);
+    MPICheckError(rv_seek_start);
+
+    /* Read the corresponding data */
+    MPI_Status status;
+    const int rv_read_data = MPI_File_read(this->fhandle_, shm_mem, val_stream_length, MPI_UINT64_T, &status);
+    MPICheckError(rv_read_data);
+    CheckMPIReadCorrectness(&status, MPI_UINT64_T, val_stream_length);
+
+    /* Next, we synchronize the window */
+    const int rv_sync_win = MPI_Win_sync(error_mesh_window);
+    MPICheckError(rv_sync_win);
+
+    /* Impose an additional barrier on the shared communicator */
+    const int rv_shm_barrier = MPI_Barrier(this->shm_comm_);
+    MPICheckError(rv_shm_barrier);
+
+    /* Setup the decoding start for the error mesh correctly */
+    const uint64_t* error_mesh_start = shm_mem - proc_offset_val_stream;
+
+    /* Reconstruct the error mesh */
+    this->error_mesh_ = std::make_unique<ErrorMesh>(this->mesh_.GetMesh(), error_mesh_start, this->shm_comm_, this->shm_rank_, this->shm_size_);
+
+    /* Delete the window */
+    const int rv_win_free = MPI_Win_free(&error_mesh_window);
+    MPICheckError(rv_win_free);
 }
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
@@ -1533,8 +2122,14 @@ DecompressionVariableMultiData<T, DIM, N>::Decompress()
     /* Inquire the basic information about the compression */
     this->InquireCompressionInfo();
 
+    /* Reconstruct the error mesh */
+    this->ReconstructErrorMesh();
+
     /* Decode the root level */
     this->DecodeRootLevelValues();
+
+    /* Create a ghost layer on the initial forest with the decompressed root level data */
+    this->CreateGhostLayerOnMesh();
 
     /* Perform the level-wise iterative decompression */
     this->DecodeMeshCompressionSteps();
@@ -1553,6 +2148,10 @@ DecompressionVariableMultiData<T, DIM, N>::Decompress()
     /* Free the allocated window */
     const int rv_win_free = MPI_Win_free(&(this->compression_info_.shared_data));
     MPICheckError(rv_win_free);
+
+    /* Free the error mesh */
+    cmc_assert(this->error_mesh_ != nullptr);
+    this->error_mesh_->DestructErrorMeshCollectively();
 
     /* Close the compressed file */
     const int rv_close = MPI_File_close(&this->fhandle_);
@@ -1578,4 +2177,4 @@ DecompressionVariableMultiData<T, DIM, N>::GetDecompressedData()
 }
 
 }
-#endif /* !CMC_PAR_MULTI_RES_DECOMPRESSION_HXX */
+#endif /* !CMC_AMR_LOSSY_TRIXI_PAR_MULTI_RES_DECOMPRESSION_HXX */

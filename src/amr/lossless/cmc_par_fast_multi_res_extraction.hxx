@@ -1,8 +1,13 @@
-#ifndef CMC_PAR_MULTI_RES_EXTRACTION_HXX
-#define CMC_PAR_MULTI_RES_EXTRACTION_HXX
+
+#if 0
+Mesh Compression has been reduced to aritzhmetic mean only; the intra compression has to be updated and the decompression as well
+#endif
+
+#ifndef CMC_PAR_FAST_MULTI_RES_EXTRACTION_HXX
+#define CMC_PAR_FAST_MULTI_RES_EXTRACTION_HXX
 
 #include "cmc.hxx"
-#include "amr/lossless/cmc_par_multi_res_extraction_util.hxx"
+#include "amr/lossless/cmc_par_fast_multi_res_extraction_util.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
@@ -14,7 +19,7 @@
 #include <span>
 #include <filesystem>
 
-namespace cmc::par::lossless::multi_res
+namespace cmc::par::lossless::multi_res::fast
 {
 
 /* Forward declaration of the general compression variable */
@@ -39,6 +44,7 @@ public:
     CompressionVariableMultiData() = delete;
     CompressionVariableMultiData(std::string name, t8_forest_t forest, const std::span<T> data)
     : name_(name), mesh_(forest), init_data_(data) {
+        static_assert(N == 1, " Currently, the intra element compression is not supported");
         /* Get the MPI communicator from the mesh */
         this->comm_ = t8_forest_get_mpicomm(forest);
         /* Get the rank and the size of the communicator */
@@ -254,50 +260,33 @@ CoarseningIterationData<T, DIM>::PerformExtraction(const int local_idx, const in
     /* Indicate that corsening has been performed */
     this->coarsening_indications.AppendSetBit();
 
-    /* Perform the multi-resolution extraction */
-    const std::vector<T> predictors = CreatePredictors<T>(std::span<T>(&(this->data[local_idx]), num_elements));
+    /* Create a view on the initial data */
+    const std::span<T> init_values(&(this->data[local_idx]), num_elements);
+
+    /* Compute the arithmetic mean */
+    const T predictor = ComputeArithmeticMean<T>(init_values);
 
     int current_lzc{-1};
     T lzc_maximizing_predictor{};
 
     ElemEncodingData<T, DIM> elem_coding;
     elem_coding.num_elements = num_elements;
-
-    /* For all predictors, we evaluate the one that gives us the overall maximum number of leading zeros */
-    for (int pred_idx{0}; pred_idx < num_elements + 2; ++pred_idx)
-    {
-        std::array<SymbolType, kNumMaxChildrenElements<DIM>> current_entropy_codes{};
-        Residuals<T, DIM> current_residuals{};
         
-        /* Check the predictor for all element values */
-        for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
-        {
-            /* Compute the residual */
-            const auto [is_approx_greater, residual] = cmc::bits::ComputeIntegerResidual<T>(predictors[pred_idx], predictors[elem_idx]);
+    /* Check the predictor for all element values (except the last which is implciitly given by all other values and the mean) */
+    for (int elem_idx{0}; elem_idx < num_elements - 1; ++elem_idx)
+    {
+        /* Compute the residual */
+        const auto [is_approx_greater, residual] = cmc::bits::ComputeIntegerResidual<T>(predictor, init_values[elem_idx]);
             
-            /* Store the entropy code */
-            current_entropy_codes[elem_idx] = CreateEntropySymbol(is_approx_greater, residual);
+        /* Store the entropy code */
+        elem_coding.entropy_symbols[elem_idx] = CreateEntropySymbol(is_approx_greater, residual);
             
-            /* Store the residual */
-            current_residuals.residuals[elem_idx] = residual;
-        }
-
-        /* Compute the cumulative leading zero count */
-        const int cumulative_lzc = std::transform_reduce(std::execution::par_unseq, current_residuals.residuals.cbegin(), current_residuals.residuals.cend(), static_cast<int>(0),
-                                                         std::plus<>{}, [](auto res){return cmc::bits::GetLZC(res);});
-
-        /* If the predictor maximizes the LZC, we store it */
-        if (current_lzc < cumulative_lzc)
-        {
-            current_lzc = cumulative_lzc;
-            lzc_maximizing_predictor = predictors[pred_idx];
-            std::copy_n(current_entropy_codes.cbegin(), kNumMaxChildrenElements<DIM>, elem_coding.entropy_symbols.begin());
-            std::copy_n(current_residuals.residuals.cbegin(), kNumMaxChildrenElements<DIM>, elem_coding.residuals.begin());
-        }
+        /* Store the residual */
+        elem_coding.residuals[elem_idx] = residual;
     }
 
     /* We store the lzc_maximizing_predictor for the next coarse level */
-    this->coarse_level_data.push_back(lzc_maximizing_predictor);
+    this->coarse_level_data.push_back(predictor);
 
     /* Store this elements coarsening data */
     this->residual_encodings.push_back(elem_coding);
@@ -674,8 +663,8 @@ ExchangeEntropySymbols(const std::vector<std::vector<ElemEncodingData<T, DIM>>>&
         /* Iterate through all coarsening data on this level */
         for (size_t coarsening_idx{0}; coarsening_idx < levelwise_residuals[lvl_idx].size(); ++coarsening_idx)
         {
-            /* Iterate over all entropy codes from this coarsening data */
-            for (unsigned entropy_sym_idx{0}; entropy_sym_idx < levelwise_residuals[lvl_idx][coarsening_idx].num_elements; ++entropy_sym_idx)
+            /* Iterate over all entropy codes from this coarsening data (the last element has no entropy code since its implciitly given) */
+            for (unsigned entropy_sym_idx{0}; entropy_sym_idx < levelwise_residuals[lvl_idx][coarsening_idx].num_elements - 1; ++entropy_sym_idx)
             {
                 /* Convert the symbol to the corresponding array index */
                 const int array_idx = MapEntropySymbolToArrayIndex<T>(levelwise_residuals[lvl_idx][coarsening_idx].entropy_symbols[entropy_sym_idx]);
@@ -785,7 +774,7 @@ void
 CompressionVariableMultiData<T, DIM, N>::EncodeData()
 {
     /* Collect and exchange all entropy symbols */
-    const std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> entropy_symbols = ExchangeEntropySymbols<T>(this->residual_encodings_, this->comm_);
+    const std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> entropy_symbols = cmc::par::lossless::multi_res::fast::ExchangeEntropySymbols<T>(this->residual_encodings_, this->comm_);
     
     /* Create a Huffman encoder */
     cmc::entropy_coding::huffman::HuffmanCoder<SymbolType> entropy_coder(entropy_symbols);
@@ -837,35 +826,8 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
                 /* Define a refernce for the ease of notation */
                 const ElemEncodingData<T, DIM>& coarse_data = lvl_coarsening_data[coarsening_data_idx];
 
-                #if 0
-                //Blocked Encoding, first all entropy codes than all residuals; however decoding in parallel is deteriorated by this
-                /* Encode this elements entropy codes */
-                for (int child_elem_idx{0}; child_elem_idx < coarse_data.num_elements; ++child_elem_idx)
-                {
-                    //cmc::cmc_global_msg("Elem idx: ", child_elem_idx, ", value: ", static_cast<int>(coarse_data.entropy_symbols[child_elem_idx]));
-                    /* Encode the entropy symbol */
-                    const cmc::entropy_coding::huffman::HuffmanCode code = entropy_coder.EncodeSymbol(coarse_data.entropy_symbols[child_elem_idx]);
-
-                    /* Serialize the encoded entropy symbol */
-                    lvl_data.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
-                }
-
-                /* Encode this elements residuals */
-                for (int child_elem_idx{0}; child_elem_idx < coarse_data.num_elements; ++child_elem_idx)
-                {
-                    /* Retrieve the LZC from the entropy symbol */
-                    const int lzc = GetLZCFromEntropySymbol(coarse_data.entropy_symbols[child_elem_idx]);
-
-                    /* We do not need to encode the implicit given one-bit following the LZC */
-                    if (lzc + 1 < sizeof(T) * cmc::bits::kCharBit) [[likely]]
-                    {
-                        /* Append the significant reisdual bits */
-                        lvl_data.AppendBits(coarse_data.residuals[child_elem_idx], lzc + 1, 0);
-                    }
-                }
-                #else
-                //Interleaved Encoding, always pair of entropy code and corresponding reisdual
-                for (int child_elem_idx{0}; child_elem_idx < static_cast<int>(coarse_data.num_elements); ++child_elem_idx)
+                //Interleaved Encoding, always pair of entropy code and corresponding residual (the last child of the family has no entropy code and residual)
+                for (int child_elem_idx{0}; child_elem_idx < static_cast<int>(coarse_data.num_elements) - 1; ++child_elem_idx)
                 {
                     /* Encode the entropy symbol */
                     const cmc::entropy_coding::huffman::HuffmanCode code = entropy_coder.EncodeSymbol(coarse_data.entropy_symbols[child_elem_idx]);
@@ -883,7 +845,6 @@ CompressionVariableMultiData<T, DIM, N>::EncodeData()
                         lvl_data.AppendBits(coarse_data.residuals[child_elem_idx], lzc + 1, 0);
                     }
                 }
-                #endif
 
                 /* Update the coarsening data accessing index */
                 ++coarsening_data_idx;
@@ -1434,7 +1395,7 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
     if (this->comm_rank_ == kRootRank)
     {
         /* Compute the bytes per level */
-        const std::vector<SizeType> global_bytes_per_level = ComputeGlobalBytesPerLevel(global_partition_info, num_global_encoding_steps, this->comm_size_);
+        const std::vector<SizeType> global_bytes_per_level = cmc::par::lossless::multi_res::fast::ComputeGlobalBytesPerLevel(global_partition_info, num_global_encoding_steps, this->comm_size_);
 
         /* Allocate a new vector which collects the start stream for the root rank */
         std::vector<uint64_t> root_rank_start_stream;
@@ -1444,7 +1405,7 @@ CompressionVariableMultiData<T, DIM, N>::GenerateOuputStreams()
         this->AppendVariableHeaderToStream(root_rank_start_stream, global_byte_count, start_encoding_offset_, num_global_mesh_encoding_steps, global_bytes_per_level);
 
         /* Append the partition table */
-        AppendPartitionTableToStream(root_rank_start_stream, global_partition_info, num_global_encoding_steps, this->comm_size_);
+        cmc::par::lossless::multi_res::fast::AppendPartitionTableToStream(root_rank_start_stream, global_partition_info, num_global_encoding_steps, this->comm_size_);
 
         /* Append the Huffman codes from the mesh encoding steps */
         std::copy_n(this->serialized_entropy_dictionary_.begin(), this->serialized_entropy_dictionary_.size(), std::back_inserter(root_rank_start_stream));
@@ -1548,4 +1509,4 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
 
 }
 
-#endif /* !CMC_PAR_MULTI_RES_EXTRACTION_HXX */
+#endif /* !CMC_PAR_FAST_MULTI_RES_EXTRACTION_HXX */

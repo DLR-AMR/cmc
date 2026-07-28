@@ -51,7 +51,7 @@ MPIAbort(const int _err_code, const char* _location);
  * @brief An MPI error function checking the return value of MPI functions and 
  * issues an error if the MPI operation was not successfull.
  */
-#define MPICheckError(err) ((err) == MPI_SUCCESS ? (void) 0 : MPIAbort(err, CMC_FILE_LOCATION))
+#define MPICheckError(err) ((err) == MPI_SUCCESS ? (void) 0 : cmc::MPIAbort(err, CMC_FILE_LOCATION))
 
 }
 

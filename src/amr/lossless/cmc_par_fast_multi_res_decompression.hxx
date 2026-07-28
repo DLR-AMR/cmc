@@ -1,8 +1,8 @@
-#ifndef CMC_PAR_MULTI_RES_DECOMPRESSION_HXX
-#define CMC_PAR_MULTI_RES_DECOMPRESSION_HXX
+#ifndef CMC_PAR_FAST_MULTI_RES_DECOMPRESSION_HXX
+#define CMC_PAR_FAST_MULTI_RES_DECOMPRESSION_HXX
 
 #include "cmc.hxx"
-#include "amr/lossless/cmc_par_multi_res_extraction_util.hxx"
+#include "amr/lossless/cmc_par_fast_multi_res_extraction_util.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
@@ -16,7 +16,7 @@
 #include <filesystem>
 
 
-namespace cmc::par::lossless::multi_res
+namespace cmc::par::lossless::multi_res::fast
 {
 
 /* Forward declaration of the general compression variable */
@@ -474,7 +474,7 @@ DecompressionVariableMultiData<T, DIM, N>::DecompressionVariableMultiData(const 
     /* Set the native data representation */
     const int rv_file_view = MPI_File_set_view(this->fhandle_, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
     MPICheckError(rv_file_view);
-    
+
     /* Create a forest mesh from the given parameters */
     mesh_.SetMesh(t8_forest_new_uniform (cmesh, scheme, 0, 0, this->comm_));
 }
@@ -938,7 +938,7 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeRootLevelValues()
     const std::vector<LevelPartition> root_level_partition = this->compression_info_.GetLevelPartition(root_level);
 
     /* De-Serialize the values */
-    this->data_ = GetRootLevelValuesFromView<T>(data_view, mesh_offset, num_local_elems, root_level_partition);
+    this->data_ = cmc::par::lossless::multi_res::fast::GetRootLevelValuesFromView<T>(data_view, mesh_offset, num_local_elems, root_level_partition);
 
     WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
 
@@ -1039,8 +1039,8 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
                     /* Check whether this element will be refined during this iteration */
                     if (lvl_mesh.GetNextBit())
                     {
-                        /* Add this amount of entropy codes to the counter */
-                        num_entropy_codes_correction += num_children;
+                        /* Add this amount of entropy codes to the counter (the last element of the family has no entropy code attachted to it) */
+                        num_entropy_codes_correction += num_children - 1;
                     }
                 }
             } else
@@ -1058,12 +1058,12 @@ DecompressionVariableMultiData<T, DIM, N>::SetStartPositionForStreamDecoder(cmc:
                         /* Get the number of elements this element refines to */
                         const int elem_num_children = scheme->element_get_num_children(tree_class, element);
 
-                        /* Add this amount of entropy codes to the counter */
-                        num_entropy_codes_correction += elem_num_children;
+                        /* Add this amount of entropy codes to the counter (the last element of the family has no entropy code attachted to it) */
+                        num_entropy_codes_correction += (elem_num_children - 1);
                     }
                 }
             }
-            
+
             /* Update the processed elements */
             num_elems_skipped += num_elements_in_tree;
         }
@@ -1196,8 +1196,8 @@ RefinementIterationData<T, DIM>::PerformRefinement(const int local_idx, const in
     /* Get the utilized predictor */
     const FourByteResidualType predictor = std::bit_cast<FourByteResidualType>(this->data[local_idx]);
 
-    /* Iterate over all finer elements that will be constructed */
-    for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
+    /* Iterate over all finer elements that will be constructed (except the last which is implciitly given) */
+    for (int elem_idx{0}; elem_idx < num_elements - 1; ++elem_idx)
     {
         /* Get the next symbol */
         const SymbolType symbol = std::invoke([this](){
@@ -1270,6 +1270,15 @@ RefinementIterationData<T, DIM>::PerformRefinement(const int local_idx, const in
             }
         }
     }
+
+    /* Define a view on the last decoded elements from this family */
+    const std::span<T> decoded_values(std::prev(this->fine_level_data.end(), num_elements - 1), num_elements - 1);
+    cmc_assert(decoded_values.size() == static_cast<size_t>(num_elements - 1));
+
+    /* Decode the implicitly given value from the family */
+    const T implicit_val = cmc::par::lossless::multi_res::fast::DecodeImplicitValueFromMean(this->data[local_idx], decoded_values, num_elements);
+
+    this->fine_level_data.push_back(implicit_val);
 }
 
 template<FourByteArithmeticType T, int32_t DIM>
@@ -1578,4 +1587,4 @@ DecompressionVariableMultiData<T, DIM, N>::GetDecompressedData()
 }
 
 }
-#endif /* !CMC_PAR_MULTI_RES_DECOMPRESSION_HXX */
+#endif /* !CMC_PAR_FAST_MULTI_RES_DECOMPRESSION_HXX */

@@ -53,7 +53,7 @@ endif()
 
 ######## WITH T8CODE
 if (CMC_WITH_T8CODE)
-# If configured wit t8code
+# If configured with t8code
 
 install(FILES
     t8code/cmc_t8_mesh.hxx 
@@ -64,14 +64,40 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/t8code
 #End if configured with t8code
 endif()
 
+######## WITH T8CODE AND MPI
+if (CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
+# Lossy AMR compressor needs MPI and t8code
+install(FILES
+    amr/lossy/cmc_ac_compression_variable.hxx 
+    amr/lossy/cmc_adaptive_coarsening.hxx 
+    amr/lossy/cmc_simul_ac_compression_variable.hxx 
+    amr/lossy/cmc_simul_adaptive_coarsening.hxx 
+    amr/lossy/cmc_byte_compression_variable.hxx 
+    amr/lossy/cmc_multi_res_trimmed_residuals.hxx 
+    amr/lossy/cmc_par_multi_res_extraction_util.hxx 
+    amr/lossy/cmc_par_multi_res_extraction.hxx 
+    amr/lossy/cmc_par_multi_res_decompression.hxx 
+    amr/lossy/cmc_par_multi_res_error_mesh.hxx 
+    amr/lossy/cmc_par_multi_res_idw_interpolation_util.hxx 
+    amr/lossy/cmc_par_multi_res_extraction_idw.hxx 
+    amr/lossy/cmc_par_multi_res_decompression_idw.hxx
+    amr/lossy/trixi/cmc_par_multi_res_extraction_idw.hxx 
+    amr/lossy/trixi/cmc_par_multi_res_decompression_idw.hxx 
+    amr/lossy/trixi/cmc_par_multi_res_util.hxx 
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy
+)
+
 
 ######## WITH T8CODE AND MPI
-# Lossless AMR compressor needs MPI and t8code 
 if (CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
+# Lossless AMR compressor needs MPI and t8code 
 install(FILES
     amr/lossless/cmc_par_multi_res_extraction_util.hxx 
     amr/lossless/cmc_par_multi_res_extraction.hxx 
-    amr/lossless/cmc_par_multi_res_decomrpession.hxx 
+    amr/lossless/cmc_par_multi_res_decompression.hxx 
+    amr/lossless/cmc_par_fast_multi_res_extraction_util.hxx 
+    amr/lossless/cmc_par_fast_multi_res_extraction.hxx 
+    amr/lossless/cmc_par_fast_multi_res_decompression.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossless
 )
 

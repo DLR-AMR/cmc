@@ -41,6 +41,69 @@ if(CMC_ENABLE_ALL_WARNINGS)
 endif()
 add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING})
 
+# Add the test for the intra element lossless multi res compression with multiple data
+set(CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION cmc_test_multi_res_lossless_multi_data_compression)
+add_executable(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_lossless_compression_multi_data.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION})
+
+# Add the test for the Trixi-related intra element lossy multi res compression with multiple data
+set(CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION cmc_test_trxi_multi_res_lossy_multi_data_compression)
+add_executable(${CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_trixi_multi_res_lossy_compression_multi_data.cxx)
+target_link_libraries(${CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION} COMMAND ${CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION})
+
+# Add the test for the Trixi-related element lossy multi res compression with single data per element
+set(CMC_TEST_TRIXI_MULTI_RES_LOSSY_SINGLE_DATA_COMPRESSION cmc_test_trxi_multi_res_lossy_single_data_compression)
+add_executable(${CMC_TEST_TRIXI_MULTI_RES_LOSSY_SINGLE_DATA_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_trixi_multi_res_lossy_compression_single_data.cxx)
+target_link_libraries(${CMC_TEST_TRIXI_MULTI_RES_LOSSY_SINGLE_DATA_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_TRIXI_MULTI_RES_LOSSY_SINGLE_DATA_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_TRIXI_MULTI_RES_LOSSY_SINGLE_DATA_COMPRESSION} COMMAND ${CMC_TEST_TRIXI_MULTI_RES_LOSSY_SINGLE_DATA_COMPRESSION})
+
+# Add the test for the lossy multi res compression based on RBF interpolation (with single data per element)
+set(CMC_TEST_MULTI_RES_RBF_LOSSY_SINGLE_DATA_COMPRESSION cmc_test_multi_res_rbf_lossy_compression)
+add_executable(${CMC_TEST_MULTI_RES_RBF_LOSSY_SINGLE_DATA_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_rbf_lossy_compression.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_RBF_LOSSY_SINGLE_DATA_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_RBF_LOSSY_SINGLE_DATA_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_MULTI_RES_RBF_LOSSY_SINGLE_DATA_COMPRESSION} COMMAND ${CMC_TEST_MULTI_RES_RBF_LOSSY_SINGLE_DATA_COMPRESSION})
+
+# Add the test for the lossy multi res compression based on IDW interpolation (with single data per element) on a hybrid mesh
+set(CMC_TEST_MULTI_RES_IDW_LOSSY_SINGLE_DATA_COMPRESSION_HYBRID cmc_test_multi_res_idw_lossy_compression_hybrid_mesh)
+add_executable(${CMC_TEST_MULTI_RES_IDW_LOSSY_SINGLE_DATA_COMPRESSION_HYBRID} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_idw_lossy_compression_hybrid_mesh.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_IDW_LOSSY_SINGLE_DATA_COMPRESSION_HYBRID} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_IDW_LOSSY_SINGLE_DATA_COMPRESSION_HYBRID} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_MULTI_RES_IDW_LOSSY_SINGLE_DATA_COMPRESSION_HYBRID} COMMAND ${CMC_TEST_MULTI_RES_IDW_LOSSY_SINGLE_DATA_COMPRESSION_HYBRID})
+
+# Add the test for the byte compression values
+set(CMC_TEST_BYTE_COMPRESSION_VALUE cmc_test_byte_compression_value)
+add_executable(${CMC_TEST_BYTE_COMPRESSION_VALUE} ${CMAKE_CURRENT_LIST_DIR}/cmc_byte_compression_value.cxx)
+target_link_libraries(${CMC_TEST_BYTE_COMPRESSION_VALUE} PUBLIC cmc)
+target_include_directories(${CMC_TEST_BYTE_COMPRESSION_VALUE} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_BYTE_COMPRESSION_VALUE} COMMAND ${CMC_TEST_BYTE_COMPRESSION_VALUE})
+
+# Add the test for the bitmap
+set(CMC_TEST_BITMAP cmc_test_bitmap)
+add_executable(${CMC_TEST_BITMAP} ${CMAKE_CURRENT_LIST_DIR}/cmc_bitmap.cxx)
+target_link_libraries(${CMC_TEST_BITMAP} PUBLIC cmc)
+target_include_directories(${CMC_TEST_BITMAP} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_BITMAP} COMMAND ${CMC_TEST_BITMAP})
+
+# Add the test for the bitmap-viewer
+set(CMC_TEST_BITMAP_VIEW cmc_test_bitmap_view)
+add_executable(${CMC_TEST_BITMAP_VIEW} ${CMAKE_CURRENT_LIST_DIR}/cmc_bitmap_view.cxx)
+target_link_libraries(${CMC_TEST_BITMAP_VIEW} PUBLIC cmc)
+target_include_directories(${CMC_TEST_BITMAP_VIEW} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_BITMAP_VIEW} COMMAND ${CMC_TEST_BITMAP_VIEW})
+
+# Add the test for the bitvector-view
+set(CMC_TEST_BITVECTOR_VIEW cmc_test_bitvector_view)
+add_executable(${CMC_TEST_BITVECTOR_VIEW} ${CMAKE_CURRENT_LIST_DIR}/cmc_bitvector_view.cxx)
+target_link_libraries(${CMC_TEST_BITVECTOR_VIEW} PUBLIC cmc)
+target_include_directories(${CMC_TEST_BITVECTOR_VIEW} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+add_test(NAME ${CMC_TEST_BITVECTOR_VIEW} COMMAND ${CMC_TEST_BITVECTOR_VIEW})
+
 # Add the test for the bitmap
 set(CMC_TEST_HUFFMAN_CODER cmc_test_huffman_coder)
 add_executable(${CMC_TEST_HUFFMAN_CODER} ${CMAKE_CURRENT_LIST_DIR}/cmc_huffman_coder.cxx)
