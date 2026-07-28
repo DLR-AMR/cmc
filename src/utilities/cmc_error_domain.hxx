@@ -39,7 +39,7 @@ public:
     
     inline bool
     IsAnyElementWithinDomain(t8_forest_t forest, const t8_locidx_t which_tree, const t8_eclass_t tree_class, const t8_locidx_t lelement_id,
-                             const t8_scheme_c* ts, const int num_elements, t8_element_t* elements[]) const
+                             const t8_scheme_c* ts, const int num_elements, const t8_element_t** elements) const
     {
         for (int idx = 0; idx < num_elements; ++idx)
         {
