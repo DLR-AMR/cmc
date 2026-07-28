@@ -1238,6 +1238,7 @@ SkipToNextCompressedElement(cmc::bits::StreamDecoder<SymbolType>& stream_decoder
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
+            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
 
@@ -1305,6 +1306,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
+            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
 
@@ -1530,11 +1532,21 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Allocate all entropy codes on this level */
         std::array<SymbolType, num_elems_on_level> lvl_entropy_codes;
         
+        //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+
+            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
+            {
+                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
+                {
+                    stream_decoder.ApplyProcessEndSymbol64Bit();
+                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+                }
+            }
         }
 
         /* Determine the number of full packs */
@@ -1751,8 +1763,18 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
+            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+            
+            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
+            {
+                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
+                {
+                    stream_decoder.ApplyProcessEndSymbol64Bit();
+                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+                }
+            }
         }
 
         /* Determine the number of full packs */
@@ -1969,8 +1991,18 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
         /* Gather all entropy codes for this level */
         for (int32_t idx{0}; idx < num_elems_on_level; ++idx)
         {
+            //TODO: Only during the first iteration it is possible to encounter a "ProcessEnd"-Symbol, afterwards the elemen is encoded contiguously
             /* Decode the next entropy symbol */
             lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+
+            if (lvl_entropy_codes[idx] == kProcessEndSymbol<T>) [[unlikely]]
+            {
+                while (lvl_entropy_codes[idx] == kProcessEndSymbol<T>)
+                {
+                    stream_decoder.ApplyProcessEndSymbol64Bit();
+                    lvl_entropy_codes[idx] = stream_decoder.DecodeNextEntropySymbol();
+                }
+            }
         }
 
         /* Determine the number of full packs */
