@@ -19,6 +19,9 @@
 namespace cmc::par::lossy::multi_res
 {
 
+/* Switch to write out intermediate data from the decompression steps */
+constexpr bool kWriteVTKDecompressionStepData = true;
+
 /* Forward declaration of the general compression variable */
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
@@ -81,6 +84,8 @@ struct CompressionInfoStruct
 
     SizeType GetOffsetPartitionTable() const {return sizeof(SizeType) * (15 + global_level_bytes.size() + global_num_elem_indications_step.size())
                                                      + kNumCharsVariableName * sizeof(char);}
+
+    const char* GetName() const {return name.data();}             
 
     SizeType global_byte_count{0};
     SizeType offset_start_encoding{0};
@@ -499,6 +504,10 @@ DecompressionVariableMultiData<T, DIM, N>::DecompressionVariableMultiData(const 
     const int rv_open = MPI_File_open(this->shm_comm_, this->file_name_.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &(this->fhandle_));
     MPICheckError(rv_open);
 
+    /* Set the native data representation */
+    const int rv_file_view = MPI_File_set_view(this->fhandle_, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
+    MPICheckError(rv_file_view);
+
     /* Create a forest mesh from the given parameters */
     mesh_.SetMesh(t8_forest_new_uniform (cmesh, scheme, 0, 0, this->comm_));
 
@@ -909,30 +918,6 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     return data;
 }
 
-
-static int step = 0;
-
-inline void
-WriteDataToVTKTest(t8_forest_t mesh, const std::vector<float>& data)
-{
-    std::vector<double> double_data1;
-
-    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
-    {
-        double_data1.push_back(data[idx]);
-    }
-
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = double_data1.data();
-
-    const std::string file_name = std::string("cmc_new_test_decompr_data_vis_np1_step_") + std::to_string(step);
-    ++step;
-    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 0, 0, 0, 1, vtk_data);
-}
-
-
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 void
@@ -960,7 +945,11 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeRootLevelValues()
     this->data_ = GetRootLevelValuesFromView<T>(data_view, mesh_offset, num_local_elems, root_level_partition);
     cmc_assert(static_cast<t8_locidx_t>(this->data_.size()) == num_local_elems);
 
-    WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
+    if constexpr (kWriteVTKDecompressionStepData)
+    {
+        const std::string file_prefix = std::string("cmc_decompression_") + std::string(this->compression_info_.GetName()) + std::string("_0");
+        WriteDataToVTK<T>(this->mesh_.GetMesh(), this->data_, std::string(this->compression_info_.GetName()), file_prefix);
+    }
 
     /* Close the shared level window after all values have been extarcted */
     this->CloseSharedLevelDataWindow();
@@ -1653,8 +1642,12 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         /* Store the partitioned mesh and the data */
         this->mesh_.SetMesh(partitioned_mesh);
         this->data_ = std::move(partitioned_data);
-        
-        WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
+
+        if constexpr (kWriteVTKDecompressionStepData)
+        {
+            const std::string file_prefix = std::string("cmc_decompression_") + std::string(this->compression_info_.GetName()) + std::string("_") + std::to_string(mesh_lvl);
+            WriteDataToVTK<T>(this->mesh_.GetMesh(), this->data_, std::string(this->compression_info_.GetName()), file_prefix);
+        }
 
         /****** Clean-Up of the decompression iteration ******/
 
