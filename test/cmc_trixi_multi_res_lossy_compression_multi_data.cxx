@@ -135,7 +135,7 @@ CreateInitMesh()
     t8_forest_commit(partitioned_forest);
 
     /* Adapt the uniform forest a little */
-    //partitioned_forest = t8_forest_new_adapt(partitioned_forest, TestAdapt, 0, 0, NULL);
+    partitioned_forest = t8_forest_new_adapt(partitioned_forest, TestAdapt, 0, 0, NULL);
 
     return partitioned_forest;
 }
@@ -281,7 +281,6 @@ RepartitionMeshAndDataToInitialPartition(t8_forest_t decompr_forest, std::vector
     /* Keep the not-partitioned forest */
     t8_forest_ref(decompr_forest);
 
-    /** Partition the forest correctly and build a halo layer **/
     t8_forest_t partitioned_mesh;
     t8_forest_init (&partitioned_mesh);
 
@@ -294,7 +293,6 @@ RepartitionMeshAndDataToInitialPartition(t8_forest_t decompr_forest, std::vector
     /* Commit the forest, this step will perform the partitioning and ghost layer creation. */
     t8_forest_commit (partitioned_mesh);
 
-    /** Exchange the data corectly to set up the halo layer **/
     /* Get the number of local elements */
     const t8_locidx_t num_local_elements = t8_forest_get_local_num_leaf_elements(partitioned_mesh);
     
@@ -406,7 +404,7 @@ main(void)
         const std::span<float> init_data(data);
 
         /* Write the data to a vtk file */
-        //cmc::test::lossy::multi_res::WriteDataToVTK(mesh, data, "cmc_test_lossy_par_multi_res_serial_multi_data_input");
+        cmc::test::lossy::multi_res::WriteDataToVTK(mesh, data, "cmc_test_lossy_par_multi_res_serial_multi_data_input");
 
         //Compression
         {
@@ -463,6 +461,9 @@ main(void)
 
         auto [decompressed_forest, decompressed_data_vec] = decompression_variable.GetDecompressedData();
 
+        /* Write the data to a vtk file */
+        cmc::test::lossy::multi_res::WriteDataToVTK(decompressed_forest, decompressed_data_vec, "cmc_test_lossy_par_multi_res_serial_multi_data_output");
+
         cmc::cmc_debug_msg("Size of decompressed data vec: ", decompressed_data_vec.size());
         /* Get the number of elements */
         const uint64_t num_global_decompr_elems = t8_forest_get_global_num_leaf_elements(decompressed_forest);
@@ -474,9 +475,6 @@ main(void)
         
         /* Save the decompressed data */
         decompressed_data = std::move(partitioned_decompressed_data);
-
-        /* Write the data to a vtk file */
-        //cmc::test::lossy::multi_res::WriteDataToVTK(decompressed_forest, decompressed_data_vec, "cmc_test_lossy_par_multi_res_serial_multi_data_output");
 
         /* Deallocate the decompressed mesh */
         t8_forest_unref(&partitioned_decompressed_forest);
@@ -495,12 +493,12 @@ main(void)
 
             if (residual > abs_dev || residual > rel_abs_dev)
             {
-                //cmc::cmc_debug_msg("Inequality at ", idx, ", Init Data: ", data[idx], ", Decompressed Data: ", decompressed_data[idx], ", Residual: ", residual, ", Permitted Absolute Deviation ", abs_dev, ", Permitted Relative Deviation (in absolute terms): ", rel_abs_dev);
-                //cmc::cmc_debug_msg("Bitset Init Data: , ", std::bitset<32>(std::bit_cast<uint32_t>(data[idx])),  ", Bitset Decompressed Data: ", std::bitset<32>(std::bit_cast<uint32_t>(decompressed_data[idx])));
+                cmc::cmc_debug_msg("Inequality at ", idx, ", Init Data: ", data[idx], ", Decompressed Data: ", decompressed_data[idx], ", Residual: ", residual, ", Permitted Absolute Deviation ", abs_dev, ", Permitted Relative Deviation (in absolute terms): ", rel_abs_dev);
+                cmc::cmc_debug_msg("Bitset Init Data: , ", std::bitset<32>(std::bit_cast<uint32_t>(data[idx])),  ", Bitset Decompressed Data: ", std::bitset<32>(std::bit_cast<uint32_t>(decompressed_data[idx])));
                 ++count_error;
             }
 
-            cmc::ExpectTrue(residual <= abs_dev && residual <= rel_abs_dev);
+            //cmc::ExpectTrue(residual <= abs_dev && residual <= rel_abs_dev);
         }
         cmc::cmc_debug_msg("Number of error domain violations (|init_data - decompressed_data| > permitted_error): ", count_error);
         cmc::ExpectTrue(count_error == 0);
