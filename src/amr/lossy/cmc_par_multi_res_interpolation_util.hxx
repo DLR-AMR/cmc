@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <numeric>
 #include <concepts>
+#include <cmath>
 
 namespace cmc::par::lossy::rbf::util
 {
@@ -27,8 +28,8 @@ constexpr int kNumHexPredictionPoints = 7;
 constexpr int kNumQuadControlPoints = 5;
 constexpr int kNumQuadPredictionPoints = 3;
 
-constexpr float eps_general = 0.07;
-constexpr float eps_gauss = 0.07;
+constexpr float eps_general = 0.1;
+constexpr float eps_gauss = 0.1;
 //constexpr float eps_gauss = 1.0;
 constexpr float eps_mq = 0.1;
 
@@ -124,7 +125,9 @@ constexpr inline
 T
 cmc_rbf(const T dist)
 {
-    return cmc_rbf_gaussian_eval(dist);
+    //return cmc_rbf_gaussian_eval(dist);
+    constexpr float eps = 0.1;
+    return std::sqrt(1.0 + (eps  * dist) * (eps  * dist));
 }
 
 /** Hex Element Operators **/
