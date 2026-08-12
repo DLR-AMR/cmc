@@ -1,349 +1,78 @@
-#ifndef CMC_PATCH_LOSSLESS_CMC_MULTI_RES_EXTRACTION_HXX
-#define CMC_PATCH_LOSSLESS_CMC_MULTI_RES_EXTRACTION_HXX
+#ifndef CMC_PATCH_LOSSLESS_MULTI_RES_EXTRACTION_HXX
+#define CMC_PATCH_LOSSLESS_MULTI_RES_EXTRACTION_HXX
 
 #include "cmc.hxx"
-#include "utilities/cmc_log_functions.hxx"
-#include "patch/lossless/cmc_patch_multi_res_extraction_util.hxx"
+#include "patch/lossless/cmc_multi_res_util.hxx"
 #include "utilities/cmc_compression_schema.hxx"
 
-#include <stdexcept>
+#include <string>
+#include <span>
 #include <filesystem>
-#include <cstdio>
+#include <array>
+#include <vector>
+#include <algorithm>
+#include <execution>
 
-#include <bitset>
-
-namespace cmc::serial::patch::lossless::multi_res
+namespace cmc::patch::lossless::multi_res
 {
 
-template <ArithmeticType T, int32_t DIM>
+template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 class CompressionVariable
 {
 public:
     CompressionVariable() = delete;
-    explicit CompressionVariable(std::vector<T>&& init_data, const std::array<int, DIM> dimension_lengths)
-    : data_(std::move(init_data)), init_dimension_lengths_(dimension_lengths)
-    {
-        const bool are_dimension_lengths_valid = std::invoke([&dimension_lengths]() -> bool {
-            for (const int& dim_length : dimension_lengths)
-            {
-                if (dim_length <= 0){return false;}
-            }
-            return true;
-        });
-        if (not are_dimension_lengths_valid) {throw std::invalid_argument("Dimension lengths have to be non-negative!");}
+    CompressionVariable(const std::span<const T> data, const std::array<int32_t, DIM>& dimension_lengths)
+    : init_data_(data), dim_lengths_(dimension_lengths),
+      max_dimension_length_{GetMaximumDimensionLength<T, DIM>(dimension_lengths)}, num_compression_lvls_{GetNumCompressionIterations<T, DIM>(dimension_lengths)}
+      {
+        /* Compute the expected amount of data */
+        const int num_data = std::reduce(dimension_lengths.begin(), dimension_lengths.end(), 1, std::multiplies<int>());
 
-        /* Get the largest dimension length */
-        const auto max_dim_length_iter = std::max_element(dimension_lengths.begin(), dimension_lengths.end());
-        if (max_dim_length_iter == dimension_lengths.end()){throw std::invalid_argument("dimension_lengths");}
+        if (static_cast<size_t>(num_data) != data.size())
+        {
+            cmc_err_msg("The expected amount of data (", num_data, ") given the supplied dimension-length vector does not coincide with the initial data size (", data.size(), ")!");
+        }
 
-        const int max_dim_length = *max_dim_length_iter;
-
-        /* Determine the number of compression iterations */
-        this->num_compression_lvls_ = ComputeNumCompressionLevels<DIM>(max_dim_length);
-        if (this->num_compression_lvls_ <= 0) {throw std::invalid_argument("dimension_lengths");}
-
-        /* Store the initial dimension lengths in the dimension length pyramid */
-        this->dim_lengths_.reserve(this->num_compression_lvls_ + 1);
-        this->dim_lengths_.push_back(dimension_lengths);
+        /* Allocate and initialize the vectors */
+        this->dim_length_pyramid_.reserve(this->num_compression_lvls_ + 1);
+        this->dim_length_pyramid_.push_back(dimension_lengths);
+        this->data_.reserve(num_data);
+        std::copy_n(data.begin(), num_data, std::back_inserter(this->data_));
+        this->levelwise_patch_encodings_.reserve(this->num_compression_lvls_);
     }
 
     void Compress();
-    void WriteData(const std::string file_name);
-
-private:
-    PatchEncodingData<T, DIM> PerformExtraction(const std::array<T, kNumMaxChildrenElements<DIM>>& patch_values, const int num_elements);
-
-    std::vector<T> data_;
-    const std::array<int, DIM> init_dimension_lengths_;
-
-    std::vector<std::vector<SymbolType>> entropy_codes_;
-    std::vector<std::vector<T>> residuals_;
-    std::vector<std::vector<uint64_t>> encoded_data_;
-    std::vector<uint64_t> serialized_entropy_dictionary_;
-
-    std::vector<std::array<int, DIM>> dim_lengths_;
-    int num_compression_lvls_;
+    void WriteCompressedData(const std::string& file_name);
 
     static struct kTag4D{} tag4D;
     static struct kTag3D{} tag3D;
     static struct kTag2D{} tag2D;
     static struct kTag1D{} tag1D;
 
-    void PerformCompression(kTag1D);
-    void PerformCompression(kTag2D);
-    void PerformCompression(kTag3D);
-    void PerformCompression(kTag4D);
+private:
+    void Compress(kTag1D);
+    void Compress(kTag2D);
+    void Compress(kTag3D);
+    void Compress(kTag4D);
+    std::vector<uint64_t> EncodeRootLevelData() const;
+    void EncodeData();
+
+    const std::span<const T> init_data_;
+    const std::array<int32_t, DIM> dim_lengths_;
+
+    const int32_t max_dimension_length_{0};
+    const int32_t num_compression_lvls_{0};
+
+    std::vector<T> data_;
+    std::vector<std::array<int32_t, DIM>> dim_length_pyramid_;
+
+    std::vector<std::vector<PatchEncoding<T, DIM>>> levelwise_patch_encodings_;
+
+    std::vector<uint64_t> serialized_entropy_dictionary_;
+    std::vector<std::vector<uint64_t>> levelwise_encoded_data_;
 };
 
-template <typename T>
-inline T
-GetValue(const std::vector<T>& data, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, const int kLevLength,  [[maybe_unused]] const int kTimeLength)
-{
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
-    return data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
-}
-
-template <typename T>
-inline void
-SetValue(std::vector<T>& data, const T value, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  const int kLevLength, [[maybe_unused]] const int kTimeLength)
-{
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
-    data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
-}
-
-template <typename T>
-inline T
-GetValue(const std::vector<T>& data, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, [[maybe_unused]] const int kLevLength)
-{
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
-    return data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
-}
-
-template <typename T>
-inline void
-SetValue(std::vector<T>& data, const T value, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  [[maybe_unused]] const int kLevLength)
-{
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int>(data.size()));
-    data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
-}
-
-template <typename T>
-inline T
-GetValue(const std::vector<T>& data, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
-{
-    cmc_assert(lat * kLonLength + lon < static_cast<int>(data.size()));
-    return data[lat * kLonLength + lon];
-}
-
-template <typename T>
-inline void
-SetValue(std::vector<T>& data, const T value, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
-{
-    cmc_assert(lat * kLonLength + lon < static_cast<int>(data.size()));
-    data[lat * kLonLength + lon] = value;
-}
-
-
-template<typename T>
-std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>>
-CollectEntropySymbols(const std::vector<std::vector<SymbolType>>& level_entropy_symbols)
-{
-    /* Get the number of all possible entropy symbols */
-    constexpr int num_entropy_symbols = GetNumEntropySymbols<T>();
-
-    /* Set the array and zero intialiaze the frequencies */
-    std::array<uint64_t, num_entropy_symbols> entropy_symbol_frequencies{};
-
-    /* Iterate through all entropy codes and accumulate their frequencies */
-    for (size_t lvl_idx{0}; lvl_idx < level_entropy_symbols.size(); ++lvl_idx)
-    {
-        for (size_t elem_idx{0}; elem_idx < level_entropy_symbols[lvl_idx].size(); ++elem_idx)
-        {
-            /* Convert the symbol to the corresponding array index */
-            const int array_idx = MapEntropySymbolToArrayIndex<T>(level_entropy_symbols[lvl_idx][elem_idx]);
-
-            /* Update the frequency */
-            ++entropy_symbol_frequencies[array_idx];
-        }
-    }
-
-    std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> global_symbol_frequencies;
-    global_symbol_frequencies.reserve(num_entropy_symbols);
-
-    /* Iterate through all codes and construct the symbol frequency table */
-    for (int idx{0}; idx < num_entropy_symbols; ++idx)
-    {
-        /* Convert the index back to the entropy symbol */
-        const SymbolType entropy_symbol = MapArrayIndexToEntropySymbol<T>(idx);
-
-        /* Store the symbol with the global frequency */
-        global_symbol_frequencies.emplace_back(entropy_symbol, entropy_symbol_frequencies[idx]);
-    }
-
-    return global_symbol_frequencies;
-}
-
-template <OneByteArithmeticType T, int32_t DIM>
-inline std::vector<uint64_t>
-EncodeRootLevel(const std::vector<T>& root_level_data)
-{
-    cmc::bits::vector root_lvl_encoding;
-    root_lvl_encoding.Reserve(root_level_data.size() * sizeof(T));
-    
-    for (size_t idx{0}; idx < root_level_data.size(); ++idx)
-    {
-        /* Store the value */
-        root_lvl_encoding.AppendBits<OneByteResidualType>(std::bit_cast<OneByteResidualType>(root_level_data[idx]), 0, 0);
-    }
-    return root_lvl_encoding.GetSerializedByteStreamBE();
-}
-
-template <TwoByteArithmeticType T, int32_t DIM>
-inline std::vector<uint64_t>
-EncodeRootLevel(const std::vector<T>& root_level_data)
-{
-    cmc::bits::vector root_lvl_encoding;
-    root_lvl_encoding.Reserve(root_level_data.size() * sizeof(T));
-    
-    for (size_t idx{0}; idx < root_level_data.size(); ++idx)
-    {
-        /* Store the value */
-        root_lvl_encoding.AppendBits<TwoByteResidualType>(std::bit_cast<TwoByteResidualType>(root_level_data[idx]), 0, 0);
-    }
-    return root_lvl_encoding.GetSerializedByteStreamBE();
-}
-
-template <FourByteArithmeticType T, int32_t DIM>
-inline std::vector<uint64_t>
-EncodeRootLevel(const std::vector<T>& root_level_data)
-{
-    cmc::bits::vector root_lvl_encoding;
-    root_lvl_encoding.Reserve(root_level_data.size() * sizeof(T));
-    
-    for (size_t idx{0}; idx < root_level_data.size(); ++idx)
-    {
-        /* Store the value */
-        root_lvl_encoding.AppendBits<FourByteResidualType>(std::bit_cast<FourByteResidualType>(root_level_data[idx]), 0, 0);
-    }
-    return root_lvl_encoding.GetSerializedByteStreamBE();
-}
-
-template <EightByteArithmeticType T, int32_t DIM>
-inline std::vector<uint64_t>
-EncodeRootLevel(const std::vector<T>& root_level_data)
-{
-    cmc::bits::vector root_lvl_encoding;
-    root_lvl_encoding.Reserve(root_level_data.size() * sizeof(T));
-    
-    for (size_t idx{0}; idx < root_level_data.size(); ++idx)
-    {
-        /* Store the value */
-        root_lvl_encoding.AppendBits<EightByteResidualType>(std::bit_cast<EightByteResidualType>(root_level_data[idx]), 0, 0);
-    }
-    return root_lvl_encoding.GetSerializedByteStreamBE();
-}
-
-template <typename T, int32_t DIM>
-requires Dimension<DIM>
-std::vector<uint64_t>
-GenerateVariableHeader(const std::vector<std::vector<uint64_t>>& encoded_data_, const std::vector<std::array<int, DIM>>& dim_lengths_, const std::vector<uint64_t>& serialized_entropy_dictionary_)
-{
-    const uint64_t var_header_size = 7 + encoded_data_.size() + DIM * dim_lengths_.size() + serialized_entropy_dictionary_.size();
-
-    std::vector<uint64_t> var_header;
-    var_header.reserve(var_header_size);
-
-    cmc_assert(encoded_data_.size() >= 1);
-
-    const int num_compression_levels = encoded_data_.size();
-
-    uint64_t global_byte_count = var_header_size;
-    for (const auto& lvl_encoding : encoded_data_)
-    {
-        global_byte_count += lvl_encoding.size();
-    }
-    global_byte_count *= sizeof(uint64_t);
-
-
-    /* Global Bytes compressed variable */
-    var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(global_byte_count));
-
-    /* Store the offset from the stream start to the start of the root level encoding */
-    var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(sizeof(uint64_t) * var_header_size));
-
-    /* Store the data type */
-    var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(ConvertToCmcType<T>())));
-
-    /* Store the dimensionality */
-    var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(DIM)));
-
-    /* Store the compression scheme */
-    var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(CompressionSchema::PatchMultiResExtraction)));
-
-    /* Store the number of mesh compresion levels */
-    var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(num_compression_levels)));
-
-    /* Append the global level bytes */
-    for (auto lvl_iter = encoded_data_.begin(); lvl_iter != encoded_data_.end(); ++lvl_iter)
-    {
-        var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(lvl_iter->size() * sizeof(uint64_t))));
-    }
-
-    /* Store the dimension lengths per level (in reverse) */
-    for (auto dim_lengths_iter = dim_lengths_.rbegin(); dim_lengths_iter != dim_lengths_.rend(); ++dim_lengths_iter)
-    {
-        for (int dim_idx{0}; dim_idx < DIM; ++dim_idx)
-        {
-            var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(dim_lengths_iter->operator[](dim_idx)));
-        }
-    }
-
-    /* Store the number of bytes for the entropy dictionary */
-    var_header.push_back(cmc::bits::ConvertToBigEndian<SizeType>(static_cast<SizeType>(serialized_entropy_dictionary_.size() * sizeof(uint64_t))));
-    std::copy_n(serialized_entropy_dictionary_.begin(), serialized_entropy_dictionary_.size(), std::back_inserter(var_header));
-
-    return var_header;
-}
-
-template <ArithmeticType T, int32_t DIM>
-requires Dimension<DIM>
-void
-CompressionVariable<T, DIM>::WriteData(const std::string file_name)
-{
-    /* Create an additional variable header */
-    const std::vector<uint64_t> var_header = GenerateVariableHeader<T, DIM>(this->encoded_data_, this->dim_lengths_, this->serialized_entropy_dictionary_);
-
-    /* Open the file, but delete it first, if it already exists */
-    const std::filesystem::path output_file_path(file_name);
-    if (std::filesystem::exists(output_file_path))
-    {
-        std::remove(output_file_path.c_str());
-    }
-    std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
-
-    /* Write the variable header */
-    const std::size_t num_written_vals_header = std::fwrite(var_header.data(), sizeof(uint64_t), var_header.size(), file_out);
-    if (num_written_vals_header != var_header.size()) {cmc::cmc_err_msg("An unexpecetd number of compressed elements has been written!");}
-
-    /* Write the encoed level data */
-    for (const std::vector<uint64_t>& encoded_level : this->encoded_data_)
-    {
-        const std::size_t num_written_lvl_vals = std::fwrite(encoded_level.data(), sizeof(uint64_t), encoded_level.size(), file_out);
-        if (num_written_lvl_vals != encoded_level.size()) {cmc::cmc_err_msg("An unexpecetd number of compressed elements has been written!");}
-    }
-
-    /* Close the file */
-    std::fclose(file_out);
-}
-
-template <OneByteArithmeticType T>
-inline void
-AppendResidualBits(cmc::bits::vector& level_encoding, const T residual, const int start_pos, const int end_pos)
-{
-    level_encoding.AppendBits(std::bit_cast<OneByteResidualType>(residual), start_pos, end_pos);
-}
-
-template <TwoByteArithmeticType T>
-inline void
-AppendResidualBits(cmc::bits::vector& level_encoding, const T residual, const int start_pos, const int end_pos)
-{
-    level_encoding.AppendBits(std::bit_cast<TwoByteResidualType>(residual), start_pos, end_pos);
-}
-
-template <FourByteArithmeticType T>
-inline void
-AppendResidualBits(cmc::bits::vector& level_encoding, const T residual, const int start_pos, const int end_pos)
-{
-    level_encoding.AppendBits(std::bit_cast<FourByteResidualType>(residual), start_pos, end_pos);
-}
-
-template <EightByteArithmeticType T>
-inline void
-AppendResidualBits(cmc::bits::vector& level_encoding, const T residual, const int start_pos, const int end_pos)
-{
-    level_encoding.AppendBits(std::bit_cast<EightByteResidualType>(residual), start_pos, end_pos);
-}
 
 template <ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
@@ -352,75 +81,61 @@ CompressionVariable<T, DIM>::Compress()
 {
     if constexpr (DIM == 1)
     {
-        cmc_debug_msg("Lossless 1D Compression");
-        this->PerformCompression(CompressionVariable<T, DIM>::tag1D);
+        cmc_global_msg("Lossless 1D Compression");
+        this->Compress(CompressionVariable<T, DIM>::tag1D);
     } else if constexpr (DIM == 2)
     {
-        cmc_debug_msg("Lossless 2D Compression");
-        this->PerformCompression(CompressionVariable<T, DIM>::tag2D);
+        cmc_global_msg("Lossless 2D Compression");
+        this->Compress(CompressionVariable<T, DIM>::tag2D);
     } else if constexpr (DIM == 3)
     {
-        cmc_debug_msg("Lossless 3D Compression");
-        this->PerformCompression(CompressionVariable<T, DIM>::tag3D);
+        cmc_global_msg("Lossless 3D Compression");
+        this->Compress(CompressionVariable<T, DIM>::tag3D);
     } else if constexpr (DIM == 4)
     {
-        cmc_debug_msg("Lossless 4D Compression");
-        this->PerformCompression(CompressionVariable<T, DIM>::tag4D);
+        cmc_global_msg("Lossless 4D Compression");
+        this->Compress(CompressionVariable<T, DIM>::tag4D);
     } else
     {
-        cmc_err_msg("Unsupported variable's dimensionality (Dim = ", DIM, ").");
+        cmc_err_msg("Unsupported variable's dimensionality (DIM = ", DIM, ").");
     }
 }
 
-template<ArithmeticType T>
-inline std::vector<T>
-CreatePredictors(const std::span<const T> values)
-{
-    /* Utilize each individual value as a predictor */
-    std::vector<T> predictors(values.size() + 2);
-    std::copy_n(values.begin(), values.size(), predictors.begin());
-
-    /* Append the arithmetic mean as a predictor */
-    predictors[values.size()] = ComputeArithmeticMean<T>(std::span<T>(predictors.data(), values.size()));
-
-    /* Append the mid-range as a predictor */
-    predictors[values.size() + 1] = ComputeMidRange<T>(std::span<T>(predictors.data(), values.size()));
-
-    return predictors;
-}
 
 template <ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
-PatchEncodingData<T, DIM>
-CompressionVariable<T, DIM>::PerformExtraction(const std::array<T, kNumMaxChildrenElements<DIM>>& patch_values, const int num_elements)
+std::pair<T, PatchEncoding<T, DIM>>
+PerformExtraction(const std::array<T, kPackSize<DIM>> patch_data, const int num_values)
 {
-    cmc_assert(num_elements > 0);
-    if (num_elements == 1) [[unlikely]]
+    cmc_assert(num_values >= 1 && num_values <= kPackSize<DIM>);
+    [[assume(num_values >= 1 && num_values <= kPackSize<DIM>)]];
+
+    if (num_values == 1) [[unlikely]]
     {
-        PatchEncodingData<T, DIM> elem_coding;
-        elem_coding.coarse_value = patch_values.front();
-        return elem_coding;
+        PatchEncoding<T, DIM> zero_coding;
+        zero_coding.entropy_symbols[0] = CreateEntropySymbol(false, TransformToUInteger<T>(0));
+        zero_coding.residuals[0] = 0;
+        zero_coding.num_elements = 1;
+        return std::make_pair(patch_data[0], std::move(zero_coding));
     }
 
-    cmc_assert(num_elements > 1 && num_elements <= kNumMaxChildrenElements<DIM>);
-    [[assume(num_elements > 1 && num_elements <= kNumMaxChildrenElements<DIM>)]];
-
     /* Perform the multi-resolution extraction */
-    const std::vector<T> predictors = CreatePredictors<T>(std::span<const T>(patch_values.data(), num_elements));
+    const auto predictors = CreatePredictors<T, kPackSize<DIM>>(patch_data, num_values);
 
     int current_lzc{-1};
     T lzc_maximizing_predictor{};
 
-    PatchEncodingData<T, DIM> elem_coding;
+    PatchEncoding<T, DIM> patch_coding;
+    patch_coding.num_elements = num_values;
+
+    Residuals<T, DIM> current_residuals{};
+    std::array<SymbolType, kPackSize<DIM>> current_entropy_codes{};
 
     /* For all predictors, we evaluate the one that gives us the overall maximum number of leading zeros */
-    for (int pred_idx{0}; pred_idx < num_elements + 2; ++pred_idx)
+    for (int pred_idx{0}; pred_idx < num_values + 2; ++pred_idx)
     {
-        std::array<SymbolType, kNumMaxChildrenElements<DIM>> current_entropy_codes{};
-        Residuals<T, DIM> current_residuals{};
-        
         /* Check the predictor for all element values */
-        for (int elem_idx{0}; elem_idx < num_elements; ++elem_idx)
+        for (int elem_idx{0}; elem_idx < num_values; ++elem_idx)
         {
             /* Compute the residual */
             const auto [is_approx_greater, residual] = cmc::bits::ComputeIntegerResidual<T>(predictors[pred_idx], predictors[elem_idx]);
@@ -433,7 +148,7 @@ CompressionVariable<T, DIM>::PerformExtraction(const std::array<T, kNumMaxChildr
         }
 
         /* Compute the cumulative leading zero count */
-        const int cumulative_lzc = std::transform_reduce(std::execution::par_unseq, current_residuals.residuals.cbegin(), current_residuals.residuals.cend(), static_cast<int>(0),
+        const int cumulative_lzc = std::transform_reduce(std::execution::par_unseq, current_residuals.residuals.cbegin(), std::next(current_residuals.residuals.cbegin(), num_values), static_cast<int>(0),
                                                          std::plus<>{}, [](auto res){return cmc::bits::GetLZC(res);});
 
         /* If the predictor maximizes the LZC, we store it */
@@ -441,496 +156,645 @@ CompressionVariable<T, DIM>::PerformExtraction(const std::array<T, kNumMaxChildr
         {
             current_lzc = cumulative_lzc;
             lzc_maximizing_predictor = predictors[pred_idx];
-            std::copy_n(current_residuals.residuals.cbegin(), kNumMaxChildrenElements<DIM>, elem_coding.residuals.begin());
-            std::copy_n(current_entropy_codes.cbegin(), kNumMaxChildrenElements<DIM>, elem_coding.entropy_symbols.begin());
+            std::copy_n(current_entropy_codes.cbegin(), num_values, patch_coding.entropy_symbols.begin());
+            std::copy_n(current_residuals.residuals.cbegin(), num_values, patch_coding.residuals.begin());
         }
     }
 
-    /* We store the lzc_maximizing_predictor for the next coarse level */
-    elem_coding.coarse_value = lzc_maximizing_predictor;
-
-
-    return elem_coding;
+    return std::make_pair(lzc_maximizing_predictor, patch_coding);
 }
 
 template <ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 void
-CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTag4D)
+CompressionVariable<T, DIM>::Compress(CompressionVariable<T, DIM>::kTag4D)
 {
-    [[maybe_unused]] constexpr int kDim = 4;
-    constexpr int kTimeID = 0;
-    constexpr int kLevID = 1;
-    constexpr int kLatID = 2;
-    constexpr int kLonID = 3;
+    static_assert(DIM == 4);
+    constexpr int32_t kTimeID = 0;
+    constexpr int32_t kLevID = 1;
+    constexpr int32_t kLatID = 2;
+    constexpr int32_t kLonID = 3;
 
-    /* Perform the iterative compression steps up until the root level */
-    for (int lvl_idx{0}; lvl_idx < num_compression_lvls_; ++lvl_idx)
+    int32_t paccess_idx{0};
+    std::array<T, kPackSize<DIM>> patch_data{};
+
+    for (int32_t lvl_idx{0}; lvl_idx < this->num_compression_lvls_; ++lvl_idx)
     {
+        /* Allocate a new dimension array */
+        this->dim_length_pyramid_.emplace_back();
+
         /* Get the current dimension lengths */
-        const int time_length = this->dim_lengths_.back()[kTimeID];
-        const int lev_length = this->dim_lengths_.back()[kLevID];
-        const int lat_length = this->dim_lengths_.back()[kLatID];
-        const int lon_length = this->dim_lengths_.back()[kLonID];
+        const std::array<int32_t, DIM>& dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 2);
 
-        /* Allocate the entropy symbols on this level */
-        this->entropy_codes_.emplace_back(time_length * lev_length * lat_length * lon_length, 0);
+        /* Get the next level dimension array */
+        std::array<int32_t, DIM>& next_lvl_dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 1);
+        next_lvl_dim_lengths[kTimeID] = (dim_lengths[kTimeID] % kDIMReductionFactor == 0 ? (dim_lengths[kTimeID] / kDIMReductionFactor) : (dim_lengths[kTimeID] / kDIMReductionFactor) + 1);
+        next_lvl_dim_lengths[kLevID] = (dim_lengths[kLevID] % kDIMReductionFactor == 0 ? (dim_lengths[kLevID] / kDIMReductionFactor) : (dim_lengths[kLevID] / kDIMReductionFactor) + 1);
+        next_lvl_dim_lengths[kLatID] = (dim_lengths[kLatID] % kDIMReductionFactor == 0 ? (dim_lengths[kLatID] / kDIMReductionFactor) : (dim_lengths[kLatID] / kDIMReductionFactor) + 1);
+        next_lvl_dim_lengths[kLonID] = (dim_lengths[kLonID] % kDIMReductionFactor == 0 ? (dim_lengths[kLonID] / kDIMReductionFactor) : (dim_lengths[kLonID] / kDIMReductionFactor) + 1);
 
-        /* Allocate the coarse level */
-        std::vector<T> coarse_data;
-        coarse_data.reserve(((time_length / kDimReductionFactor) + 1) * ((lev_length / kDimReductionFactor) + 1) * ((lat_length / kDimReductionFactor) + 1) * ((lon_length / kDimReductionFactor) + 1));
+        /* Compute the number of next level values */
+        const int32_t num_next_level_vals = next_lvl_dim_lengths[kTimeID] * next_lvl_dim_lengths[kLevID] * next_lvl_dim_lengths[kLatID] * next_lvl_dim_lengths[kLonID];
+        /* Allocate a next level vector for the coarse data */
+        std::vector<T> coarse_values;
+        coarse_values.reserve(num_next_level_vals);
 
-        std::array<T, kNumMaxChildrenElements<DIM>> patch_values{};
+        /* Allocate a level-wise patch encdoing */
+        this->levelwise_patch_encodings_.emplace_back();
+        this->levelwise_patch_encodings_.back().reserve(num_next_level_vals);
 
-        /* Iterate over patches */
-        for (int time = 0; time < time_length; time += kDimReductionFactor)
+        /* Extract the coarse level values */
+        for (int32_t time = 0; time < dim_lengths[kTimeID]; time += kDIMReductionFactor)
         {
-            for (int lev = 0; lev < lev_length; lev += kDimReductionFactor)
+            for (int32_t lev = 0; lev < dim_lengths[kLevID]; lev += kDIMReductionFactor)
             {
-                for (int lat = 0; lat < lat_length; lat += kDimReductionFactor)
+                for (int32_t lat = 0; lat < dim_lengths[kLatID]; lat += kDIMReductionFactor)
                 {
-                    for (int lon = 0; lon < lon_length; lon += kDimReductionFactor)
+                    for (int32_t lon = 0; lon < dim_lengths[kLonID]; lon += kDIMReductionFactor)
                     {
-                        int elem_idx{0};
+                        /* Reset the access idx for each new patch */
+                        paccess_idx = 0;
 
-                        /* Gather the values for this patch */
-                        for (int time_idx = 0; time_idx < kDimReductionFactor; ++time_idx)
+                        /* Gather the values for this initial patch */
+                        for (int32_t time_idx = 0; time_idx < kDIMReductionFactor; ++time_idx)
                         {
-                            for (int lev_idx = 0; lev_idx < kDimReductionFactor; ++lev_idx)
+                            for (int32_t lev_idx = 0; lev_idx < kDIMReductionFactor; ++lev_idx)
                             {
-                                for (int lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
+                                for (int32_t lat_idx = 0; lat_idx < kDIMReductionFactor; ++lat_idx)
                                 {
-                                    for (int lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
+                                    for (int32_t lon_idx = 0; lon_idx < kDIMReductionFactor; ++lon_idx)
                                     {
-                                        if (time + time_idx >= time_length || lev + lev_idx >= lev_length || lat + lat_idx >= lat_length || lon + lon_idx >= lon_length) [[unlikely]]
+                                        if (time + time_idx >= dim_lengths[kTimeID] || lev + lev_idx >= dim_lengths[kLevID] || lat + lat_idx >= dim_lengths[kLatID] || lon + lon_idx >= dim_lengths[kLonID]) [[unlikely]]
                                         {
                                             continue;
                                         } else
                                         {
-                                            patch_values[elem_idx] = GetValue<T>(this->data_, time + time_idx, lev + lev_idx, lat + lat_idx, lon + lon_idx, lon_length, lat_length, lev_length, time_length);
-                                            ++elem_idx;
+                                            /* Retrieve the corresponding value from this patch */
+                                            patch_data[paccess_idx] = GetValue<T>(this->data_, time + time_idx, lev + lev_idx, lat + lat_idx, lon + lon_idx,
+                                                                                  dim_lengths[kLonID], dim_lengths[kLatID], dim_lengths[kLevID], dim_lengths[kTimeID]);
                                         }
+                                        ++paccess_idx;
                                     }
                                 }
                             }
                         }
 
-                        /* Perform an extraction operation on this patch of values */
-                        const PatchEncodingData<T, DIM> extracted_values = this->PerformExtraction(patch_values, elem_idx);
+                        /* Compute the coarse data and the residual encoding */
+                        auto [coarse_value, patch_encoding] = PerformExtraction<T, DIM>(patch_data, paccess_idx);
 
-                        /* Re-Assign the fine values */
-                        int extracted_val_idx{0};
-                        for (int time_idx = 0; time_idx < kDimReductionFactor; ++time_idx)
-                        {
-                            for (int lev_idx = 0; lev_idx < kDimReductionFactor; ++lev_idx)
-                            {
-                                for (int lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
-                                {
-                                    for (int lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
-                                    {
-                                        if (time + time_idx >= time_length || lev + lev_idx >= lev_length || lat + lat_idx >= lat_length || lon + lon_idx >= lon_length) [[unlikely]]
-                                        {
-                                            continue;
-                                        } else
-                                        {
-                                            /* Update the fine value accordingly */
-                                            SetValue<T>(this->data_, std::bit_cast<T>(extracted_values.residuals[extracted_val_idx]), time + time_idx, lev + lev_idx, lat + lat_idx, lon + lon_idx, lon_length, lat_length, lev_length, time_length);
-                                            SetValue<SymbolType>(this->entropy_codes_.back(), extracted_values.entropy_symbols[extracted_val_idx], time + time_idx, lev + lev_idx, lat + lat_idx, lon + lon_idx, lon_length, lat_length, lev_length, time_length);
-                                            ++extracted_val_idx;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        /* Store the extracted information */
-                        coarse_data.push_back(extracted_values.coarse_value);
+                        /* Store the coarse value */
+                        coarse_values.push_back(coarse_value);
+
+                        /* Store the computed patch encoding */
+                        this->levelwise_patch_encodings_.back().push_back(std::move(patch_encoding));
                     }
                 }
             }
         }
 
-        /* Store the data */
-        this->residuals_.push_back(std::move(this->data_));
-        this->data_ = std::move(coarse_data);
+        /* Switch to the coarse data for the next level extraction */
+        this->data_ = std::move(coarse_values);
 
-        /* Update the dimension sizes */
-        const int new_time_length = (time_length % kDimReductionFactor == 0 ? (time_length / kDimReductionFactor) : (time_length / kDimReductionFactor) + 1);
-        const int new_lev_length = (lev_length % kDimReductionFactor == 0 ? (lev_length / kDimReductionFactor) : (lev_length / kDimReductionFactor) + 1);
-        const int new_lat_length = (lat_length % kDimReductionFactor == 0 ? (lat_length / kDimReductionFactor) : (lat_length / kDimReductionFactor) + 1);
-        const int new_lon_length = (lon_length % kDimReductionFactor == 0 ? (lon_length / kDimReductionFactor) : (lon_length / kDimReductionFactor) + 1);
-    
-        /* Store the dimensions for the next iteration */
-        dim_lengths_.push_back(std::array<int, DIM>{new_time_length, new_lev_length, new_lat_length, new_lon_length});
+        cmc_debug_msg("The compression iteration step ", lvl_idx, " is finished.");
     }
 
-    /* Determine Entropy Codes */
-    const std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> entropy_symbols = CollectEntropySymbols<T>(this->entropy_codes_);
+    /* Encode the gathered data */
+    this->EncodeData();
 
-    /* Build a Huffman coder */
-    cmc::entropy_coding::huffman::HuffmanCoder<SymbolType> entropy_coder(entropy_symbols);
-
-    /* Store the serialized Huffman coder of the intra element compression */
-    this->serialized_entropy_dictionary_ = entropy_coder.SerializeHuffmanCodesBEPadded();
-
-    encoded_data_.reserve(num_compression_lvls_ + 1);
-
-    /* Encode Root Level */
-    encoded_data_.push_back(EncodeRootLevel<T, DIM>(this->data_));
-
-    /* Encode data from higer levels in reverse */
-    auto lvl_entropy_symbols_iter = this->entropy_codes_.rbegin();
-    auto lvl_residual_iter = this->residuals_.rbegin();
-
-    for (int lvl_idx{0}; lvl_idx < this->num_compression_lvls_; ++lvl_idx)
-    {
-        /* Define some references for the ease of notation */
-        const std::vector<SymbolType>& entropy_symbols = *lvl_entropy_symbols_iter;
-        const auto& residuals = *lvl_residual_iter;
-
-        /* Allocate a cmc_bits_vector */
-        cmc::bits::vector lvl_encoding;
-        lvl_encoding.Reserve(sizeof(T) * cmc::bits::kCharBit * (residuals.size() / 2));
-
-        cmc_assert(entropy_symbols.size() == residuals.size());
-        const int num_elems = entropy_symbols.size();
-
-        /* Encode the symbols and the entropy codes in an interleved fashion */
-        for (int elem_idx{0}; elem_idx < num_elems; ++elem_idx)
-        {
-            /* Encode the entropy symbol */
-            const cmc::entropy_coding::huffman::HuffmanCode code = entropy_coder.EncodeSymbol(entropy_symbols[elem_idx]);
-
-            /* Retrieve the LZC from the entropy symbol */
-            const int lzc = GetLZCFromEntropySymbol(entropy_symbols[elem_idx]);
-
-            /* Serialize the encoded entropy symbol */
-            lvl_encoding.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
-            
-            /* We do not need to encode the implicit given one-bit following the LZC */
-            if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
-            {
-                /* Append the significant reisdual bits */
-                AppendResidualBits<T>(lvl_encoding, residuals[elem_idx], lzc + 1, 0);
-            }
-        }
-
-        /* Store the level-wise encoding */
-        encoded_data_.push_back(lvl_encoding.GetSerializedByteStreamBE());
-
-        /* Update the iterators */
-        ++lvl_entropy_symbols_iter;
-        ++lvl_residual_iter;
-    }
+    cmc_debug_msg("The lossless compression of is finished.");
 }
 
 
 template <ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 void
-CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTag3D)
+CompressionVariable<T, DIM>::Compress(CompressionVariable<T, DIM>::kTag3D)
 {
-    [[maybe_unused]] constexpr int kDim = 3;
-    constexpr int kLevID = 0;
-    constexpr int kLatID = 1;
-    constexpr int kLonID = 2;
+    static_assert(DIM == 3);
+    constexpr int32_t kLevID = 0;
+    constexpr int32_t kLatID = 1;
+    constexpr int32_t kLonID = 2;
 
-    /* Perform the iterative compression steps up until the root level */
-    for (int lvl_idx{0}; lvl_idx < num_compression_lvls_; ++lvl_idx)
+    int32_t paccess_idx{0};
+    std::array<T, kPackSize<DIM>> patch_data{};
+
+    for (int32_t lvl_idx{0}; lvl_idx < this->num_compression_lvls_; ++lvl_idx)
     {
+        /* Allocate a new dimension array */
+        this->dim_length_pyramid_.emplace_back();
+
         /* Get the current dimension lengths */
-        const int lev_length = this->dim_lengths_.back()[kLevID];
-        const int lat_length = this->dim_lengths_.back()[kLatID];
-        const int lon_length = this->dim_lengths_.back()[kLonID];
+        const std::array<int32_t, DIM>& dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 2);
 
-        /* Allocate the entropy symbols on this level */
-        this->entropy_codes_.emplace_back(lev_length * lat_length * lon_length, 0);
+        /* Get the next level dimension array */
+        std::array<int32_t, DIM>& next_lvl_dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 1);
+        next_lvl_dim_lengths[kLevID] = (dim_lengths[kLevID] % kDIMReductionFactor == 0 ? (dim_lengths[kLevID] / kDIMReductionFactor) : (dim_lengths[kLevID] / kDIMReductionFactor) + 1);
+        next_lvl_dim_lengths[kLatID] = (dim_lengths[kLatID] % kDIMReductionFactor == 0 ? (dim_lengths[kLatID] / kDIMReductionFactor) : (dim_lengths[kLatID] / kDIMReductionFactor) + 1);
+        next_lvl_dim_lengths[kLonID] = (dim_lengths[kLonID] % kDIMReductionFactor == 0 ? (dim_lengths[kLonID] / kDIMReductionFactor) : (dim_lengths[kLonID] / kDIMReductionFactor) + 1);
 
-        /* Allocate the coarse level */
-        std::vector<T> coarse_data;
-        coarse_data.reserve(((lev_length / kDimReductionFactor) + 1) * ((lat_length / kDimReductionFactor) + 1) * ((lon_length / kDimReductionFactor) + 1));
+        /* Compute the number of next level values */
+        const int32_t num_next_level_vals = next_lvl_dim_lengths[kLevID] * next_lvl_dim_lengths[kLatID] * next_lvl_dim_lengths[kLonID];
+        /* Allocate a next level vector for the coarse data */
+        std::vector<T> coarse_values;
+        coarse_values.reserve(num_next_level_vals);
 
-        std::array<T, kNumMaxChildrenElements<DIM>> patch_values{};
+        /* Allocate a level-wise patch encdoing */
+        this->levelwise_patch_encodings_.emplace_back();
+        this->levelwise_patch_encodings_.back().reserve(num_next_level_vals);
 
-        /* Iterate over patches */
-        for (int lev = 0; lev < lev_length; lev += kDimReductionFactor)
+        /* Extract the coarse level values */
+        for (int32_t lev = 0; lev < dim_lengths[kLevID]; lev += kDIMReductionFactor)
         {
-            for (int lat = 0; lat < lat_length; lat += kDimReductionFactor)
+            for (int32_t lat = 0; lat < dim_lengths[kLatID]; lat += kDIMReductionFactor)
             {
-                for (int lon = 0; lon < lon_length; lon += kDimReductionFactor)
+                for (int32_t lon = 0; lon < dim_lengths[kLonID]; lon += kDIMReductionFactor)
                 {
-                    int elem_idx{0};
+                    /* Reset the access idx for each new patch */
+                    paccess_idx = 0;
 
-                    /* Gather the values for this patch */
-                    for (int lev_idx = 0; lev_idx < kDimReductionFactor; ++lev_idx)
+                    /* Gather the values for this initial patch */
+                    for (int32_t lev_idx = 0; lev_idx < kDIMReductionFactor; ++lev_idx)
                     {
-                        for (int lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
+                        for (int32_t lat_idx = 0; lat_idx < kDIMReductionFactor; ++lat_idx)
                         {
-                            for (int lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
+                            for (int32_t lon_idx = 0; lon_idx < kDIMReductionFactor; ++lon_idx)
                             {
-                                if (lev + lev_idx >= lev_length || lat + lat_idx >= lat_length || lon + lon_idx >= lon_length) [[unlikely]]
+                                if (lev + lev_idx >= dim_lengths[kLevID] || lat + lat_idx >= dim_lengths[kLatID] || lon + lon_idx >= dim_lengths[kLonID]) [[unlikely]]
                                 {
                                     continue;
                                 } else
                                 {
-                                    patch_values[elem_idx] = GetValue<T>(this->data_, lev + lev_idx, lat + lat_idx, lon + lon_idx, lon_length, lat_length, lev_length);
-                                    ++elem_idx;
+                                    /* Retrieve the corresponding value from this patch */
+                                    patch_data[paccess_idx] = GetValue<T>(this->data_, lev + lev_idx, lat + lat_idx, lon + lon_idx,
+                                                                          dim_lengths[kLonID], dim_lengths[kLatID], dim_lengths[kLevID]);
                                 }
+                                ++paccess_idx;
                             }
                         }
                     }
 
-                    /* Perform an extraction operation on this patch of values */
-                    const PatchEncodingData<T, DIM> extracted_values = this->PerformExtraction(patch_values, elem_idx);
+                    /* Compute the coarse data and the residual encoding */
+                    auto [coarse_value, patch_encoding] = PerformExtraction<T, DIM>(patch_data, paccess_idx);
 
-                    /* Re-Assign the fine values */
-                    int extracted_val_idx{0};
-                    for (int lev_idx = 0; lev_idx < kDimReductionFactor; ++lev_idx)
-                    {
-                        for (int lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
-                        {
-                            for (int lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
-                            {
-                                if (lev + lev_idx >= lev_length || lat + lat_idx >= lat_length || lon + lon_idx >= lon_length) [[unlikely]]
-                                {
-                                    continue;
-                                } else
-                                {
-                                    /* Update the fine value accordingly */
-                                    SetValue<T>(this->data_, std::bit_cast<T>(extracted_values.residuals[extracted_val_idx]), lev + lev_idx, lat + lat_idx, lon + lon_idx, lon_length, lat_length, lev_length);
-                                    SetValue<SymbolType>(this->entropy_codes_.back(), extracted_values.entropy_symbols[extracted_val_idx], lev + lev_idx, lat + lat_idx, lon + lon_idx, lon_length, lat_length, lev_length);
-                                    ++extracted_val_idx;
-                                }
-                            }
-                        }
-                    }
+                    /* Store the coarse value */
+                    coarse_values.push_back(coarse_value);
 
-                    /* Store the extracted information */
-                    coarse_data.push_back(extracted_values.coarse_value);
+                    /* Store the computed patch encoding */
+                    this->levelwise_patch_encodings_.back().push_back(std::move(patch_encoding));
                 }
             }
         }
 
-        /* Store the data */
-        this->residuals_.push_back(std::move(this->data_));
-        this->data_ = std::move(coarse_data);
+        /* Switch to the coarse data for the next level extraction */
+        this->data_ = std::move(coarse_values);
 
-        /* Update the dimension sizes */
-        const int new_lev_length = (lev_length % kDimReductionFactor == 0 ? (lev_length / kDimReductionFactor) : (lev_length / kDimReductionFactor) + 1);
-        const int new_lat_length = (lat_length % kDimReductionFactor == 0 ? (lat_length / kDimReductionFactor) : (lat_length / kDimReductionFactor) + 1);
-        const int new_lon_length = (lon_length % kDimReductionFactor == 0 ? (lon_length / kDimReductionFactor) : (lon_length / kDimReductionFactor) + 1);
-    
-        /* Store the dimensions for the next iteration */
-        dim_lengths_.push_back(std::array<int, DIM>{new_lev_length, new_lat_length, new_lon_length});
+        cmc_debug_msg("The compression iteration step ", lvl_idx, " is finished.");
     }
 
-    /* Determine Entropy Codes */
-    const std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> entropy_symbols = CollectEntropySymbols<T>(this->entropy_codes_);
+    /* Encode the gathered data */
+    this->EncodeData();
 
-    /* Build a Huffman coder */
-    cmc::entropy_coding::huffman::HuffmanCoder<SymbolType> entropy_coder(entropy_symbols);
+    cmc_debug_msg("The lossless compression of is finished.");
+}
 
-    /* Store the serialized Huffman coder of the intra element compression */
-    this->serialized_entropy_dictionary_ = entropy_coder.SerializeHuffmanCodesBEPadded();
+template <ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+void
+CompressionVariable<T, DIM>::Compress(CompressionVariable<T, DIM>::kTag2D)
+{
+    static_assert(DIM == 2);
+    constexpr int32_t kLatID = 0;
+    constexpr int32_t kLonID = 1;
 
-    encoded_data_.reserve(num_compression_lvls_ + 1);
+    int32_t paccess_idx{0};
+    std::array<T, kPackSize<DIM>> patch_data{};
 
-    /* Encode Root Level */
-    encoded_data_.push_back(EncodeRootLevel<T, DIM>(this->data_));
-
-    /* Encode data from higer levels in reverse */
-    auto lvl_entropy_symbols_iter = this->entropy_codes_.rbegin();
-    auto lvl_residual_iter = this->residuals_.rbegin();
-
-    for (int lvl_idx{0}; lvl_idx < this->num_compression_lvls_; ++lvl_idx)
+    for (int32_t lvl_idx{0}; lvl_idx < this->num_compression_lvls_; ++lvl_idx)
     {
-        /* Define some references for the ease of notation */
-        const std::vector<SymbolType>& entropy_symbols = *lvl_entropy_symbols_iter;
-        const auto& residuals = *lvl_residual_iter;
+        /* Allocate a new dimension array */
+        this->dim_length_pyramid_.emplace_back();
 
-        /* Allocate a cmc_bits_vector */
-        cmc::bits::vector lvl_encoding;
-        lvl_encoding.Reserve(sizeof(T) * cmc::bits::kCharBit * (residuals.size() / 2));
+        /* Get the current dimension lengths */
+        const std::array<int32_t, DIM>& dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 2);
 
-        cmc_assert(entropy_symbols.size() == residuals.size());
-        const int num_elems = entropy_symbols.size();
+        /* Get the next level dimension array */
+        std::array<int32_t, DIM>& next_lvl_dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 1);
+        next_lvl_dim_lengths[kLatID] = (dim_lengths[kLatID] % kDIMReductionFactor == 0 ? (dim_lengths[kLatID] / kDIMReductionFactor) : (dim_lengths[kLatID] / kDIMReductionFactor) + 1);
+        next_lvl_dim_lengths[kLonID] = (dim_lengths[kLonID] % kDIMReductionFactor == 0 ? (dim_lengths[kLonID] / kDIMReductionFactor) : (dim_lengths[kLonID] / kDIMReductionFactor) + 1);
 
-        /* Encode the symbols and the entropy codes in an interleved fashion */
-        for (int elem_idx{0}; elem_idx < num_elems; ++elem_idx)
+        /* Compute the number of next level values */
+        const int32_t num_next_level_vals = next_lvl_dim_lengths[kLatID] * next_lvl_dim_lengths[kLonID];
+        /* Allocate a next level vector for the coarse data */
+        std::vector<T> coarse_values;
+        coarse_values.reserve(num_next_level_vals);
+
+        /* Allocate a level-wise patch encdoing */
+        this->levelwise_patch_encodings_.emplace_back();
+        this->levelwise_patch_encodings_.back().reserve(num_next_level_vals);
+
+        /* Extract the coarse level values */
+        for (int32_t lat = 0; lat < dim_lengths[kLatID]; lat += kDIMReductionFactor)
         {
-            /* Encode the entropy symbol */
-            const cmc::entropy_coding::huffman::HuffmanCode code = entropy_coder.EncodeSymbol(entropy_symbols[elem_idx]);
-
-            /* Retrieve the LZC from the entropy symbol */
-            const int lzc = GetLZCFromEntropySymbol(entropy_symbols[elem_idx]);
-
-            /* Serialize the encoded entropy symbol */
-            lvl_encoding.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
-            
-            /* We do not need to encode the implicit given one-bit following the LZC */
-            if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
+            for (int32_t lon = 0; lon < dim_lengths[kLonID]; lon += kDIMReductionFactor)
             {
-                /* Append the significant reisdual bits */
-                AppendResidualBits<T>(lvl_encoding, residuals[elem_idx], lzc + 1, 0);
+                /* Reset the access idx for each new patch */
+                paccess_idx = 0;
+
+                /* Gather the values for this initial patch */
+                for (int32_t lat_idx = 0; lat_idx < kDIMReductionFactor; ++lat_idx)
+                {
+                    for (int32_t lon_idx = 0; lon_idx < kDIMReductionFactor; ++lon_idx)
+                    {
+                        if (lat + lat_idx >= dim_lengths[kLatID] || lon + lon_idx >= dim_lengths[kLonID]) [[unlikely]]
+                        {
+                            continue;
+                        } else
+                        {
+                            /* Retrieve the corresponding value from this patch */
+                            patch_data[paccess_idx] = GetValue<T>(this->data_, lat + lat_idx, lon + lon_idx,
+                                                                  dim_lengths[kLonID], dim_lengths[kLatID]);
+                        }
+                        ++paccess_idx;
+                    }
+                }
+
+                /* Compute the coarse data and the residual encoding */
+                auto [coarse_value, patch_encoding] = PerformExtraction<T, DIM>(patch_data, paccess_idx);
+
+                /* Store the coarse value */
+                coarse_values.push_back(coarse_value);
+
+                /* Store the computed patch encoding */
+                this->levelwise_patch_encodings_.back().push_back(std::move(patch_encoding));
             }
         }
 
-        /* Store the level-wise encoding */
-        encoded_data_.push_back(lvl_encoding.GetSerializedByteStreamBE());
+        /* Switch to the coarse data for the next level extraction */
+        this->data_ = std::move(coarse_values);
 
-        /* Update the iterators */
-        ++lvl_entropy_symbols_iter;
-        ++lvl_residual_iter;
+        cmc_debug_msg("The compression iteration step ", lvl_idx, " is finished.");
+    }
+
+    /* Encode the gathered data */
+    this->EncodeData();
+
+    cmc_debug_msg("The lossless compression of is finished.");
+}
+
+
+template <ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+void
+CompressionVariable<T, DIM>::Compress(CompressionVariable<T, DIM>::kTag1D)
+{
+    static_assert(DIM == 1);
+    constexpr int32_t kLonID = 0;
+
+    int32_t paccess_idx{0};
+    std::array<T, kPackSize<DIM>> patch_data{};
+
+    for (int32_t lvl_idx{0}; lvl_idx < this->num_compression_lvls_; ++lvl_idx)
+    {
+        /* Allocate a new dimension array */
+        this->dim_length_pyramid_.emplace_back();
+
+        /* Get the current dimension lengths */
+        const std::array<int32_t, DIM>& dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 2);
+
+        /* Get the next level dimension array */
+        std::array<int32_t, DIM>& next_lvl_dim_lengths = *std::prev(this->dim_length_pyramid_.end(), 1);
+        next_lvl_dim_lengths[kLonID] = (dim_lengths[kLonID] % kDIMReductionFactor == 0 ? (dim_lengths[kLonID] / kDIMReductionFactor) : (dim_lengths[kLonID] / kDIMReductionFactor) + 1);
+
+        /* Compute the number of next level values */
+        const int32_t num_next_level_vals = next_lvl_dim_lengths[kLonID];
+        /* Allocate a next level vector for the coarse data */
+        std::vector<T> coarse_values;
+        coarse_values.reserve(num_next_level_vals);
+
+        /* Allocate a level-wise patch encdoing */
+        this->levelwise_patch_encodings_.emplace_back();
+        this->levelwise_patch_encodings_.back().reserve(num_next_level_vals);
+
+        /* Extract the coarse level values */
+        for (int32_t lon = 0; lon < dim_lengths[kLonID]; lon += kDIMReductionFactor)
+        {
+            /* Reset the access idx for each new patch */
+            paccess_idx = 0;
+
+            /* Gather the values for this initial patch */
+            for (int32_t lon_idx = 0; lon_idx < kDIMReductionFactor; ++lon_idx)
+            {
+                if (lon + lon_idx >= dim_lengths[kLonID]) [[unlikely]]
+                {
+                    continue;
+                } else
+                {
+                    /* Retrieve the corresponding value from this patch */
+                    patch_data[paccess_idx] = GetValue<T>(this->data_, lon + lon_idx,
+                                                          dim_lengths[kLonID]);
+                }
+                ++paccess_idx;
+            }
+
+            /* Compute the coarse data and the residual encoding */
+            auto [coarse_value, patch_encoding] = PerformExtraction<T, DIM>(patch_data, paccess_idx);
+
+            /* Store the coarse value */
+            coarse_values.push_back(coarse_value);
+
+            /* Store the computed patch encoding */
+            this->levelwise_patch_encodings_.back().push_back(std::move(patch_encoding));
+        }
+
+        /* Switch to the coarse data for the next level extraction */
+        this->data_ = std::move(coarse_values);
+
+        cmc_debug_msg("The compression iteration step ", lvl_idx, " is finished.");
+    }
+
+    /* Encode the gathered data */
+    this->EncodeData();
+
+    cmc_debug_msg("The lossless compression of is finished.");
+}
+
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>>
+CollectEntropySymbols(const std::vector<std::vector<PatchEncoding<T, DIM>>>& levelwise_encodings)
+{
+    /* Get the number of all possible entropy symbols */
+    constexpr int num_entropy_symbols = GetNumEntropySymbols<T>();
+
+    /* Set the array and zero intialiaze the frequencies */
+    std::array<uint64_t, num_entropy_symbols> entropy_symbol_frequencies{};
+
+    /* Iterate through all entropy codes and accumulate their frequencies */
+    for (size_t lvl_idx{0}; lvl_idx < levelwise_encodings.size(); ++lvl_idx)
+    {
+        /* Iterate through all coarsening data on this level */
+        for (size_t coarsening_idx{0}; coarsening_idx < levelwise_encodings[lvl_idx].size(); ++coarsening_idx)
+        {
+            /* Iterate over all entropy codes from this coarsening data */
+            for (uint32_t entropy_sym_idx{0}; entropy_sym_idx < levelwise_encodings[lvl_idx][coarsening_idx].num_elements; ++entropy_sym_idx)
+            {
+                /* Convert the symbol to the corresponding array index */
+                const int array_idx = MapEntropySymbolToArrayIndex<T>(levelwise_encodings[lvl_idx][coarsening_idx].entropy_symbols[entropy_sym_idx]);
+                /* Update the frequency */
+                ++entropy_symbol_frequencies[array_idx];
+            }
+        }
+    }
+
+    /* Add the process end symbol */
+    AddProcessEndSymbol<T>(entropy_symbol_frequencies, 1);
+
+    /* Replicate the global entropy frequencies over all levels */
+    std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> global_symbol_frequencies;
+    global_symbol_frequencies.reserve(num_entropy_symbols);
+
+    for (int idx{0}; idx < num_entropy_symbols; ++idx)
+    {
+        /* Convert the index back to the entropy symbol */
+        const SymbolType entropy_symbol = MapArrayIndexToEntropySymbol<T>(idx);
+
+        /* Store the symbol with the global frequency */
+        global_symbol_frequencies.emplace_back(entropy_symbol, entropy_symbol_frequencies[idx]);
+    }
+
+    return global_symbol_frequencies;
+}
+
+template<OneByteArithmeticType T>
+inline std::vector<uint64_t>
+PerformRootLevelEncoding(const std::vector<T>& data_)
+{
+    cmc::bits::vector root_lvl_encoding;
+    root_lvl_encoding.Reserve(data_.size() * sizeof(T));
+    
+    for (size_t idx{0}; idx < data_.size(); ++idx)
+    {
+        /* Store the value */
+        root_lvl_encoding.AppendBits<OneByteResidualType>(std::bit_cast<OneByteResidualType>(data_[idx]), 0, 0);
+    }
+    return root_lvl_encoding.GetSerializedByteStreamBE();
+}
+
+template<TwoByteArithmeticType T>
+inline std::vector<uint64_t>
+PerformRootLevelEncoding(const std::vector<T>& data_)
+{
+    cmc::bits::vector root_lvl_encoding;
+    root_lvl_encoding.Reserve(data_.size() * sizeof(T));
+    
+    for (size_t idx{0}; idx < data_.size(); ++idx)
+    {
+        /* Store the value */
+        root_lvl_encoding.AppendBits<TwoByteResidualType>(std::bit_cast<TwoByteResidualType>(data_[idx]), 0, 0);
+    }
+    return root_lvl_encoding.GetSerializedByteStreamBE();
+}
+
+template<FourByteArithmeticType T>
+inline std::vector<uint64_t>
+PerformRootLevelEncoding(const std::vector<T>& data_)
+{
+    cmc::bits::vector root_lvl_encoding;
+    root_lvl_encoding.Reserve(data_.size() * sizeof(T));
+    
+    for (size_t idx{0}; idx < data_.size(); ++idx)
+    {
+        /* Store the value */
+        root_lvl_encoding.AppendBits<FourByteResidualType>(std::bit_cast<FourByteResidualType>(data_[idx]), 0, 0);
+    }
+    return root_lvl_encoding.GetSerializedByteStreamBE();
+}
+
+template<EightByteArithmeticType T>
+inline std::vector<uint64_t>
+PerformRootLevelEncoding(const std::vector<T>& data_)
+{
+    cmc::bits::vector root_lvl_encoding;
+    root_lvl_encoding.Reserve(data_.size() * sizeof(T));
+    
+    for (size_t idx{0}; idx < data_.size(); ++idx)
+    {
+        /* Store the value */
+        root_lvl_encoding.AppendBits<EightByteResidualType>(std::bit_cast<EightByteResidualType>(data_[idx]), 0, 0);
+    }
+    return root_lvl_encoding.GetSerializedByteStreamBE();
+}
+
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+std::vector<uint64_t>
+CompressionVariable<T, DIM>::EncodeRootLevelData() const
+{   
+    /* The lastly added vector to the data pyramid resembles the root level */
+    return PerformRootLevelEncoding<T>(this->data_);
+}
+
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+void
+CompressionVariable<T, DIM>::EncodeData()
+{
+    /* Collect and exchange all entropy symbols */
+    const std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> entropy_symbols = CollectEntropySymbols<T>(this->levelwise_patch_encodings_);
+    
+    /* Create a Huffman encoder */
+    cmc::entropy_coding::huffman::HuffmanCoder<SymbolType> entropy_coder(entropy_symbols);
+
+    /* Store the serialized Huffman coder */
+    this->serialized_entropy_dictionary_ = entropy_coder.SerializeHuffmanCodesBEPadded();
+
+    /* Number of overall encoding steps */
+    const int num_encoding_steps = this->num_compression_lvls_ + 1;
+
+    /* Allocate an output vector for the levelwise encoding */
+    this->levelwise_encoded_data_.reserve(num_encoding_steps);
+
+    /* We need to encode the data resididng on the root level */
+    this->levelwise_encoded_data_.push_back(this->EncodeRootLevelData());
+
+    /* We encode the data from the root level to the leaf level */
+    auto enc_iter = this->levelwise_patch_encodings_.rbegin();
+
+    /* Iterate over all compression levels (Without the root level and the intra element level) */
+    for (int32_t step_idx{1}; step_idx < num_encoding_steps; ++step_idx, ++enc_iter)
+    {
+        /* Allocate a bits::vector to store this level's encoded data */
+        cmc::bits::vector lvl_data;
+        lvl_data.Reserve((enc_iter->size() * sizeof(PatchEncoding<T, DIM>) * cmc::bits::kCharBit) / 2);
+
+        /* Define a reference on the coarsening data for the ease of notation */
+        const std::vector<PatchEncoding<T, DIM>>& lvl_encoding_data = *enc_iter;
+
+        /* Number of data on this level */
+        const int32_t num_elems = lvl_encoding_data.size();
+        /* Iterate over this level's refinement indications */
+        for (int32_t elem_idx{0}; elem_idx < num_elems; ++elem_idx)
+        {
+            /* Define a reference for the ease of notation */
+            const PatchEncoding<T, DIM>& enc_data = lvl_encoding_data[elem_idx];
+
+            /* Encode the quantization bins and potentially interleave the unpredicted values */
+            for (int val_idx{0}; val_idx < static_cast<int>(enc_data.num_elements); ++val_idx)
+            {
+                /* Encode the entropy symbol */
+                const cmc::entropy_coding::huffman::HuffmanCode code = entropy_coder.EncodeSymbol(enc_data.entropy_symbols[val_idx]);
+
+                /* Retrieve the LZC from the entropy symbol */
+                const int lzc = GetLZCFromEntropySymbol(enc_data.entropy_symbols[val_idx]);
+
+                /* Serialize the encoded entropy symbol */
+                lvl_data.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
+            
+                /* We do not need to encode the implicit given one-bit following the LZC */
+                if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
+                {
+                    /* Append the significant reisdual bits */
+                    lvl_data.AppendBits(enc_data.residuals[val_idx], lzc + 1, 0);
+                }
+
+            }
+        }
+
+        /* At the end of the local encoding of the level, we append the process-end symbol */
+        const cmc::entropy_coding::huffman::HuffmanCode process_lvl_end_code = entropy_coder.EncodeSymbol(kProcessEndSymbol<T>);
+
+        /* Serialize the encoded process end symbol */
+        lvl_data.AppendBits(process_lvl_end_code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - process_lvl_end_code.code_length), 0);
+
+        /* We store this level's encoding in the variable's buffer */
+        this->levelwise_encoded_data_.push_back(lvl_data.GetSerializedByteStreamBE());
     }
 }
 
 template <ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 void
-CompressionVariable<T, DIM>::PerformCompression(CompressionVariable<T, DIM>::kTag2D)
+CompressionVariable<T, DIM>::WriteCompressedData(const std::string& file_name)
 {
-    [[maybe_unused]] constexpr int kDim = 2;
-    constexpr int kLatID = 0;
-    constexpr int kLonID = 1;
-
-    /* Perform the iterative compression steps up until the root level */
-    for (int lvl_idx{0}; lvl_idx < num_compression_lvls_; ++lvl_idx)
+    /* Check if the output file exists, if so, we delete it */
+    const std::filesystem::path output_file_path(file_name);
+    if (std::filesystem::exists(output_file_path))
     {
-        /* Get the current dimension lengths */
-        const int lat_length = this->dim_lengths_.back()[kLatID];
-        const int lon_length = this->dim_lengths_.back()[kLonID];
-
-        /* Allocate the entropy symbols on this level */
-        this->entropy_codes_.emplace_back(lat_length * lon_length, 0);
-
-        /* Allocate the coarse level */
-        std::vector<T> coarse_data;
-        coarse_data.reserve(((lat_length / kDimReductionFactor) + 1) * ((lon_length / kDimReductionFactor) + 1));
-
-        std::array<T, kNumMaxChildrenElements<DIM>> patch_values{};
-
-        /* Iterate over patches */
-        for (int lat = 0; lat < lat_length; lat += kDimReductionFactor)
-        {
-            for (int lon = 0; lon < lon_length; lon += kDimReductionFactor)
-            {
-                int elem_idx{0};
-
-                /* Gather the values for this patch */
-                for (int lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
-                {
-                    for (int lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
-                    {
-                        if (lat + lat_idx >= lat_length || lon + lon_idx >= lon_length) [[unlikely]]
-                        {
-                            continue;
-                        } else
-                        {
-                            patch_values[elem_idx] = GetValue<T>(data_, lat + lat_idx, lon + lon_idx, lon_length, lat_length);
-                            ++elem_idx;
-                        }
-                    }
-                }
-
-                /* Perform an extraction operation on this patch of values */
-                const PatchEncodingData<T, DIM> extracted_values = this->PerformExtraction(patch_values, elem_idx);
-
-                /* Re-Assign the fine values */
-                int extracted_val_idx{0};
-                for (int lat_idx = 0; lat_idx < kDimReductionFactor; ++lat_idx)
-                {
-                    for (int lon_idx = 0; lon_idx < kDimReductionFactor; ++lon_idx)
-                    {
-                        if (lat + lat_idx >= lat_length || lon + lon_idx >= lon_length) [[unlikely]]
-                        {
-                            continue;
-                        } else
-                        {
-                            /* Update the fine value accordingly */
-                            SetValue<T>(this->data_, std::bit_cast<T>(extracted_values.residuals[extracted_val_idx]), lat + lat_idx, lon + lon_idx, lon_length, lat_length);
-                            SetValue<SymbolType>(this->entropy_codes_.back(), extracted_values.entropy_symbols[extracted_val_idx], lat + lat_idx, lon + lon_idx, lon_length, lat_length);
-                            ++extracted_val_idx;
-                        }
-                    }
-                }
-                /* Store the extracted information */
-                coarse_data.push_back(extracted_values.coarse_value);
-            }
-        }
-
-        /* Store the data */
-        this->residuals_.push_back(std::move(this->data_));
-        this->data_ = std::move(coarse_data);
-
-        /* Update the dimension sizes */
-        const int new_lat_length = (lat_length % kDimReductionFactor == 0 ? (lat_length / kDimReductionFactor) : (lat_length / kDimReductionFactor) + 1);
-        const int new_lon_length = (lon_length % kDimReductionFactor == 0 ? (lon_length / kDimReductionFactor) : (lon_length / kDimReductionFactor) + 1);
-    
-        /* Store the dimensions for the next iteration */
-        dim_lengths_.push_back(std::array<int, DIM>{new_lat_length, new_lon_length});
+        std::filesystem::remove(output_file_path);
     }
 
-    /* Determine Entropy Codes */
-    const std::vector<cmc::entropy_coding::huffman::EntropySymbol<SymbolType>> entropy_symbols = CollectEntropySymbols<T>(this->entropy_codes_);
+    const uint64_t num_header_vals = 7 + this->levelwise_encoded_data_.size() + this->levelwise_encoded_data_.size() * DIM;
+    const uint64_t header_size = sizeof(uint64_t) * num_header_vals;
 
-    /* Build a Huffman coder */
-    cmc::entropy_coding::huffman::HuffmanCoder<SymbolType> entropy_coder(entropy_symbols);
+    /* We construct the output stream */
+    std::vector<uint64_t> header;
+    header.reserve(num_header_vals);
 
-    /* Store the serialized Huffman coder of the intra element compression */
-    this->serialized_entropy_dictionary_ = entropy_coder.SerializeHuffmanCodesBEPadded();
-
-    encoded_data_.reserve(num_compression_lvls_ + 1);
-
-    /* Encode Root Level */
-    encoded_data_.push_back(EncodeRootLevel<T, DIM>(this->data_));
-
-    /* Encode data from higer levels in reverse */
-    auto lvl_entropy_symbols_iter = this->entropy_codes_.rbegin();
-    auto lvl_residual_iter = this->residuals_.rbegin();
-
-    cmc_assert(this->entropy_codes_.size() == this->residuals_.size());
-
-    for (int lvl_idx{0}; lvl_idx < this->num_compression_lvls_; ++lvl_idx)
+    /* Global Bytes compressed variable */
+    uint64_t level_bytes{0};
+    for (size_t lvl_idx{0}; lvl_idx < this->levelwise_encoded_data_.size(); ++lvl_idx)
     {
-        /* Define some references for the ease of notation */
-        const std::vector<SymbolType>& entropy_symbols = *lvl_entropy_symbols_iter;
-        const auto& residuals = *lvl_residual_iter;
-
-        /* Allocate a cmc_bits_vector */
-        cmc::bits::vector lvl_encoding;
-        lvl_encoding.Reserve(sizeof(T) * cmc::bits::kCharBit * (residuals.size() / 2));
-
-        cmc_assert(entropy_symbols.size() == residuals.size());
-        const int num_elems = entropy_symbols.size();
-
-        /* Encode the symbols and the entropy codes in an interleved fashion */
-        for (int elem_idx{0}; elem_idx < num_elems; ++elem_idx)
-        {
-            /* Encode the entropy symbol */
-            const cmc::entropy_coding::huffman::HuffmanCode code = entropy_coder.EncodeSymbol(entropy_symbols[elem_idx]);
-
-            /* Retrieve the LZC from the entropy symbol */
-            const int lzc = GetLZCFromEntropySymbol(entropy_symbols[elem_idx]);
-
-            /* Serialize the encoded entropy symbol */
-            lvl_encoding.AppendBits(code.code_word, static_cast<int>(sizeof(cmc::entropy_coding::huffman::HuffmanCodeWord) * cmc::bits::kCharBit - code.code_length), 0);
-            
-            /* We do not need to encode the implicit given one-bit following the LZC */
-            if (lzc + 1 < static_cast<int>(sizeof(T) * cmc::bits::kCharBit)) [[likely]]
-            {
-                /* Append the significant reisdual bits */
-                AppendResidualBits<T>(lvl_encoding, residuals[elem_idx], lzc + 1, 0);
-            }
-        }
-
-        /* Store the level-wise encoding */
-        encoded_data_.push_back(lvl_encoding.GetSerializedByteStreamBE());
-
-        /* Update the iterators */
-        ++lvl_entropy_symbols_iter;
-        ++lvl_residual_iter;
+        level_bytes += this->levelwise_encoded_data_[lvl_idx].size() * sizeof(uint64_t);
     }
+    const uint64_t global_byte_count = header_size + this->serialized_entropy_dictionary_.size() * sizeof(uint64_t) + level_bytes;
+    header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(global_byte_count));
+
+    /* Store the offset from the beginning to the start of the root level encoding */
+    const uint64_t level_encoding_byte_offset = header_size;
+    header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(level_encoding_byte_offset));
+
+    /* Store the data type */
+    header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(ConvertToCmcType<T>())));
+
+    /* Store the dimensionality */
+    header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(DIM)));
+
+    /* Store the compression scheme */
+    header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(CompressionSchema::ParallelMultiResExtraction)));
+
+    /* Store the number of compression levels */
+    header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(this->levelwise_encoded_data_.size())));
+
+    /* Append the global level bytes */
+    const int32_t num_compr_level = static_cast<int32_t>(this->levelwise_encoded_data_.size());
+    for (int32_t lvl_idx{0}; lvl_idx < num_compr_level; ++lvl_idx)
+    {
+        header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(this->levelwise_encoded_data_[lvl_idx].size() * sizeof(uint64_t))));
+    }
+
+    /* Append the dimensionality pyramid (it needs to be traversed in reverse order) */
+    const int32_t dim_pyra_size = static_cast<int32_t>(this->dim_length_pyramid_.size());
+    for (size_t lvl_idx{0}; lvl_idx < this->dim_length_pyramid_.size(); ++lvl_idx)
+    {
+        for (int32_t dim_idx{0}; dim_idx < DIM; ++dim_idx)
+        {
+            header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(this->dim_length_pyramid_[dim_pyra_size - 1 - lvl_idx][dim_idx])));
+        }
+    }
+
+    /* Store the Huffman codes */
+    const uint64_t num_bytes_huffman_codes = this->serialized_entropy_dictionary_.size() * sizeof(uint64_t);
+    header.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(num_bytes_huffman_codes));
+
+    /* Open the output file */
+    std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+
+    /* Write the header */
+    std::fwrite(header.data(), sizeof(uint64_t), header.size(), file_out);
+
+    /* Write the Huffman Codes */
+    std::fwrite(this->serialized_entropy_dictionary_.data(), sizeof(uint64_t), this->serialized_entropy_dictionary_.size(), file_out);
+
+    /* Write the levelwise encoding streams */
+    for (size_t lvl_idx{0}; lvl_idx < this->levelwise_encoded_data_.size(); ++lvl_idx)
+    {
+        std::fwrite(this->levelwise_encoded_data_[lvl_idx].data(), sizeof(uint64_t), this->levelwise_encoded_data_[lvl_idx].size(), file_out);
+    }
+
+    /* And, finally, close the file */
+    std::fclose(file_out);
 }
 
 }
 
-#endif /* !CMC_PATCH_LOSSLESS_CMC_MULTI_RES_EXTRACTION_HXX */
+#endif /* !CMC_PATCH_LOSSLESS_MULTI_RES_EXTRACTION_HXX */
