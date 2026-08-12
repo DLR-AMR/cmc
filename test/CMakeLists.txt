@@ -21,13 +21,6 @@ if(CMC_ENABLE_ALL_WARNINGS)
 endif()
 add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_INTRA_ELEM_CODING})
 
-# Add the test for the intra element lossless multi res compression with multiple data
-set(CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION cmc_test_multi_res_lossless_multi_data_compression)
-add_executable(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_lossless_compression_multi_data.cxx)
-target_link_libraries(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} PUBLIC cmc)
-target_include_directories(${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
-add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_MULTI_DATA_COMPRESSION})
-
 # Add the test for the Trixi-related intra element lossy multi res compression with multiple data
 set(CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION cmc_test_trxi_multi_res_lossy_multi_data_compression)
 add_executable(${CMC_TEST_TRIXI_MULTI_RES_LOSSY_MULTI_DATA_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_trixi_multi_res_lossy_compression_multi_data.cxx)
@@ -85,3 +78,34 @@ if(CMC_ENABLE_ALL_WARNINGS)
     target_compile_options(${CMC_TEST_HUFFMAN_CODER} PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 add_test(NAME ${CMC_TEST_HUFFMAN_CODER} COMMAND ${CMC_TEST_HUFFMAN_CODER})
+
+# Add the test for the lossy multi-res patch-wise IDW compression
+set(CMC_TEST_MULTI_RES_LOSSY_IDW_PATCH_COMPRESSION cmc_test_multi_res_idw_lossy_patch_compression)
+add_executable(${CMC_TEST_MULTI_RES_LOSSY_IDW_PATCH_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_lossy_idw_patch_compression.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_LOSSY_IDW_PATCH_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_LOSSY_IDW_PATCH_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+if(CMC_ENABLE_ALL_WARNINGS)
+    target_compile_options(${CMC_TEST_MULTI_RES_LOSSY_IDW_PATCH_COMPRESSION} PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+add_test(NAME ${CMC_TEST_MULTI_RES_LOSSY_IDW_PATCH_COMPRESSION} COMMAND ${CMC_TEST_MULTI_RES_LOSSY_IDW_PATCH_COMPRESSION})
+
+# Add the test for the lossy multi-res patch-wise RBF compression
+set(CMC_TEST_MULTI_RES_LOSSY_RBF_PATCH_COMPRESSION cmc_test_multi_res_rbf_lossy_patch_compression)
+add_executable(${CMC_TEST_MULTI_RES_LOSSY_RBF_PATCH_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_lossy_rbf_patch_compression.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_LOSSY_RBF_PATCH_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_LOSSY_RBF_PATCH_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+if(CMC_ENABLE_ALL_WARNINGS)
+    target_compile_options(${CMC_TEST_MULTI_RES_LOSSY_RBF_PATCH_COMPRESSION} PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+add_test(NAME ${CMC_TEST_MULTI_RES_LOSSY_RBF_PATCH_COMPRESSION} COMMAND ${CMC_TEST_MULTI_RES_LOSSY_RBF_PATCH_COMPRESSION})
+
+# Add the test for the lossless multi-res patch-wise compression
+set(CMC_TEST_MULTI_RES_LOSSLESS_PATCH_COMPRESSION cmc_test_multi_res_lossless_patch_compression)
+add_executable(${CMC_TEST_MULTI_RES_LOSSLESS_PATCH_COMPRESSION} ${CMAKE_CURRENT_LIST_DIR}/cmc_multi_res_lossless_patch_compression.cxx)
+target_link_libraries(${CMC_TEST_MULTI_RES_LOSSLESS_PATCH_COMPRESSION} PUBLIC cmc)
+target_include_directories(${CMC_TEST_MULTI_RES_LOSSLESS_PATCH_COMPRESSION} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/..)
+if(CMC_ENABLE_ALL_WARNINGS)
+    target_compile_options(${CMC_TEST_MULTI_RES_LOSSLESS_PATCH_COMPRESSION} PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+add_test(NAME ${CMC_TEST_MULTI_RES_LOSSLESS_PATCH_COMPRESSION} COMMAND ${CMC_TEST_MULTI_RES_LOSSLESS_PATCH_COMPRESSION})
+

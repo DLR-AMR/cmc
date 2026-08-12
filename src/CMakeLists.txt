@@ -25,6 +25,8 @@ install(FILES
     utilities/cmc_log_functions.hxx
     utilities/cmc_huffman_coder.hxx
     utilities/cmc_utilities.hxx 
+    utilities/cmc_error_domain.hxx 
+    utilities/cmc_error_domain_functions.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 
@@ -32,6 +34,15 @@ install(FILES
     patch/lossless/cmc_multi_res_extraction.hxx
     patch/lossless/cmc_patch_multi_res_extraction_util.hxx 
     patch/lossless/cmc_multi_res_decompression.hxx 
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
+)
+
+install(FILES
+    patch/lossy/cmc_multi_res_util.hxx
+    patch/lossy/cmc_multi_res_extraction_idw.hxx 
+    patch/lossy/cmc_multi_res_decompression_idw.hxx 
+    patch/lossy/cmc_multi_res_extraction_rbf.hxx 
+    patch/lossy/cmc_multi_res_decompression_rbf.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
@@ -87,9 +98,6 @@ install(FILES
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy
 )
 
-
-######## WITH T8CODE AND MPI
-if (CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
 # Lossless AMR compressor needs MPI and t8code 
 install(FILES
     amr/lossless/cmc_par_multi_res_extraction_util.hxx 
