@@ -14,7 +14,10 @@
 
 namespace cmc::patch::lossless::multi_res
 {
-    
+
+/* Switch to minimize the compression error for the fast multi res compression */
+constexpr bool kTryToCorrectMeanFastCompression = true;
+
 template<int32_t DIM>
 concept Dimension = (DIM >= 1 && DIM <= 4);
 
@@ -393,8 +396,8 @@ KahanTwoSum(const std::array<T, N>& values, const int num_vals)
     return static_cast<T>(sum);
 }
 
-template<ArithmeticType T, int32_t N>
-inline long double
+template<FloatType T, int32_t N>
+inline T
 NeumaierKahanBabuskaSum(const std::array<T, N>& values, const int num_vals)
 {
     static_assert(N >= 1);
@@ -421,12 +424,12 @@ NeumaierKahanBabuskaSum(const std::array<T, N>& values, const int num_vals)
 
     const long double sum_corrected = sum + correction;
 
-    return sum_corrected;
+    return static_cast<T>(sum_corrected);
 }
 
 
-template<ArithmeticType T>
-inline long double
+template<FloatType T>
+inline T
 NeumaierKahanBabuskaSum(const std::vector<T>& values)
 {
     cmc_assert(values.size() >= 1);
@@ -452,16 +455,16 @@ NeumaierKahanBabuskaSum(const std::vector<T>& values)
 
     const long double sum_corrected = sum + correction;
 
-    return sum_corrected;
+    return static_cast<T>(sum_corrected);
 }
 
 template<ArithmeticType T, int32_t N>
 inline T
 CreateArithmeticMeanPredictor(const std::array<T, N>& init_data, const int num_elems)
 {
-    const long double sum = NeumaierKahanBabuskaSum<T, N>(init_data, num_elems);
-    const long double mean = sum / static_cast<long double>(num_elems);
-    return static_cast<T>(mean);
+    const T sum = NeumaierKahanBabuskaSum<T, N>(init_data, num_elems);
+    const T mean = sum / static_cast<T>(num_elems);
+    return mean;
 }
 
 constexpr uint32_t kCheckFloatSign = 0x80000000U;
@@ -635,10 +638,8 @@ CreateMatchingMeanPredictor(const std::array<T, N>& init_data, const int num_ele
     const auto d_partial_sum = NeumaierKahanBabuskaSum<T, N>(init_data, num_elems - 1);
     const T partial_sum = static_cast<T>(d_partial_sum);
     const T value_to_match = init_data[num_elems - 1];
-
     /* Create the mean predictor */
     const T matching_mean = FindMatchingMeanValue(num_vals, partial_sum, value_to_match);
-
     return matching_mean;
 }
 
@@ -650,9 +651,7 @@ ComputeImplicitValue(const T mean_value, const std::vector<T>& values)
     const T num_vals = static_cast<T>(values.size() + 1);
     const auto d_partial_sum = NeumaierKahanBabuskaSum<T>(values);
     const T partial_sum = static_cast<T>(d_partial_sum);
-
     const T implicit_val = ComputeFMAForImplicitValue<T>(num_vals, mean_value, partial_sum);
-
     return implicit_val;
 }
 

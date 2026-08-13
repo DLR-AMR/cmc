@@ -34,6 +34,8 @@ install(FILES
     patch/lossless/cmc_multi_res_extraction.hxx
     patch/lossless/cmc_patch_multi_res_extraction_util.hxx 
     patch/lossless/cmc_multi_res_decompression.hxx 
+    patch/lossless/cmc_fast_multi_res_extraction.hxx
+    patch/lossless/cmc_fast_multi_res_decompression.hxx
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
