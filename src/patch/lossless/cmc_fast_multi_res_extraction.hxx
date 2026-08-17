@@ -720,7 +720,6 @@ CompressionVariable<T, DIM>::WriteCompressedData(const std::string& file_name)
         std::filesystem::remove(output_file_path);
     }
 
-    cmc_global_msg("levelwise encoded data size: ", this->levelwise_encoded_data_.size());
     const uint64_t num_header_vals = 7 + this->levelwise_encoded_data_.size() + this->levelwise_encoded_data_.size() * DIM;
     const uint64_t header_size = sizeof(uint64_t) * num_header_vals;
 
