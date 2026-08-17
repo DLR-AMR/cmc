@@ -430,6 +430,50 @@ ComputeIntegerResidual(const T approximation, const U real_value)
     return std::make_pair(is_approx_greater, diff);
 }
 
+template<OneByteType T, OneByteType U>
+constexpr uint8_t
+ComputeXORIntegerResidual(const T approximation, const U real_value)
+{
+    /* Compute the difference in integer arithmetic */
+    const uint8_t diff = std::bit_cast<uint8_t>(approximation) ^ std::bit_cast<uint8_t>(real_value);
+
+    /* Return the residual */
+    return diff;
+}
+
+template<TwoByteType T, TwoByteType U>
+constexpr uint16_t
+ComputeXORIntegerResidual(const T approximation, const U real_value)
+{
+    /* Compute the difference in integer arithmetic */
+    const uint16_t diff = std::bit_cast<uint16_t>(approximation) ^ std::bit_cast<uint16_t>(real_value);
+
+    /* Return the residual */
+    return diff;
+}
+
+template<FourByteType T, FourByteType U>
+constexpr uint32_t
+ComputeXORIntegerResidual(const T approximation, const U real_value)
+{
+    /* Compute the difference in integer arithmetic */
+    const uint32_t diff = std::bit_cast<uint32_t>(approximation) ^ std::bit_cast<uint32_t>(real_value);
+
+    /* Return the residual */
+    return diff;
+}
+
+template<EightByteType T, EightByteType U>
+constexpr uint64_t
+ComputeXORIntegerResidual(const T approximation, const U real_value)
+{
+    /* Compute the difference in integer arithmetic */
+    const uint64_t diff = std::bit_cast<uint64_t>(approximation) ^ std::bit_cast<uint64_t>(real_value);
+
+    /* Return the residual */
+    return diff;
+}
+
 template<typename T>
 constexpr int
 GetLZC(const T residual)
