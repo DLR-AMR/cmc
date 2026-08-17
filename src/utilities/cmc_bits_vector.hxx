@@ -81,10 +81,10 @@ vector::AppendBits(const T value, const U start_pos, const U end_pos)
     const int start_pos_shift = start_pos + (sizeof(uint64_t) - sizeof(T)) * kCharBit;
 
     /* Get the value as an promoted uint64_t and nullified insignificant bits */
-    const uint64_t value_u64 = static_cast<uint64_t>(value) & ((~uint64_t{0} >> start_pos_shift) & (~uint64_t{0} << end_pos));
+    const uint64_t value_u64 = static_cast<uint64_t>(value) & ((~uint64_t{0} >> start_pos_shift) & (~uint64_t{0} << static_cast<int>(end_pos)));
 
     /* Check if the significant bits fit into the current value */
-    const bool do_bits_fit_into_current_val = ((bit_position_ + 1) >= GetNumSignificantBits<uint64_t>(start_pos_shift, end_pos));
+    const bool do_bits_fit_into_current_val = ((bit_position_ + 1) >= GetNumSignificantBits<uint64_t, int>(start_pos_shift, static_cast<int>(end_pos)));
 
     /* If the bits fit into the current value, we can just append it */
     if (do_bits_fit_into_current_val) [[likely]]
@@ -98,7 +98,7 @@ vector::AppendBits(const T value, const U start_pos, const U end_pos)
         vector_.back() |= aligned_value_u64;
 
         /* Offset the bit position by the number of appended bits */
-        bit_position_ -= GetNumSignificantBits<uint64_t>(start_pos_shift, end_pos);
+        bit_position_ -= GetNumSignificantBits<uint64_t, int>(start_pos_shift, static_cast<int>(end_pos));
     } else
     {
         /* In case the bits do not fit into the current value, we need to add the significant bits in two phases */
@@ -107,7 +107,7 @@ vector::AppendBits(const T value, const U start_pos, const U end_pos)
         vector_.back() |= (value_u64 >> right_shift);
 
         /* In the next phase, we add the new value with the remaining bits set */
-        const int left_shift = 64 - (GetNumSignificantBits<uint64_t>(start_pos_shift, end_pos) - (bit_position_ + 1));
+        const int left_shift = 64 - (GetNumSignificantBits<uint64_t, int>(start_pos_shift, static_cast<int>(end_pos)) - (bit_position_ + 1));
         vector_.push_back(value_u64 << left_shift);
 
         /* We need to offset the position counters */
