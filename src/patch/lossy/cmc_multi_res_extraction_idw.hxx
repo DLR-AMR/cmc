@@ -158,7 +158,7 @@ CompressionVariable<T, DIM>::CollectCoarseDataPyramid(CompressionVariable<T, DIM
                         const T coarse_patch_value = GetValue<T>(this->data_pyramid_.back(), time, lev, lat, lon, dim_lengths[kLonID], dim_lengths[kLatID], dim_lengths[kLevID], dim_lengths[kTimeID]);
 
                         /* Store the coarse value */
-                        SetValue<T>(coarse_values, coarse_patch_value, time / 2, lev / 2, lat / 2, lon / 2, next_lvl_dim_lengths[kLonID], next_lvl_dim_lengths[kLatID], next_lvl_dim_lengths[kLevID], next_lvl_dim_lengths[kTimeID]);
+                        SetValue<T>(coarse_values, coarse_patch_value, time / kDIMReductionFactor, lev / kDIMReductionFactor, lat / kDIMReductionFactor, lon / kDIMReductionFactor, next_lvl_dim_lengths[kLonID], next_lvl_dim_lengths[kLatID], next_lvl_dim_lengths[kLevID], next_lvl_dim_lengths[kTimeID]);
                     }
                 }
             }
@@ -209,7 +209,7 @@ CompressionVariable<T, DIM>::CollectCoarseDataPyramid(CompressionVariable<T, DIM
                     const T coarse_patch_value = GetValue<T>(this->data_pyramid_.back(), lev, lat, lon, dim_lengths[kLonID], dim_lengths[kLatID], dim_lengths[kLevID]);
 
                     /* Store the coarse value */
-                    SetValue<T>(coarse_values, coarse_patch_value, lev / 2, lat / 2, lon / 2, next_lvl_dim_lengths[kLonID], next_lvl_dim_lengths[kLatID], next_lvl_dim_lengths[kLevID]);
+                    SetValue<T>(coarse_values, coarse_patch_value, lev / kDIMReductionFactor, lat / kDIMReductionFactor, lon / kDIMReductionFactor, next_lvl_dim_lengths[kLonID], next_lvl_dim_lengths[kLatID], next_lvl_dim_lengths[kLevID]);
                 }
             }
         }
