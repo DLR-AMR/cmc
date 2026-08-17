@@ -1,8 +1,7 @@
 #include "cmc.hxx"
 #include "utilities/cmc_log_functions.hxx"
-#include "patch/lossless/cmc_patch_multi_res_extraction_compression.hxx"
-#include "input/cmc_binary_reader.hxx"
-#include "compression_io/cmc_compression_serial_output.hxx"
+#include "patch/lossless/cmc_multi_res_extraction.hxx"
+#include "input/cmc_binary_file_reader.hxx"
 
 #include <unistd.h>
 #include <cstdio>
@@ -19,8 +18,7 @@ DisplayHelpMessage()
     cmc::cmc_msg("");
     cmc::cmc_msg("\t-t \tThe data type of the data to compress, possible options are float, double, int16_t, uint16_t, int32_t, uint32_t, int64_t or uint64_t");
     cmc::cmc_msg("\t-i \tThe path to the input file storing the array of binary data to compress");
-    cmc::cmc_msg("\t-o \tThe prefix of the output file storing the compressed data (the resulting file_name will be $file_prefix + '_' + $variable_name + '.cmc')");
-    cmc::cmc_msg("\t-v \tThe name of the variable to compress");
+    cmc::cmc_msg("\t-o \tThe name of the output file storing the compressed data");
     cmc::cmc_msg("\t-d \tThe dimensionality of the array storing the binary data, e.g. 3 for 3D data");
     cmc::cmc_msg("\t-s \tA string representing the shape of the data, e.g. '100 200 500' for a 3D array of size 100x200x500,"
                  " such that the slowest varying dimension is the first (e.g. 100) and the fastest varying dimension is the last parameter (e.g. 500)");
@@ -28,20 +26,9 @@ DisplayHelpMessage()
 }
 
 void
-Compress(const cmc::CmcType data_type, const std::string& input_file, const std::string& output_file, const std::string& var_name, const int dim, const std::vector<size_t>& dim_lengths)
+Compress(const cmc::CmcType data_type, const std::string& input_file, const std::string& output_file, const int dim, const std::vector<size_t>& dim_lengths, const std::endian endianness_of_data_in_file = std::endian::native)
 {
     cmc::cmc_debug_msg("Performing Patch-Based Lossless MultiRes Extraction Compression.");
-
-    /* Generate input variables from the binary file */
-    cmc::input::binary::Reader binary_reader(input_file);
-
-    const size_t num_elements = std::reduce(dim_lengths.begin(), dim_lengths.end(), 1, std::multiplies<size_t>());
-    cmc::cmc_debug_msg("Number of elements in the variable: ", num_elements);
-    const int arbitrary_var_id = 0;
-    const cmc::DataLayout layout = cmc::GetDefaultDataLayout(dim);
-    const cmc::GeoDomain domain = cmc::GetDefaultDomain(layout, dim_lengths);
-    cmc::input::Var variable = binary_reader.CreateVariableFromBinaryData(data_type, var_name, arbitrary_var_id, num_elements, layout, domain);
-    std::vector<cmc::input::Var> input_variables{std::move(variable)};
 
     switch (dim)
     {
@@ -51,74 +38,82 @@ Compress(const cmc::CmcType data_type, const std::string& input_file, const std:
             {
                 case cmc::CmcType::Float:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<float, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<float> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<float, 1> compression_variable(std::span<const float>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Double:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<double, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<double, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<double> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<double, 1> compression_variable(std::span<const double>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int16_t, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<int16_t, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int16_t, 1> compression_variable(std::span<const int16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint16_t, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<uint16_t, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint16_t, 1> compression_variable(std::span<const uint16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int32_t, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<int32_t, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int32_t, 1> compression_variable(std::span<const int32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint32_t, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<uint32_t, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint32_t, 1> compression_variable(std::span<const uint32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int64_t, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<int64_t, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int64_t, 1> compression_variable(std::span<const int64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint64_t, 1> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 1> dims{static_cast<int32_t>(dim_lengths[0])};
+                    cmc::input::binary_file::Reader<uint64_t, 1> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint64_t, 1> compression_variable(std::span<const uint64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 default:
@@ -133,74 +128,82 @@ Compress(const cmc::CmcType data_type, const std::string& input_file, const std:
             {
                 case cmc::CmcType::Float:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<float, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<float> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<float, 2> compression_variable(std::span<const float>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Double:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<double, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<double, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<double> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<double, 2> compression_variable(std::span<const double>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int16_t, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<int16_t, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int16_t, 2> compression_variable(std::span<const int16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint16_t, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<uint16_t, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint16_t, 2> compression_variable(std::span<const uint16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int32_t, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<int32_t, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int32_t, 2> compression_variable(std::span<const int32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint32_t, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<uint32_t, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint32_t, 2> compression_variable(std::span<const uint32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int64_t, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<int64_t, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int64_t, 2> compression_variable(std::span<const int64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint64_t, 2> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 2> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1])};
+                    cmc::input::binary_file::Reader<uint64_t, 2> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint64_t, 2> compression_variable(std::span<const uint64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 default:
@@ -215,74 +218,82 @@ Compress(const cmc::CmcType data_type, const std::string& input_file, const std:
             {
                 case cmc::CmcType::Float:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<float, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<float> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<float, 3> compression_variable(std::span<const float>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Double:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<double, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<double, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<double> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<double, 3> compression_variable(std::span<const double>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int16_t, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<int16_t, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int16_t, 3> compression_variable(std::span<const int16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint16_t, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<uint16_t, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint16_t, 3> compression_variable(std::span<const uint16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int32_t, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<int32_t, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int32_t, 3> compression_variable(std::span<const int32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint32_t, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<uint32_t, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint32_t, 3> compression_variable(std::span<const uint32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int64_t, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<int64_t, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int64_t, 3> compression_variable(std::span<const int64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint64_t, 3> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 3> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2])};
+                    cmc::input::binary_file::Reader<uint64_t, 3> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint64_t, 3> compression_variable(std::span<const uint64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 default:
@@ -297,74 +308,82 @@ Compress(const cmc::CmcType data_type, const std::string& input_file, const std:
             {
                 case cmc::CmcType::Float:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<float, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<float, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<float> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<float, 4> compression_variable(std::span<const float>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Double:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<double, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<double, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<double> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<double, 4> compression_variable(std::span<const double>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int16_t, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<int16_t, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int16_t, 4> compression_variable(std::span<const int16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint16_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint16_t, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<uint16_t, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint16_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint16_t, 4> compression_variable(std::span<const uint16_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int32_t, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<int32_t, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int32_t, 4> compression_variable(std::span<const int32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint32_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint32_t, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<uint32_t, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint32_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint32_t, 4> compression_variable(std::span<const uint32_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Int64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<int64_t, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<int64_t, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<int64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<int64_t, 4> compression_variable(std::span<const int64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 case cmc::CmcType::Uint64_t:
                 {
-                    cmc::patch::lossless::multi_res::PatchCompressionVariable<uint64_t, 4> var(input_variables.front());
-                    var.Compress();
-                    cmc::compression_io::serial::Writer writer(output_file);
-                    writer.SetVariable(&var);
-                    writer.Write();
+                    const std::array<int32_t, 4> dims{static_cast<int32_t>(dim_lengths[0]), static_cast<int32_t>(dim_lengths[1]), static_cast<int32_t>(dim_lengths[2]), static_cast<int32_t>(dim_lengths[3])};
+                    cmc::input::binary_file::Reader<uint64_t, 4> binary_reader(input_file, dims, endianness_of_data_in_file);
+                    const std::vector<uint64_t> data = binary_reader.ReadData();
+                    cmc::patch::lossless::multi_res::CompressionVariable<uint64_t, 4> compression_variable(std::span<const uint64_t>(data), dims);
+                    compression_variable.Compress();
+                    compression_variable.WriteCompressedData(output_file);
                 }
                 break;
                 default:
@@ -414,11 +433,8 @@ EvaluateDataType(const std::string& type)
 }
 
 void
-DisplayCompressionResult(cmc::CmcType data_type, const std::vector<size_t>& dim_lengths, const std::string& output_file_prefix, const std::string& var_name)
+DisplayCompressionResult(cmc::CmcType data_type, const std::vector<size_t>& dim_lengths, const std::string& output_file)
 {
-    /* Create the file name */
-    const std::string output_file = cmc::compression_io::serial::CreateFileName(output_file_prefix, var_name);
-
     /* Check if the output file exists */
     const std::filesystem::path output_file_path(output_file);
     if (not std::filesystem::exists(output_file_path))
@@ -439,7 +455,8 @@ DisplayCompressionResult(cmc::CmcType data_type, const std::vector<size_t>& dim_
     cmc::cmc_msg("The compressed data storage amounts to: \t", file_size, " bytes.");
 }
 
-constexpr int kNumArgCRequired = 13;
+//constexpr int kNumArgCRequired = 12;
+constexpr int kNumArgCRequired = 5;
 
 int
 main(int argc, char *argv[])
@@ -451,13 +468,12 @@ main(int argc, char *argv[])
     cmc::CmcType data_type;
     std::string input_file;
     std::string output_file;
-    std::string var_name;
     int dim;
     std::string read_dim_lengths;
     std::vector<size_t> dim_lengths;
 
     int opt;
-    while ((opt = getopt(argc, argv, "t:i:o:v:d:s:h")) != -1)
+    while ((opt = getopt(argc, argv, "t:i:o:d:s:h")) != -1)
     {
         switch (opt)
         {
@@ -473,10 +489,6 @@ main(int argc, char *argv[])
                 cmc::cmc_debug_msg("Output File Prefix: ", std::string(optarg));
                 output_file = std::string(optarg);
                 break;
-            case 'v':
-                cmc::cmc_debug_msg("Variable Name: ", std::string(optarg));
-                var_name = std::string(optarg);
-                break;
             case 'd':
                 cmc::cmc_debug_msg("Dimensionality: ", std::string(optarg));
                 dim = atoi(optarg);
@@ -490,7 +502,7 @@ main(int argc, char *argv[])
                 return 0;
                 break;
             case '?':
-                if (optopt == 't' || optopt == 'i' || optopt == 'o' || optopt == 'v' || optopt == 'd' || optopt == 's') {
+                if (optopt == 't' || optopt == 'i' || optopt == 'o' || optopt == 'd' || optopt == 's') {
                     cmc::cmc_err_msg("The option -", static_cast<char>(optopt), " requires an argument.");
                 } else {
                     cmc::cmc_err_msg("An unknown option: ", static_cast<char>(optopt), " has been passed.");
@@ -527,12 +539,6 @@ main(int argc, char *argv[])
         cmc::cmc_err_msg("A output file prefix must be specified.");
     }
 
-    /* Check the variable name */
-    if (var_name.empty())
-    {
-        cmc::cmc_err_msg("A variable name must be specified.");
-    }
-
     /* Check if the dimensionality is supported */
     if (dim < 1 || dim > 4)
     {
@@ -564,9 +570,9 @@ main(int argc, char *argv[])
     }
 
     /* Perform the compresison */
-    Compress(data_type, input_file, output_file, var_name, dim, dim_lengths);
+    Compress(data_type, input_file, output_file, dim, dim_lengths);
 
-    DisplayCompressionResult(data_type, dim_lengths, output_file, var_name);
+    DisplayCompressionResult(data_type, dim_lengths, output_file);
     
     }
     /* Finalize cmc */
