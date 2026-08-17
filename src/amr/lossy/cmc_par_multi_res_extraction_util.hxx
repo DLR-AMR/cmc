@@ -177,7 +177,7 @@ inline std::pair<bool, int>
 GetQuantizationBinFromEntropySymbol(const SymbolType symbol)
 {
     cmc_assert(symbol != kProcessEndSymbol && symbol != kFlagUnpredictable);
-    const bool is_prediction_greater = (symbol >= kEntropySymbolBinSignSwitch);
+    const bool is_prediction_greater = (symbol > kEntropySymbolBinSignSwitch);
     const int bin = (is_prediction_greater ? symbol - kEntropySymbolBinSignSwitch : symbol);
     return std::make_pair(is_prediction_greater, bin);
 }
