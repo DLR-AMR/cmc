@@ -26,7 +26,7 @@ inline void
 cmc_global_msg(Ts... msgs)
 {
     /* check for MPI_Comm_rank */
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
         MPICheckError(err);
@@ -41,12 +41,12 @@ cmc_global_msg(Ts... msgs)
     #endif
 }
 
-#ifdef CMC_ENABLE_DEBUG
+#if CMC_ENABLE_DEBUG
 template<typename... Ts>
 inline void
 cmc_debug_msg(Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
         MPICheckError(err);
@@ -76,7 +76,7 @@ template<typename... Ts>
 void
 cmc_msg(Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
         MPICheckError(err);
@@ -99,7 +99,7 @@ template<typename... Ts>
 [[noreturn]] void
 cmc_err_msg(Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
         MPICheckError(err);
@@ -120,7 +120,7 @@ template<typename... Ts>
 inline void
 cmc_warn_msg(Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
         MPICheckError(err);
@@ -139,13 +139,13 @@ cmc_warn_msg(Ts... msgs)
     #endif
 }
 
-#ifdef CMC_ENABLE_MPI
+#if CMC_ENABLE_MPI
 
 template<typename... Ts>
 inline void
 cmc_warn_msg(MPI_Comm comm, Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(comm, &rank)};
         MPICheckError(err);
@@ -168,7 +168,7 @@ template<typename... Ts>
 [[noreturn]] void
 cmc_err_msg(MPI_Comm comm, Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(comm, &rank)};
         MPICheckError(err);
@@ -188,7 +188,7 @@ template<typename... Ts>
 inline void
 cmc_msg(MPI_Comm comm, Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(comm, &rank)};
         MPICheckError(err);
@@ -208,12 +208,12 @@ cmc_msg(MPI_Comm comm, Ts... msgs)
 }
 
 
-#ifdef CMC_ENABLE_DEBUG
+#if CMC_ENABLE_DEBUG
 template<typename... Ts>
 inline void
 cmc_debug_msg(MPI_Comm comm, Ts... msgs)
 {
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0}, size{0};
         int err{MPI_Comm_rank(comm, &rank)};
         MPICheckError(err);
@@ -243,7 +243,7 @@ void
 cmc_global_msg(MPI_Comm comm, Ts... msgs)
 {
     /* check for MPI_Comm_rank */
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
         int rank{0};
         int err{MPI_Comm_rank(comm, &rank)};
         MPICheckError(err);

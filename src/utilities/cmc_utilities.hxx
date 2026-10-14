@@ -21,7 +21,7 @@
 namespace cmc
 {
 
-#ifdef CMC_ENABLE_DEBUG
+#if CMC_ENABLE_DEBUG
 #define cmc_assert(condition) assert(condition)
 #define cmc_static_assert(condition) static_assert(condition)
 #else
