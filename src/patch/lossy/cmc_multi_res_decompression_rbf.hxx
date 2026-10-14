@@ -18,6 +18,8 @@
 namespace cmc::patch::lossy::multi_res::rbf
 {
 
+constexpr bool kWriteLowResDecompressionLevels = true;
+
 /* Forward declaration of the general compression variable */
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
@@ -692,6 +694,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag4D)
             }
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
@@ -832,6 +843,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag3D)
             }
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
@@ -963,6 +983,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag2D)
             }
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
@@ -1087,6 +1116,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag1D)
             this->PerformPredictionDecompression(control_values, this->abs_error_, lon, next_lvl_dim_lengths);
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+        
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
