@@ -126,7 +126,7 @@ constexpr inline
 T
 cmc_rbf(const T dist)
 {
-    constexpr float eps = 0.1,
+    constexpr float eps = 0.1;
 
     //Gauss
     //return std::exp(-1.0 * (eps * dist) * (eps * dist));
