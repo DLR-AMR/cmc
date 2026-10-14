@@ -1344,7 +1344,7 @@ LossyMultiResDecompression (t8_forest_t forest,
 
         for (int child_idx{0}; child_idx < num_children; ++child_idx)
         {
-            eval_coords.emplace_back(cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, which_tree, child_elements[child_idx]));
+            eval_coords.emplace_back(cmc::par::lossy::idw::util::FillElementChildIDWCoordinates<DIM>(forest_from, which_tree, child_elements[child_idx]));
         }
 
         /* Get the number of faces of this element */
@@ -1386,7 +1386,8 @@ LossyMultiResDecompression (t8_forest_t forest,
                 /* Add a new control value via this face */
                 control_points.emplace_back();
                 control_points.back().data = adapt_data->GetData(neighbor_element_indices[neigh_idx]);
-                control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, neigh_tree_idx, neighbor_leaves[neigh_idx]);
+                //control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, neigh_tree_idx, neighbor_leaves[neigh_idx]);
+                control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementNeighborIDWCoordinates<DIM>(forest_from, ts, neighbor_tree_class, neigh_tree_idx, neighbor_leaves[neigh_idx]);
             }
 
             /* Deallocate the memory for the face neighbor construction */

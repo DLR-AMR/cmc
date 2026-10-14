@@ -533,7 +533,7 @@ LossyMultiResCompression (t8_forest_t forest,
 
         for (int child_idx{0}; child_idx < num_children; ++child_idx)
         {
-            eval_coords.emplace_back(cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, which_tree, child_elements[child_idx]));
+            eval_coords.emplace_back(cmc::par::lossy::idw::util::FillElementChildIDWCoordinates<DIM>(forest_from, which_tree, child_elements[child_idx]));
         }
 
         /* Get the number of faces of this element */
@@ -575,7 +575,8 @@ LossyMultiResCompression (t8_forest_t forest,
                 /* Add a new control value via this face */
                 control_points.emplace_back();
                 control_points.back().data = adapt_data->GetData(neighbor_element_indices[neigh_idx]);
-                control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, neigh_tree_idx, neighbor_leaves[neigh_idx]);
+                //control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, neigh_tree_idx, neighbor_leaves[neigh_idx]);
+                control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementNeighborIDWCoordinates<DIM>(forest_from, ts, neighbor_tree_class, neigh_tree_idx, neighbor_leaves[neigh_idx]);
             }
 
             /* Deallocate the memory for the face neighbor construction */
@@ -696,7 +697,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
 {
     static_assert(N == 1, "Intra-Element Compression is currently not supported for the lossy compression.");
 
-    cmc_debug_msg("The lossy multi-resolution compression of variable ", this->name_, " is performed.");
+    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " is performed.");
     /* Potentially, gather the maximum present element level */
     this->DetermineMaxInitElementLevel();
 
@@ -789,7 +790,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     /* Clean-up the error mesh MPI-allocations after the encoding of the error mesh */
     this->error_mesh_->DestructErrorMeshCollectively();
 
-    cmc_debug_msg("The lossly multi-resolution compression of variable ", this->name_, " has been completed.");
+    cmc_global_msg("The lossly multi-resolution compression of variable ", this->name_, " has been completed.");
 }
 
 
