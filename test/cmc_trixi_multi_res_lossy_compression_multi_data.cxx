@@ -411,23 +411,23 @@ main(void)
         //Compression
         {
         /* Supply the reference coordinates of the element */
-        std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> ref_coords{cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y0}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y0}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y0}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y0}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y1}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y1}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y1}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y1}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y2}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y2}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y2}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y2}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y3}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y3}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y3}),
-                                                                            cmc::par::lossy::idw::util::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y3}),
-                                                                        };
+        std::vector<cmc::util::idw::Coordinate<DIM>> ref_coords{cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y0}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y0}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y0}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y0}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y1}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y1}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y1}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y1}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y2}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y2}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y2}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y2}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x0, cmc::test::lossy::multi_res::y3}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x1, cmc::test::lossy::multi_res::y3}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x2, cmc::test::lossy::multi_res::y3}),
+                                                                cmc::util::idw::Coordinate<DIM>(std::array<float, DIM>{cmc::test::lossy::multi_res::x3, cmc::test::lossy::multi_res::y3}),
+                                                                };
 
         /* Perform the lossy compression with multiple data */
         cmc::par::lossy::multi_res::idw::trixi::CompressionVariableMultiData<float, DIM, N> variable("test_var", mesh, init_data, error_domains, ref_coords);

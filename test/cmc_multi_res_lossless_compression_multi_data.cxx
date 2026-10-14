@@ -6,7 +6,6 @@
 #include "utilities/cmc_bits_stream_decoder.hxx"
 #include "utilities/cmc_huffman_coder.hxx"
 #include "amr/lossless/cmc_par_multi_res_extraction.hxx"
-
 #include "amr/lossless/cmc_par_multi_res_decompression.hxx"
 
 #include <t8_cmesh/t8_cmesh_examples.h>
@@ -277,6 +276,10 @@ main(void)
     /* Initialize cmc */
     cmc::CmcInitialize();
     {
+
+        /* A simple test for the intral element compression */
+        Test2DFloatData();
+
         /* Setup a compression variable */
         constexpr int32_t DIM = 2;
         constexpr int32_t N = kNumPointsPerElem;
@@ -299,7 +302,7 @@ main(void)
         }
 
         {
-        cmc::par::lossless::multi_res::CompressionVariable<float, DIM> variable("test_var", mesh, init_data);
+        cmc::par::lossless::multi_res::CompressionVariableMultiData<float, DIM, N> variable("test_var", mesh, init_data);
         
         /* Compress */
         variable.Compress(); 
