@@ -44,6 +44,9 @@ constexpr int k3DNumPredicitionValues = 8;
 constexpr int k4DNumControlValues = 9;
 constexpr int k4DNumPredicitionValues = 16;
 
+constexpr int k2DNumExtendedControlValues = 9;
+constexpr int k2DNumExtendedPredicitionValues = 4;
+
 template<typename T>
 concept ArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T>);
 
@@ -140,7 +143,7 @@ using SymbolType = uint16_t;
 
 constexpr inline SymbolType kPredictionWithinBound = 0;
 
-constexpr inline int kResidualMaxDeviationFactor = 255;
+constexpr inline int kResidualMaxDeviationFactor = 16381;//16383
 constexpr inline int kCheckResidualMaxDeviationFactor = kResidualMaxDeviationFactor;
 static_assert(kResidualMaxDeviationFactor % 2 != 0 && kResidualMaxDeviationFactor > 0 && kResidualMaxDeviationFactor < std::numeric_limits<SymbolType>::max() - 2);
 
@@ -233,7 +236,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, const int kLevLength, [[maybe_unused]] const int kTimeLength)
 {
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     return data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
 }
 
@@ -241,7 +244,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T& value, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  const int kLevLength, [[maybe_unused]] const int kTimeLength)
 {
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
 }
 
@@ -249,7 +252,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, [[maybe_unused]] const int kLevLength)
 {
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     return data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
 }
 
@@ -257,7 +260,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T& value, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, [[maybe_unused]] const int kLevLength)
 {
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
 }
 
@@ -265,7 +268,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
 {
-    cmc_assert(lat * kLonLength + lon < data.size());
+    cmc_assert(lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     return data[lat * kLonLength + lon];
 }
 
@@ -273,7 +276,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T& value, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
 {
-    cmc_assert(lat * kLonLength + lon < data.size());
+    cmc_assert(lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     data[lat * kLonLength + lon] = value;
 }
 
@@ -281,8 +284,8 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int lon, [[maybe_unused]] const int kLonLength)
 {
-    cmc_assert(lon < kLonLength);
-    cmc_assert(lon < data.size());
+    cmc_assert(lon >= 0 && lon < kLonLength);
+    cmc_assert(static_cast<size_t>(lon) < data.size());
     return data[lon];
 }
 
@@ -290,8 +293,8 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T& value, const int lon, [[maybe_unused]] const int kLonLength)
 {
-    cmc_assert(lon < kLonLength);
-    cmc_assert(lon < data.size());
+    cmc_assert(lon >= 0 && lon < kLonLength);
+    cmc_assert(static_cast<size_t>(lon) < data.size());
     data[lon] = value;
 }
 
@@ -468,6 +471,67 @@ GetFaceControlValues(const std::vector<T>& data,
     return control_values;
 }
 
+template <ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+inline std::array<T, k2DNumExtendedControlValues>
+GetExtendedFaceControlValues(const std::vector<T>& data,
+                             const int32_t lat_idx, const int32_t lon_idx, const std::array<int32_t, DIM>& dim_lengths)
+{
+    static_assert(DIM == 2);
+    static_assert(k2DNumExtendedControlValues == 9);
+
+    constexpr int32_t kLatID = 0;
+    constexpr int32_t kLonID = 1;
+
+    const T patch_control_value = GetValue<T>(data, lat_idx, lon_idx, dim_lengths[kLonID], dim_lengths[kLatID]);
+    
+    std::array<T, k2DNumExtendedControlValues> control_values;
+    control_values.fill(patch_control_value);
+
+    if (lon_idx > 0 && lat_idx < dim_lengths[kLatID] - 1) [[likely]]
+    {
+        control_values[1] = GetValue<T>(data, lat_idx + 1, lon_idx - 1, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    if (lat_idx < dim_lengths[kLatID] - 1) [[likely]]
+    {
+        control_values[2] = GetValue<T>(data, lat_idx + 1, lon_idx, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    if (lon_idx < dim_lengths[kLonID] - 1 && lat_idx < dim_lengths[kLatID] - 1) [[likely]]
+    {
+        control_values[3] = GetValue<T>(data, lat_idx + 1, lon_idx + 1, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    if (lon_idx > 0) [[likely]]
+    {
+        control_values[4] = GetValue<T>(data, lat_idx, lon_idx - 1, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    if (lon_idx < dim_lengths[kLonID] - 1) [[likely]]
+    {
+        control_values[5] = GetValue<T>(data, lat_idx, lon_idx + 1, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    if (lon_idx > 0 && lat_idx > 0) [[likely]]
+    {
+        control_values[6] = GetValue<T>(data, lat_idx - 1, lon_idx - 1, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    if (lat_idx > 0) [[likely]]
+    {
+        control_values[6] = GetValue<T>(data, lat_idx - 1, lon_idx, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    if (lon_idx < dim_lengths[kLonID] - 1 && lat_idx > 0) [[likely]]
+    {
+        control_values[6] = GetValue<T>(data, lat_idx - 1, lon_idx + 1, dim_lengths[kLonID], dim_lengths[kLatID]);
+    }
+
+    return control_values;
+}
+
+
 namespace idw
 {
 /* 2D-IDW interpolation */
@@ -483,26 +547,27 @@ constexpr float ExpDist(const double dist)
     }
     return static_cast<float>(exp_dist);
 }
-//TODO: The distances account for the neighboring element's midpoint and not the actual first child's midpoint
-constexpr float pred1_d0 = 1.0f / ExpDist(std::sqrt(2.0));
-constexpr float pred1_d1 = 1.0f / ExpDist(std::sqrt(26.0));
-constexpr float pred1_d2 = 1.0f / ExpDist(std::sqrt(10.0));
-constexpr float pred1_d3 = 1.0f / ExpDist(std::sqrt(10.0));
-constexpr float pred1_d4 = 1.0f / ExpDist(std::sqrt(26.0));
+
+constexpr float pred1_d0 = 1.0f / ExpDist(1.0);
+constexpr float pred1_d1 = 1.0f / ExpDist(3.0);
+constexpr float pred1_d2 = 1.0f / ExpDist(1.0);
+constexpr float pred1_d3 = 1.0f / ExpDist(std::sqrt(5.0));
+constexpr float pred1_d4 = 1.0f / ExpDist(std::sqrt(5.0));
+
 constexpr float sum_pred1 = pred1_d0 + pred1_d1 + pred1_d2 + pred1_d3 + pred1_d4;
 
-constexpr float pred2_d0 = 1.0f / ExpDist(std::sqrt(2.0));
-constexpr float pred2_d1 = 1.0f / ExpDist(std::sqrt(10.0));
-constexpr float pred2_d2 = 1.0f / ExpDist(std::sqrt(26.0));
-constexpr float pred2_d3 = 1.0f / ExpDist(std::sqrt(26.0));
-constexpr float pred2_d4 = 1.0f / ExpDist(std::sqrt(10.0));
+constexpr float pred2_d0 = 1.0f / ExpDist(1.0);
+constexpr float pred2_d1 = 1.0f / ExpDist(std::sqrt(5.0));
+constexpr float pred2_d2 = 1.0f / ExpDist(std::sqrt(5.0));
+constexpr float pred2_d3 = 1.0f / ExpDist(3.0);
+constexpr float pred2_d4 = 1.0f / ExpDist(1.0);
 constexpr float sum_pred2 = pred2_d0 + pred2_d1 + pred2_d2 + pred2_d3 + pred2_d4;
 
-constexpr float pred3_d0 = 1.0f / ExpDist(std::sqrt(8.0));
-constexpr float pred3_d1 = 1.0f / ExpDist(std::sqrt(26.0));
-constexpr float pred3_d2 = 1.0f / ExpDist(std::sqrt(10.0));
-constexpr float pred3_d3 = 1.0f / ExpDist(std::sqrt(26.0));
-constexpr float pred3_d4 = 1.0f / ExpDist(std::sqrt(10.0));
+constexpr float pred3_d0 = 1.0f / ExpDist(std::sqrt(2.0));
+constexpr float pred3_d1 = 1.0f / ExpDist(std::sqrt(10.0));
+constexpr float pred3_d2 = 1.0f / ExpDist(std::sqrt(2.0));
+constexpr float pred3_d3 = 1.0f / ExpDist(std::sqrt(10.0));
+constexpr float pred3_d4 = 1.0f / ExpDist(std::sqrt(2.0));
 constexpr float sum_pred3 = pred3_d0 + pred3_d1 + pred3_d2 + pred3_d3 + pred3_d4;
 }
 /* Define the prediction matrix */
@@ -765,6 +830,44 @@ Perform4DRBFPrediction(const std::array<T, k4DNumControlValues>& control_values)
 {
     static_assert(false, "The RBF Prediction for 4D is currently not implemented!");
     return std::array<T, k4DNumPredicitionValues>();
+}
+
+template<ArithmeticType T, int32_t DIM>
+requires Dimension<DIM>
+constexpr 
+inline std::array<T, k2DNumExtendedPredicitionValues>
+PerformExtended2DRBFPrediction(const std::array<T, k2DNumExtendedControlValues>& control_values)
+{
+    static_assert(std::is_floating_point_v<T>, "The RBF Prediction is currently only applicable to floating point data!");
+    
+    /* Get the inverse sytem matrix */
+    constexpr std::array<std::array<T, cmc::par::lossy::rbf::util::kNumExtendedQuadControlPoints>, cmc::par::lossy::rbf::util::kNumExtendedQuadControlPoints> M_inv = cmc::par::lossy::rbf::util::GetExtendedQuadMatrixInverse<T>();
+
+    /* Compute the weights for the quad prediction */
+    const std::array<T, cmc::par::lossy::rbf::util::kNumExtendedQuadControlPoints> weights{
+        M_inv[0][0] * control_values[0] + M_inv[0][1] * control_values[1] + M_inv[0][2] * control_values[2] + M_inv[0][3] * control_values[3] + M_inv[0][4] * control_values[4] + M_inv[0][5] * control_values[5] + M_inv[0][6] * control_values[6] + M_inv[0][7] * control_values[7] + M_inv[0][8] * control_values[8],
+        M_inv[1][0] * control_values[0] + M_inv[1][1] * control_values[1] + M_inv[1][2] * control_values[2] + M_inv[1][3] * control_values[3] + M_inv[1][4] * control_values[4] + M_inv[1][5] * control_values[5] + M_inv[1][6] * control_values[6] + M_inv[1][7] * control_values[7] + M_inv[1][8] * control_values[8],
+        M_inv[2][0] * control_values[0] + M_inv[2][1] * control_values[1] + M_inv[2][2] * control_values[2] + M_inv[2][3] * control_values[3] + M_inv[2][4] * control_values[4] + M_inv[2][5] * control_values[5] + M_inv[2][6] * control_values[6] + M_inv[2][7] * control_values[7] + M_inv[2][8] * control_values[8],
+        M_inv[3][0] * control_values[0] + M_inv[3][1] * control_values[1] + M_inv[3][2] * control_values[2] + M_inv[3][3] * control_values[3] + M_inv[3][4] * control_values[4] + M_inv[3][5] * control_values[5] + M_inv[3][6] * control_values[6] + M_inv[3][7] * control_values[7] + M_inv[3][8] * control_values[8],
+        M_inv[4][0] * control_values[0] + M_inv[4][1] * control_values[1] + M_inv[4][2] * control_values[2] + M_inv[4][3] * control_values[3] + M_inv[4][4] * control_values[4] + M_inv[4][5] * control_values[5] + M_inv[4][6] * control_values[6] + M_inv[4][7] * control_values[7] + M_inv[4][8] * control_values[8],
+        M_inv[5][0] * control_values[0] + M_inv[5][1] * control_values[1] + M_inv[5][2] * control_values[2] + M_inv[5][3] * control_values[3] + M_inv[5][4] * control_values[4] + M_inv[5][5] * control_values[5] + M_inv[5][6] * control_values[6] + M_inv[5][7] * control_values[7] + M_inv[5][8] * control_values[8],
+        M_inv[6][0] * control_values[0] + M_inv[6][1] * control_values[1] + M_inv[6][2] * control_values[2] + M_inv[6][3] * control_values[3] + M_inv[6][4] * control_values[4] + M_inv[6][5] * control_values[5] + M_inv[6][6] * control_values[6] + M_inv[6][7] * control_values[7] + M_inv[6][8] * control_values[8],
+        M_inv[7][0] * control_values[0] + M_inv[7][1] * control_values[1] + M_inv[7][2] * control_values[2] + M_inv[7][3] * control_values[3] + M_inv[7][4] * control_values[4] + M_inv[7][5] * control_values[5] + M_inv[7][6] * control_values[6] + M_inv[7][7] * control_values[7] + M_inv[7][8] * control_values[8],
+        M_inv[8][0] * control_values[0] + M_inv[8][1] * control_values[1] + M_inv[8][2] * control_values[2] + M_inv[8][3] * control_values[3] + M_inv[8][4] * control_values[4] + M_inv[8][5] * control_values[5] + M_inv[8][6] * control_values[6] + M_inv[8][7] * control_values[7] + M_inv[8][8] * control_values[8]
+    };
+
+    /* Get the evaluation coordinates */
+    constexpr std::array<std::array<T, cmc::par::lossy::rbf::util::kNumExtendedQuadControlPoints>, cmc::par::lossy::rbf::util::kNumExtendedQuadPredictionPoints> eval_coords = cmc::par::lossy::rbf::util::GetExtendedQuadPredictionCoordsEvaluation<T>();
+
+    /* Perform the prediction */
+    const std::array<T, k2DNumExtendedPredicitionValues> prediction{
+        control_values[0],
+        weights[0] * eval_coords[0][0] + weights[1] * eval_coords[0][1] + weights[2] * eval_coords[0][2] + weights[3] * eval_coords[0][3] + weights[4] * eval_coords[0][4] + weights[5] * eval_coords[0][5] + weights[6] * eval_coords[0][6] + weights[7] * eval_coords[0][7] + weights[8] * eval_coords[0][8],
+        weights[0] * eval_coords[1][0] + weights[1] * eval_coords[1][1] + weights[2] * eval_coords[1][2] + weights[3] * eval_coords[1][3] + weights[4] * eval_coords[1][4] + weights[5] * eval_coords[1][5] + weights[6] * eval_coords[1][6] + weights[7] * eval_coords[1][7] + weights[8] * eval_coords[1][8],
+        weights[0] * eval_coords[2][0] + weights[1] * eval_coords[2][1] + weights[2] * eval_coords[2][2] + weights[3] * eval_coords[2][3] + weights[4] * eval_coords[2][4] + weights[5] * eval_coords[2][5] + weights[6] * eval_coords[2][6] + weights[7] * eval_coords[2][7] + weights[8] * eval_coords[2][8]
+    };
+
+    return prediction;
 }
 
 }
