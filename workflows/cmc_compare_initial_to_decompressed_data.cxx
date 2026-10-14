@@ -11,6 +11,8 @@
 #include <vector>
 #include <filesystem>
 #include <cmath>
+#include <bit>
+#include <concepts>
 
 template <typename T>
 std::vector<T>
@@ -28,6 +30,85 @@ ReadDataFromStream(const std::string& file_name)
             istrm.read(reinterpret_cast<char*>(&value), sizeof(T));
 
             values.push_back(value);
+        }
+        istrm.close();
+    }
+
+    /* Remove the end of file byte */
+    values.pop_back();
+    
+    return values;
+}
+
+template<typename T>
+concept ArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T>);
+
+template<typename T>
+concept OneByteArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T> && (sizeof(T) == 1));
+
+template<typename T>
+concept TwoByteArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T> && (sizeof(T) == 2));
+
+template<typename T>
+concept FourByteArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T> && (sizeof(T) == 4));
+
+template<typename T>
+concept EightByteArithmeticType = (std::is_arithmetic_v<T> && std::is_fundamental_v<T> && (sizeof(T) == 8));
+
+template<OneByteArithmeticType T>
+constexpr inline
+uint8_t
+TransformToUInteger(const T value)
+{
+    return std::bit_cast<uint8_t>(value);
+}
+
+template<TwoByteArithmeticType T>
+constexpr inline
+uint16_t
+TransformToUInteger(const T value)
+{
+    return std::bit_cast<uint16_t>(value);
+}
+
+template<FourByteArithmeticType T>
+constexpr inline
+uint32_t
+TransformToUInteger(const T value)
+{
+    return std::bit_cast<uint32_t>(value);
+}
+
+template<EightByteArithmeticType T>
+constexpr inline
+uint64_t
+TransformToUInteger(const T value)
+{
+    return std::bit_cast<uint64_t>(value);
+}
+
+template <typename T>
+std::vector<T>
+ReadDataFromStream(const std::string& file_name, const std::endian file_endianness)
+{
+    std::vector<T> values;
+
+    std::ifstream istrm(file_name, std::ios::binary);
+    if (!istrm.is_open())
+        std::cout << "failed to open " << file_name << '\n';
+    else
+    {
+        while ( !istrm.eof() ) {
+            T value;
+            istrm.read(reinterpret_cast<char*>(&value), sizeof(T));
+
+            if (file_endianness == std::endian::native)
+            {
+                values.push_back(value);
+            } else
+            {
+                values.push_back(std::bit_cast<T>(std::byteswap(TransformToUInteger<T>(value))));
+            }
         }
         istrm.close();
     }
@@ -63,9 +144,10 @@ DisplayHelpMessage()
     cmc::cmc_msg("This is cmc (version: ", CMC_VERSION, ").");
     cmc::cmc_msg("This application compares the two supplied binary files.");
     cmc::cmc_msg("It may be used for to compare the intial data to the decompressed data (i.e. <file1> should the initial data and <file2> the decompressed data).");
-    cmc::cmc_msg("Usage:\t./cmc_comapre_bin_data_output <file1> <file2>");
-    cmc::cmc_msg("or \t./cmc_comapre_bin_data_output -t <data_type> <file1> <file2>");
-    cmc::cmc_msg("\t-t \tThe data type of the values stored in the binary files (optional argument); (it is assumed the endiannes of both files matches!)");
+    cmc::cmc_msg("Usage:\t./cmc_compare_initial_to_decompressed_data <file1> <file2>");
+    cmc::cmc_msg("or \t./cmc_compare_initial_to_decompressed_data -t <data_type> -e <endianness> <file1> <file2>");
+    cmc::cmc_msg("\t-t \tThe data type of the values stored in the binary files (optional argument);");
+    cmc::cmc_msg("\t-e \tThe endianness of the initial data (<file1>), supported options are little or big; the endianness of <file2> is considered to be native");
     cmc::cmc_msg("\t\tpossible options are float, double, int16_t, uint16_t, int32_t, uint32_t, int64_t or uint64_t");
     cmc::cmc_msg("\t-h \tUse this option to display the help message");
 }
@@ -105,6 +187,22 @@ EvaluateDataType(const std::string& type)
     }
 }
 
+std::endian
+EvaluateEndianness(const std::string& type)
+{
+    if (type.compare("little") == 0)
+    {
+        return std::endian::little;
+    } else if (type.compare("big") == 0)
+    {
+        return std::endian::big;
+    } else
+    {
+        DisplayHelpMessage();
+        cmc::cmc_err_msg("The specified endianness (", type, ") is not recognized. Only little and big endian orderings are supported.");
+        return std::endian::native;
+    }
+}
 
 template <typename T>
 auto ComputeDecompressionMetrics(const std::vector<T>& data1, const std::vector<T>& data2)
@@ -192,8 +290,11 @@ auto ComputeDecompressionMetrics(const std::vector<T>& data1, const std::vector<
     /* Compute the mean squared error */
     mse = mse / static_cast<double>(num_elems);
 
-    /* Compute the roor MSE*/
+    /* Compute the roor MSE */
     const double rmse = std::sqrt(mse);
+
+    /* Compute the normalized root mean square error */
+    const double nrmse = rmse / (std::fabs(maximum_value - minimum_value));
 
     /* Compute the peak signal to noise ratio */
     const double psnr = 20 * std::log10(std::abs(static_cast<double>(maximum_value) - static_cast<double>(minimum_value))) - 10 * std::log10(mse);
@@ -203,67 +304,68 @@ auto ComputeDecompressionMetrics(const std::vector<T>& data1, const std::vector<
     cmc::cmc_global_msg("Maximum relative error: ", max_relative_error, "; Minimum relative error: ", min_relative_error);
     cmc::cmc_global_msg("Mean Squared Error: ", mse);
     cmc::cmc_global_msg("Root Mean Squared Error: ", rmse);
+    cmc::cmc_global_msg("Normalized Root Mean Squared Error: ", nrmse);
     cmc::cmc_global_msg("Peak Signal to Noise Ratio: ", psnr);
 }
 
 void
-CheckEqualityForConvertedValues(const cmc::CmcType type, const std::string& file1, const std::string& file2)
+CheckEqualityForConvertedValues(const cmc::CmcType type, const std::string& file1, const std::string& file2, const std::endian endianness_of_file1)
 {
     switch (type)
     {
         case cmc::CmcType::Float:
         {
-            const std::vector<float> input_data_1 = ReadDataFromStream<float>(file1);
-            const std::vector<float> input_data_2 = ReadDataFromStream<float>(file2);
+            const std::vector<float> input_data_1 = ReadDataFromStream<float>(file1, endianness_of_file1);
+            const std::vector<float> input_data_2 = ReadDataFromStream<float>(file2, std::endian::native);
             ComputeDecompressionMetrics<float>(input_data_1, input_data_2);
         }
         break;
         case cmc::CmcType::Double:
         {
-            const std::vector<double> input_data_1 = ReadDataFromStream<double>(file1);
-            const std::vector<double> input_data_2 = ReadDataFromStream<double>(file2);
+            const std::vector<double> input_data_1 = ReadDataFromStream<double>(file1, endianness_of_file1);
+            const std::vector<double> input_data_2 = ReadDataFromStream<double>(file2, std::endian::native);
             ComputeDecompressionMetrics<double>(input_data_1, input_data_2);
         }
         break;
         case cmc::CmcType::Int16_t:
         {
-            const std::vector<int16_t> input_data_1 = ReadDataFromStream<int16_t>(file1);
-            const std::vector<int16_t> input_data_2 = ReadDataFromStream<int16_t>(file2);
+            const std::vector<int16_t> input_data_1 = ReadDataFromStream<int16_t>(file1, endianness_of_file1);
+            const std::vector<int16_t> input_data_2 = ReadDataFromStream<int16_t>(file2, std::endian::native);
             ComputeDecompressionMetrics<int16_t>(input_data_1, input_data_2);
         }
         break;
         case cmc::CmcType::Uint16_t:
         {
-            const std::vector<uint16_t> input_data_1 = ReadDataFromStream<uint16_t>(file1);
-            const std::vector<uint16_t> input_data_2 = ReadDataFromStream<uint16_t>(file2);
+            const std::vector<uint16_t> input_data_1 = ReadDataFromStream<uint16_t>(file1, endianness_of_file1);
+            const std::vector<uint16_t> input_data_2 = ReadDataFromStream<uint16_t>(file2, std::endian::native);
             ComputeDecompressionMetrics<uint16_t>(input_data_1, input_data_2);
         }
         break;
         case cmc::CmcType::Int32_t:
         {
-            const std::vector<int32_t> input_data_1 = ReadDataFromStream<int32_t>(file1);
-            const std::vector<int32_t> input_data_2 = ReadDataFromStream<int32_t>(file2);
+            const std::vector<int32_t> input_data_1 = ReadDataFromStream<int32_t>(file1, endianness_of_file1);
+            const std::vector<int32_t> input_data_2 = ReadDataFromStream<int32_t>(file2, std::endian::native);
             ComputeDecompressionMetrics<int32_t>(input_data_1, input_data_2);
         }
         break;
         case cmc::CmcType::Uint32_t:
         {
-            const std::vector<uint32_t> input_data_1 = ReadDataFromStream<uint32_t>(file1);
-            const std::vector<uint32_t> input_data_2 = ReadDataFromStream<uint32_t>(file2);
+            const std::vector<uint32_t> input_data_1 = ReadDataFromStream<uint32_t>(file1, endianness_of_file1);
+            const std::vector<uint32_t> input_data_2 = ReadDataFromStream<uint32_t>(file2, std::endian::native);
             ComputeDecompressionMetrics<uint32_t>(input_data_1, input_data_2);
         }
         break;
         case cmc::CmcType::Int64_t:
         {
-            const std::vector<int64_t> input_data_1 = ReadDataFromStream<int64_t>(file1);
-            const std::vector<int64_t> input_data_2 = ReadDataFromStream<int64_t>(file2);
+            const std::vector<int64_t> input_data_1 = ReadDataFromStream<int64_t>(file1, endianness_of_file1);
+            const std::vector<int64_t> input_data_2 = ReadDataFromStream<int64_t>(file2, std::endian::native);
             ComputeDecompressionMetrics<int64_t>(input_data_1, input_data_2);
         }
         break;
         case cmc::CmcType::Uint64_t:
         {
-            const std::vector<uint64_t> input_data_1 = ReadDataFromStream<uint64_t>(file1);
-            const std::vector<uint64_t> input_data_2 = ReadDataFromStream<uint64_t>(file2);
+            const std::vector<uint64_t> input_data_1 = ReadDataFromStream<uint64_t>(file1, endianness_of_file1);
+            const std::vector<uint64_t> input_data_2 = ReadDataFromStream<uint64_t>(file2, std::endian::native);
             ComputeDecompressionMetrics<uint64_t>(input_data_1, input_data_2);
         }
         break;
@@ -275,7 +377,7 @@ CheckEqualityForConvertedValues(const cmc::CmcType type, const std::string& file
 }
 
 constexpr int kNumExpectedArgs = 3;
-constexpr int kNumExpectedArgsWithDataTypeOpt = 5;
+constexpr int kNumExpectedArgsWithDataTypeOpt = 7;
 
 int
 main(int argc, char *argv[])
@@ -285,14 +387,18 @@ main(int argc, char *argv[])
     int opt;
     bool is_type_given = false;
     cmc::CmcType data_type;
+    std::endian endianness_of_file1;
 
-    while ((opt = getopt(argc, argv, "t:h")) != -1)
+    while ((opt = getopt(argc, argv, "t:e:h")) != -1)
     {
         switch (opt)
         {
             case 't':
                 is_type_given = true;
                 data_type = EvaluateDataType(std::string(optarg));
+                break;
+            case 'e':
+                endianness_of_file1 = EvaluateEndianness(std::string(optarg));
                 break;
             case 'h':
                 DisplayHelpMessage();
@@ -317,8 +423,8 @@ main(int argc, char *argv[])
 
     if (is_type_given)
     {
-        input_file_1 = std::string(argv[3]);
-        input_file_2 = std::string(argv[4]);
+        input_file_1 = std::string(argv[5]);
+        input_file_2 = std::string(argv[6]);
     } else
     {
         input_file_1 = std::string(argv[1]);
@@ -352,7 +458,7 @@ main(int argc, char *argv[])
 
     if (is_type_given)
     {
-        CheckEqualityForConvertedValues(data_type, input_file_1, input_file_2);
+        CheckEqualityForConvertedValues(data_type, input_file_1, input_file_2, endianness_of_file1);
     } else
     {
         if (cmp == 0)
