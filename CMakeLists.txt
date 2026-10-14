@@ -11,9 +11,11 @@ set(CMC_VERSION "${PROJECT_VERSION}")
 # Configuration options
 option(CMC_BUILD_SHARED_LIBS "Build using shared libraries" ON)
 option(CMC_ENABLE_MPI "Enable features that rely on MPI" ON)
-option(CMC_WITH_NETCDF "Enable features that rely on netCDF" OFF)
+
 option(CMC_WITH_T8CODE "Link against an available t8code installation" ON)
-option(CMC_ENABLE_ALL_WARNINGS "Use compilation flags -Wall -Wextra -Wpedantic" [OFF])
+option(CMC_ENABLE_ALL_WARNINGS "Use compilation flags -Wall -Wextra -Wpedantic" OFF)
+#Currently, netCDF linkage has no effect
+option(CMC_WITH_NETCDF "Enable features that rely on netCDF" OFF)
 
 # Define some paths for potential library linkage
 set(CMC_NETCDF_ROOT_DIR "" CACHE PATH "Directory containing netCDF installation")
@@ -233,8 +235,6 @@ endif()
 if(CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
     find_package(T8CODE REQUIRED CONFIG)
     target_link_libraries(cmc PUBLIC T8CODE::T8)
-    #target_include_directories(cmc PUBLIC ${CMC_NETCDF_ROOT_DIR}/include)
-    #add_library(T8CODE::T8 INTERFACE)
     message("-- Found t8code installation")
     set(CMC_WITH_T8CODE ON) 
     target_compile_definitions(cmc PUBLIC CMC_WITH_T8CODE=1)
@@ -247,7 +247,6 @@ else()
 endif()
 
 # Define incldue-directories for building and installing
-#target_include_directories(cmc PUBLIC "${PROJECT_SOURCE_DIR}")
 target_include_directories(cmc PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>
