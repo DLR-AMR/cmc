@@ -47,6 +47,8 @@ install(FILES
     patch/lossy/cmc_multi_res_decompression_idw.hxx 
     patch/lossy/cmc_multi_res_extraction_rbf.hxx 
     patch/lossy/cmc_multi_res_decompression_rbf.hxx 
+    patch/lossy/cmc_multi_res_extraction_rbf_2d_ext.hxx 
+    patch/lossy/cmc_multi_res_decompression_rbf_2d_ext.hxx 
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
 )
 
