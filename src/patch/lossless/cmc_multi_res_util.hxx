@@ -467,75 +467,76 @@ CreateArithmeticMeanPredictor(const std::array<T, N>& init_data, const int num_e
     return mean;
 }
 
-constexpr uint32_t kCheckFloatSign = 0x80000000U;
-constexpr uint32_t kAllFloatBitsSet = 0xFFFFFFFFU;
-
-constexpr uint64_t kCheckDoubleSign = 0x8000000000000000ULL;
-constexpr uint64_t kAllDoubleBitsSet = 0xFFFFFFFFFFFFFFFFULL;
-
-/* Assign a monotonically ordering to all floats */
-inline uint32_t
+/* Assign an integer ordering to all finite floats 
+* As outlined in: https://stereopsis.com/radix.html and https://lemire.me/blog/2020/12/14/converting-floating-point-numbers-to-integers-while-preserving-order/
+*/
+[[maybe_unused]] inline uint32_t
 OrderFloat(const float value)
 {
     const uint32_t u_value = std::bit_cast<uint32_t>(value);
-
-    if (u_value & kCheckFloatSign)
-    {
-        return u_value ^ kAllFloatBitsSet;
-    } else
-    {
-        return u_value ^ kCheckFloatSign;
-    }
+    const uint32_t mask = -int32_t(u_value >> 31) | 0x80000000;
+    return u_value ^ mask;
 }
 
-/* Reverse the ordering to the actual float */
-inline float
+/* Reverse the integer ordering to a floating point number 
+ * as outlined in: https://stereopsis.com/radix.html */
+[[maybe_unused]] inline float
 ReFloatOrder(const uint32_t order)
 {
-    if (order & kCheckFloatSign)
-    {
-        return std::bit_cast<float>(order ^ kCheckFloatSign);
-    } else
-    {
-        return std::bit_cast<float>(order ^ kAllFloatBitsSet);
-    }
+    const uint32_t mask = ((order >> 31) - 1) | 0x80000000;
+	return std::bit_cast<float>(order ^ mask);
 }
 
-inline uint64_t
+/* Assign an integer ordering to all finite doubles 
+* As outlined in: https://stereopsis.com/radix.html and https://lemire.me/blog/2020/12/14/converting-floating-point-numbers-to-integers-while-preserving-order/
+*/
+[[maybe_unused]] inline uint64_t
 OrderFloat(const double value)
 {
     const uint64_t u_value = std::bit_cast<uint64_t>(value);
-
-    if (u_value & kCheckDoubleSign)
-    {
-        return u_value ^ kAllDoubleBitsSet;
-    } else
-    {
-        return u_value ^ kCheckDoubleSign;
-    }
+    const uint64_t mask = -int64_t(u_value >> 63) | 0x8000000000000000;
+    return u_value ^ mask;
 }
 
-/* Reverse the ordering to the actual float */
-inline double
+/* Reverse the integer ordering to a floating point number 
+ * as outlined in: https://stereopsis.com/radix.html */
+[[maybe_unused]] inline double
 ReFloatOrder(const uint64_t order)
 {
-    if (order & kCheckDoubleSign)
-    {
-        return std::bit_cast<double>(order ^ kCheckDoubleSign);
-    } else
-    {
-        return std::bit_cast<double>(order ^ kAllDoubleBitsSet);
-    }
+    const uint64_t mask = ((order >> 63) - 1) | 0x8000000000000000;
+	return std::bit_cast<double>(order ^ mask);
 }
 
 template <FloatType T>
-inline T
+[[maybe_unused]] inline T
 ComputeFMAForImplicitValue(const T N, const T mean, const T partial_sum)
 {
     return std::fma(N, mean, -partial_sum);
 }
 
-inline float
+template <FloatType T>
+inline T
+FindMatchingMeanValue(const int N, const double sum)
+{
+    if (N == 2)
+    {
+        return static_cast<T>(sum * 0.5);
+    } else if (N == 4)
+    {
+        return static_cast<T>(sum * 0.25);
+    } else if (N == 8)
+    {
+        return static_cast<T>(sum * 0.125);
+    } else if (N == 16)
+    {
+        return static_cast<T>(sum * 0.0625);
+    } else
+    {
+        return static_cast<T>(sum / static_cast<T>(N));
+    }
+}
+
+[[maybe_unused]] inline float
 FindMatchingMeanValue(const float N, const float partial_sum, const float value_to_match)
 {
     /* Perform a binary search such that the values is matched */
@@ -573,7 +574,7 @@ FindMatchingMeanValue(const float N, const float partial_sum, const float value_
     const float eval_mean = ReFloatOrder(lbound);
 
     /* Compute the matching value */
-    #ifdef CMC_ENABLE_DEBUG
+    #if CMC_ENABLE_DEBUG
     [[maybe_unused]] const float eval_match = ComputeFMAForImplicitValue<float>(N, eval_mean, partial_sum);
     cmc_debug_msg("Evaluated match: ", eval_match, ", ", std::bitset<32>(std::bit_cast<uint32_t>(eval_match)));
     cmc_debug_msg(" Value to match: ", value_to_match, ", ", std::bitset<32>(std::bit_cast<uint32_t>(value_to_match)));
@@ -582,7 +583,7 @@ FindMatchingMeanValue(const float N, const float partial_sum, const float value_
     return eval_mean;
 }
 
-inline double
+[[maybe_unused]] inline double
 FindMatchingMeanValue(const double N, const double partial_sum, const double value_to_match)
 {
     /* Perform a binary search such that the values is matched */
@@ -620,7 +621,7 @@ FindMatchingMeanValue(const double N, const double partial_sum, const double val
     const double eval_mean = ReFloatOrder(lbound);
 
     /* Compute the matching value */
-    #ifdef CMC_ENABLE_DEBUG
+    #if CMC_ENABLE_DEBUG
     [[maybe_unused]] const double eval_match = ComputeFMAForImplicitValue<double>(N, eval_mean, partial_sum);
     cmc_debug_msg("Evaluated match: ", eval_match, ", ", std::bitset<64>(std::bit_cast<uint64_t>(eval_match)));
     cmc_debug_msg(" Value to match: ", value_to_match, ", ", std::bitset<64>(std::bit_cast<uint64_t>(value_to_match)));
@@ -634,12 +635,12 @@ inline T
 CreateMatchingMeanPredictor(const std::array<T, N>& init_data, const int num_elems)
 {
     cmc_assert(num_elems > 1);
-    const T num_vals = static_cast<T>(num_elems);
-    const auto d_partial_sum = NeumaierKahanBabuskaSum<T, N>(init_data, num_elems - 1);
-    const T partial_sum = static_cast<T>(d_partial_sum);
-    const T value_to_match = init_data[num_elems - 1];
+    /* Sum up all values */
+    const auto d_sum = NeumaierKahanBabuskaSum<T, N>(init_data, num_elems);
+
     /* Create the mean predictor */
-    const T matching_mean = FindMatchingMeanValue(num_vals, partial_sum, value_to_match);
+    const T matching_mean = FindMatchingMeanValue<T>(num_elems, d_sum);
+    
     return matching_mean;
 }
 
@@ -691,7 +692,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, const int kLevLength, [[maybe_unused]] const int kTimeLength)
 {
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     return data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
 }
 
@@ -699,7 +700,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T& value, const int time, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength,  const int kLevLength, [[maybe_unused]] const int kTimeLength)
 {
-    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     data[time * (kLevLength * kLatLength * kLonLength) + lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
 }
 
@@ -707,7 +708,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, [[maybe_unused]] const int kLevLength)
 {
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     return data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon];
 }
 
@@ -715,7 +716,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T& value, const int lev, const int lat, const int lon, const int kLonLength, const int kLatLength, [[maybe_unused]] const int kLevLength)
 {
-    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < data.size());
+    cmc_assert(lev * (kLatLength * kLonLength) + lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     data[lev * (kLatLength * kLonLength) + lat * kLonLength + lon] = value;
 }
 
@@ -723,7 +724,7 @@ template <typename T>
 inline T
 GetValue(const std::vector<T>& data, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
 {
-    cmc_assert(lat * kLonLength + lon < data.size());
+    cmc_assert(lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     return data[lat * kLonLength + lon];
 }
 
@@ -731,7 +732,7 @@ template <typename T>
 inline void
 SetValue(std::vector<T>& data, const T& value, const int lat, const int lon, const int kLonLength, [[maybe_unused]] const int kLatLength)
 {
-    cmc_assert(lat * kLonLength + lon < data.size());
+    cmc_assert(lat * kLonLength + lon < static_cast<int64_t>(data.size()));
     data[lat * kLonLength + lon] = value;
 }
 
@@ -740,7 +741,7 @@ inline T
 GetValue(const std::vector<T>& data, const int lon, [[maybe_unused]] const int kLonLength)
 {
     cmc_assert(lon < kLonLength);
-    cmc_assert(lon < data.size());
+    cmc_assert(lon < static_cast<int64_t>(data.size()));
     return data[lon];
 }
 
@@ -749,7 +750,7 @@ inline void
 SetValue(std::vector<T>& data, const T& value, const int lon, [[maybe_unused]] const int kLonLength)
 {
     cmc_assert(lon < kLonLength);
-    cmc_assert(lon < data.size());
+    cmc_assert(lon < static_cast<int64_t>(data.size()));
     data[lon] = value;
 }
 
