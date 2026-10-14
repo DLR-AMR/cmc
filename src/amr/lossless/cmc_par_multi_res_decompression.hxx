@@ -886,30 +886,6 @@ GetRootLevelValuesFromView(cmc::bits::vector_view lvl_data_start_view, const t8_
     return data;
 }
 
-
-static int step = 0;
-
-inline void
-WriteDataToVTKTest(t8_forest_t mesh, const std::vector<float>& data)
-{
-    std::vector<double> double_data1;
-
-    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
-    {
-        double_data1.push_back(data[idx]);
-    }
-
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = double_data1.data();
-
-    const std::string file_name = std::string("cmc_new_test_decompr_data_vis_np1_step_") + std::to_string(step);
-    ++step;
-    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 1, 1, 1, 1, vtk_data);
-}
-
-
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 void
@@ -939,8 +915,6 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeRootLevelValues()
 
     /* De-Serialize the values */
     this->data_ = GetRootLevelValuesFromView<T>(data_view, mesh_offset, num_local_elems, root_level_partition);
-
-    WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
 
     /* Close the shared level window after all values have been extarcted */
     this->CloseSharedLevelDataWindow();
@@ -1377,8 +1351,6 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeMeshCompressionSteps()
         /* Store the partitioned mesh */
         mesh_.SetMesh(partitioned_forest);
 
-        //WriteDataToVTKTest(this->mesh_.GetMesh(), this->data_);
-
         /****** Clean-Up of the decompression iteration ******/
         /* Free the former/coarser forest */
         t8_forest_unref(&adapted_forest);
@@ -1503,7 +1475,7 @@ DecompressionVariableMultiData<T, DIM, N>::DecodeIntraElementSteps()
         RefinementIntraElementData<T, DIM, N> intra_level_decompressor(std::span<T>(this->data_), this->stream_decoder_);
 
         /* Iterate over all local elements and decompress them */
-        for (int elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
+        for (SizeType elem_idx{0}; elem_idx < num_local_elems; ++elem_idx)
         {
             intra_level_decompressor.PerformRefinement(elem_idx);
         }

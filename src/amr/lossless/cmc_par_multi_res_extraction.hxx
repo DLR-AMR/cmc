@@ -65,7 +65,7 @@ public:
     void SetIsMeshAlreadyPartitionedForCoarsening(const bool is_partitioned_for_coarsening);
 
     //TODO:
-    std::vector<DataOutput<T>> __GetLocalOutputDataInMemory() const;
+    //std::vector<DataOutput<T>> __GetLocalOutputDataInMemory() const;
 private:
     void DetermineMaxInitElementLevel();
     void PerformIntraElementCompression();
@@ -317,7 +317,7 @@ CompressionVariableMultiData<T, DIM, N>::Repartition(t8_forest_t adapted_mesh, s
     t8_forest_init(&partitioned_forest);
 
     /* Partition the forest */
-    const int partition_for_coarsening = 1; //TODO: change to 'one' when partition for coarsening is in t8code
+    constexpr int partition_for_coarsening = 1;
     t8_forest_set_partition(partitioned_forest, adapted_mesh, partition_for_coarsening);
     t8_forest_commit(partitioned_forest);
 
@@ -567,28 +567,6 @@ LosslessMultiResCompression (t8_forest_t forest,
     }
 }
 
-static int step2{0};
-
-inline void
-WriteDataToVTKTest2(t8_forest_t mesh, const std::vector<float>& data)
-{
-    std::vector<double> double_data1;
-
-    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
-    {
-        double_data1.push_back(data[idx]);
-    }
-
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "GeneralData");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = double_data1.data();
-
-    const std::string file_name = std::string("cmc_new_test_compr_coarse_data_vis_np1_step_") + std::to_string(step2);
-    ++step2;
-    t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 1, 1, 1, 1, vtk_data);
-}
-
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 void
@@ -610,8 +588,6 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     {
         this->Repartition(mesh_.GetMesh(), this->data_);
     }
-
-    //WriteDataToVTKTest2(mesh_.GetMesh(), this->data_);
 
     int32_t compression_step{0};
 
@@ -636,19 +612,10 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
         this->level_partitioning_info_.emplace_back(static_cast<uint64_t>(t8_forest_get_local_num_leaf_elements(adapted_forest)));
 
         // 4) Repartition the mesh and the data for the next iteration
-        //if (t8_forest_get_global_num_leaf_elements(adapted_forest) == t8_forest_get_num_global_trees(adapted_forest))
-        //{
-        //    //Fix for PFC bug in t8code on the root level
-        //    this->data_ = adapt_data.coarse_level_data;
-        //    mesh_.SetMesh(adapted_forest);
-        //} else
-        //{
-            this->Repartition(adapted_forest, adapt_data.coarse_level_data);
-            cmc_debug_msg("This coarsening iteration is finished.");
-        //}
-        ++compression_step;
+        this->Repartition(adapted_forest, adapt_data.coarse_level_data);
 
-        //WriteDataToVTKTest2(mesh_.GetMesh(), this->data_);
+        cmc_debug_msg("This coarsening iteration is finished.");
+        ++compression_step;
     }
 
     /* Encode the data that has been collected */
