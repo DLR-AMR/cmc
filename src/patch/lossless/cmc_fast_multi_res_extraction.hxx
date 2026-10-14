@@ -120,7 +120,7 @@ PerformExtraction(const std::array<T, kPackSize<DIM>> patch_data, const int num_
     }
 
     /* Perform the multi-resolution extraction */
-    const T mean_predictor = (is_init_extraction ? CreateMatchingMeanPredictor<T, kPackSize<DIM>>(patch_data, num_values) : CreateArithmeticMeanPredictor<T, kPackSize<DIM>>(patch_data, num_values));
+    const T mean_predictor = CreateMatchingMeanPredictor<T, kPackSize<DIM>>(patch_data, num_values);
 
     PatchEncoding<T, DIM> patch_coding;
     patch_coding.num_elements = num_values;
