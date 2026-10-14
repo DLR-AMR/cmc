@@ -172,7 +172,7 @@ int
 main(int argc, char *argv[])
 {
     /* Initialize cmc */
-    cmc::CmcInitialize();
+    cmc::CmcInitialize(cmc::kMinimumInitialization);
     {
     
     cmc::CmcType data_type;
