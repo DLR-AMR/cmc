@@ -6,7 +6,7 @@
 
 #include "utilities/cmc_utilities.hxx"
 
-#ifdef CMC_ENABLE_MPI
+#if CMC_ENABLE_MPI
 /* We define a macro to skip the inclusion of MPI-CXX interface when OpenMPI is used (but buitl with CXX support) */
 #ifndef OMPI_SKIP_MPICXX
 #define OMPI_SKIP_MPICXX
@@ -17,10 +17,6 @@
 
 namespace cmc
 {
-
-#ifdef CMC_ENABLE_MPI
-#define MPI_MORTON_INDEX_T MPI_INT64_T
-#endif
 
 constexpr int kRootRank = 0;
 

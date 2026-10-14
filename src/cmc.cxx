@@ -2,11 +2,11 @@
 
 #include "cmc.hxx"
 
-#ifdef CMC_ENABLE_MPI
+#if CMC_ENABLE_MPI
 #include "mpi/cmc_mpi.hxx"
 #endif
 
-#ifdef CMC_WITH_T8CODE
+#if CMC_WITH_T8CODE
 #include "t8.h"
 #endif
 
@@ -28,7 +28,7 @@ CmcInitialize(const bool initialization)
         std::cout << "[cmc] WARNING: cmc has already been initialized." << std::endl;
         return;
     }
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
     MPIInitialize();
 
     int err, rank;
@@ -36,7 +36,7 @@ CmcInitialize(const bool initialization)
     err = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPICheckError(err);
 
-    #ifdef CMC_WITH_T8CODE
+    #if CMC_WITH_T8CODE
     if (initialization)
     {
       sc_init (MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
@@ -66,13 +66,13 @@ CmcFinalize()
         return;
     }
 
-    #ifdef CMC_ENABLE_MPI
+    #if CMC_ENABLE_MPI
     int err, rank;
     /* Get the rank of the process */
     err = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPICheckError(err);
   
-    #ifdef CMC_WITH_T8CODE
+    #if CMC_WITH_T8CODE
     if (kInitializationScheme)
     {
        sc_finalize();

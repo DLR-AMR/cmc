@@ -8,7 +8,7 @@ namespace cmc
 void
 MPIInitialize()
 {
-#ifdef CMC_ENABLE_MPI
+#if CMC_ENABLE_MPI
     int init_flag{0};
 
     /* Check if MPI already has been initialized */
@@ -29,7 +29,7 @@ MPIInitialize()
 void
 MPIFinalize()
 {
-#ifdef CMC_ENABLE_MPI
+#if CMC_ENABLE_MPI
     int err{MPI_Finalize()};
     MPICheckError(err);
 #else
@@ -42,7 +42,7 @@ MPIFinalize()
 void
 MPIAbort(const int _err_code, const char* _location)
 {
-#ifdef CMC_ENABLE_MPI
+#if CMC_ENABLE_MPI
     int rank{0};
     int err{MPI_Comm_rank(MPI_COMM_WORLD, &rank)};
     if (err == MPI_SUCCESS)
