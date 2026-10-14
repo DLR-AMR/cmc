@@ -47,7 +47,7 @@ class CompressionVariableMultiData
 {
 public:
     CompressionVariableMultiData() = delete;
-    CompressionVariableMultiData(std::string name, t8_forest_t forest, const std::span<T> data, const std::vector<ErrorDomain>& error_domains, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates = std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>(1))
+    CompressionVariableMultiData(std::string name, t8_forest_t forest, const std::span<T> data, const std::vector<ErrorDomain>& error_domains, const std::vector<cmc::util::idw::Coordinate<DIM>>& reference_coordinates = std::vector<cmc::util::idw::Coordinate<DIM>>(1))
     : name_(name), mesh_(forest), init_data_(data), error_domains_(error_domains), reference_coordinates_(reference_coordinates) {
         if (integral_pow<static_cast<uint32_t>(DIM)>(N) != reference_coordinates_.size())
         {
@@ -121,7 +121,7 @@ private:
     const std::vector<ErrorDomain> error_domains_;
 
     /* The reference coordinates of the DG coefficients per element */
-    std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> reference_coordinates_;
+    std::vector<cmc::util::idw::Coordinate<DIM>> reference_coordinates_;
 
     std::vector<std::vector<T>> data_pyramid_;
     int mesh_coarsening_steps_{0};
@@ -456,7 +456,7 @@ struct CompressionIterationData
 
     void LeaveElementUnchanged(const int local_idx);
 
-    void PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
+    void PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values, const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
 
 
     const std::span<T> data;
@@ -481,7 +481,7 @@ CompressionIterationData<T, DIM>::LeaveElementUnchanged(const int local_index)
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 inline void 
-CompressionIterationData<T, DIM>::PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values,  const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
+CompressionIterationData<T, DIM>::PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values,  const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
 {
     const int num_elems = static_cast<int>(eval_coords.size());
 
@@ -593,7 +593,7 @@ LossyMultiResCompression (t8_forest_t forest,
         t8_element_get_children(ts, tree_class, elements[0], num_children, child_elements.data());
 
         /* Compute the evaluation coords of the constructed children elements */
-        std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> eval_coords;
+        std::vector<cmc::util::idw::Coordinate<DIM>> eval_coords;
         eval_coords.reserve(child_elements.size());
 
         for (int child_idx{0}; child_idx < num_children; ++child_idx)
@@ -605,7 +605,7 @@ LossyMultiResCompression (t8_forest_t forest,
         const int num_faces = t8_element_get_num_faces(ts, tree_class, elements[0]);
 
         /* Allocate the control points */
-        std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> control_points;
+        std::vector<cmc::util::idw::PointData<T, DIM>> control_points;
         control_points.reserve(num_faces + 1);
 
         /* Create a point value for the family's control value */
@@ -959,7 +959,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 IntraElemEncodingData<T, DIM, N>
-ComputeIntraElementEncoding(const T single_val, const std::span<const T>& control_values, const std::span<const T>& init_data, const float permitted_abs_error, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates)
+ComputeIntraElementEncoding(const T single_val, const std::span<const T>& control_values, const std::span<const T>& init_data, const float permitted_abs_error, const std::vector<cmc::util::idw::Coordinate<DIM>>& reference_coordinates)
 {
     cmc_assert(kNumIntraElemControlValues<DIM> == control_values.size());
 
@@ -1025,7 +1025,7 @@ ComputeIntraElementEncoding(const T single_val, const std::span<const T>& contro
     std::array<int, kNumIntraElemControlValues<DIM>> control_value_indices = GetControlValueIndices<DIM, N>();
 
     /* Create the prediction control values */
-    std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> prediction_control_values(kNumIntraElemControlValues<DIM>);
+    std::vector<cmc::util::idw::PointData<T, DIM>> prediction_control_values(kNumIntraElemControlValues<DIM>);
     for (int cidx{0}; cidx < kNumIntraElemControlValues<DIM>; ++cidx)
     {
         prediction_control_values[cidx].data = control_values_predictions[cidx];
@@ -1750,7 +1750,7 @@ CompressionVariableMultiData<T, DIM, N>::AppendVariableHeaderToStream(std::vecto
         uint64_t packed_data{0};
         int front_back_indicator{0};
         /* Iterate over all reference coordinates */
-        for (const cmc::par::lossy::idw::util::Coordinate<DIM>& coords : this->reference_coordinates_)
+        for (const cmc::util::idw::Coordinate<DIM>& coords : this->reference_coordinates_)
         {
             /* Iterate over all dimensional coordinates */
             for (auto dim_iter = coords.coordinates.begin(); dim_iter != coords.coordinates.end(); ++dim_iter)

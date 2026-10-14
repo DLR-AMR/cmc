@@ -541,7 +541,7 @@ private:
     CompressionInfoStruct compression_info_;
 
     /* The reference coordinates of the DG coefficients per element */
-    std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> reference_coordinates_;
+    std::vector<cmc::util::idw::Coordinate<DIM>> reference_coordinates_;
 
     /* The current AMR mesh */
     AmrMesh mesh_;
@@ -1318,7 +1318,7 @@ struct RefinementIterationData
     }
 
     void LeaveElementUnchanged(const int local_idx);
-    void PerformRefinement(const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
+    void PerformRefinement(const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values, const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
     bool WillNextElementBeRefined() {return process_local_level_mesh_encoding.GetNextBit();}
     T GetData(const int idx) const {return data[idx];}
     inline float GetPermittedAbsError(const t8_scheme_c* scheme, const int global_tree_id, const t8_eclass_t tree_class, const t8_element_t* element) const
@@ -1372,7 +1372,7 @@ GetUnpredictableValue(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 void
-RefinementIterationData<T, DIM>::PerformRefinement(const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
+RefinementIterationData<T, DIM>::PerformRefinement(const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values, const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
 {
     const int num_elems = static_cast<int>(eval_coords.size());
 
@@ -1476,7 +1476,7 @@ LossyMultiResDecompression (t8_forest_t forest,
         t8_element_get_children(ts, tree_class, elements[0], num_children, child_elements.data());
 
         /* Compute the evaluation coords of the constructed children elements */
-        std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> eval_coords;
+        std::vector<cmc::util::idw::Coordinate<DIM>> eval_coords;
         eval_coords.reserve(child_elements.size());
 
         for (int child_idx{0}; child_idx < num_children; ++child_idx)
@@ -1488,7 +1488,7 @@ LossyMultiResDecompression (t8_forest_t forest,
         const int num_faces = ts->element_get_num_faces(tree_class, elements[0]);
 
         /* Create a vector for all face_values (and fill it with the default value (this families control value)) */
-        std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> control_points;
+        std::vector<cmc::util::idw::PointData<T, DIM>> control_points;
         control_points.reserve(1 + num_faces);
 
         /* Create a point value for the family's control value */
@@ -1838,19 +1838,17 @@ struct RefinementIntraElementData
         fine_elem_data.reserve(current_data.size() * kGetNumPointsPerElement<DIM, N>());
     }
 
-    void PerformRefinement(const int coarse_value_id, const float permitted_abs_error, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates);
+    void PerformRefinement(const int coarse_value_id, const float permitted_abs_error, const std::vector<cmc::util::idw::Coordinate<DIM>>& reference_coordinates);
 
     const std::span<T> data;
     cmc::bits::StreamDecoder<SymbolType>& stream_decoder;
     std::vector<T> fine_elem_data;
 };
 
-static int celem_id{0};
-
 template<ArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 std::array<T, kGetNumPointsPerElement<DIM, N>()>
-PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const T coarse_predictor, const float permitted_abs_error, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates)
+PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, const T coarse_predictor, const float permitted_abs_error, const std::vector<cmc::util::idw::Coordinate<DIM>>& reference_coordinates)
 {
     constexpr int kNumControlPoints = kNumIntraElemControlValues<DIM>;
     constexpr int kNumInitPredictionPoints = kNumInitDataPredictions<DIM, N>;
@@ -1861,7 +1859,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
     cmc_assert(reference_coordinates.size() == static_cast<size_t>(kGetNumPointsPerElement<DIM, N>()));
 
     /* Create the prediction control values */
-    std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> prediction_control_values(kNumControlPoints);
+    std::vector<cmc::util::idw::PointData<T, DIM>> prediction_control_values(kNumControlPoints);
 
     {
     /* Get the indices of the control values */
@@ -1909,9 +1907,6 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
 
         /* Store the predicted values as a control value */
         prediction_control_values[cidx].data = predictions[control_val_indices[cidx]];
-
-        //cmc_debug_msg("celem_id: ", celem_id);
-        //++celem_id;
     }
 
     }
@@ -1940,14 +1935,11 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
             const auto [was_prediction_greater, quant_bin] = GetQuantizationBinFromEntropySymbol(symbol);
 
             /* Perform the IDW prediction */
-            const T prediction = ComputePrediction<T, DIM>(prediction_control_values, reference_coordinates[prediciton_indices[iidx]]);
+            const T prediction = cmc::par::lossy::idw::util::ComputePrediction<T, DIM>(prediction_control_values, reference_coordinates[prediciton_indices[iidx]]);
 
             /* Perform the de-quantization */
             predictions[prediciton_indices[iidx]] = prediction + ((was_prediction_greater ? -2.0 : +2.0) * permitted_abs_error * quant_bin);
         }
-
-        //cmc_debug_msg("celem_id: ", celem_id);
-        //++celem_id;
     }
 
     return predictions;
@@ -1956,7 +1948,7 @@ PerformElementDecoding(cmc::bits::StreamDecoder<SymbolType>& stream_decoder, con
 template<FourByteArithmeticType T, int32_t DIM, int32_t N>
 requires Dimension<DIM>
 inline void
-RefinementIntraElementData<T, DIM, N>::PerformRefinement(const int coarse_value_id, const float permitted_abs_error, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& reference_coordinates)
+RefinementIntraElementData<T, DIM, N>::PerformRefinement(const int coarse_value_id, const float permitted_abs_error, const std::vector<cmc::util::idw::Coordinate<DIM>>& reference_coordinates)
 {
     /* Perform the element decoding */
     const std::array<T, kGetNumPointsPerElement<DIM, N>()> elem_data = PerformElementDecoding<T, DIM, N>(this->stream_decoder, this->data[coarse_value_id], permitted_abs_error, reference_coordinates);

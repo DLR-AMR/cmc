@@ -390,7 +390,7 @@ struct CompressionIterationData
 
     void LeaveElementUnchanged(const int local_idx);
 
-    void PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values,  const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
+    void PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values,  const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
 
 
     const std::span<T> data;
@@ -415,7 +415,7 @@ CompressionIterationData<T, DIM>::LeaveElementUnchanged(const int local_index)
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 inline void 
-CompressionIterationData<T, DIM>::PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
+CompressionIterationData<T, DIM>::PerformRefinementPrediction(const std::span<T> initial_values, const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values, const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
 {
     const int num_elems = static_cast<int>(eval_coords.size());
 
@@ -528,7 +528,7 @@ LossyMultiResCompression (t8_forest_t forest,
         t8_element_get_children(ts, tree_class, elements[0], num_children, child_elements.data());
 
         /* Compute the evaluation coords of the constructed children elements */
-        std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> eval_coords;
+        std::vector<cmc::util::idw::Coordinate<DIM>> eval_coords;
         eval_coords.reserve(child_elements.size());
 
         for (int child_idx{0}; child_idx < num_children; ++child_idx)
@@ -540,7 +540,7 @@ LossyMultiResCompression (t8_forest_t forest,
         const int num_faces = t8_element_get_num_faces(ts, tree_class, elements[0]);
 
         /* Allocate the control points */
-        std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> control_points;
+        std::vector<cmc::util::idw::PointData<T, DIM>> control_points;
         control_points.reserve(num_faces + 1);
 
         /* Create a point value for the family's control value */

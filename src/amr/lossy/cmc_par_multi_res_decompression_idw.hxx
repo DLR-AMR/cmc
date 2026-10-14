@@ -1182,7 +1182,7 @@ struct RefinementIterationData
     }
 
     void LeaveElementUnchanged(const int local_idx);
-    void PerformRefinement(const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
+    void PerformRefinement(const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values, const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error);
     bool WillNextElementBeRefined() {return process_local_level_mesh_encoding.GetNextBit();}
     T GetData(const int idx) const {return data[idx];}
     inline float GetPermittedAbsError(const t8_scheme_c* scheme, const int global_tree_id, const t8_eclass_t tree_class, const t8_element_t* element) const
@@ -1235,7 +1235,7 @@ GetUnpredictableValue(cmc::bits::StreamDecoder<SymbolType>& stream_decoder)
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 void
-RefinementIterationData<T, DIM>::PerformRefinement(const std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>>& control_values, const std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
+RefinementIterationData<T, DIM>::PerformRefinement(const std::vector<cmc::util::idw::PointData<T, DIM>>& control_values, const std::vector<cmc::util::idw::Coordinate<DIM>>& eval_coords, const std::vector<float>& permitted_abs_error)
 {
     const int num_elems = static_cast<int>(eval_coords.size());
 
@@ -1339,7 +1339,7 @@ LossyMultiResDecompression (t8_forest_t forest,
         t8_element_get_children(ts, tree_class, elements[0], num_children, child_elements.data());
 
         /* Compute the evaluation coords of the constructed children elements */
-        std::vector<cmc::par::lossy::idw::util::Coordinate<DIM>> eval_coords;
+        std::vector<cmc::util::idw::Coordinate<DIM>> eval_coords;
         eval_coords.reserve(child_elements.size());
 
         for (int child_idx{0}; child_idx < num_children; ++child_idx)
@@ -1351,7 +1351,7 @@ LossyMultiResDecompression (t8_forest_t forest,
         const int num_faces = ts->element_get_num_faces(tree_class, elements[0]);
 
         /* Create a vector for all face_values (and fill it with the default value (this families control value)) */
-        std::vector<cmc::par::lossy::idw::util::PointData<T, DIM>> control_points;
+        std::vector<cmc::util::idw::PointData<T, DIM>> control_points;
         control_points.reserve(1 + num_faces);
 
         /* Create a point value for the family's control value */

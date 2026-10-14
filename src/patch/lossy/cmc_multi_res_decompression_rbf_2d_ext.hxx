@@ -3,9 +3,9 @@
 
 #include "cmc.hxx"
 #include "patch/lossy/cmc_multi_res_util.hxx"
-#include "amr/lossy/cmc_par_multi_res_error_mesh.hxx"
-#include "amr/lossy/cmc_par_multi_res_idw_interpolation_util.hxx"
 #include "utilities/cmc_compression_schema.hxx"
+#include "utilities/cmc_idw_interpolation_util.hxx"
+#include "utilities/cmc_bits_stream_decoder.hxx"
 
 #include <string>
 #include <span>
