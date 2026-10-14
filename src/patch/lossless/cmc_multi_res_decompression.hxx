@@ -16,6 +16,9 @@
 namespace cmc::patch::lossless::multi_res
 {
 
+constexpr bool kReadDecompressedDataAtOnce = true;
+constexpr bool kWriteLowResDecompressionLevels = true;
+
 /* Forward declaration of the general compression variable */
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
@@ -404,6 +407,29 @@ DecompressionVariable<T, DIM>::InquireCompressionInfo()
 
     /* Store the number of decompression steps */
     this->num_decompression_levels_ = static_cast<int>(this->compression_info_.num_decompression_levels); 
+
+if constexpr (kReadDecompressedDataAtOnce)
+{
+    /* Compute the amount of data for all compression levels */
+    const uint64_t num_level_bytes = std::accumulate(this->compression_info_.global_level_bytes.begin(), this->compression_info_.global_level_bytes.end(), 0);
+
+    /* File offset for the start of the level-wise encoding */
+    const uint64_t file_offset = this->compression_info_.offset_start_encoding + this->compression_info_.num_bytes_compression_huffman_codes;
+
+    /* Move tot he encoding start */
+    const int rv_seek_start = std::fseek(this->fhandle_, file_offset, SEEK_SET);
+    CheckFileError<int>(rv_seek_start);
+
+    /* Number of uint64_t's to read */
+    const uint64_t num_global_vals = num_level_bytes / sizeof(uint64_t);
+
+    /* Allocate memory for the encoded stream */
+    this->level_encoding_ = std::vector<uint64_t>(num_global_vals);
+
+    /* Read in all of the data at once */
+    const size_t rv_read_level = std::fread(this->level_encoding_.data(), sizeof(uint64_t), num_global_vals, this->fhandle_);
+    CheckFileReadCorrectness(rv_read_level, num_global_vals);
+}
 }
 
 template<ArithmeticType T, int32_t DIM>
@@ -413,6 +439,18 @@ DecompressionVariable<T, DIM>::OpenSharedLevelDataWindow(const int level)
 {
     cmc_assert(this->compression_info_.global_level_bytes.size() > static_cast<size_t>(level) && level >= 0);
 
+if constexpr (kReadDecompressedDataAtOnce)
+{
+    /* Gather the offset to the current level */
+    const uint64_t var_level_offset = std::accumulate(this->compression_info_.global_level_bytes.begin(), std::next(this->compression_info_.global_level_bytes.begin(), level), 0);
+
+    /* Compute the number of value */
+    const uint64_t num_level_offset_vals = var_level_offset / sizeof(uint64_t);
+
+    /* Return the pointer to the correct position in the encoding */
+    return &(this->level_encoding_[num_level_offset_vals]);
+} else
+{
     /* Get the number of bytes for this encoding level */
     const uint64_t level_bytes = this->compression_info_.global_level_bytes[level];
     cmc_assert(level_bytes % sizeof(uint64_t) == 0);
@@ -431,13 +469,17 @@ DecompressionVariable<T, DIM>::OpenSharedLevelDataWindow(const int level)
 
     return this->level_encoding_.data();
 }
+}
 
 template<ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 void
 DecompressionVariable<T, DIM>::CloseSharedLevelDataWindow()
 {
+if constexpr (not kReadDecompressedDataAtOnce)
+{
     this->level_encoding_.clear();
+}
 }
 
 template<OneByteArithmeticType T>
@@ -994,6 +1036,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag4D)
             }
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
@@ -1077,6 +1128,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag3D)
             }
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
@@ -1156,6 +1216,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag2D)
             }
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
@@ -1231,6 +1300,15 @@ DecompressionVariable<T, DIM>::Decompress(DecompressionVariable<T, DIM>::kTag1D)
             this->PerformPredictionDecompression(coarse_predictor, lon, next_lvl_dim_lengths);
         }
 
+        /* Write the decompressed level data */
+        if constexpr (kWriteLowResDecompressionLevels)
+        {
+            const std::string file_name = std::string("cmc_decompression_data_level_") + std::to_string(lvl_idx) + std::string(".cmc");
+            std::FILE* file_out = std::fopen(file_name.c_str(), "wb");
+            std::fwrite(this->data_.data(), sizeof(T), this->data_.size(), file_out);
+            std::fclose(file_out);
+        }
+        
         /* Close the data level */
         this->CloseSharedLevelDataWindow();
 
