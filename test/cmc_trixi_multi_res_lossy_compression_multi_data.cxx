@@ -117,8 +117,8 @@ CreateInitMesh()
     /* Create a mesh */
     const sc_MPI_Comm comm = MPI_COMM_WORLD;
     t8_cmesh_t cmesh;
-
-    cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
 
     const t8_scheme *scheme = t8_scheme_new_default ();
 
@@ -143,7 +143,9 @@ CreateInitMesh()
 std::pair<t8_cmesh_t, const t8_scheme *>
 GetInitCMeshAndScheme()
 {
-    t8_cmesh_t cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
+    t8_cmesh_t cmesh;
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
     return std::make_pair(cmesh, t8_scheme_new_default());
 }
 
@@ -498,7 +500,7 @@ main(void)
                 ++count_error;
             }
 
-            //cmc::ExpectTrue(residual <= abs_dev && residual <= rel_abs_dev);
+            cmc::ExpectTrue(residual <= abs_dev && residual <= rel_abs_dev);
         }
         cmc::cmc_debug_msg("Number of error domain violations (|init_data - decompressed_data| > permitted_error): ", count_error);
         cmc::ExpectTrue(count_error == 0);

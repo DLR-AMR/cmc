@@ -24,6 +24,8 @@
 #include <cmath>
 #include <filesystem>
 
+constexpr bool kWriteVTKDataTestTrixiLossyMultiRes = false;
+
 namespace cmc::test
 {
 
@@ -59,8 +61,8 @@ CreateInitMesh()
     /* Create a mesh */
     const sc_MPI_Comm comm = MPI_COMM_WORLD;
     t8_cmesh_t cmesh;
-
-    cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
 
     const t8_scheme *scheme = t8_scheme_new_default ();
 
@@ -84,10 +86,11 @@ CreateInitMesh()
 std::pair<t8_cmesh_t, const t8_scheme *>
 GetInitCMeshAndScheme()
 {
-    t8_cmesh_t cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
+    t8_cmesh_t cmesh;
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
     return std::make_pair(cmesh, t8_scheme_new_default());
 }
-
 
 std::vector<float>
 CreateInitData(const t8_forest_t mesh)
@@ -235,7 +238,10 @@ main(void)
         /* Create a view on the data */
         const std::span<float> init_data(data);
 
-        //cmc::test::WriteDataToVTK(mesh, data, "cmc_test_input_data_lossy_compr");
+        if constexpr (kWriteVTKDataTestTrixiLossyMultiRes)
+        {
+            cmc::test::WriteDataToVTK(mesh, data, "cmc_test_input_data_lossy_compr");
+        }
 
         //Compression
         {
@@ -277,7 +283,10 @@ main(void)
         /* Save the decompressed data */
         decompressed_data = std::move(partitioned_decompressed_data);
 
-        //cmc::test::WriteDataToVTK(partitioned_decompressed_forest, decompressed_data, "cmc_test_output_data_lossy_compr");
+        if constexpr (kWriteVTKDataTestTrixiLossyMultiRes)
+        {
+            cmc::test::WriteDataToVTK(partitioned_decompressed_forest, decompressed_data, "cmc_test_output_data_lossy_compr");
+        }
 
         /* Deallocate the decompressed forest */
         t8_forest_unref(&partitioned_decompressed_forest);
@@ -296,8 +305,8 @@ main(void)
 
             if (residual > abs_dev || residual > rel_abs_dev)
             {
-                //cmc::cmc_debug_msg("Inequality at ", idx, ", Init Data: ", data[idx], ", Decompressed Data: ", decompressed_data[idx], ", Residual: ", residual, ", Permitted Absolute Deviation ", abs_dev, ", Permitted Relative Deviation (in absolute terms): ", rel_abs_dev);
-                //cmc::cmc_debug_msg("Bitset Init Data: , ", std::bitset<32>(std::bit_cast<uint32_t>(data[idx])),  ", Bitset Decompressed Data: ", std::bitset<32>(std::bit_cast<uint32_t>(decompressed_data[idx])));
+                cmc::cmc_debug_msg("Inequality at ", idx, ", Init Data: ", data[idx], ", Decompressed Data: ", decompressed_data[idx], ", Residual: ", residual, ", Permitted Absolute Deviation ", abs_dev, ", Permitted Relative Deviation (in absolute terms): ", rel_abs_dev);
+                cmc::cmc_debug_msg("Bitset Init Data: , ", std::bitset<32>(std::bit_cast<uint32_t>(data[idx])),  ", Bitset Decompressed Data: ", std::bitset<32>(std::bit_cast<uint32_t>(decompressed_data[idx])));
                 ++count_error;
             }
 

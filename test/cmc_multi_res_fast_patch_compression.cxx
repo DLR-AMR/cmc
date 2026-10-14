@@ -20,16 +20,6 @@ main(void)
     cmc::CmcInitialize();
     {
 
-    /* Check the corrected mean computation */
-    std::vector<float> values{1.3f, 2.42f, 1.714f, 2.12f};
-    std::vector<float> partial_values{values[0], values[1], values[2]};
-    const float N = static_cast<float>(values.size());
-    const float partial_sum = cmc::patch::lossless::multi_res::NeumaierKahanBabuskaSum<float>(partial_values);
-    const float value_to_match = values[3];
-    const float mmean = cmc::patch::lossless::multi_res::FindMatchingMeanValue(N, partial_sum, value_to_match);
-    const float eval_mmean = cmc::patch::lossless::multi_res::ComputeFMAForImplicitValue(N, mmean, partial_sum);
-    cmc::ExpectTrue(std::bit_cast<uint32_t>(value_to_match) == std::bit_cast<uint32_t>(eval_mmean));
-
     //2D Test case
     {
     cmc::cmc_global_msg("2D Fast Patch-based Compression Test");

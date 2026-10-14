@@ -24,6 +24,8 @@
 #include <cmath>
 #include <filesystem>
 
+constexpr bool kWriteVTKDataTestMultiResRBF = false;
+
 namespace cmc::test
 {
 
@@ -32,8 +34,8 @@ TestAdapt ([[maybe_unused]] t8_forest_t forest,
            t8_forest_t forest_from,
            t8_locidx_t which_tree,
            [[maybe_unused]] const t8_eclass_t tree_class,
-           t8_locidx_t lelement_id,
-           [[maybe_unused]] const t8_scheme_c * ts,
+           [[maybe_unused]] t8_locidx_t lelement_id,
+           [[maybe_unused]] const t8_scheme_c* ts,
            const int is_family,
            [[maybe_unused]] const int num_elements,
            [[maybe_unused]] t8_element_t * elements[])
@@ -59,8 +61,8 @@ CreateInitMesh()
     /* Create a mesh */
     const sc_MPI_Comm comm = MPI_COMM_WORLD;
     t8_cmesh_t cmesh;
-
-    cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
 
     const t8_scheme *scheme = t8_scheme_new_default ();
 
@@ -84,10 +86,11 @@ CreateInitMesh()
 std::pair<t8_cmesh_t, const t8_scheme *>
 GetInitCMeshAndScheme()
 {
-    t8_cmesh_t cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
+    t8_cmesh_t cmesh;
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
     return std::make_pair(cmesh, t8_scheme_new_default());
 }
-
 
 std::vector<float>
 CreateInitData(const t8_forest_t mesh)
@@ -171,7 +174,10 @@ main(void)
         /* Create a view on the data */
         const std::span<float> init_data(data);
 
-        //cmc::test::WriteDataToVTK(mesh, data, "cmc_test_input_data_lossy_compr");
+        if constexpr (kWriteVTKDataTestMultiResRBF)
+        {
+            cmc::test::WriteDataToVTK(mesh, data, "cmc_test_input_data_lossy_compr");
+        }
 
         //Compression
         {
@@ -183,7 +189,7 @@ main(void)
 
         /* Write the encoded data */
         variable.WriteCompressedData(file_name);
-        cmc::cmc_global_msg("Num elems mesh: ", t8_forest_get_local_num_leaf_elements(mesh));
+
         t8_forest_unref(&mesh);
         }
 
@@ -202,7 +208,10 @@ main(void)
         auto [decompr_forest, decompressed_data_vec] = decompression_variable.GetDecompressedData();
         decompressed_data = decompressed_data_vec;
 
-        //cmc::test::WriteDataToVTK(decompr_forest, decompressed_data_vec, "cmc_test_output_data_lossy_compr");
+        if constexpr (kWriteVTKDataTestMultiResRBF)
+        {
+            cmc::test::WriteDataToVTK(decompr_forest, decompressed_data_vec, "cmc_test_output_data_lossy_compr");
+        }
 
         /* Deallocate the decompressed forest */
         t8_forest_unref(&decompr_forest);
@@ -225,6 +234,7 @@ main(void)
             }
         }
         cmc::cmc_global_msg("Num error violations: ", count_error);
+        cmc::ExpectTrue(count_error == 0);
 
         /* Delete the test's output file */
         const std::filesystem::path output_file_path(file_name);

@@ -23,6 +23,8 @@
 #include <limits>
 #include <cmath>
 
+constexpr bool kWriteVTKDataTestLosslessMultiResMultiData = false;
+
 void
 Test2DFloatData()
 {
@@ -151,8 +153,8 @@ TestAdapt ([[maybe_unused]] t8_forest_t forest,
            t8_forest_t forest_from,
            t8_locidx_t which_tree,
            [[maybe_unused]] const t8_eclass_t tree_class,
-           t8_locidx_t lelement_id,
-           [[maybe_unused]] const t8_scheme_c * ts,
+           [[maybe_unused]] t8_locidx_t lelement_id,
+           [[maybe_unused]] const t8_scheme_c* ts,
            const int is_family,
            [[maybe_unused]] const int num_elements,
            [[maybe_unused]] t8_element_t * elements[])
@@ -178,13 +180,9 @@ CreateInitMesh()
     /* Create a mesh */
     const sc_MPI_Comm comm = MPI_COMM_WORLD;
     t8_cmesh_t cmesh;
-    #if 0
-    cmesh = t8_cmesh_new_hypercube (T8_ECLASS_QUAD, comm, 0, 0, 0);
-    #else
-    cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
-    #endif
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
     const t8_scheme *scheme = t8_scheme_new_default ();
-    //const int initial_level = 5;
     const int initial_level = 2;
     t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);
     
@@ -193,7 +191,7 @@ CreateInitMesh()
     t8_forest_init(&partitioned_forest);
 
     /* Partition the forest */
-    const int partition_for_coarsening = 1; //TODO: change to 'one' when partition for coarsening is in t8code
+    const int partition_for_coarsening = 1;
     t8_forest_set_partition(partitioned_forest, forest, partition_for_coarsening);
     t8_forest_commit(partitioned_forest);
 
@@ -202,15 +200,13 @@ CreateInitMesh()
     return partitioned_forest;
 }
 
-std::pair<t8_cmesh_t, const t8_scheme *>
+std::pair<t8_cmesh_t, const t8_scheme*>
 GetInitCMeshAndScheme()
 {
-    #if 0
-    return std::make_pair(t8_cmesh_new_hypercube (T8_ECLASS_QUAD, MPI_COMM_WORLD, 0, 0, 0), t8_scheme_new_default());
-    #else
-    t8_cmesh_t cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, MPI_COMM_WORLD);
+    t8_cmesh_t cmesh;
+    t8_cmesh_init (&cmesh);
+    t8_cmesh_new_brick_2d (cmesh, 2, 2, 0, 0, MPI_COMM_WORLD);
     return std::make_pair(cmesh, t8_scheme_new_default());
-    #endif
 }
 
 std::vector<float>
@@ -221,55 +217,21 @@ CreateInitData(const t8_forest_t mesh)
     std::vector<float> data;
     data.reserve(num_elems * kNumPointsPerElem);
 
-    const t8_scheme *scheme = t8_forest_get_scheme (mesh);
-
     t8_locidx_t num_trees = t8_forest_get_num_local_trees (mesh);
 
-    for (t8_locidx_t itree = 0, idata = 0; itree < num_trees; itree++)
+    for (t8_locidx_t itree = 0; itree < num_trees; itree++)
     {
-        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, itree);
         t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, itree);
 
         for (t8_locidx_t ielement = 0; ielement < num_elems_in_tree; ielement++)
         {
-            const t8_element_t *element = t8_forest_get_leaf_element_in_tree (mesh, itree, ielement);
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, itree, ielement);
 
             /* Evaluate the data for this element */
             std::array<float, kNumPointsPerElem> elem_data = EvalPoints(mesh, itree, element);
 
             /* Store the element data */
             std::copy_n(elem_data.begin(), kNumPointsPerElem, std::back_inserter(data));
-        }
-    }
-
-    return data;
-}
-
-std::vector<float>
-CreateInitData2(const t8_forest_t mesh)
-{
-    const t8_locidx_t num_elems = t8_forest_get_local_num_leaf_elements(mesh);
-
-    std::vector<float> data;
-    data.reserve(num_elems);
-
-    const t8_scheme *scheme = t8_forest_get_scheme (mesh);
-
-    t8_locidx_t num_trees = t8_forest_get_num_local_trees (mesh);
-
-    for (t8_locidx_t itree = 0, idata = 0; itree < num_trees; itree++)
-    {
-        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, itree);
-        t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, itree);
-
-        for (t8_locidx_t ielement = 0; ielement < num_elems_in_tree; ielement++)
-        {
-            const t8_element_t *element = t8_forest_get_leaf_element_in_tree (mesh, itree, ielement);
-
-            std::array<double, 3> elem_coords{};
-            t8_forest_element_coordinate (mesh, itree, element, 0, elem_coords.data());
-
-            data.push_back(std::cos(elem_coords[0] - 0.5) * std::cos(elem_coords[1] - 0.5));
         }
     }
 
@@ -309,115 +271,12 @@ WriteDataToVTK(t8_forest_t mesh, const std::vector<float>& data)
     t8_forest_write_vtk_ext (mesh, "cmc_new_new_test_data_vis", 1, 1, 1, 1, 1, 1, 1, 4, vtk_data);
 }
 
-void
-WriteDataToVTK2(t8_forest_t mesh, const std::vector<float>& data)
-{
-    std::vector<double> double_data1;
-    for (int idx{0}; idx < t8_forest_get_local_num_leaf_elements(mesh); ++idx)
-    {
-        double_data1.push_back(data[idx]);
-    }
-
-    t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "ExampleData1");
-    vtk_data[0].type = T8_VTK_SCALAR;
-    vtk_data[0].data = double_data1.data();
-
-    t8_forest_write_vtk_ext (mesh, "cmc_new_new_test_data_vis", 1, 1, 1, 1, 1, 1, 1, 1, vtk_data);
-}
-
-
-static t8_locidx_t
-CoarsenFourthTree ([[maybe_unused]] t8_forest_t forest,
-                    t8_forest_t forest_from,
-                    t8_locidx_t which_tree,
-                    [[maybe_unused]] const t8_eclass_t tree_class,
-                    [[maybe_unused]] t8_locidx_t lelement_id,
-                    [[maybe_unused]] const t8_scheme_c * ts,
-                    [[maybe_unused]] const int is_family,
-                    [[maybe_unused]] const int num_elements,
-                    [[maybe_unused]] t8_element_t * elements[])
-{
-    const t8_gloidx_t gtree_id = t8_forest_global_tree_id (forest_from, which_tree);
-
-    if (gtree_id == 3)
-    {
-        return -1;
-    } else
-    {
-        return 0;
-    }
-}
-
-static t8_locidx_t
-CoarsenAllFamilies ([[maybe_unused]] t8_forest_t forest,
-                    [[maybe_unused]]t8_forest_t forest_from,
-                    [[maybe_unused]] t8_locidx_t which_tree,
-                    [[maybe_unused]] const t8_eclass_t tree_class,
-                    [[maybe_unused]] t8_locidx_t lelement_id,
-                    [[maybe_unused]] const t8_scheme_c * ts,
-                    const int is_family,
-                    [[maybe_unused]] const int num_elements,
-                    [[maybe_unused]] t8_element_t * elements[])
-{
-    if (is_family)
-    {
-        return -1;
-    } else
-    {
-        return 0;
-    }
-}
-
-void
-TestPFC()
-{
-    const MPI_Comm comm = MPI_COMM_WORLD;
-    t8_cmesh_t cmesh = t8_cmesh_new_brick_2d (2, 2, 0, 0, comm);
-    const t8_scheme* scheme = t8_scheme_new_default ();
-
-    #if 0
-    const int initial_level = 2;
-    t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, initial_level, 0, comm);
-
-    t8_forest_t adapted_forest = t8_forest_new_adapt(forest, CoarsenFourthTree, 0, 0, NULL);
-
-    t8_forest_write_vtk_ext (adapted_forest, "test_pfc_mesh_adapted", 1, 1, 1, 1, 1, 1, 1, 0, NULL);
-
-    t8_forest_t pfc_forest; 
-    t8_forest_init(&pfc_forest);
-
-    /* Partition the forest */
-    const int partition_for_coarsening = 1; //TODO: change to 'one' when partition for coarsening is in t8code
-    t8_forest_set_partition(pfc_forest, adapted_forest, partition_for_coarsening);
-    t8_forest_commit(pfc_forest);
-
-    t8_forest_write_vtk_ext (pfc_forest, "test_pfc_mesh_partitioned", 1, 1, 1, 1, 1, 1, 1, 0, NULL);
-    #else
-    
-    t8_forest_t forest = t8_forest_new_uniform (cmesh, scheme, 0, 0, comm);
-    t8_forest_t pfc_forest; 
-    t8_forest_init(&pfc_forest);
-
-    /* Partition the forest */
-    const int partition_for_coarsening = 1; //TODO: change to 'one' when partition for coarsening is in t8code
-    t8_forest_set_partition(pfc_forest, forest, partition_for_coarsening);
-    t8_forest_commit(pfc_forest);
-
-    #endif
-
-}
-
 int
 main(void)
 {
     /* Initialize cmc */
     cmc::CmcInitialize();
     {
-
-        //TestPFC();
-        //cmc::cmc_global_msg("ENDDDDDDDDD");
-        //cmc::cmc_err_msg("End of test"); 
         /* Setup a compression variable */
         constexpr int32_t DIM = 2;
         constexpr int32_t N = kNumPointsPerElem;
@@ -425,22 +284,21 @@ main(void)
 
         std::vector<float> decompressed_data;
 
-#if 1
         /* Create a cmesh */
         t8_forest_t mesh = CreateInitMesh();
 
         /* Create some data */
-        //std::vector<float> data = CreateInitData(mesh);
-        std::vector<float> data = CreateInitData2(mesh);
+        std::vector<float> data = CreateInitData(mesh);
 
         /* Create a view on the data */
         const std::span<float> init_data(data);
 
-        //WriteDataToVTK(mesh, data);
-        WriteDataToVTK2(mesh, data);
-        //cmc::cmc_err_msg("Stop here");
+        if constexpr (kWriteVTKDataTestLosslessMultiResMultiData)
         {
-        //cmc::par::lossless::multi_res::CompressionVariableMultiData<float, DIM, N> variable("test_var", mesh, init_data);
+            WriteDataToVTK(mesh, data);
+        }
+
+        {
         cmc::par::lossless::multi_res::CompressionVariable<float, DIM> variable("test_var", mesh, init_data);
         
         /* Compress */
@@ -448,43 +306,39 @@ main(void)
 
         /* Write the encoded data */
         variable.WriteCompressedData(file_name);
-        cmc::cmc_global_msg("Num elems mesh: ", t8_forest_get_local_num_leaf_elements(mesh));
+
         t8_forest_unref(&mesh);
         }
-#endif
-#if 0
+
         {
         cmc::par::lossless::multi_res::ReadCompressionInfo(file_name);
         
         /* Decompress */
         const auto [cmesh, scheme] = GetInitCMeshAndScheme();
 
-        //cmc::par::lossless::multi_res::DecompressionVariableMultiData<float, DIM, N> decompression_variable(file_name, MPI_COMM_WORLD, cmesh, scheme);
-        cmc::par::lossless::multi_res::DecompressionVariable<float, DIM> decompression_variable(file_name, MPI_COMM_WORLD, cmesh, scheme);
+        cmc::par::lossless::multi_res::DecompressionVariableMultiData<float, DIM, N> decompression_variable(file_name, MPI_COMM_WORLD, cmesh, scheme);
         decompression_variable.Decompress();
 
         auto [decompr_forest, decompressed_data_vec] = decompression_variable.GetDecompressedData(); 
         decompressed_data = decompressed_data_vec;
 
-        //Write the data 
-        WriteDataToVTK2(decompr_forest, decompressed_data);
-
+        if constexpr (kWriteVTKDataTestLosslessMultiResMultiData)
+        {
+            WriteDataToVTK(decompr_forest, decompressed_data);
+        }
 
         t8_forest_unref(&decompr_forest);
         }
 
-#endif
-#if 0
         /* Compare the initial and decompressed data */
-        for (int idx{0}; idx < init_data.size(); ++idx)
+        for (size_t idx{0}; idx < init_data.size(); ++idx)
         {
             if (init_data[idx] != decompressed_data[idx])
             {
                 cmc::cmc_global_msg("Inequality at ", idx, ", Init: ", init_data[idx], ", Decompr: ", decompressed_data[idx]);
             }
+            cmc::ExpectTrue(init_data[idx] == decompressed_data[idx]);
         }
-
-#endif
 
     }
     /* Finalize cmc */
