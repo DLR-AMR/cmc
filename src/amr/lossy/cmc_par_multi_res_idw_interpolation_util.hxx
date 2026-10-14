@@ -317,7 +317,7 @@ ComputePrediction(const std::vector<PointData<T, DIM>>& points, const Coordinate
 template<int32_t DIM>
 requires Dimension<DIM>
 std::array<FloatType, DIM> 
-FillElementIDWCoordinates(t8_forest_t mesh, t8_locidx_t tree_idx, const t8_element_t* elem)
+FillElementChildIDWCoordinates(t8_forest_t mesh, t8_locidx_t tree_idx, const t8_element_t* elem)
 {
     std::array<double, 3> coords{};
     //t8_forest_element_coordinate (mesh, tree_idx, elem, 0, coords.data());
@@ -331,6 +331,34 @@ FillElementIDWCoordinates(t8_forest_t mesh, t8_locidx_t tree_idx, const t8_eleme
     return coordinates;
 }
 
+template<int32_t DIM>
+requires Dimension<DIM>
+std::array<FloatType, DIM> 
+FillElementNeighborIDWCoordinates(t8_forest_t mesh, const t8_scheme_c* scheme, const t8_eclass_t tree_class, t8_locidx_t tree_idx, const t8_element_t* elem)
+{
+    constexpr t8_locidx_t kConstructedChildIDX = 0;
+
+    /* Get the first child element */
+    t8_element_t* child_elem{nullptr};
+    t8_element_new (scheme, tree_class, 1, &child_elem);
+    t8_element_get_child (scheme, tree_class, elem, kConstructedChildIDX, child_elem);
+
+    /* Compute the midpoint of the element */
+    std::array<double, 3> coords{};
+    t8_forest_element_linear_centroid (mesh, tree_idx, child_elem, coords.data());
+
+    /* Destroy the child element */
+    t8_element_destroy(scheme, tree_class, 1, &child_elem);
+
+    /* Return an array of the correct dimensionality */
+    std::array<FloatType, DIM> coordinates;
+    for_constexpr<0, DIM, 1>([&](auto IDX)
+    {
+        coordinates[IDX] = static_cast<FloatType>(coords[IDX]);
+    });
+
+    return coordinates;
+}
 
 #endif
 
