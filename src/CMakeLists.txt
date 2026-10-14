@@ -27,6 +27,7 @@ install(FILES
     utilities/cmc_utilities.hxx 
     utilities/cmc_error_domain.hxx 
     utilities/cmc_error_domain_functions.hxx 
+    utilities/cmc_idw_interpolation_util.hxx 
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 )
 
