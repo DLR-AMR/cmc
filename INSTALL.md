@@ -1,72 +1,53 @@
 
-## Installation  
+### Installation
 
-CMC is a software package that uses Autotools as a build system and relies on t8code (as a submodule).  
-For parallelization MPI is used and optionally, it may be linked against netCDF.  
+CMC relies on CMake to configure and build the software.
+An autotools build process is currently not supported.
 
-Many features are based on a working netCDF installation. Therefore, it is highly recommended to link against netCDF.
+A short CMake setup will be described in the following.
 
-### Get the Code  
-
-In order to get started, clone the repository, e.g.  
+CMC needs to be donwloaded, e.g.:
 ```
-	git clone https://github.com/DLR-AMR/cmc.git
+git clone https://github.com/DLR-AMR/cmc.git 
 ```
 
-Suppose the project has been cloned into the directory `~/cmc`.
-For the next steps, we need to change into the projects's directory, e.g. `cd cmc`.
-
-### Initialize the submodule  
-
-CMC relies on [t8code](https://github.com/DLR-AMR/t8code) as a submodule.  
-Therefore, it has to be initialized and updated.  
+It is recommended to create an out-of-source build-directory, e.g.:
 ```
-	git submodule update --init --recursive
-```
-If a t8code installation is already available, this submodule-initialization step may be skipped.  
-In this case, CMC has to be linked manually against t8code during the configuration (see the option `--with-t8code`).  
-However, to ensure compatibility, it is recommended to use t8code as a submodule.  
-
-### Create the configure script  
-
-Afterwards, we need to call the `bootstrap` script.
-CMC does not ship with a `configure` script. It needs to be generated on the local machine by calling the `bootstrap` script in the project's directory.
-
-```
-	./bootstrap
+mkdir cmc_build && cd cmc_build
 ```
 
-### Configuration of CMC  
+With `cmake -LH ../cmc` all possible configuration options can be displayed with their default values.
+A sample of the configuration options reads:
+| Option                  | Default Value |
+| ----------------------- | ------------- |
+| CMC_WITH_T8CODE         | ON            |
+| CMC_ENABLE_MPI          | ON            |
+| CMC_ENABLE_ALL_WARNINGS | OFF           |
 
-Now, we have created a configure script. Move into the directory in which CMC is ought to be built.  
-For the next steps, suppose we want to build it in the directory `~/cmc_build`.  
+Additional `<lib>_DIR`, `<lib>_ROOT` or `<lib>_ROOT_DIR` might help CMake to find the correct dependencies.
 
-Therefore, we need to call the freshly created `configure` script from the directory `~/cmc_build`.  
+A configuration with t8code and MPI may look similar to
 ```
-../cmc/configure [OPTIONS]
-```
-Common options for the configuration are `--enable-debug`, `--enable-mpi`, `--with-netcdf`.  
-A quick start may look like 
-```
-../cmc/configure --enable-mpi --with-netcdf
-```
-Please take a look at the configuration help for a complete list of available options,  
-```
-../cmc/configure --help
+CC=mpicc CXX=mpicxx cmake -DCMAKE_BUILD_TYPE=Release -DCMC_ENABLE_MPI=ON -DCMC_WITH_T8CODE=ON -DT8CODE_DIR:PATH=<t8code_install_directory>/cmake -DP4EST_DIR:PATH=<t8code_install_directory>/cmake -DSC_DIR:PATH=<t8code_install_directory>/cmake -DCMAKE_INSTALL_PREFIX=<cmc_install_directory> ../cmc
 ```
 
-### Building of CMC  
-
-In order to build the software with the previously configured options, we will need to call  
+In order to quickly test the patch-based compression approaches, the configuration may look like:
 ```
-make -j
+cmake -DCMAKE_BUILD_TYPE=Release -DCMC_WITH_T8CODE=OFF -DCMC_ENABLE_MPI=OFF ../cmc
 ```
 
-### Testing
+After the configuration the available options are summarized and displayed.
 
-After the compilation, we are able to verify the 'installed' software by building and running it's 'test'-target
+In order to build cmc with CMake
 ```
-make check -j
+cmake --build .
+```
+might be called, and optionally it might be installed by
+```
+cmake --install .
 ```
 
-If all checks have passed, the software is good to use, otherwise please verify the availabilty of all dependencies or reach out to us via GitHub [CMC](https://github.com/DLR-AMR/cmc).
+Afterwards, the supplied tests may be executed with
+```
+ctest
+```
