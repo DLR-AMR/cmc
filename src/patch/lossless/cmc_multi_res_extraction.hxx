@@ -101,11 +101,14 @@ CompressionVariable<T, DIM>::Compress()
     }
 }
 
+constexpr bool kChooseBestPredictor = false;
 
 template <ArithmeticType T, int32_t DIM>
 requires Dimension<DIM>
 std::pair<T, PatchEncoding<T, DIM>>
 PerformExtraction(const std::array<T, kPackSize<DIM>> patch_data, const int num_values)
+{
+if constexpr (kChooseBestPredictor)
 {
     cmc_assert(num_values >= 1 && num_values <= kPackSize<DIM>);
     [[assume(num_values >= 1 && num_values <= kPackSize<DIM>)]];
@@ -148,7 +151,7 @@ PerformExtraction(const std::array<T, kPackSize<DIM>> patch_data, const int num_
         }
 
         /* Compute the cumulative leading zero count */
-        const int cumulative_lzc = std::transform_reduce(std::execution::par_unseq, current_residuals.residuals.cbegin(), std::next(current_residuals.residuals.cbegin(), num_values), static_cast<int>(0),
+        const int cumulative_lzc = std::transform_reduce(current_residuals.residuals.cbegin(), std::next(current_residuals.residuals.cbegin(), num_values), static_cast<int>(0),
                                                          std::plus<>{}, [](auto res){return cmc::bits::GetLZC(res);});
 
         /* If the predictor maximizes the LZC, we store it */
@@ -162,6 +165,44 @@ PerformExtraction(const std::array<T, kPackSize<DIM>> patch_data, const int num_
     }
 
     return std::make_pair(lzc_maximizing_predictor, patch_coding);
+} else
+{
+    /* Always choose the first family member as a predictor */
+    cmc_assert(num_values >= 1 && num_values <= kPackSize<DIM>);
+    [[assume(num_values >= 1 && num_values <= kPackSize<DIM>)]];
+
+    if (num_values == 1) [[unlikely]]
+    {
+        PatchEncoding<T, DIM> zero_coding;
+        zero_coding.entropy_symbols[0] = CreateEntropySymbol(false, TransformToUInteger<T>(0));
+        zero_coding.residuals[0] = 0;
+        zero_coding.num_elements = 1;
+        return std::make_pair(patch_data[0], std::move(zero_coding));
+    }
+
+    const T predictor = patch_data[0];
+
+    PatchEncoding<T, DIM> patch_coding;
+    patch_coding.num_elements = num_values;
+
+    patch_coding.entropy_symbols[0] = static_cast<SymbolType>(sizeof(T) * cmc::bits::kCharBit);
+    patch_coding.residuals[0] = T{};
+
+    /* Check the predictor for all element values */
+    for (int elem_idx{1}; elem_idx < num_values; ++elem_idx)
+    {
+        /* Compute the residual */
+        const auto [is_approx_greater, residual] = cmc::bits::ComputeIntegerResidual<T>(predictor, patch_data[elem_idx]);
+        
+        /* Store the entropy code */
+        patch_coding.entropy_symbols[elem_idx] = CreateEntropySymbol(is_approx_greater, residual);
+        
+        /* Store the residual */
+        patch_coding.residuals[elem_idx] = residual;
+    }
+
+    return std::make_pair(predictor, patch_coding);
+}
 }
 
 template <ArithmeticType T, int32_t DIM>
