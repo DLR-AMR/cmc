@@ -116,5 +116,10 @@ install(FILES
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossless
 )
 
+install(FILES
+    amr/mesh/cmc_amr_mesh_compressor.hxx
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/mesh
+)
+
 #End if configured with t8code and MPI
 endif()
