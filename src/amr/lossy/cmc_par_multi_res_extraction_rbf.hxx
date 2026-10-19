@@ -4,7 +4,7 @@
 #include "cmc.hxx"
 #include "amr/lossy/cmc_par_multi_res_extraction_util.hxx"
 #include "amr/lossy/cmc_par_multi_res_error_mesh.hxx"
-#include "amr/lossy/cmc_par_multi_res_interpolation_util.hxx"
+#include "amr/lossy/cmc_par_multi_res_rbf_interpolation_util.hxx"
 #include "mpi/cmc_mpi.hxx"
 #include "t8code/cmc_t8_mesh.hxx"
 #include "t8code/cmc_t8_adaptation_callbacks.hxx"
@@ -16,7 +16,7 @@
 #include <span>
 #include <filesystem>
 
-namespace cmc::par::lossy::multi_res
+namespace cmc::par::lossy::multi_res::rbf
 {
 
 /* A switch to write out intermediate data during the compression */
@@ -627,8 +627,8 @@ LossyMultiResCompression (t8_forest_t forest,
                           const t8_eclass_t tree_class,
                           t8_locidx_t lelement_id,
                           const t8_scheme_c * ts,
-                          const int is_family,
-                          const int num_elements,
+                          [[maybe_unused]] const int is_family,
+                          [[maybe_unused]]  const int num_elements,
                           t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
@@ -637,8 +637,6 @@ LossyMultiResCompression (t8_forest_t forest,
     
     /* Compute the start offset in the local contiguous array of the data*/
     const int local_start_index = t8_forest_get_tree_element_offset (forest_from, which_tree) + lelement_id;
-
-    const int global_elem_idx = t8_forest_get_first_local_leaf_element_id(forest_from) + local_start_index;
 
     /* Check if the current element will be refined/performs a prediction */
     if (adapt_data->WillNextElementBeRefined())

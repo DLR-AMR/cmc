@@ -16,7 +16,7 @@
 #include <span>
 #include <filesystem>
 
-namespace cmc::par::lossy::multi_res
+namespace cmc::par::lossy::multi_res::rbf
 {
 
 /* Switch to write out intermediate data from the decompression steps */
@@ -313,7 +313,7 @@ PrintCompressionInfo(const std::vector<uint64_t>& encoded_preamble, const std::s
     }
     cmc_global_msg("\t Partition Table Byte Count: ", info.partition_table_size, " bytes");
 
-    for (int lvl_idx{0}; lvl_idx < info.mesh_compression_levels; ++lvl_idx)
+    for (SizeType lvl_idx{0}; lvl_idx < info.mesh_compression_levels; ++lvl_idx)
     {
         const int offset = 15 + info.global_level_bytes.size() + info.global_num_elem_indications_step.size() +
                           (kNumCharsVariableName * sizeof(char) + lvl_idx * info.compression_comm_size * 2 * sizeof(SizeType)) / sizeof(uint64_t);
@@ -1361,8 +1361,8 @@ LossyMultiResDecompression (t8_forest_t forest,
                             const t8_eclass_t tree_class,
                             t8_locidx_t lelement_id,
                             const t8_scheme_c * ts,
-                            const int is_family,
-                            const int num_elements,
+                            [[maybe_unused]] const int is_family,
+                            [[maybe_unused]] const int num_elements,
                             t8_element_t * elements[])
 {
     /* Retrieve the adapt_data */
@@ -1907,12 +1907,9 @@ std::pair<t8_forest_t, std::vector<T>>
 DecompressionVariableMultiData<T, DIM, N>::GetDecompressedData()
 {
     t8_forest_t mesh = mesh_.GetMesh();
-    const int num_local_elements = t8_forest_get_local_num_leaf_elements(mesh);
     mesh_.SetNullMesh();
     std::vector<T> decompressed_data{};
     std::swap(decompressed_data, this->data_);
-    /* Remove the ghost data */
-    //decompressed_data.resize(num_local_elements);
     return std::make_pair(mesh, std::move(decompressed_data));
 }
 
