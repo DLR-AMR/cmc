@@ -42,7 +42,7 @@ set_target_properties(cmc PROPERTIES OUTPUT_NAME cmc)
 
 # Set C and C++ standard for compilations
 target_compile_features(cmc PUBLIC c_std_11 cxx_std_23)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set a default build type if none was specified

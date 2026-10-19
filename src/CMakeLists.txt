@@ -33,7 +33,7 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utilities
 
 install(FILES
     patch/lossless/cmc_multi_res_extraction.hxx 
-    patch/lossless/cmc_patch_multi_res_extraction_util.hxx 
+    patch/lossless/cmc_multi_res_util.hxx 
     patch/lossless/cmc_multi_res_decompression.hxx 
     patch/lossless/cmc_fast_multi_res_extraction.hxx 
     patch/lossless/cmc_fast_multi_res_decompression.hxx 
@@ -50,7 +50,7 @@ install(FILES
     patch/lossy/cmc_multi_res_decompression_rbf.hxx 
     patch/lossy/cmc_multi_res_extraction_rbf_2d_ext.hxx 
     patch/lossy/cmc_multi_res_decompression_rbf_2d_ext.hxx 
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossless
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/patch/lossy
 )
 
 ######## WITH MPI
@@ -86,23 +86,23 @@ endif()
 if (CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
 # Lossy AMR compressor needs MPI and t8code
 install(FILES
-    amr/lossy/cmc_ac_compression_variable.hxx 
-    amr/lossy/cmc_adaptive_coarsening.hxx 
-    amr/lossy/cmc_simul_ac_compression_variable.hxx 
-    amr/lossy/cmc_simul_adaptive_coarsening.hxx 
-    amr/lossy/cmc_byte_compression_variable.hxx 
-    amr/lossy/cmc_multi_res_trimmed_residuals.hxx 
     amr/lossy/cmc_par_multi_res_extraction_util.hxx 
-    amr/lossy/cmc_par_multi_res_extraction.hxx 
-    amr/lossy/cmc_par_multi_res_decompression.hxx 
+    amr/lossy/cmc_par_multi_res_extraction_rbf.hxx 
+    amr/lossy/cmc_par_multi_res_decompression_rbf.hxx 
     amr/lossy/cmc_par_multi_res_error_mesh.hxx 
+    amr/lossy/cmc_par_multi_res_rbf_interpolation_util.hxx 
     amr/lossy/cmc_par_multi_res_idw_interpolation_util.hxx 
     amr/lossy/cmc_par_multi_res_extraction_idw.hxx 
     amr/lossy/cmc_par_multi_res_decompression_idw.hxx
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy
+)
+
+# Lossy AMR compressor needs MPI and t8code
+install(FILES
     amr/lossy/trixi/cmc_par_multi_res_extraction_idw.hxx 
     amr/lossy/trixi/cmc_par_multi_res_decompression_idw.hxx 
     amr/lossy/trixi/cmc_par_multi_res_util.hxx 
-DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossy/trixi
 )
 
 # Lossless AMR compressor needs MPI and t8code 
@@ -118,7 +118,16 @@ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/lossless
 
 install(FILES
     amr/mesh/cmc_amr_mesh_compressor.hxx
+    amr/mesh/cmc_amr_mesh_decompressor.hxx
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/amr/mesh
+)
+
+# Install some convenience headers 
+install(FILES
+    cmc_amr_lossless_compression.hxx 
+    cmc_amr_lossy_compression.hxx 
+    cmc_amr_mesh_compression.hxx 
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 #End if configured with t8code and MPI
