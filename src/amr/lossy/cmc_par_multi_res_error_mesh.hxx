@@ -105,7 +105,7 @@ ErrorMesh::ErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& erro
 template <typename T>
 ErrorMesh::ErrorMesh(t8_forest_t init_mesh, const std::vector<ErrorDomain>& error_domains, const std::span<T>& init_data, const int num_data_per_elem)
 {
-    cmc_assert(t8_forest_get_local_num_leaf_elements(init_mesh) * num_data_per_elem == init_data.size());
+    cmc_assert(t8_forest_get_local_num_leaf_elements(init_mesh) * num_data_per_elem == static_cast<int64_t>(init_data.size()));
     /* Construct the error mesh from multiple data per element and serialize it */
     this->CreateErrorMesh(init_mesh, error_domains, init_data, num_data_per_elem);
 }

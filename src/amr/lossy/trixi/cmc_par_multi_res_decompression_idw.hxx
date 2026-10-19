@@ -1445,9 +1445,9 @@ LossyMultiResDecompression (t8_forest_t forest,
                             const t8_eclass_t tree_class,
                             t8_locidx_t lelement_id,
                             const t8_scheme_c * ts,
-                            const int is_family,
-                            const int num_elements,
-                            t8_element_t * elements[])
+                            [[maybe_unused]] const int is_family,
+                            [[maybe_unused]] const int num_elements,
+                            t8_element_t* elements[])
 {
     /* Retrieve the adapt_data */
     RefinementIterationData<T, DIM>* adapt_data = static_cast<RefinementIterationData<T, DIM>*>(t8_forest_get_user_data(forest));

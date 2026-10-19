@@ -928,7 +928,7 @@ ComputeElementEncoding(const std::span<T> init_data)
                 predictors[pack_idx] = predictor;
 
                 /* Store the residuals */
-                std::copy_n(residuals.data(), kPackSize<DIM>, &(elem_coding.residuals[elem_idx]));                                
+                std::copy_n(residuals.data(), kPackSize<DIM>, &(elem_coding.residuals[elem_idx]));
 
                 /* Store the entropy codes */
                 std::copy_n(entropy_codes.data(), kPackSize<DIM>, &(elem_coding.entropy_codes[elem_idx]));

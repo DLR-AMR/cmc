@@ -4,7 +4,6 @@
 #include "cmc.hxx"
 #include "patch/lossy/cmc_multi_res_util.hxx"
 #include "utilities/cmc_compression_schema.hxx"
-#include "utilities/cmc_idw_interpolation_util.hxx"
 #include "utilities/cmc_bits_stream_decoder.hxx"
 
 #include <string>

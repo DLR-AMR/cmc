@@ -1,7 +1,6 @@
 #include "cmc.hxx"
 #include "test/cmc_test.hxx"
-#include "amr/mesh/cmc_amr_mesh_compressor.hxx"
-#include "amr/mesh/cmc_amr_mesh_decompressor.hxx"
+#include "cmc_amr_mesh_compression.hxx"
 
 #include <t8_cmesh/t8_cmesh_examples.h>
 #include <t8_schemes/t8_default/t8_default.hxx>

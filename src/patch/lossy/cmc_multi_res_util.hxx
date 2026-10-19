@@ -3,7 +3,7 @@
 
 #include "cmc.hxx"
 #include "utilities/cmc_log_functions.hxx"
-#include "amr/lossy/cmc_par_multi_res_interpolation_util.hxx"
+#include "amr/lossy/cmc_par_multi_res_rbf_interpolation_util.hxx"
 
 #include <cmath>
 #include <string>

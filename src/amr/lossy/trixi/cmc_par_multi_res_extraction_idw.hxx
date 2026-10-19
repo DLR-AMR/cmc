@@ -49,7 +49,7 @@ public:
     CompressionVariableMultiData() = delete;
     CompressionVariableMultiData(std::string name, t8_forest_t forest, const std::span<T> data, const std::vector<ErrorDomain>& error_domains, const std::vector<cmc::util::idw::Coordinate<DIM>>& reference_coordinates = std::vector<cmc::util::idw::Coordinate<DIM>>(1))
     : name_(name), mesh_(forest), init_data_(data), error_domains_(error_domains), reference_coordinates_(reference_coordinates) {
-        if (integral_pow<static_cast<uint32_t>(DIM)>(N) != reference_coordinates_.size())
+        if (integral_pow<static_cast<uint32_t>(DIM)>(N) != static_cast<int>(reference_coordinates_.size()))
         {
             cmc_err_msg("The number of reference coordinates does not match the expected number of data points per element.");
         }
@@ -761,7 +761,7 @@ CompressionVariableMultiData<T, DIM, N>::CollectIntraElementPredictionPyramid(co
     /* In case more than a single value is given on each element */
     if constexpr (N > 1)
     {
-        cmc_assert(this->init_data_.size() == num_local_mesh_elems * integral_pow<DIM>(N));
+        cmc_assert(static_cast<int64_t>(this->init_data_.size()) == num_local_mesh_elems * integral_pow<DIM>(N));
 
         /* Store the initial data in the data pyramid */
         std::vector<T> initial_data;
@@ -785,8 +785,6 @@ CompressionVariableMultiData<T, DIM, N>::CollectIntraElementPredictionPyramid(co
 
             for (int elem_idx{0}; elem_idx < num_local_mesh_elems; ++elem_idx)
             {
-                int32_t intra_elem_control_value_offset{0};
-
                 /* Add the control values from this element to the prediction data */
                 for (int idx{0}; idx < kNumIntraElemControlValues<DIM>; ++idx)
                 {

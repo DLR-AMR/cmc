@@ -38,18 +38,18 @@ template <uint32_t P>
 constexpr int32_t
 integral_pow(const int32_t base)
 {
-    if constexpr (P == 0)
+    if constexpr (P == 0U)
     {
         return 1;
     }
-    if constexpr (P == 1)
+    if constexpr (P == 1U)
     {
         return base;
     }
 
     const int temp = integral_pow<P / 2>(base);
 
-    if constexpr (P % 2 == 0)
+    if constexpr (P % 2U == 0)
     {
         return temp * temp;
     } else
@@ -105,7 +105,6 @@ template <int32_t DIM, int32_t N>
 requires Dimension<DIM>
 constexpr int kNumInitDataPredictions = std::max(kGetNumPointsPerElement<DIM, N>() - GetNumIntraElemControlValues<DIM>(), 0);
 
-
 template<int32_t DIM, int32_t N>
 requires Dimension<DIM>
 constexpr
@@ -129,9 +128,6 @@ inline std::array<int, kNumInitDataPredictions<DIM, N>>
 GetPredictionReferenceCoordinates()
 {
     std::array<int, kNumInitDataPredictions<DIM, N>> coords_indices{};
-
-    /* Get the control value indices */
-    constexpr std::array<int, kNumIntraElemControlValues<DIM>> control_value_indices = GetControlValueIndices<DIM, N>();
 
     /* Iterate over all element indices */
     constexpr int kNumElemPoints = kGetNumPointsPerElement<DIM, N>();

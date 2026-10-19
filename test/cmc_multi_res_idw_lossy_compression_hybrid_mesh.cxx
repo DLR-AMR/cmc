@@ -102,13 +102,10 @@ CreateInitData(const t8_forest_t mesh)
     std::vector<float> data;
     data.reserve(num_elems);
 
-    const t8_scheme *scheme = t8_forest_get_scheme (mesh);
-
     t8_locidx_t num_trees = t8_forest_get_num_local_trees (mesh);
 
-    for (t8_locidx_t itree = 0, idata = 0; itree < num_trees; itree++)
+    for (t8_locidx_t itree = 0; itree < num_trees; itree++)
     {
-        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, itree);
         t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, itree);
 
         for (t8_locidx_t ielement = 0; ielement < num_elems_in_tree; ielement++)
@@ -298,7 +295,7 @@ main(void)
         int count_error{0};
 
         /* Compare the initial and decompressed data */
-        for (int idx{0}; idx < data.size(); ++idx)
+        for (size_t idx{0}; idx < data.size(); ++idx)
         {
             /* Compute the permitted minumum absolute deviation from the error criteria */
             const float rel_abs_dev = std::abs(data[idx] * kRelMaxError);

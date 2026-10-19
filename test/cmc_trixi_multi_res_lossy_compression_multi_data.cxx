@@ -90,7 +90,7 @@ TestAdapt ([[maybe_unused]] t8_forest_t forest,
            t8_forest_t forest_from,
            t8_locidx_t which_tree,
            [[maybe_unused]] const t8_eclass_t tree_class,
-           t8_locidx_t lelement_id,
+           [[maybe_unused]] t8_locidx_t lelement_id,
            [[maybe_unused]] const t8_scheme_c * ts,
            const int is_family,
            [[maybe_unused]] const int num_elements,
@@ -157,18 +157,15 @@ CreateInitData(const t8_forest_t mesh)
     std::vector<float> data;
     data.reserve(num_elems * kNumPointsPerElem);
 
-    const t8_scheme *scheme = t8_forest_get_scheme (mesh);
+    const t8_locidx_t num_trees = t8_forest_get_num_local_trees (mesh);
 
-    t8_locidx_t num_trees = t8_forest_get_num_local_trees (mesh);
-
-    for (t8_locidx_t itree = 0, idata = 0; itree < num_trees; itree++)
+    for (t8_locidx_t itree = 0; itree < num_trees; itree++)
     {
-        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, itree);
-        t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, itree);
+        const t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, itree);
 
         for (t8_locidx_t ielement = 0; ielement < num_elems_in_tree; ielement++)
         {
-            const t8_element_t *element = t8_forest_get_leaf_element_in_tree (mesh, itree, ielement);
+            const t8_element_t* element = t8_forest_get_leaf_element_in_tree (mesh, itree, ielement);
 
             /* Evaluate the data for this element */
             std::array<float, kNumPointsPerElem> elem_data = EvalPoints(mesh, itree, element);
@@ -278,7 +275,7 @@ RepartitionMeshAndDataToInitialPartition(t8_forest_t decompr_forest, std::vector
 {
     const t8_locidx_t current_local_elems = t8_forest_get_local_num_leaf_elements(decompr_forest);
 
-    cmc::ExpectTrue(current_local_elems * cmc::test::lossy::multi_res::kNumPointsPerElem == decompressed_data_vec.size());
+    cmc::ExpectTrue(current_local_elems * cmc::test::lossy::multi_res::kNumPointsPerElem == static_cast<t8_locidx_t>(decompressed_data_vec.size()));
 
     /* Keep the not-partitioned forest */
     t8_forest_ref(decompr_forest);
@@ -486,7 +483,7 @@ main(void)
         int count_error{0};
 
         /* Compare the initial and decompressed data */
-        for (int idx{0}; idx < data.size(); ++idx)
+        for (size_t idx{0}; idx < data.size(); ++idx)
         {
             /* Compute the permitted minumum absolute deviation from the error criteria */
             const float rel_abs_dev = std::abs(data[idx] * kRelMaxError);

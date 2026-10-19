@@ -2,12 +2,12 @@
 #include "test/cmc_test.hxx"
 
 #include "mpi/cmc_mpi.hxx"
-#include "amr/lossless/cmc_par_multi_res_extraction_util.hxx"
+#include "amr/lossy/cmc_par_multi_res_extraction_util.hxx"
 #include "utilities/cmc_bits_stream_decoder.hxx"
 #include "utilities/cmc_huffman_coder.hxx"
 
-#include "amr/lossy/cmc_par_multi_res_extraction.hxx"
-#include "amr/lossy/cmc_par_multi_res_decompression.hxx"
+#include "amr/lossy/cmc_par_multi_res_extraction_rbf.hxx"
+#include "amr/lossy/cmc_par_multi_res_decompression_rbf.hxx"
 
 #include <t8_cmesh/t8_cmesh_examples.h>
 #include <t8_schemes/t8_default/t8_default.hxx>
@@ -100,13 +100,10 @@ CreateInitData(const t8_forest_t mesh)
     std::vector<float> data;
     data.reserve(num_elems);
 
-    const t8_scheme *scheme = t8_forest_get_scheme (mesh);
-
     t8_locidx_t num_trees = t8_forest_get_num_local_trees (mesh);
 
-    for (t8_locidx_t itree = 0, idata = 0; itree < num_trees; itree++)
+    for (t8_locidx_t itree = 0; itree < num_trees; itree++)
     {
-        const t8_eclass_t tree_class = t8_forest_get_tree_class (mesh, itree);
         t8_locidx_t num_elems_in_tree = t8_forest_get_tree_num_leaf_elements (mesh, itree);
 
         for (t8_locidx_t ielement = 0; ielement < num_elems_in_tree; ielement++)
@@ -182,7 +179,7 @@ main(void)
         //Compression
         {
         /* Perform the lossy compression with multiple data */
-        cmc::par::lossy::multi_res::CompressionVariable<float, DIM> variable("test_var", mesh, init_data, error_domains);
+        cmc::par::lossy::multi_res::rbf::CompressionVariable<float, DIM> variable("test_var", mesh, init_data, error_domains);
 
         /* Compress */
         variable.Compress();
@@ -195,13 +192,13 @@ main(void)
 
         //Decompression
         {
-        cmc::par::lossy::multi_res::ReadCompressionInfo(file_name);
+        cmc::par::lossy::multi_res::rbf::ReadCompressionInfo(file_name);
         
         /* Get the initial base mesh */
         const auto [cmesh, scheme] = cmc::test::GetInitCMeshAndScheme();
 
         /* Decompress the mesh and the data */
-        cmc::par::lossy::multi_res::DecompressionVariable<float, DIM> decompression_variable(file_name, MPI_COMM_WORLD, cmesh, scheme);
+        cmc::par::lossy::multi_res::rbf::DecompressionVariable<float, DIM> decompression_variable(file_name, MPI_COMM_WORLD, cmesh, scheme);
         decompression_variable.Decompress();
 
         /* Access the decompressed components */
@@ -219,7 +216,7 @@ main(void)
 
         int count_error{0};
         /* Compare the initial and decompressed data */
-        for (int idx{0}; idx < data.size(); ++idx)
+        for (size_t idx{0}; idx < data.size(); ++idx)
         {
             /* Compute the permitted minumum absolute deviation from the error criteria */
             const float rel_abs_dev = std::abs(data[idx] * kRelMaxError);

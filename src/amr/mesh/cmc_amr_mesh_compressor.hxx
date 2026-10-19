@@ -470,11 +470,11 @@ Compressor::CollectMeshEncodingOnTheRootRank(const std::vector<uint64_t>& global
         {
             mesh_encoding_vals += (elems_per_level[lvl_idx] / (sizeof(uint64_t) * cmc::bits::kCharBit) + (elems_per_level[lvl_idx] % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0));
         }
-        cmc_debug_msg("Num mesh encoding vals in collect on root: ", mesh_encoding_vals);
+
         /* Allocate mesh encoding */
         std::vector<uint64_t> global_mesh_encoding;
         global_mesh_encoding.reserve(mesh_encoding_vals);
-        cmc_debug_msg("in collect: mesh_encoding_vals: ", mesh_encoding_vals);
+
         std::vector<uint64_t> level_rank_offsets(this->comm_size_ - 1, 0);
 
         for (int lvl_idx{0}; lvl_idx < num_levels; ++lvl_idx)
@@ -541,7 +541,6 @@ ComputeGlobalMeshEncodingNumBytes(const std::vector<uint64_t>& global_elems_per_
     uint64_t num_vals{0};
     for (auto lvl_iter = global_elems_per_level.begin(); lvl_iter != global_elems_per_level.end(); ++lvl_iter)
     {
-        cmc_debug_msg("Global vals on level: ", *lvl_iter);
         num_vals += (*lvl_iter) / (sizeof(uint64_t) * cmc::bits::kCharBit) + ((*lvl_iter) % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
     }
     
@@ -575,7 +574,6 @@ Compressor::GenerateOuputStreams()
      * with an updated stream consisting of the variable header, partition table, huffman codes and level offsets, etc. */
     if (this->comm_rank_ == kRootRank)
     {
-        cmc_debug_msg("this->global_mesh_encoding_.size() * sizeof(uint64_t): ", this->global_mesh_encoding_.size() * sizeof(uint64_t));
         /* Compute the output file size */
         this->global_compressed_file_size_in_bytes_ = this->global_mesh_encoding_.size() * sizeof(uint64_t) + GetVarHeaderSize(num_partition_infos);
 
@@ -607,7 +605,7 @@ CheckMPIWriteCorrectness(const MPI_Status* status, const MPI_Datatype datatype, 
     MPICheckError(rv_check_write);
     if (elem_count_ != expected_num_elems)
     {
-        cmc_debug_msg("The expeceted number of bytes could not be written to the file.");
+        cmc_msg("The expeceted number of bytes could not be written to the file.");
         MPICheckError(MPI_ERR_COUNT);
     }
 }
