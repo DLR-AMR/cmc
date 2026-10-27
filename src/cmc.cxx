@@ -29,6 +29,9 @@ CmcInitialize(const bool initialization)
         return;
     }
 
+    CmcIsInitialized = true;
+    kInitializationScheme = initialization;
+    
     if (initialization == kMinimumInitialization)
     {
         #if CMC_ENABLE_DEBUG
@@ -61,9 +64,6 @@ CmcInitialize(const bool initialization)
     #else
     std::cout << "[cmc] cmc has been initialized." << std::endl; 
     #endif
-
-    CmcIsInitialized = true;
-    kInitializationScheme = initialization;
 }
 
 void
