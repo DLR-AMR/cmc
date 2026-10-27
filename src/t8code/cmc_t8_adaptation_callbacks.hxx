@@ -8,13 +8,9 @@
 #include <t8_forest/t8_forest_general.h>
 #endif
 
-#include <vector>
-#include <functional>
-
 namespace cmc::t8
 {
 
-//using AdaptationFn = t8_forest_adapt_t;
 typedef t8_forest_adapt_t AdaptationFn;
 
 /* Helper functions for return values during the t8code adaptation call */
