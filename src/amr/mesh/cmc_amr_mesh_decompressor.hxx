@@ -15,6 +15,8 @@
 namespace cmc::mesh
 {
 
+constexpr bool kWriteOutIntermediateDecompressionSteps = false;
+
 constexpr uint64_t kT8CodeSupportedMaxDimension = 3;
 constexpr uint64_t kT8CodeSupportedMaxRefinementLevel = 65;
 
@@ -353,6 +355,12 @@ Decompressor::ReconstructMesh(const int max_decompression_refinement_level)
         cmc_err_msg("The maximum decompression level cannot be negative!");
     }
 
+    // Potentially, write out the root level mesh
+    if constexpr (kWriteOutIntermediateDecompressionSteps)
+    {
+        t8_forest_write_vtk_ext (this->mesh_.GetMesh(), "cmc_mesh_decompression_step_0", 1, 1, 1, 1, 0, 0, 0, 0, NULL);
+    }
+
     /* Determine the number of compression steps */
     const int num_mesh_compression_levels = std::min(this->compression_info_.GetMeshRefinementSteps(), max_decompression_refinement_level);
 
@@ -386,6 +394,13 @@ Decompressor::ReconstructMesh(const int max_decompression_refinement_level)
 
         /* Store the partitioned mesh */
         mesh_.SetMesh(partitioned_forest);
+
+        // Potentially, write out the intermediate refined mesh
+        if constexpr (kWriteOutIntermediateDecompressionSteps)
+        {
+            const std::string vtk_prefix = "cmc_mesh_decompression_step_" + std::to_string(mesh_lvl + 1);
+            t8_forest_write_vtk_ext (this->mesh_.GetMesh(), vtk_prefix.c_str(), 1, 1, 1, 1, 0, 0, 0, 0, NULL);
+        }
 
         cmc_debug_msg("The mesh decompression step ", mesh_lvl," has been completed.");
     }
@@ -477,6 +492,8 @@ PrintMeshCompressionInfo(const std::string& file_name)
     MPICheckError(rv_remaining_bytes);
     CheckMPIReadCorrectness(&status, MPI_UINT64_T, num_data_to_read);
 
+    cmc_global_msg("mesh_compression_levels: ", mesh_compression_levels);
+
     /* Build up the vector containing the global number of elements on each level (from root to leaf level) */
     std::vector<uint64_t> num_global_elems_per_level;
     num_global_elems_per_level.reserve(mesh_compression_levels);
@@ -487,6 +504,8 @@ PrintMeshCompressionInfo(const std::string& file_name)
     {
         num_global_elems_per_level.push_back(cmc::bits::ConvertBigEndianToNativeEndianness<uint64_t>(remaining_vals[lvl_idx]));
         
+        cmc_global_msg("Num global elems per level: ", num_global_elems_per_level.back());
+
         if (previous_num_elems > num_global_elems_per_level.back()) [[unlikely]]
         {
             cmc_err_msg("The number of global elements on successive level cannot shrink (PREV_LVL: ", previous_num_elems, "; CURR_LVL: ", num_global_elems_per_level.back(), ")!");

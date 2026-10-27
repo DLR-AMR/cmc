@@ -17,6 +17,8 @@
 namespace cmc::mesh
 {
 
+constexpr bool kWriteOutIntermediateCompressionSteps = false;
+
 constexpr int kRootRank = 0;
 constexpr int kTagMeshEncoding = 1000;
 
@@ -46,8 +48,8 @@ public:
         this->mesh_dimension_ = t8_cmesh_get_dimension (cmesh);
     }
 
-    void CompressMeshStructure();
-    void WriteCompressedMeshStructure(const std::string& file_name);
+    void CompressMeshStructure(const bool enfore_strictly_level_wise_compression = false);
+    void WriteCompressedMeshStructure(const std::string& file_name, const bool block_mpi_processes_until_file_is_written = true);
     
     
     void SetMaximumInitialElementLevel(const int max_init_elem_level);
@@ -62,6 +64,7 @@ private:
     void AppendVariableHeaderToStream(std::vector<uint64_t>& stream, const int mesh_compression_levels);
     std::vector<std::vector<uint64_t>> AdjustLevelMeshEncodings(const std::vector<uint64_t>& partition_info, const int num_global_encoding_steps);
     void CollectMeshEncodingOnTheRootRank(const std::vector<uint64_t>& global_partition_info, const uint64_t num_global_encoding_steps, const std::vector<std::vector<uint64_t>>& offseted_level_mesh_encodings);
+    void InsertFileHeader(std::vector<uint64_t>& stream, const int mesh_compression_levels);
 
     /* The input mesh for the compression */
     AmrMesh mesh_;
@@ -155,7 +158,6 @@ Compressor::RepartitionMeshForCoarsening(t8_forest_t adapted_mesh)
     mesh_.SetMesh(partitioned_forest);
 }
 
-
 inline void
 Compressor::DetermineMaxInitElementLevel()
 {
@@ -233,20 +235,61 @@ CoarsenMeshLevelWise (t8_forest_t forest,
     }
 }
 
+inline t8_locidx_t
+CoarsenMesh (t8_forest_t forest,
+             [[maybe_unused]] t8_forest_t forest_from,
+             [[maybe_unused]] t8_locidx_t which_tree,
+             [[maybe_unused]] const t8_eclass_t tree_class,
+             [[maybe_unused]] t8_locidx_t lelement_id,
+             [[maybe_unused]] const t8_scheme_c* ts,
+             const int is_family,
+             [[maybe_unused]] const int num_elements,
+             [[maybe_unused]] t8_element_t * elements[])
+{
+    /* Retrieve the adapt_data */
+    CoarseningIterationData* adapt_data = static_cast<CoarseningIterationData*>(t8_forest_get_user_data(forest));
+    cmc_assert(adapt_data != nullptr);
+
+    /* Check if a family is supplied to the adaptation function */
+    if (is_family == 0)
+    {
+        /* If there is no family, the element stays unchanged */
+        adapt_data->LeaveElementUnchanged();
+        return cmc::t8::kLeaveElementUnchanged;
+    } else
+    {
+        /* Extract a value of the family and coarsen it */
+        adapt_data->PerformExtraction();
+        return cmc::t8::kCoarsenElements;
+    }
+}
+
 inline void
-Compressor::CompressMeshStructure()
+Compressor::CompressMeshStructure(const bool enfore_strictly_level_wise_compression)
 {
     cmc_debug_msg("The AMR mesh compression is performed.");
-    /* Potentially, gather the maximum present element level */
-    this->DetermineMaxInitElementLevel();
-    
-    /* Allocate for the expected levelwise data-streams */
-    this->coarsening_indications_.reserve(this->max_init_elem_level_ + 1);
+    if (enfore_strictly_level_wise_compression)
+    {
+        cmc_debug_msg("The mesh compression is performed strictly level-wise.");
+        /* Potentially, gather the maximum present element level if has not been set already */
+        this->DetermineMaxInitElementLevel();
+        /* Allocate for the expected levelwise data-streams */
+        this->coarsening_indications_.reserve(this->max_init_elem_level_ + 1);
+    } else
+    {
+        cmc_debug_msg("The mesh compression is performed as fast as possible disregarding a strictly level-wise compression.");
+    }
+
+    // Potentially, write out the leaf level mesh
+    if constexpr (kWriteOutIntermediateCompressionSteps)
+    {
+        t8_forest_write_vtk_ext (this->mesh_.GetMesh(), "cmc_mesh_compression_step_0", 1, 1, 1, 1, 0, 0, 0, 0, NULL);
+    }
 
     /* Potentially, perform partition for coarsening */
     if (not this->IsAlreadyPartitionedForCoarsening())
     {
-        this->RepartitionMeshForCoarsening(mesh_.GetMesh());
+        this->RepartitionMeshForCoarsening(this->mesh_.GetMesh());
     }
 
     /* We also store a partition info for the leaf level */
@@ -266,8 +309,11 @@ Compressor::CompressMeshStructure()
         CoarseningIterationData adapt_data(this->max_init_elem_level_, compression_step, num_global_elems, this->mesh_dimension_);
 
         // 2)  Adapt
+        /* Get the correct adaptation function pointer */
+        cmc::t8::AdaptationFn adapt_fn = (enfore_strictly_level_wise_compression ? CoarsenMeshLevelWise : CoarsenMesh);
+
         /* Perform a coarsening iteration */
-        t8_forest_t adapted_forest = t8_forest_new_adapt(mesh_.GetMesh(), CoarsenMeshLevelWise, 0, 0, static_cast<void*>(&adapt_data));
+        t8_forest_t adapted_forest = t8_forest_new_adapt(mesh_.GetMesh(), adapt_fn, 0, 0, static_cast<void*>(&adapt_data));
         cmc_debug_msg("The mesh adaptation step is finished; resulting in ", t8_forest_get_global_num_leaf_elements(adapted_forest), " global elements");
 
         // 3) Store data to be encoded later
@@ -279,15 +325,30 @@ Compressor::CompressMeshStructure()
         // 4) Repartition the mesh
         this->RepartitionMeshForCoarsening(adapted_forest);
 
+        // Potentially, write out the intermediate caorsened mesh
+        if constexpr (kWriteOutIntermediateCompressionSteps)
+        {
+            const std::string vtk_prefix = "cmc_mesh_compression_step_" + std::to_string(compression_step + 1);
+            t8_forest_write_vtk_ext (this->mesh_.GetMesh(), vtk_prefix.c_str(), 1, 1, 1, 1, 0, 0, 0, 0, NULL);
+        }
+
         cmc_debug_msg("This coarsening iteration is finished.");
         ++compression_step;
     }
 
-    for (const auto& nv : this->level_partitioning_info_)
+    cmc_debug_msg("The AMR mesh compression is completed.");
+}
+
+inline uint64_t
+ComputeGlobalMeshEncodingNumBytes(const std::vector<uint64_t>& global_elems_per_level)
+{
+    uint64_t num_vals{0};
+    for (auto lvl_iter = global_elems_per_level.begin(); lvl_iter != global_elems_per_level.end(); ++lvl_iter)
     {
-        cmc_debug_msg("NumElems on Lvl: ", nv);
+        num_vals += (*lvl_iter) / (sizeof(uint64_t) * cmc::bits::kCharBit) + ((*lvl_iter) % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
     }
-    cmc_debug_msg("The Amr mesh compression is completed.");
+    
+    return num_vals * sizeof(uint64_t);
 }
 
 inline uint64_t
@@ -303,7 +364,7 @@ GetVarHeaderSize(const int mesh_compression_levels)
            );
 }
 
-void
+[[maybe_unused]] inline void
 Compressor::AppendVariableHeaderToStream(std::vector<uint64_t>& stream, const int mesh_compression_levels)
 {
     /* Store the dimensionality */
@@ -327,6 +388,41 @@ Compressor::AppendVariableHeaderToStream(std::vector<uint64_t>& stream, const in
     /* Store the length of the global mesh encoding */
     cmc_assert(not this->global_mesh_encoding_.empty());
     stream.push_back(cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(this->global_mesh_encoding_.size() * sizeof(uint64_t))));
+}
+
+inline void
+Compressor::InsertFileHeader(std::vector<uint64_t>& stream, const int mesh_compression_levels)
+{
+    cmc_assert(stream.size() >= GetVarHeaderSize(mesh_compression_levels) / sizeof(uint64_t));
+
+    int offset{0};
+
+    /* Store the dimensionality */
+    stream[offset] = cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(this->mesh_dimension_));
+    ++offset;
+
+    /* Store the size of the MPI Communicator */
+    stream[offset] = cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(this->comm_size_));
+    ++offset;
+
+    /* Store the number of mesh compresion levels */
+    stream[offset] = cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(mesh_compression_levels));
+    ++offset;
+
+    /* Append the global num elements per level */
+    for (auto lvl_elem_iter = this->num_elements_per_level_.begin(); lvl_elem_iter != this->num_elements_per_level_.end(); ++lvl_elem_iter)
+    {
+        stream[offset] = cmc::bits::ConvertToBigEndian<uint64_t>(static_cast<uint64_t>(*lvl_elem_iter));
+        ++offset;
+    }
+
+    /* Push back the number of initial global mesh elements */
+    stream[offset] = cmc::bits::ConvertToBigEndian<uint64_t>(this->num_init_global_elements_);
+    ++offset;
+
+    /* Store the length of the global mesh encoding */
+    const uint64_t num_global_mesh_encoding_bytes = ComputeGlobalMeshEncodingNumBytes(this->num_elements_per_level_);
+    stream[offset] = cmc::bits::ConvertToBigEndian<uint64_t>(num_global_mesh_encoding_bytes);
 }
 
 inline std::vector<std::vector<uint64_t>>
@@ -361,8 +457,6 @@ Compressor::AdjustLevelMeshEncodings(const std::vector<uint64_t>& partition_info
 
         /* Get the offseted byte stream */
         offseted_level_mesh_encodings.emplace_back(this->coarsening_indications_[num_coarsening_encodings - 1 - lvl_idx].GetSerializedOffsetByteStreamBE(shift));
-
-        cmc_debug_msg("Size of offset stream: ", offseted_level_mesh_encodings.back().size());
     }
 
     return offseted_level_mesh_encodings;
@@ -377,7 +471,7 @@ ComputeGlobalMeshEncodingLength(const std::vector<uint64_t> global_elems_per_lev
         num_bytes += (*lvl_iter) / (sizeof(uint64_t) * cmc::bits::kCharBit) + ((*lvl_iter) % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
     }
 
-    cmc::cmc_debug_msg("Number of bytes for global mesh encoding: ", num_bytes);
+    cmc_debug_msg("Computed number of bytes for the global mesh encoding: ", num_bytes);
     
     return num_bytes;
 }
@@ -389,9 +483,12 @@ Compressor::CollectMeshEncodingOnTheRootRank(const std::vector<uint64_t>& global
     const int num_levels = this->coarsening_indications_.size();
     cmc_assert(num_levels == static_cast<int>(num_global_encoding_steps) - 1);
 
+    /* Number of mesh encoding steps */
+    const int num_partition_infos = static_cast<int>(this->coarsening_indications_.size() + 1);
+
     /* Allocate an output vector */
-    std::vector<uint64_t> elems_per_level;
-    elems_per_level.reserve(this->coarsening_indications_.size());
+    this->num_elements_per_level_.clear();
+    this->num_elements_per_level_.reserve(this->coarsening_indications_.size());
 
     cmc_assert(num_levels >= 1);
 
@@ -405,8 +502,8 @@ Compressor::CollectMeshEncodingOnTheRootRank(const std::vector<uint64_t>& global
             global_elems_level += global_partition_info[access_idx];
         }
 
-        elems_per_level.push_back(global_elems_level);
-        cmc_debug_msg("Level: ", lvl_idx, ", global elems: ", global_elems_level);
+        this->num_elements_per_level_.push_back(global_elems_level);
+        cmc_debug_msg("On level: ", lvl_idx, ", number of global elements: ", global_elems_level);
     }
 
     if (this->comm_rank_ != kRootRank)
@@ -428,15 +525,44 @@ Compressor::CollectMeshEncodingOnTheRootRank(const std::vector<uint64_t>& global
         }
 
         /* Send the message to the root rank */
-        const int rv_send = MPI_Send(message.data(), message.size(), MPI_UINT64_T, kRootRank, kTagMeshEncoding, this->comm_);
+        const int rv_send = MPI_Ssend(message.data(), message.size(), MPI_UINT64_T, kRootRank, kTagMeshEncoding, this->comm_);
         MPICheckError(rv_send);
     } else
     {
-        /* Allocate a vector collecting the messages from the other ranks */
+        /* Compute the number of bytes for the global level-wise mesh encoding */
+        uint64_t mesh_encoding_vals{0};
+        for (int lvl_idx{0}; lvl_idx < num_levels; ++lvl_idx)
+        {
+            mesh_encoding_vals += (this->num_elements_per_level_[lvl_idx] / (sizeof(uint64_t) * cmc::bits::kCharBit) + (this->num_elements_per_level_[lvl_idx] % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0));
+        }
+
+        /* Compute the size of the file header */
+        const uint64_t var_header_size_vals = GetVarHeaderSize(num_partition_infos) / sizeof(uint64_t);
+
+        /* Allocate the encoded output stream on the root rank */
+        std::vector<uint64_t> global_encoding(mesh_encoding_vals + var_header_size_vals, uint64_t{0});
+
+        /* Write the variable header to the stream */
+        this->InsertFileHeader(global_encoding, num_partition_infos);
+
+        /* The mesh encoding starts directly after the variable header */
+        uint64_t root_rank_encoding_offset = var_header_size_vals;
+
+        /* Write the root-local mesh encodings per level to the stream */
+        for (int lvl_idx{0}; lvl_idx < num_levels; ++lvl_idx)
+        {
+            /* Copy the root-local part into the global mesh encoding */
+            std::copy_n(offseted_level_mesh_encodings[lvl_idx].begin(), offseted_level_mesh_encodings[lvl_idx].size(), std::next(global_encoding.begin(), root_rank_encoding_offset));
+
+            /* Update the write offset */
+            root_rank_encoding_offset += this->num_elements_per_level_[lvl_idx] / (sizeof(uint64_t) * cmc::bits::kCharBit) + (this->num_elements_per_level_[lvl_idx] % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
+        }
+
+        /* Compute the number of expected messages */
         const int num_expected_msgs = this->comm_size_ - 1;
 
-        std::vector<std::vector<uint64_t>> recv_messages(num_expected_msgs);
-        recv_messages.reserve(num_expected_msgs);
+        /* Declare a vector to receive the messages */
+        std::vector<uint64_t> recv_msg;
 
         /* Receive all messages from the other ranks collecting their process-local mesh encoding for all levels */
         for (int msg_idx{0}; msg_idx < num_expected_msgs; ++msg_idx)
@@ -455,96 +581,74 @@ Compressor::CollectMeshEncodingOnTheRootRank(const std::vector<uint64_t>& global
             MPICheckError(rv_count);
 
             /* Allocate the vector */
-            recv_messages[source_rank - 1] = std::vector<uint64_t>(num_elements);
+            recv_msg = std::vector<uint64_t>(num_elements);
 
             /* Receive the message */
-            const int rv_recv = MPI_Recv(recv_messages[source_rank - 1].data(), num_elements, MPI_UINT64_T, source_rank, kTagMeshEncoding, this->comm_, MPI_STATUS_IGNORE);
+            const int rv_recv = MPI_Recv(recv_msg.data(), num_elements, MPI_UINT64_T, source_rank, kTagMeshEncoding, this->comm_, MPI_STATUS_IGNORE);
             MPICheckError(rv_recv);
-        }
-        
-        /* After all expeceted messages have been received, we process them and create the global level-wise mesh encoding */
 
-        /* Compute the number of bytes for the global level-wise mesh encoding */
-        uint64_t mesh_encoding_vals{0};
-        for (int lvl_idx{0}; lvl_idx < num_levels; ++lvl_idx)
-        {
-            mesh_encoding_vals += (elems_per_level[lvl_idx] / (sizeof(uint64_t) * cmc::bits::kCharBit) + (elems_per_level[lvl_idx] % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0));
-        }
+            uint64_t global_start_offset{var_header_size_vals};
+            uint64_t intra_msg_offset{0};
 
-        /* Allocate mesh encoding */
-        std::vector<uint64_t> global_mesh_encoding;
-        global_mesh_encoding.reserve(mesh_encoding_vals);
-
-        std::vector<uint64_t> level_rank_offsets(this->comm_size_ - 1, 0);
-
-        for (int lvl_idx{0}; lvl_idx < num_levels; ++lvl_idx)
-        {
-            uint64_t current_elem_offset{0};
-
-            /* Copy the root-local part into the global mesh encoding */
-            std::copy_n(offseted_level_mesh_encodings[lvl_idx].begin(), offseted_level_mesh_encodings[lvl_idx].size(), std::back_inserter(global_mesh_encoding));
-
-            cmc_assert(not global_mesh_encoding.empty());
-            if (global_mesh_encoding.empty()) [[unlikely]] {global_mesh_encoding.push_back(uint64_t{0});}
-            
-            /* Update the offset by the root local elements */
-            current_elem_offset += global_partition_info[lvl_idx];
-
-            /* Iterate over the root level from all other ranks and append their encodings */
-            for (int rank_idx{1}; rank_idx < this->comm_size_; ++rank_idx)
+            /* Processs the message */
+            for (int lvl_idx{0}; lvl_idx < num_levels; ++lvl_idx)
             {
-                const int access_idx = rank_idx * num_global_encoding_steps + lvl_idx;
+                uint64_t current_elem_offset{0};
+                /* Iterate over the level from all other ranks and append their encodings */
+                for (int rank_idx{0}; rank_idx < source_rank; ++rank_idx)
+                {
+                    /* Compute the access index for this level on this rank */
+                    const int access_idx = rank_idx * num_global_encoding_steps + lvl_idx;
 
-                const uint64_t lvl_rank_num_elems = global_partition_info[access_idx];
+                    /* Get the number of bits/elements on this level for this rank */
+                    const uint64_t lvl_other_rank_num_elems = global_partition_info[access_idx];
+
+                    /* Update the element offset */
+                    current_elem_offset += lvl_other_rank_num_elems;
+                }
+
+                /* Now, we have reached the correct offset for this rank's message on this level */
+                const int rank_access_idx = source_rank * num_global_encoding_steps + lvl_idx;
+                const uint64_t lvl_rank_num_elems = global_partition_info[rank_access_idx];
 
                 if (lvl_rank_num_elems > 0) [[likely]]
                 {
                     const uint64_t lvl_rank_bits = lvl_rank_num_elems + (current_elem_offset % (sizeof(uint64_t) * cmc::bits::kCharBit));
-                    uint64_t start_idx{0};
-                    uint64_t num_vals_to_copy = lvl_rank_bits / (sizeof(uint64_t) * cmc::bits::kCharBit) + (lvl_rank_bits % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
+                    const uint64_t num_vals_to_copy = lvl_rank_bits / (sizeof(uint64_t) * cmc::bits::kCharBit) + (lvl_rank_bits % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
 
-                    /* Check whether we need to interleave the first value */
-                    if (current_elem_offset % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0) [[likely]]
+                    const uint64_t global_encoding_start_offset = global_start_offset + current_elem_offset / (sizeof(uint64_t) * cmc::bits::kCharBit);
+
+                    /** To ensure correctness, we always need to interleave the first and the last value in order to not overwrite the contents from the other ranks **/
+                    /* Interleave the first value */
+                    global_encoding[global_encoding_start_offset] |= recv_msg[intra_msg_offset];
+
+                    /* Copy the intermediate values between start and end */
+                    if (num_vals_to_copy >= 3)
                     {
-                        /* Interleave the first byte */
-                        global_mesh_encoding.back() |= recv_messages[rank_idx - 1].operator[](level_rank_offsets[rank_idx - 1]);
-                        start_idx = 1;
-                        --num_vals_to_copy;
+                        std::copy_n(&(recv_msg[intra_msg_offset + 1]), num_vals_to_copy - 2, std::next(global_encoding.begin(), global_encoding_start_offset + 1));
                     }
 
-                    if (num_vals_to_copy > 0) [[likely]]
+                    /* Interleave the last value */
+                    if (num_vals_to_copy >= 2)
                     {
-                        /* Copy the remaining bytes over */
-                        std::copy_n(&(recv_messages[rank_idx - 1].operator[](level_rank_offsets[rank_idx - 1] + start_idx)), num_vals_to_copy, std::back_inserter(global_mesh_encoding));
+                        global_encoding[global_encoding_start_offset + num_vals_to_copy - 1] |= recv_msg[intra_msg_offset + num_vals_to_copy - 1];
                     }
 
                     /* Update the element offset */
                     current_elem_offset += lvl_rank_num_elems;
 
-                    /* Store the offset of this rank for the next level */
-                    level_rank_offsets[rank_idx - 1] += (lvl_rank_bits / (sizeof(uint64_t) * cmc::bits::kCharBit) + (lvl_rank_bits % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0));
+                    /* Update the intra msg offset for the next level */
+                    intra_msg_offset += (lvl_rank_bits / (sizeof(uint64_t) * cmc::bits::kCharBit) + (lvl_rank_bits % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0));
                 }
+
+                /* Update the offset to the start of the next level */
+                global_start_offset += this->num_elements_per_level_[lvl_idx] / (sizeof(uint64_t) * cmc::bits::kCharBit) + (this->num_elements_per_level_[lvl_idx] % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
             }
         }
-
-        /* Store the global mesh encoding on the root rank */
-        this->global_mesh_encoding_ = std::move(global_mesh_encoding);
+        
+        /* After all expeceted messages have been received and processed, the encoding is completed */
+        this->root_rank_compression_stream_ = std::move(global_encoding);
     }
-
-    /* Store the number of global elements per level */
-    this->num_elements_per_level_ = std::move(elems_per_level);
-}
-
-inline uint64_t
-ComputeGlobalMeshEncodingNumBytes(const std::vector<uint64_t>& global_elems_per_level)
-{
-    uint64_t num_vals{0};
-    for (auto lvl_iter = global_elems_per_level.begin(); lvl_iter != global_elems_per_level.end(); ++lvl_iter)
-    {
-        num_vals += (*lvl_iter) / (sizeof(uint64_t) * cmc::bits::kCharBit) + ((*lvl_iter) % (sizeof(uint64_t) * cmc::bits::kCharBit) != 0 ? 1 : 0);
-    }
-    
-    return num_vals * sizeof(uint64_t);
 }
 
 inline void
@@ -570,30 +674,12 @@ Compressor::GenerateOuputStreams()
     /* Collect the global level-wise mesh encoding on the root rank */
     this->CollectMeshEncodingOnTheRootRank(global_partition_info, num_partition_infos, offseted_level_mesh_encodings);
 
-    /* In case of the root rank, we need to exchange the root level encoding and offset,
-     * with an updated stream consisting of the variable header, partition table, huffman codes and level offsets, etc. */
+    /* Compute the global file sizes on all ranks */
+    this->global_compressed_file_size_in_bytes_ = ComputeGlobalMeshEncodingNumBytes(this->num_elements_per_level_) + GetVarHeaderSize(num_partition_infos);
+
     if (this->comm_rank_ == kRootRank)
     {
-        /* Compute the output file size */
-        this->global_compressed_file_size_in_bytes_ = this->global_mesh_encoding_.size() * sizeof(uint64_t) + GetVarHeaderSize(num_partition_infos);
-
-        /* Allocate a new vector which collects the start stream for the root rank */
-        std::vector<uint64_t> root_rank_start_stream;
-        root_rank_start_stream.reserve(this->global_mesh_encoding_.size() + (GetVarHeaderSize(num_partition_infos) / sizeof(uint64_t)));
-
-        /* Append the variable header */
-        this->AppendVariableHeaderToStream(root_rank_start_stream, num_partition_infos);
-
-        /* Append the mesh encoding */
-        std::copy_n(this->global_mesh_encoding_.begin(), this->global_mesh_encoding_.size(), std::back_inserter(root_rank_start_stream));
-
-        this->root_rank_compression_stream_ = std::move(root_rank_start_stream);
-
         cmc_assert(this->global_compressed_file_size_in_bytes_ == this->root_rank_compression_stream_.size() * sizeof(uint64_t));
-    } else
-    {
-        /* Compute the gloal file sizes on the other ranks as well */
-        this->global_compressed_file_size_in_bytes_ = ComputeGlobalMeshEncodingNumBytes(this->num_elements_per_level_) + GetVarHeaderSize(num_partition_infos);
     }
 }
 
@@ -605,54 +691,52 @@ CheckMPIWriteCorrectness(const MPI_Status* status, const MPI_Datatype datatype, 
     MPICheckError(rv_check_write);
     if (elem_count_ != expected_num_elems)
     {
-        cmc_msg("The expeceted number of bytes could not be written to the file.");
+        cmc_msg("The expeceted number of values could not be written to the file.");
         MPICheckError(MPI_ERR_COUNT);
     }
 }
 
 inline void
-Compressor::WriteCompressedMeshStructure(const std::string& file_name)
+Compressor::WriteCompressedMeshStructure(const std::string& file_name, const bool block_mpi_processes_until_file_is_written)
 {
     /* Generate the output streams for writing the data to disk */
     this->GenerateOuputStreams();
 
-    /* Check if the output file exists, if so, we delete it, since the preallcoation fails if the file already exists */
-    const std::filesystem::path output_file_path(file_name);
-    if (this->comm_rank_ == kRootRank && std::filesystem::exists(output_file_path))
-    {
-        const int rv_delete = MPI_File_delete(file_name.c_str(), MPI_INFO_NULL);
-        MPICheckError(rv_delete);
-    }
-
-    const int rv_barrier_delete = MPI_Barrier(this->comm_);
-    MPICheckError(rv_barrier_delete);
-
-    /* Allocate a MPI file handle */
-    MPI_File fhandle;
-
-    /* Open the file */
-    constexpr int opening_mode = MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL;
-    const int rv_open = MPI_File_open(this->comm_, file_name.c_str(), opening_mode, MPI_INFO_NULL, &fhandle);
-    MPICheckError(rv_open);
-
-    cmc_debug_msg(this->comm_, "The file ", file_name, " has been opened.");
-
-    /* Set the native data representation */
-    const int rv_file_view = MPI_File_set_view(fhandle, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
-    MPICheckError(rv_file_view);
-    
-    /* Pre-Allocate global file storage */
-    const uint64_t preallocation_size = this->global_compressed_file_size_in_bytes_;
-    cmc_debug_msg("File pre-allocation size: ", preallocation_size);
-    const int rv_file_prealloc = MPI_File_preallocate(fhandle, preallocation_size);
-    MPICheckError(rv_file_prealloc);
-    cmc_debug_msg("The file has been pre-allocated.");
-
-    /* Allocate an MPI status object */
-    MPI_Status status;
-
+    /* We write the file from the root rank only */
     if (this->comm_rank_ == kRootRank)
     {
+        /* Check if the output file exists, if so, we delete it, since the preallcoation fails if the file already exists */
+        const std::filesystem::path output_file_path(file_name);
+        if (std::filesystem::exists(output_file_path))
+        {
+            const int rv_delete = MPI_File_delete(file_name.c_str(), MPI_INFO_NULL);
+            MPICheckError(rv_delete);
+        }
+
+        /* Allocate a MPI file handle */
+        MPI_File fhandle;
+
+        /* Open the file */
+        constexpr int opening_mode = MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL;
+        const int rv_open = MPI_File_open(MPI_COMM_SELF, file_name.c_str(), opening_mode, MPI_INFO_NULL, &fhandle);
+        MPICheckError(rv_open);
+
+        cmc_debug_msg(MPI_COMM_SELF, "The file ", file_name, " has been opened.");
+
+        /* Set the native data representation */
+        const int rv_file_view = MPI_File_set_view(fhandle, 0, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
+        MPICheckError(rv_file_view);
+        
+        /* Pre-Allocate global file storage */
+        const uint64_t preallocation_size = this->global_compressed_file_size_in_bytes_;
+        cmc_debug_msg("File pre-allocation size: ", preallocation_size);
+        const int rv_file_prealloc = MPI_File_preallocate(fhandle, preallocation_size);
+        MPICheckError(rv_file_prealloc);
+        cmc_debug_msg("The file has been pre-allocated.");
+
+        /* Allocate an MPI status object */
+        MPI_Status status;
+
         cmc_assert(preallocation_size == this->root_rank_compression_stream_.size() * sizeof(uint64_t));
         /* Write out the single stream making up the whole compressed file */
         const int rv_pos_fhandle = MPI_File_seek(fhandle, 0, MPI_SEEK_SET);
@@ -662,16 +746,20 @@ Compressor::WriteCompressedMeshStructure(const std::string& file_name)
         const int rv_write_data_buffer = MPI_File_write(fhandle, this->root_rank_compression_stream_.data(), root_rank_compression_stream_.size(), MPI_UINT64_T, &status);
         MPICheckError(rv_write_data_buffer);
         CheckMPIWriteCorrectness(&status, MPI_UINT64_T, static_cast<int>(this->root_rank_compression_stream_.size()));
+        cmc_debug_msg("The file has been written.");
+
+        /* Close the file */
+        const int rv_close = MPI_File_close(&fhandle);
+        MPICheckError(rv_close);
+        cmc_debug_msg("The file ", file_name, " has been closed.");
     }
 
-    const int rv_barrier_close = MPI_Barrier(this->comm_);
-    MPICheckError(rv_barrier_close);
-
-    /* Close the file */
-    const int rv_close = MPI_File_close(&fhandle);
-    MPICheckError(rv_close);
-
-    cmc_debug_msg(this->comm_, "The file ", file_name, " has been closed.");
+    if (block_mpi_processes_until_file_is_written)
+    {
+        const int rv_barrier_wait_file_completion = MPI_Barrier(this->comm_);
+        MPICheckError(rv_barrier_wait_file_completion);
+        cmc_debug_msg(this->comm_, "The file ", file_name, " output has been completed.");
+    }
 }
 
 }
