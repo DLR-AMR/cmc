@@ -28,6 +28,15 @@ CmcInitialize(const bool initialization)
         std::cout << "[cmc] WARNING: cmc has already been initialized." << std::endl;
         return;
     }
+
+    if (initialization == kMinimumInitialization)
+    {
+        #if CMC_ENABLE_DEBUG
+        std::cout << "[cmc] cmc has been initialized." << std::endl;
+        #endif
+        return;
+    }
+
     #if CMC_ENABLE_MPI
     MPIInitialize();
 
@@ -66,6 +75,17 @@ CmcFinalize()
         return;
     }
 
+    CmcIsFinalized = true;
+    CmcIsInitialized = false;
+
+    if (kInitializationScheme == kMinimumInitialization)
+    {
+        #if CMC_ENABLE_DEBUG 
+        std::cout << "[cmc] cmc has been finalized." << std::endl;
+        #endif
+        return;
+    }
+
     #if CMC_ENABLE_MPI
     int err, rank;
     /* Get the rank of the process */
@@ -75,23 +95,20 @@ CmcFinalize()
     #if CMC_WITH_T8CODE
     if (kInitializationScheme)
     {
-       sc_finalize();
+        sc_finalize();
     }
     #endif
   
     MPIFinalize();
-  
-    /* Only print out the initilization info on rank zero */
+
+    /* Only print out the finalization info on rank zero */
     if (rank == 0)
     {
-      std::cout << "[cmc] cmc has been finalized." << std::endl;
+        std::cout << "[cmc] cmc has been finalized." << std::endl;
     }
     #else
     std::cout << "[cmc] cmc has been finalized." << std::endl;
     #endif
-
-    CmcIsFinalized = true;
-    CmcIsInitialized = false;
 }
 
 }

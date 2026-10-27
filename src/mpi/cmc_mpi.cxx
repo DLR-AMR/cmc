@@ -12,13 +12,13 @@ MPIInitialize()
     int init_flag{0};
 
     /* Check if MPI already has been initialized */
-    int err{MPI_Initialized(&init_flag)};
-    MPICheckError(err);
+    const int rv_is_init = MPI_Initialized(&init_flag);
+    MPICheckError(rv_is_init);
 
     if (init_flag == 0)
     {
-        err = MPI_Init(NULL, NULL);
-        MPICheckError(err);
+        const int rv_init = MPI_Init(NULL, NULL);
+        MPICheckError(rv_init);
     }
 #else
     cmc_warn_msg("MPIInitialize is called although CMC is not configured with MPI!");
@@ -30,8 +30,14 @@ void
 MPIFinalize()
 {
 #if CMC_ENABLE_MPI
-    int err{MPI_Finalize()};
-    MPICheckError(err);
+    int finalized_flag{0};
+    const int rv_is_fin = MPI_Finalized(&finalized_flag);
+    MPICheckError(rv_is_fin);
+    if (finalized_flag == 0)
+    {
+        const int rv_fin = MPI_Finalize();
+        MPICheckError(rv_fin);
+    }
 #else
     cmc_warn_msg("MPIFinalize is called although CMC is not configured with MPI!");
 #endif
