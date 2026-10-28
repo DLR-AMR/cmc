@@ -233,7 +233,10 @@ endif()
 
 # Check if t8code will be linked 
 if(CMC_WITH_T8CODE AND CMC_ENABLE_MPI)
-    find_package(T8CODE REQUIRED CONFIG)
+    if(NOT TARGET T8CODE::T8)
+        # Find t8code if the target does not yet exist
+        find_package(T8CODE REQUIRED CONFIG)
+    endif()
     target_link_libraries(cmc PUBLIC T8CODE::T8)
     message("-- Found t8code installation")
     set(CMC_WITH_T8CODE ON) 
@@ -248,13 +251,9 @@ endif()
 
 # Define incldue-directories for building and installing
 target_include_directories(cmc PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
+  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>
 )
-
-# Add this path as an include directory
-include_directories(${PROJECT_BINARY_DIR}/src)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # Rpath options necessary for shared library install to work correctly in user projects.
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
