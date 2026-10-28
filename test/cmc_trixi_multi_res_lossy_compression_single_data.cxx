@@ -24,10 +24,10 @@
 #include <cmath>
 #include <filesystem>
 
-constexpr bool kWriteVTKDataTestTrixiLossyMultiRes = false;
-
 namespace cmc::test
 {
+
+constexpr bool kWriteVTKDataTestTrixiLossyMultiRes = false;
 
 static t8_locidx_t
 TestAdapt ([[maybe_unused]] t8_forest_t forest,
@@ -129,8 +129,9 @@ WriteDataToVTK(t8_forest_t mesh, const std::vector<float>& data, const std::stri
         double_data1.push_back(data[idx]);
     }
 
+    constexpr int kCMCT8BufferSize{1024};
     t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "ExampleData1");
+    snprintf (vtk_data[0].description, kCMCT8BufferSize, "ExampleData1");
     vtk_data[0].type = T8_VTK_SCALAR;
     vtk_data[0].data = double_data1.data();
 
@@ -235,7 +236,7 @@ main(void)
         /* Create a view on the data */
         const std::span<float> init_data(data);
 
-        if constexpr (kWriteVTKDataTestTrixiLossyMultiRes)
+        if constexpr (cmc::test::kWriteVTKDataTestTrixiLossyMultiRes)
         {
             cmc::test::WriteDataToVTK(mesh, data, "cmc_test_input_data_lossy_compr");
         }
@@ -280,7 +281,7 @@ main(void)
         /* Save the decompressed data */
         decompressed_data = std::move(partitioned_decompressed_data);
 
-        if constexpr (kWriteVTKDataTestTrixiLossyMultiRes)
+        if constexpr (cmc::test::kWriteVTKDataTestTrixiLossyMultiRes)
         {
             cmc::test::WriteDataToVTK(partitioned_decompressed_forest, decompressed_data, "cmc_test_output_data_lossy_compr");
         }

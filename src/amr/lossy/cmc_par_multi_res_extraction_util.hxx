@@ -249,8 +249,9 @@ WriteDataToVTK(t8_forest_t mesh, const std::vector<T>& data, const std::string v
         double_data.push_back(static_cast<double>(data[idx]));
     }
 
+    constexpr int kCMCT8BufferSize{1024};
     t8_vtk_data_field_t vtk_data[1];
-    snprintf (vtk_data[0].description, BUFSIZ, "%s", variable_name.c_str());
+    snprintf (vtk_data[0].description, kCMCT8BufferSize, "%s", variable_name.c_str());
     vtk_data[0].type = T8_VTK_SCALAR;
     vtk_data[0].data = double_data.data();
 

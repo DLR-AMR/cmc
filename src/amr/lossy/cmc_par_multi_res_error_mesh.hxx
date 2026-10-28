@@ -19,7 +19,7 @@
 namespace cmc::par::lossy::multi_res
 {
 
-constexpr bool kWriteErrorMeshToVTK = true;
+constexpr bool kWriteErrorMeshToVTK = false;
 
 using bfloat16_t = uint16_t;
 
@@ -670,8 +670,9 @@ ErrorMesh::GetCoarseErrors(t8_forest_t base_mesh, const std::vector<ErrorDomain>
         {
             abs_errors_double.push_back(static_cast<double>(GetFloat(*iter)));
         }
+        constexpr int kCMCT8BufferSize{1024};
         t8_vtk_data_field_t vtk_data[1];
-        snprintf (vtk_data[0].description, BUFSIZ, "PermittedAbsError");
+        snprintf (vtk_data[0].description, kCMCT8BufferSize, "PermittedAbsError");
         vtk_data[0].type = T8_VTK_SCALAR;
         vtk_data[0].data = abs_errors_double.data();
 

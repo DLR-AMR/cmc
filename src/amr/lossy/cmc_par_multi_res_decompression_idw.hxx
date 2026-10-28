@@ -21,7 +21,7 @@ namespace cmc::par::lossy::multi_res::idw
 {
 
 /* Switch to write out intermediate data from the decompression steps */
-constexpr bool kWriteVTKDecompressionStepData = true;
+constexpr bool kWriteVTKDecompressionStepData = false;
 
 /* Forward declaration of the general compression variable */
 template<ArithmeticType T, int32_t DIM, int32_t N>

@@ -20,7 +20,7 @@ namespace cmc::par::lossy::multi_res::rbf
 {
 
 /* A switch to write out intermediate data during the compression */
-constexpr bool kWriteVTKCompressionStep = true;
+constexpr bool kWriteVTKCompressionStep = false;
 
 /* Forward declaration of the general compression variable */
 template<ArithmeticType T, int32_t DIM, int32_t N>

@@ -27,6 +27,8 @@
 namespace cmc::test::lossy::multi_res
 {
 
+constexpr bool kWriteVTKCompressionData = false;
+
 struct Point
 {
     Point() = default;
@@ -218,53 +220,54 @@ WriteDataToVTK(t8_forest_t mesh, const std::vector<float>& data, const std::stri
         double_data16.push_back(data[idx * kNumPointsPerElem + 15]);
     }
 
+    constexpr int kCMCT8BufferSize{1024};
     t8_vtk_data_field_t vtk_data[16];
-    snprintf (vtk_data[0].description, BUFSIZ, "ExampleData1");
+    snprintf (vtk_data[0].description, kCMCT8BufferSize, "ExampleData1");
     vtk_data[0].type = T8_VTK_SCALAR;
     vtk_data[0].data = double_data1.data();
-    snprintf (vtk_data[1].description, BUFSIZ, "ExampleData2");
+    snprintf (vtk_data[1].description, kCMCT8BufferSize, "ExampleData2");
     vtk_data[1].type = T8_VTK_SCALAR;
     vtk_data[1].data = double_data2.data();
-    snprintf (vtk_data[2].description, BUFSIZ, "ExampleData3");
+    snprintf (vtk_data[2].description, kCMCT8BufferSize, "ExampleData3");
     vtk_data[2].type = T8_VTK_SCALAR;
     vtk_data[2].data = double_data3.data();
-    snprintf (vtk_data[3].description, BUFSIZ, "ExampleData4");
+    snprintf (vtk_data[3].description, kCMCT8BufferSize, "ExampleData4");
     vtk_data[3].type = T8_VTK_SCALAR;
     vtk_data[3].data = double_data4.data();
-    snprintf (vtk_data[4].description, BUFSIZ, "ExampleData5");
+    snprintf (vtk_data[4].description, kCMCT8BufferSize, "ExampleData5");
     vtk_data[4].type = T8_VTK_SCALAR;
     vtk_data[4].data = double_data5.data();
-    snprintf (vtk_data[5].description, BUFSIZ, "ExampleData6");
+    snprintf (vtk_data[5].description, kCMCT8BufferSize, "ExampleData6");
     vtk_data[5].type = T8_VTK_SCALAR;
     vtk_data[5].data = double_data6.data();
-    snprintf (vtk_data[6].description, BUFSIZ, "ExampleData7");
+    snprintf (vtk_data[6].description, kCMCT8BufferSize, "ExampleData7");
     vtk_data[6].type = T8_VTK_SCALAR;
     vtk_data[6].data = double_data7.data();
-    snprintf (vtk_data[7].description, BUFSIZ, "ExampleData8");
+    snprintf (vtk_data[7].description, kCMCT8BufferSize, "ExampleData8");
     vtk_data[7].type = T8_VTK_SCALAR;
     vtk_data[7].data = double_data8.data();
-    snprintf (vtk_data[8].description, BUFSIZ, "ExampleData9");
+    snprintf (vtk_data[8].description, kCMCT8BufferSize, "ExampleData9");
     vtk_data[8].type = T8_VTK_SCALAR;
     vtk_data[8].data = double_data9.data();
-    snprintf (vtk_data[9].description, BUFSIZ, "ExampleData10");
+    snprintf (vtk_data[9].description, kCMCT8BufferSize, "ExampleData10");
     vtk_data[9].type = T8_VTK_SCALAR;
     vtk_data[9].data = double_data10.data();
-    snprintf (vtk_data[10].description, BUFSIZ, "ExampleData11");
+    snprintf (vtk_data[10].description, kCMCT8BufferSize, "ExampleData11");
     vtk_data[10].type = T8_VTK_SCALAR;
     vtk_data[10].data = double_data11.data();
-    snprintf (vtk_data[11].description, BUFSIZ, "ExampleData12");
+    snprintf (vtk_data[11].description, kCMCT8BufferSize, "ExampleData12");
     vtk_data[11].type = T8_VTK_SCALAR;
     vtk_data[11].data = double_data12.data();
-    snprintf (vtk_data[12].description, BUFSIZ, "ExampleData13");
+    snprintf (vtk_data[12].description, kCMCT8BufferSize, "ExampleData13");
     vtk_data[12].type = T8_VTK_SCALAR;
     vtk_data[12].data = double_data13.data();
-    snprintf (vtk_data[13].description, BUFSIZ, "ExampleData14");
+    snprintf (vtk_data[13].description, kCMCT8BufferSize, "ExampleData14");
     vtk_data[13].type = T8_VTK_SCALAR;
     vtk_data[13].data = double_data14.data();
-    snprintf (vtk_data[14].description, BUFSIZ, "ExampleData15");
+    snprintf (vtk_data[14].description, kCMCT8BufferSize, "ExampleData15");
     vtk_data[14].type = T8_VTK_SCALAR;
     vtk_data[14].data = double_data15.data();
-    snprintf (vtk_data[15].description, BUFSIZ, "ExampleData16");
+    snprintf (vtk_data[15].description, kCMCT8BufferSize, "ExampleData16");
     vtk_data[15].type = T8_VTK_SCALAR;
     vtk_data[15].data = double_data16.data();
     t8_forest_write_vtk_ext (mesh, file_name.c_str(), 1, 1, 1, 1, 0, 0, 0, 16, vtk_data);
@@ -403,8 +406,10 @@ main(void)
         const std::span<float> init_data(data);
 
         /* Write the data to a vtk file */
-        cmc::test::lossy::multi_res::WriteDataToVTK(mesh, data, "cmc_test_lossy_par_multi_res_serial_multi_data_input");
-
+        if constexpr (cmc::test::lossy::multi_res::kWriteVTKCompressionData)
+        {
+            cmc::test::lossy::multi_res::WriteDataToVTK(mesh, data, "cmc_test_lossy_par_multi_res_serial_multi_data_input");
+        }
         //Compression
         {
         /* Supply the reference coordinates of the element */
@@ -461,9 +466,12 @@ main(void)
         auto [decompressed_forest, decompressed_data_vec] = decompression_variable.GetDecompressedData();
 
         /* Write the data to a vtk file */
-        cmc::test::lossy::multi_res::WriteDataToVTK(decompressed_forest, decompressed_data_vec, "cmc_test_lossy_par_multi_res_serial_multi_data_output");
+        if constexpr (cmc::test::lossy::multi_res::kWriteVTKCompressionData)
+        {
+            cmc::test::lossy::multi_res::WriteDataToVTK(decompressed_forest, decompressed_data_vec, "cmc_test_lossy_par_multi_res_serial_multi_data_output");
+        }
 
-        cmc::cmc_debug_msg("Size of decompressed data vec: ", decompressed_data_vec.size());
+        cmc::cmc_debug_msg("Size of decompressed data vector: ", decompressed_data_vec.size());
         /* Get the number of elements */
         const uint64_t num_global_decompr_elems = t8_forest_get_global_num_leaf_elements(decompressed_forest);
 

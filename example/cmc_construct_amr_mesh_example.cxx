@@ -236,7 +236,8 @@ main(void)
             ddata.push_back(static_cast<double>(val));
         }
         t8_vtk_data_field_t vtk_data[1];
-        snprintf (vtk_data[0].description, BUFSIZ, "values");
+        constexpr int kCMCT8BufferSize{1024};
+        snprintf (vtk_data[0].description, kCMCT8BufferSize, "values");
         vtk_data[0].type = T8_VTK_SCALAR;
         vtk_data[0].data = ddata.data();
 
@@ -299,7 +300,8 @@ main(void)
             ddata.push_back(static_cast<double>(val));
         }
         t8_vtk_data_field_t vtk_data[1];
-        snprintf (vtk_data[0].description, BUFSIZ, "values");
+        constexpr int kCMCT8BufferSize{1024};
+        snprintf (vtk_data[0].description, kCMCT8BufferSize, "values");
         vtk_data[0].type = T8_VTK_SCALAR;
         vtk_data[0].data = ddata.data();
         t8_forest_write_vtk_ext (mesh, "cmc_amr_example_decompressed_mesh_and_data", 1, 1, 1, 1, 0, 0, 0, 1, vtk_data);

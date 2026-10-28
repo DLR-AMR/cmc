@@ -253,17 +253,18 @@ WriteDataToVTK(t8_forest_t mesh, const std::vector<float>& data)
     }
     cmc::cmc_global_msg("Num elems mesh: ", t8_forest_get_local_num_leaf_elements(mesh), " Num Points per elem: ", kNumPointsPerElem, ", Num Data: ", data.size());
 
+    constexpr int kCMCT8BufferSize{1024};
     t8_vtk_data_field_t vtk_data[4];
-    snprintf (vtk_data[0].description, BUFSIZ, "ExampleData1");
+    snprintf (vtk_data[0].description, kCMCT8BufferSize, "ExampleData1");
     vtk_data[0].type = T8_VTK_SCALAR;
     vtk_data[0].data = double_data1.data();
-    snprintf (vtk_data[1].description, BUFSIZ, "ExampleData2");
+    snprintf (vtk_data[1].description, kCMCT8BufferSize, "ExampleData2");
     vtk_data[1].type = T8_VTK_SCALAR;
     vtk_data[1].data = double_data2.data();
-    snprintf (vtk_data[2].description, BUFSIZ, "ExampleData3");
+    snprintf (vtk_data[2].description, kCMCT8BufferSize, "ExampleData3");
     vtk_data[2].type = T8_VTK_SCALAR;
     vtk_data[2].data = double_data3.data();
-    snprintf (vtk_data[3].description, BUFSIZ, "ExampleData4");
+    snprintf (vtk_data[3].description, kCMCT8BufferSize, "ExampleData4");
     vtk_data[3].type = T8_VTK_SCALAR;
     vtk_data[3].data = double_data4.data();
 
