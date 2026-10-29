@@ -267,8 +267,8 @@ CoarsenMesh (t8_forest_t forest,
 inline void
 Compressor::CompressMeshStructure(const bool enfore_strictly_level_wise_compression)
 {
-    cmc_debug_msg("The AMR mesh compression is performed.");
-    if (enfore_strictly_level_wise_compression)
+    cmc_global_msg("The global AMR mesh compression begins.");
+    if (enfore_strictly_level_wise_compression) [[unlikely]]
     {
         cmc_debug_msg("The mesh compression is performed strictly level-wise.");
         /* Potentially, gather the maximum present element level if has not been set already */
@@ -336,7 +336,7 @@ Compressor::CompressMeshStructure(const bool enfore_strictly_level_wise_compress
         ++compression_step;
     }
 
-    cmc_debug_msg("The AMR mesh compression is completed.");
+    cmc_global_msg("The global AMR mesh has been compressed.");
 }
 
 inline uint64_t
@@ -760,6 +760,8 @@ Compressor::WriteCompressedMeshStructure(const std::string& file_name, const boo
         MPICheckError(rv_barrier_wait_file_completion);
         cmc_debug_msg(this->comm_, "The file ", file_name, " output has been completed.");
     }
+
+    cmc_global_msg("The compressed global AMR mesh has been written to: ", file_name);
 }
 
 }

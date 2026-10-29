@@ -309,7 +309,6 @@ requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::CollectCoarseLevelPredictionPyramid()
 {
-
     /* Allocate for the expected levelwise data-streams */
     this->coarsening_indications_.reserve(this->max_init_elem_level_ + 1);
     this->level_partition_offset_.reserve(this->max_init_elem_level_ + 1);
@@ -561,9 +560,6 @@ LossyMultiResCompression (t8_forest_t forest,
         for (int face_idx{0}; face_idx < num_faces; ++face_idx)
         {
             /* Gather the face neighbor via this face */
-            //t8_forest_leaf_face_neighbors (forest_from, which_tree, elements[0], &neighbor_leaves, face_idx, &dual_faces, &num_neighbors,
-            //    &neighbor_element_indices, &neighbor_tree_class);
-            
             t8_forest_leaf_face_neighbors_ext (forest_from, which_tree, elements[0], &neighbor_leaves, face_idx, &dual_faces, &num_neighbors,
                                                &neighbor_element_indices, &neighbor_tree_class, &gneigh_tree, &orientation);
 
@@ -575,7 +571,6 @@ LossyMultiResCompression (t8_forest_t forest,
                 /* Add a new control value via this face */
                 control_points.emplace_back();
                 control_points.back().data = adapt_data->GetData(neighbor_element_indices[neigh_idx]);
-                //control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementIDWCoordinates<DIM>(forest_from, neigh_tree_idx, neighbor_leaves[neigh_idx]);
                 control_points.back().coordinates = cmc::par::lossy::idw::util::FillElementNeighborIDWCoordinates<DIM>(forest_from, ts, neighbor_tree_class, neigh_tree_idx, neighbor_leaves[neigh_idx]);
             }
 
@@ -697,7 +692,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
 {
     static_assert(N == 1, "Intra-Element Compression is currently not supported for the lossy compression.");
 
-    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " is performed.");
+    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " starts.");
     /* Potentially, gather the maximum present element level */
     this->DetermineMaxInitElementLevel();
 
@@ -790,7 +785,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     /* Clean-up the error mesh MPI-allocations after the encoding of the error mesh */
     this->error_mesh_->DestructErrorMeshCollectively();
 
-    cmc_global_msg("The lossly multi-resolution compression of variable ", this->name_, " has been completed.");
+    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " has been completed.");
 }
 
 
@@ -1706,6 +1701,7 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
     MPICheckError(rv_close);
 
     cmc_debug_msg(this->comm_, "The file ", file_name, " has been closed.");
+    cmc_global_msg("The compressed data has been written to: ", file_name);
 }
 
 }

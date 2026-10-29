@@ -80,7 +80,7 @@ public:
     void SetIsMeshAlreadyPartitionedForCoarsening(const bool is_partitioned_for_coarsening);
 
     //TODO:
-    std::vector<DataOutput<T>> __GetLocalOutputDataInMemory() const;
+    //std::vector<DataOutput<T>> __GetLocalOutputDataInMemory() const;
 private:
     void DetermineMaxInitElementLevel();
     void PerformIntraElementCompression(const std::vector<T>& intra_elem_prediction_data, const std::vector<T>& init_data, const SizeType partition_bound);
@@ -845,7 +845,7 @@ requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::Compress()
 {
-    cmc_debug_msg("The lossy multi-resolution compression of variable ", this->name_, " is performed.");
+    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " starts.");
 
     /* Potentially, gather the maximum present element level */
     this->DetermineMaxInitElementLevel();
@@ -951,7 +951,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     /* Clean-up the error mesh MPI-allocations after the encoding of the error mesh */
     this->error_mesh_->DestructErrorMeshCollectively();
 
-    cmc_debug_msg("The lossly multi-resolution compression of variable ", this->name_, " has been completed.");
+    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " has been completed.");
 }
 
 template<ArithmeticType T, int32_t DIM, int32_t N>
@@ -1079,7 +1079,6 @@ requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::PerformIntraElementCompression(const std::vector<T>& intra_elem_prediction_data, const std::vector<T>& init_data, const SizeType partition_bound)
 {
-    cmc_global_msg("intra_elem_prediction_data.size(): ", intra_elem_prediction_data.size(), ", init_data.size(): ", init_data.size(), ", partition_bound: ", partition_bound);
     /* Get the current mesh with one value per element */
     t8_forest_t mesh = this->mesh_.GetMesh();
 
@@ -1189,7 +1188,6 @@ ExchangeIntraElementEntropySymbols(const std::vector<IntraElemEncodingData<T, DI
 {
     if constexpr (N > 1)
     {
-    
         /* Get the number of all possible entropy symbols */
         constexpr int num_entropy_symbols = GetNumEntropySymbols();
 
@@ -2282,6 +2280,7 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
     MPICheckError(rv_close);
 
     cmc_debug_msg(this->comm_, "The file ", file_name, " has been closed.");
+    cmc_global_msg("The compressed data has been written to: ", file_name);
 }
 
 }

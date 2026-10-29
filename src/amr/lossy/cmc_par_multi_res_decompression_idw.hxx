@@ -1796,6 +1796,8 @@ requires Dimension<DIM>
 void
 DecompressionVariableMultiData<T, DIM, N>::Decompress()
 {
+    cmc_global_msg("The decompression of variable ", reinterpret_cast<const char*>(this->compression_info_.name.data()), " starts.");
+
     if (this->is_already_decompressed_) [[unlikely]]
     {
         cmc_err_msg("The variable has already been decompressed!");
@@ -1842,7 +1844,7 @@ DecompressionVariableMultiData<T, DIM, N>::Decompress()
     /* Set the flag that the data has already been decompressed */
     this->is_already_decompressed_ = true;
 
-    cmc_debug_msg("Decompression of variable ", reinterpret_cast<const char*>(this->compression_info_.name.data()), " has been completed.");
+    cmc_global_msg("Decompression of variable ", reinterpret_cast<const char*>(this->compression_info_.name.data()), " has been completed.");
 }
 
 template<ArithmeticType T, int32_t DIM, int32_t N>

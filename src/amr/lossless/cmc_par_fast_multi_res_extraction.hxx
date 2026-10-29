@@ -561,7 +561,7 @@ requires Dimension<DIM>
 void
 CompressionVariableMultiData<T, DIM, N>::Compress()
 {
-    cmc_debug_msg("The lossless multi-resolution compression of variable ", this->name_, " is performed.");
+    cmc_global_msg("The lossless multi-resolution compression of variable ", this->name_, " is performed.");
     /* Potentially, gather the maximum present element level */
     this->DetermineMaxInitElementLevel();
     
@@ -610,7 +610,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     /* Encode the data that has been collected */
     this->EncodeData();
 
-    cmc_debug_msg("The lossless multi-resolution compression of variable ", this->name_, " has been completed.");
+    cmc_global_msg("The lossless multi-resolution compression of variable ", this->name_, " has been completed.");
 }
 
 template<ArithmeticType T, int32_t DIM>
@@ -1472,6 +1472,7 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
     MPICheckError(rv_close);
 
     cmc_debug_msg(this->comm_, "The file ", file_name, " has been closed.");
+    cmc_global_msg("The compressed data has been written to: ", file_name);
 }
 
 }

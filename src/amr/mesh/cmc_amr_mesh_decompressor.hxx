@@ -343,6 +343,7 @@ AMRMeshDecompression (t8_forest_t forest,
 inline t8_forest_t
 Decompressor::ReconstructMesh(const int max_decompression_refinement_level)
 {
+    cmc_global_msg("The global AMR mesh reconstruction begins.");
     /* Check if the data has already been decompressed */
     if (this->is_already_decompressed_) [[unlikely]]
     {
@@ -427,6 +428,7 @@ Decompressor::ReconstructMesh(const int max_decompression_refinement_level)
     this->mesh_.SetNullMesh();
 
     cmc_debug_msg("Decompression of the mesh onto level ", num_mesh_compression_levels, " has been completed.");
+    cmc_global_msg("The global AMR mesh has been reconstructed.");
 
     /* Return the decompressed partitioned mesh */
     return partitioned_decompressed_mesh;
@@ -492,8 +494,6 @@ PrintMeshCompressionInfo(const std::string& file_name)
     MPICheckError(rv_remaining_bytes);
     CheckMPIReadCorrectness(&status, MPI_UINT64_T, num_data_to_read);
 
-    cmc_global_msg("mesh_compression_levels: ", mesh_compression_levels);
-
     /* Build up the vector containing the global number of elements on each level (from root to leaf level) */
     std::vector<uint64_t> num_global_elems_per_level;
     num_global_elems_per_level.reserve(mesh_compression_levels);
@@ -504,8 +504,6 @@ PrintMeshCompressionInfo(const std::string& file_name)
     {
         num_global_elems_per_level.push_back(cmc::bits::ConvertBigEndianToNativeEndianness<uint64_t>(remaining_vals[lvl_idx]));
         
-        cmc_global_msg("Num global elems per level: ", num_global_elems_per_level.back());
-
         if (previous_num_elems > num_global_elems_per_level.back()) [[unlikely]]
         {
             cmc_err_msg("The number of global elements on successive level cannot shrink (PREV_LVL: ", previous_num_elems, "; CURR_LVL: ", num_global_elems_per_level.back(), ")!");

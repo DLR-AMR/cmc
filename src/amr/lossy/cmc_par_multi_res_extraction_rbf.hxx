@@ -833,7 +833,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
 {
     static_assert(N == 1, "Intra-Element Compression is currently not supported for the lossy compression.");
     
-    cmc_debug_msg("The lossy multi-resolution compression of variable ", this->name_, " is performed.");
+    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " starts.");
     /* Potentially, gather the maximum present element level */
     this->DetermineMaxInitElementLevel();
 
@@ -857,7 +857,6 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     this->error_mesh_ = std::make_unique<ErrorMesh>(this->mesh_.GetMesh(), this->error_domains_, this->data_pyramid_.back());
 
     //Perfom Intra Element Coarse-Predictor Extraction?
-    
 
     /* Collect the coarse level predictors from the mesh coarsening steps */
     this->CollectCoarseLevelPredictionPyramid();
@@ -919,7 +918,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
         ++(refinement_indicator_iter);
     }
 
-    //Perfom Intra Element Compression
+    //Perform Intra Element Compression?
 
     /* Encode the data that has been collected */
     this->EncodeData();
@@ -927,7 +926,7 @@ CompressionVariableMultiData<T, DIM, N>::Compress()
     /* Clean-up the error mesh MPI-allocations after the encoding of the error mesh */
     this->error_mesh_->DestructErrorMeshCollectively();
 
-    cmc_debug_msg("The lossly multi-resolution compression of variable ", this->name_, " has been completed.");
+    cmc_global_msg("The lossy multi-resolution compression of variable ", this->name_, " has been completed.");
 }
 
 
@@ -1843,6 +1842,7 @@ CompressionVariableMultiData<T, DIM, N>::WriteCompressedData(const std::string& 
     MPICheckError(rv_close);
 
     cmc_debug_msg(this->comm_, "The file ", file_name, " has been closed.");
+    cmc_global_msg("The compressed data has been written to: ", file_name);
 }
 
 }
